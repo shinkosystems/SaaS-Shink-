@@ -1,9 +1,8 @@
-
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Opportunity, RDEStatus, Archetype, IntensityLevel, BpmnTask, BpmnNode, ProjectStatus } from './types';
 import OpportunityWizard from './components/OpportunityWizard';
 import OpportunityDetail from './components/OpportunityDetail';
-import { ProjectWorkspace } from './components/ProjectWorkspace'; // Import new component
+import { ProjectWorkspace } from './components/ProjectWorkspace';
 import MatrixChart from './components/MatrixChart';
 import { CalendarView } from './components/CalendarView';
 import { KanbanBoard } from './components/KanbanBoard';
@@ -69,7 +68,200 @@ const MOCK_DATA: Opportunity[] = [
         edges: []
     }
   },
-  // ... (Outros dados mockados mantidos para brevidade, o foco é a lógica de Auth)
+  {
+    id: '2',
+    title: 'AgroTech Drone Monitor',
+    description: 'Plataforma de monitoramento de safras via drone com análise preditiva de pragas.',
+    rde: RDEStatus.WARM,
+    viability: 3, velocity: 5, revenue: 4, prioScore: 4.05,
+    archetype: Archetype.PLATFORM, intensity: IntensityLevel.L4,
+    tads: { scalability: true, integration: false, painPoint: true, recurring: true, mvpSpeed: false },
+    tadsScore: 8,
+    evidence: { clientsAsk: [], clientsSuffer: ['Perda de 15% da safra por pragas'], wontPay: ['Preço dos drones é alto'] },
+    status: 'Negotiation',
+    createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
+    priorityLock: false,
+    organizationId: 3,
+    bpmn: {
+        lanes: [{id: 'l1', label: 'Campo'}],
+        nodes: [{ id: 'n1', label: 'MVP Piloto', laneId: 'l1', type: 'task', checklist: [
+            { id: 't4', displayId: 20010, text: 'Definir Hardware', completed: true, status: 'done', estimatedHours: 6, assignee: 'Ana', dueDate: generateDate(-2) },
+            { id: 't5', displayId: 20012, text: 'Contrato de Parceria', completed: false, status: 'review', estimatedHours: 2, assignee: 'Fernando', dueDate: generateDate(1) }
+        ]}], edges: []
+    }
+  },
+  {
+    id: '3',
+    title: 'FinHealth Dashboard',
+    description: 'Dashboard financeiro para clínicas médicas com conciliação automática de convênios.',
+    rde: RDEStatus.HOT,
+    viability: 4, velocity: 5, revenue: 4, prioScore: 4.35,
+    archetype: Archetype.SAAS_VERTICAL, intensity: IntensityLevel.L2,
+    tads: { scalability: true, integration: true, painPoint: true, recurring: true, mvpSpeed: true },
+    tadsScore: 10,
+    evidence: { clientsAsk: ['Clínicas perdem 20% em glosas'], clientsSuffer: [], wontPay: [] },
+    status: 'Active',
+    createdAt: new Date().toISOString(),
+    organizationId: 3,
+    bpmn: {
+        lanes: [{id: 'l1', label: 'Dev'}],
+        nodes: [{ id: 'n1', label: 'Integração TISS', laneId: 'l1', type: 'task', checklist: [
+            { id: 't6', displayId: 3001, text: 'Mapear Padrão TISS', completed: false, status: 'todo', estimatedHours: 16, assignee: 'Roberto', dueDate: generateDate(3) },
+            { id: 't7', displayId: 3002, text: 'Frontend Dashboard', completed: false, status: 'doing', estimatedHours: 20, assignee: 'Ana', dueDate: generateDate(4) }
+        ]}], edges: []
+    }
+  },
+  {
+    id: '4',
+    title: 'EduLMS Corporate',
+    description: 'Plataforma de treinamento corporativo com gamificação e IA geradora de quizzes.',
+    rde: RDEStatus.COLD,
+    viability: 2, velocity: 2, revenue: 5, prioScore: 2.8,
+    archetype: Archetype.PLATFORM, intensity: IntensityLevel.L3,
+    tads: { scalability: true, integration: false, painPoint: false, recurring: true, mvpSpeed: false },
+    tadsScore: 6,
+    evidence: { clientsAsk: [], clientsSuffer: [], wontPay: ['Já usam Udemy'] },
+    status: 'Frozen',
+    createdAt: new Date(Date.now() - 86400000 * 20).toISOString(),
+    organizationId: 3,
+    bpmn: { lanes: [], nodes: [], edges: [] }
+  },
+  {
+    id: '5',
+    title: 'LogiTrack Last Mile',
+    description: 'Roteirização inteligente para entregas urbanas com foco em e-commerce local.',
+    rde: RDEStatus.WARM,
+    viability: 4, velocity: 3, revenue: 4, prioScore: 3.65,
+    archetype: Archetype.SERVICE_TECH, intensity: IntensityLevel.L2,
+    tads: { scalability: false, integration: true, painPoint: true, recurring: true, mvpSpeed: true },
+    tadsScore: 8,
+    evidence: { clientsAsk: ['Entregadores se perdem'], clientsSuffer: ['Custo de combustível alto'], wontPay: [] },
+    status: 'Future',
+    createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+    organizationId: 3,
+    bpmn: { lanes: [], nodes: [], edges: [] }
+  },
+  {
+    id: '6',
+    title: 'Chatbot Jurídico GenAI',
+    description: 'IA treinada em jurisprudência brasileira para auxiliar advogados na redação de peças.',
+    rde: RDEStatus.HOT,
+    viability: 4, velocity: 5, revenue: 5, prioScore: 4.6,
+    archetype: Archetype.SAAS_ENTRY, intensity: IntensityLevel.L4,
+    tads: { scalability: true, integration: false, painPoint: true, recurring: true, mvpSpeed: true },
+    tadsScore: 10,
+    evidence: { clientsAsk: ['Advogados demoram 3h/peça'], clientsSuffer: [], wontPay: [] },
+    status: 'Negotiation',
+    createdAt: new Date().toISOString(),
+    organizationId: 3,
+    bpmn: {
+        lanes: [{id: 'l1', label: 'IA Team'}],
+        nodes: [{ id: 'n1', label: 'Fine-tuning', laneId: 'l1', type: 'task', checklist: [
+            { id: 't8', displayId: 6001, text: 'Coletar Dataset STF', completed: false, status: 'doing', estimatedHours: 40, assignee: 'Gustavo', dueDate: generateDate(10) }
+        ]}], edges: []
+    }
+  },
+  {
+    id: '7',
+    title: 'Marketplace de Resíduos',
+    description: 'Conecta geradores de resíduos industriais com recicladores certificados.',
+    rde: RDEStatus.WARM,
+    viability: 3, velocity: 3, revenue: 4, prioScore: 3.25,
+    archetype: Archetype.PLATFORM, intensity: IntensityLevel.L1,
+    tads: { scalability: true, integration: false, painPoint: true, recurring: false, mvpSpeed: false },
+    tadsScore: 6,
+    evidence: { clientsAsk: [], clientsSuffer: ['Multas ambientais'], wontPay: [] },
+    status: 'Future',
+    createdAt: new Date().toISOString(),
+    organizationId: 3,
+    bpmn: { lanes: [], nodes: [], edges: [] }
+  },
+  {
+    id: '8',
+    title: 'RH Ponto Facial',
+    description: 'App de ponto eletrônico com reconhecimento facial anti-fraude.',
+    rde: RDEStatus.HOT,
+    viability: 5, velocity: 5, revenue: 3, prioScore: 4.5,
+    archetype: Archetype.SAAS_ENTRY, intensity: IntensityLevel.L1,
+    tads: { scalability: true, integration: true, painPoint: true, recurring: true, mvpSpeed: true },
+    tadsScore: 10,
+    evidence: { clientsAsk: ['Funcionários batem ponto pro amigo'], clientsSuffer: [], wontPay: [] },
+    status: 'Active',
+    createdAt: new Date().toISOString(),
+    organizationId: 3,
+    bpmn: {
+        lanes: [{id: 'l1', label: 'Mobile'}],
+        nodes: [{ id: 'n1', label: 'App iOS/Android', laneId: 'l1', type: 'task', checklist: [
+            { id: 't9', displayId: 8001, text: 'Integração FaceID', completed: true, status: 'done', estimatedHours: 8, assignee: 'Roberto', dueDate: generateDate(-5) },
+            { id: 't10', displayId: 8002, text: 'Geolocalização', completed: false, status: 'review', estimatedHours: 4, assignee: 'Roberto', dueDate: generateDate(0) }
+        ]}], edges: []
+    }
+  },
+  {
+    id: '9',
+    title: 'Consultoria LGPD Automática',
+    description: 'Ferramenta que varre banco de dados e aponta violações da LGPD.',
+    rde: RDEStatus.WARM,
+    viability: 4, velocity: 4, revenue: 3, prioScore: 3.75,
+    archetype: Archetype.SERVICE_TECH, intensity: IntensityLevel.L2,
+    tads: { scalability: false, integration: true, painPoint: true, recurring: false, mvpSpeed: true },
+    tadsScore: 8,
+    evidence: { clientsAsk: [], clientsSuffer: ['Medo de multas'], wontPay: [] },
+    status: 'Negotiation',
+    createdAt: new Date().toISOString(),
+    organizationId: 3,
+    bpmn: { lanes: [], nodes: [], edges: [] }
+  },
+  {
+    id: '10',
+    title: 'Smart Condomínio',
+    description: 'App para gestão de reservas, portaria e comunicados em condomínios.',
+    rde: RDEStatus.COLD,
+    viability: 5, velocity: 5, revenue: 2, prioScore: 3.75,
+    archetype: Archetype.SAAS_ENTRY, intensity: IntensityLevel.L1,
+    tads: { scalability: true, integration: false, painPoint: false, recurring: true, mvpSpeed: true },
+    tadsScore: 8,
+    evidence: { clientsAsk: [], clientsSuffer: [], wontPay: ['Mercado saturado'] },
+    status: 'Archived',
+    createdAt: new Date(Date.now() - 86400000 * 60).toISOString(),
+    organizationId: 3,
+    bpmn: { lanes: [], nodes: [], edges: [] }
+  },
+  {
+    id: '11',
+    title: 'Indústria 4.0 Sensor',
+    description: 'Sistema IoT para predição de falhas em maquinário pesado industrial.',
+    rde: RDEStatus.HOT,
+    viability: 3, velocity: 4, revenue: 5, prioScore: 4.15,
+    archetype: Archetype.SAAS_VERTICAL, intensity: IntensityLevel.L4,
+    tads: { scalability: true, integration: true, painPoint: true, recurring: true, mvpSpeed: false },
+    tadsScore: 8,
+    evidence: { clientsAsk: ['Manutenção corretiva custa caro'], clientsSuffer: ['Linha de produção para 2h/semana'], wontPay: [] },
+    status: 'Negotiation',
+    createdAt: new Date().toISOString(),
+    organizationId: 3,
+    bpmn: {
+        lanes: [{id: 'l1', label: 'Hardware'}],
+        nodes: [{ id: 'n1', label: 'Protótipo PCB', laneId: 'l1', type: 'task', checklist: [
+            { id: 't11', displayId: 11001, text: 'Desenho de Circuito', completed: true, status: 'done', estimatedHours: 20, assignee: 'Ana', dueDate: generateDate(-10) }
+        ]}], edges: []
+    }
+  },
+  {
+    id: '12',
+    title: 'CreditScore AI',
+    description: 'API de análise de crédito para fintechs usando dados alternativos e Open Finance.',
+    rde: RDEStatus.HOT,
+    viability: 4, velocity: 5, revenue: 5, prioScore: 4.65,
+    archetype: Archetype.SAAS_ENTRY, intensity: IntensityLevel.L3,
+    tads: { scalability: true, integration: true, painPoint: true, recurring: true, mvpSpeed: true },
+    tadsScore: 10,
+    evidence: { clientsAsk: ['Inadimplência alta'], clientsSuffer: [], wontPay: [] },
+    status: 'Future',
+    createdAt: new Date().toISOString(),
+    organizationId: 3,
+    bpmn: { lanes: [], nodes: [], edges: [] }
+  }
 ];
 
 const App: React.FC = () => {
@@ -101,7 +293,7 @@ const App: React.FC = () => {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // --- THEME EFFECT (FIX DARK MODE) ---
+  // --- THEME EFFECT ---
   useEffect(() => {
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
@@ -174,7 +366,7 @@ const App: React.FC = () => {
               setOpportunities(filteredOpps);
               setDbStatus('connected');
           } else {
-              // Fallback robusto se fetch falhar
+              // Fallback robusto se fetch falhar (Failed to fetch)
               setOpportunities(MOCK_DATA);
               setDbStatus('error'); 
           }
@@ -213,7 +405,6 @@ const App: React.FC = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
         if (!mounted) return;
         
-        // Detecta evento de recuperação de senha
         if (event === 'PASSWORD_RECOVERY') {
             setShowResetPasswordModal(true);
         }
@@ -269,7 +460,6 @@ const App: React.FC = () => {
       setView('list');
   };
 
-  // Function to navigate to the project detail page
   const handleOpenProject = (opp: Opportunity) => {
       setSelectedOpp(opp);
       setView('project-detail');
@@ -334,15 +524,24 @@ const App: React.FC = () => {
   };
 
   const handleSaveOpportunity = async (opp: Opportunity) => {
-      console.log("Saving opp", opp);
-      setOpportunities(prev => [...prev, opp]); 
-      setIsWizardOpen(false);
+    setIsWizardOpen(false);
+    const oppWithOrg = { ...opp, organizationId: opp.organizationId || userOrgId || 3 };
+    const isUpdate = opportunities.some(o => o.id === oppWithOrg.id);
+    let updatedList = isUpdate ? opportunities.map(o => o.id === oppWithOrg.id ? oppWithOrg : o) : [oppWithOrg, ...opportunities];
+    
+    setOpportunities(updatedList);
+
+    if (dbStatus === 'connected') {
+        let saved = isUpdate ? await updateOpportunity(oppWithOrg) : await createOpportunity(oppWithOrg);
+        if (saved) setOpportunities(prev => prev.map(o => o.id === saved!.id ? saved : o));
+    }
   };
 
   const handleDeleteOpportunity = async (id: string) => {
-      setOpportunities(prev => prev.filter(o => o.id !== id));
-      setSelectedOpp(null);
-      if (view === 'project-detail') setView('list');
+    setOpportunities(prev => prev.filter(o => o.id !== id));
+    setSelectedOpp(null);
+    if (view === 'project-detail') setView('list');
+    if (dbStatus === 'connected') await deleteOpportunity(id);
   };
 
   const getStatusColor = (status: string) => {
@@ -477,8 +676,12 @@ const App: React.FC = () => {
                 <div className="h-full flex flex-col animate-in fade-in duration-500">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                         <div>
-                            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Projetos</h1>
-                            <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Gerencie seu portfólio de inovação e demandas.</p>
+                            <h2 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                <ListIcon className="w-8 h-8 text-amber-500"/> Projetos
+                            </h2>
+                            <p className="text-slate-500 dark:text-slate-400 mt-1">
+                                Portfólio completo de iniciativas.
+                            </p>
                         </div>
                         {userRole !== 'cliente' && (
                             <button
@@ -587,7 +790,7 @@ const App: React.FC = () => {
                     {searchResults.map(res => (
                         <div key={res.id} className="glass-card p-6 rounded-xl border border-white/10 bg-white/5 dark:bg-slate-900/50">
                             <h3 className="font-bold text-slate-900 dark:text-white text-lg cursor-pointer hover:text-amber-500" onClick={() => handleOpenProject(res)}>{res.title}</h3>
-                            <p className="text-sm text-slate-500 mb-4">{res.description}</p>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 text-sm">{res.description}</p>
                             {res.matchedTasks && res.matchedTasks.length > 0 && (
                                 <div className="space-y-2 pl-4 border-l-2 border-slate-200 dark:border-slate-700">
                                     <p className="text-xs font-bold text-slate-400 uppercase">Tarefas Encontradas:</p>
@@ -621,6 +824,22 @@ const App: React.FC = () => {
             onSave={handleSaveQuickTask}
             userRole={userRole}
           />
+      )}
+
+      {selectedOpp && (
+        <OpportunityDetail 
+          opportunity={selectedOpp}
+          onClose={() => setSelectedOpp(null)}
+          onEdit={(opp) => { setSelectedOpp(null); setEditingOpp(opp); setIsWizardOpen(true); }}
+          onDelete={handleDeleteOpportunity}
+          onUpdate={(updatedOpp) => {
+             setOpportunities(prev => prev.map(o => o.id === updatedOpp.id ? updatedOpp : o));
+             setSelectedOpp(updatedOpp);
+          }}
+          userRole={userRole}
+          currentUserId={session?.user?.id}
+          userName={userData.name}
+        />
       )}
 
     </div>

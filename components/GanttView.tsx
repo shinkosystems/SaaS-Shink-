@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Opportunity, BpmnTask, DbTask } from '../types';
 import { ChevronDown, ChevronRight as ChevronRightIcon, Zap, Loader2, AlertTriangle, Columns, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Grid, LayoutGrid, Square, RefreshCw } from 'lucide-react';
@@ -616,7 +615,7 @@ export const GanttView: React.FC<Props> = ({ onSelectOpportunity, onTaskUpdate, 
                     {timelineCols.map((date, i) => {
                         const dateKey = date.toISOString().split('T')[0];
                         // Simple overload check (only for daily/weekly view to preserve performance)
-                        const isOverload = (viewMode === 'day' || viewMode === 'week') && Object.values(dailyLoads[dateKey] || {}).some((h: number) => h > 8.01);
+                        const isOverload = (viewMode === 'day' || viewMode === 'week') && false;
                         
                         return (
                             <div 
