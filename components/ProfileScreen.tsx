@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Mail, Phone, Building2, MapPin, Save, Camera, Shield, CreditCard, Bell, Globe, Loader2, UploadCloud, Sparkles, Check, X, Copy, ExternalLink, FileText, History, ArrowUpRight, ArrowDownRight, Zap, Lock, Calendar, AlertTriangle, RefreshCw } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
@@ -62,13 +61,13 @@ export const ProfileScreen: React.FC = () => {
             .single();
 
           if (userProfile) {
-            setName(userProfile.nome || meta.full_name || '');
+            setName(userProfile.nome || meta.full_name || 'Usuário ShinkŌS');
             setPhone(userProfile.telefone || '');
             setRole(userProfile.perfil || 'Colaborador');
             if (userProfile.localizacao) setLocation(userProfile.localizacao);
             else if (meta.location) setLocation(meta.location);
           } else {
-             setName(meta.full_name || '');
+             setName(meta.full_name || 'Usuário ShinkŌS');
              if (meta.location) setLocation(meta.location);
           }
           
@@ -270,7 +269,7 @@ export const ProfileScreen: React.FC = () => {
   }
 
   return (
-    <div className="h-full flex flex-col animate-in fade-in zoom-in-95 duration-300 overflow-y-auto pb-10">
+    <div className="h-full flex flex-col animate-in fade-in zoom-in-95 duration-300 overflow-y-auto pb-10 custom-scrollbar">
       
       {/* Header / Cover */}
       <div className="h-52 bg-gradient-to-r from-slate-800 to-slate-900 relative rounded-t-2xl shrink-0 z-10">
@@ -344,7 +343,7 @@ export const ProfileScreen: React.FC = () => {
          </div>
 
          {/* Form Area */}
-         <div className="flex-1 bg-white dark:bg-white/5 rounded-2xl border border-slate-200/50 dark:border-white/10 p-8 shadow-sm relative overflow-hidden">
+         <div className="flex-1 glass-panel rounded-2xl border border-slate-200/50 dark:border-white/10 p-8 shadow-sm relative overflow-hidden">
             
             {activeTab === 'personal' && (
                 <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
@@ -362,7 +361,7 @@ export const ProfileScreen: React.FC = () => {
                                   type="text" 
                                   value={name}
                                   onChange={e => setName(e.target.value)}
-                                  className="w-full h-12 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-slate-700 rounded-lg pl-10 pr-4 text-base text-slate-900 dark:text-white focus:ring-2 focus:ring-shinko-primary/50 focus:border-shinko-primary outline-none transition-all" 
+                                  className="w-full h-12 glass-input rounded-lg pl-10 pr-4 text-base text-slate-900 dark:text-white focus:ring-2 focus:ring-shinko-primary/50 focus:border-shinko-primary outline-none transition-all" 
                                 />
                             </div>
                         </div>
@@ -375,7 +374,7 @@ export const ProfileScreen: React.FC = () => {
                                   type="email" 
                                   value={email}
                                   disabled
-                                  className="w-full h-12 bg-slate-100 dark:bg-black/40 border border-slate-200 dark:border-slate-800 rounded-lg pl-10 pr-4 text-base text-slate-500 cursor-not-allowed" 
+                                  className="w-full h-12 glass-input bg-slate-100 dark:bg-white/5 rounded-lg pl-10 pr-4 text-base text-slate-500 cursor-not-allowed" 
                                 />
                             </div>
                         </div>
@@ -388,7 +387,7 @@ export const ProfileScreen: React.FC = () => {
                                   type="text" 
                                   value={phone}
                                   onChange={e => setPhone(e.target.value)}
-                                  className="w-full h-12 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-slate-700 rounded-lg pl-10 pr-4 text-base text-slate-900 dark:text-white focus:ring-2 focus:ring-shinko-primary/50 focus:border-shinko-primary outline-none transition-all" 
+                                  className="w-full h-12 glass-input rounded-lg pl-10 pr-4 text-base text-slate-900 dark:text-white focus:ring-2 focus:ring-shinko-primary/50 focus:border-shinko-primary outline-none transition-all" 
                                 />
                             </div>
                         </div>
@@ -402,7 +401,7 @@ export const ProfileScreen: React.FC = () => {
                                   value={location}
                                   onChange={e => setLocation(e.target.value)}
                                   placeholder="Cidade, Estado"
-                                  className="w-full h-12 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-slate-700 rounded-lg pl-10 pr-4 text-base text-slate-900 dark:text-white focus:ring-2 focus:ring-shinko-primary/50 focus:border-shinko-primary outline-none transition-all" 
+                                  className="w-full h-12 glass-input rounded-lg pl-10 pr-4 text-base text-slate-900 dark:text-white focus:ring-2 focus:ring-shinko-primary/50 focus:border-shinko-primary outline-none transition-all" 
                                 />
                             </div>
                         </div>
@@ -516,10 +515,10 @@ export const ProfileScreen: React.FC = () => {
                                 <div 
                                     key={plan.id} 
                                     onClick={() => handlePlanSelection(plan)}
-                                    className={`relative p-6 rounded-xl border transition-all cursor-pointer flex flex-col justify-between h-64 ${
+                                    className={`relative p-6 rounded-xl border transition-all cursor-pointer flex flex-col justify-between h-64 glass-card hover:border-amber-500/50 ${
                                         currentPlan === plan.id 
                                         ? 'bg-slate-900 text-white border-slate-800 shadow-xl transform scale-105 z-10' 
-                                        : 'bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 hover:border-amber-500/50 dark:hover:border-amber-500/50'
+                                        : ''
                                     }`}
                                 >
                                     {plan.recommended && (
@@ -678,5 +677,6 @@ export const ProfileScreen: React.FC = () => {
                 </div>
             )}
         </div>
-    );
+    </div>
+  );
 };
