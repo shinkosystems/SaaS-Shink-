@@ -1,0 +1,373 @@
+
+import { GoogleGenAI } from "@google/genai";
+import { Opportunity } from "../types";
+
+const getAiClient = () => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) return null;
+  return new GoogleGenAI({ apiKey });
+};
+
+// --- CONFIGURAÇÃO DE TEMPO SHINKŌ ---
+
+// Feriados Nacionais Fixos (Dia-Mês)
+const FIXED_HOLIDAYS = [
+  '01-01', '04-21', '05-01', '09-07', '10-12', '11-02', '11-15', '12-25'
+];
+
+// Feriados Móveis
+const MOBILE_HOLIDAYS = [
+  '2025-03-03', '2025-03-04', '2025-04-18', '2025-06-19',
+  '2026-02-16', '2026-02-17', '2026-04-03', '2026-06-04',
+  '2027-02-08', '2027-02-09', '2027-03-26', '2027-05-27',
+  '2028-02-28', '2028-02-29', '2028-04-14', '2028-06-15',
+  '2029-02-12', '2029-02-13', '2029-03-30', '2029-05-31',
+  '2030-03-04', '2030-03-05', '2030-04-19', '2030-06-20'
+];
+
+// Formata data localmente para YYYY-MM-DD evitando shifts de UTC
+const toLocalISOString = (date: Date): string => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+};
+
+// Helper para normalizar data para meio-dia
+const normalizeDate = (date: Date): Date => {
+    const d = new Date(date);
+    d.setHours(12, 0, 0, 0);
+    return d;
+};
+
+// RIGID Business Day Check
+const isBusinessDay = (date: Date): boolean => {
+    const d = normalizeDate(date);
+    const day = d.getDay();
+    
+    // 0 = Domingo, 6 = Sábado. Retorna false imediatamente.
+    if (day === 0 || day === 6) return false;
+
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    
+    const fixed = `${mm}-${dd}`;
+    const full = `${yyyy}-${mm}-${dd}`;
+
+    if (FIXED_HOLIDAYS.includes(fixed)) return false;
+    if (MOBILE_HOLIDAYS.includes(full)) return false;
+
+    return true;
+};
+
+// Helper to clean Markdown
+const cleanJson = (text: string) => {
+  if (!text) return "";
+  let cleaned = text.replace(/```json\n?|```/g, '').trim();
+  const firstBrace = cleaned.indexOf('{');
+  const firstBracket = cleaned.indexOf('[');
+  
+  if (firstBrace === -1 && firstBracket === -1) return cleaned;
+
+  const start = firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket) ? firstBrace : firstBracket;
+  const end = cleaned.lastIndexOf(start === firstBrace ? '}' : ']');
+  
+  if (end !== -1) {
+      cleaned = cleaned.substring(start, end + 1);
+  }
+  return cleaned;
+};
+
+export const analyzeOpportunity = async (title: string, description: string): Promise<string> => {
+  const ai = getAiClient();
+  if (!ai) return "API Key not found.";
+
+  const prompt = `
+    Atue como um consultor de inovação sênior da Shinkō.
+    Analise a seguinte oportunidade: ${title} - ${description}
+    Seja direto.
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+    });
+    return response.text || "Não foi possível gerar a análise.";
+  } catch (error) {
+    console.error("Gemini Analysis Error:", error);
+    return "Erro ao conectar com a IA.";
+  }
+};
+
+export const suggestEvidence = async (title: string): Promise<string> => {
+    const ai = getAiClient();
+    if (!ai) return "API Key not found.";
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: `Liste 3 evidências para validar: "${title}".`,
+      });
+      return response.text || "Sem sugestões.";
+    } catch (error) {
+      return "Erro na IA.";
+    }
+};
+
+export const extractPdfContext = async (base64Pdf: string): Promise<string> => {
+    const ai = getAiClient();
+    if (!ai) return "Erro: API Key não encontrada.";
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: {
+                parts: [
+                    { inlineData: { mimeType: 'application/pdf', data: base64Pdf } },
+                    { text: "Resuma para BPMN." }
+                ]
+            }
+        });
+        return response.text || "Erro PDF.";
+    } catch (error) {
+        return "Erro ao processar PDF.";
+    }
+};
+
+export const generateSubtasksForTask = async (taskTitle: string, context: string): Promise<string[]> => {
+    const ai = getAiClient();
+    if (!ai) return [];
+    const prompt = `Crie um checklist técnico JSON para: "${taskTitle}". Contexto: ${context}. Return JSON array strings.`;
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: { responseMimeType: 'application/json' }
+        });
+        return JSON.parse(cleanJson(response.text || ""));
+    } catch (error) {
+        return [];
+    }
+};
+
+export const generateBpmn = async (title: string, description: string, archetype: string, docsContext?: string): Promise<any> => {
+    const ai = getAiClient();
+    if (!ai) return null;
+    const prompt = `Crie um BPMN JSON para "${title}" (${archetype}). Context: ${docsContext}. Structure: {lanes, nodes:[{checklist:[{text, estimatedHours}]}], edges}.`;
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: { responseMimeType: 'application/json' }
+        });
+        return JSON.parse(cleanJson(response.text || ""));
+    } catch (error) {
+        return null;
+    }
+};
+
+/**
+ * ALGORITMO DE ALOCAÇÃO "GRANULAR SPLIT" COM REALOCAÇÃO DE RESPONSÁVEIS
+ * 
+ * Objetivo: Encontrar a data de entrega mais cedo possível, respeitando 8h/dia.
+ * Permite trocar o responsável se outro desenvolvedor puder entregar antes.
+ */
+export const optimizeSchedule = async (tasks: any[], availableDevelopers: {id: string, nome: string}[] = []): Promise<any[]> => {
+    
+    // Fila de tarefas (Priorizadas por Valor/GUT)
+    const queue = tasks.map(t => ({
+        id: t.taskId,
+        text: t.taskText,
+        originalAssigneeId: t.assigneeId, // DB ID
+        estimatedHours: Math.max(0.5, Number(t.estimatedHours) || 2),
+        valueScore: t.gut ? (t.gut.g * t.gut.u * t.gut.t) : 1
+    }));
+
+    console.log(`[Optimizer] Iniciando Alocação para ${queue.length} tarefas. Devs disponíveis: ${availableDevelopers.length}`);
+
+    // Ordena por prioridade
+    queue.sort((a, b) => b.valueScore - a.valueScore);
+
+    const updates: any[] = [];
+    
+    // Inicializa o estado de carga dos desenvolvedores
+    // devState[devId] = { nextFreeSlot: Date, dailyLoads: { [isoDate]: hours } }
+    const devState: Record<string, { nextFreeSlot: Date, dailyLoads: Record<string, number> }> = {};
+
+    // Data base = Amanhã
+    const baseDate = new Date();
+    baseDate.setDate(baseDate.getDate() + 1); 
+    baseDate.setHours(12, 0, 0, 0);
+
+    // Se não tiver devs disponíveis, usa um placeholder "Unassigned" para simulação
+    const devsPool = availableDevelopers.length > 0 
+        ? availableDevelopers 
+        : [{ id: 'unassigned', nome: 'Sem Dev' }];
+
+    // Inicializa cursores para cada Dev
+    devsPool.forEach(dev => {
+        // Avança para próximo dia útil inicial
+        let start = new Date(baseDate);
+        while (!isBusinessDay(start)) {
+            start.setDate(start.getDate() + 1);
+            start = normalizeDate(start);
+        }
+        devState[dev.id] = { 
+            nextFreeSlot: start, 
+            dailyLoads: {} 
+        };
+    });
+
+    // Função auxiliar para simular alocação de uma tarefa para um dev específico
+    // Retorna a data de conclusão prevista se alocada para este dev
+    const simulateAllocation = (devId: string, hoursNeeded: number): { finishDate: Date, startDate: Date } => {
+        const state = devState[devId];
+        
+        // Começamos a procurar espaço a partir do próximo slot livre deste dev
+        let cursor = new Date(state.nextFreeSlot);
+        let remaining = hoursNeeded;
+        
+        // Clone loads to not affect real state yet during simulation
+        const tempLoads = { ...state.dailyLoads };
+        let firstAllocationDate: Date | null = null;
+
+        let safety = 0;
+        while (remaining > 0.001 && safety < 1000) {
+            // Se for feriado ou fds, pula IMEDIATAMENTE
+            while (!isBusinessDay(cursor)) {
+                cursor.setDate(cursor.getDate() + 1);
+                cursor = normalizeDate(cursor);
+            }
+
+            const dateKey = toLocalISOString(cursor);
+            const currentLoad = tempLoads[dateKey] || 0;
+            const capacity = 8 - currentLoad;
+
+            if (capacity <= 0.001) {
+                // Dia cheio, vai para o próximo
+                cursor.setDate(cursor.getDate() + 1);
+                cursor = normalizeDate(cursor);
+                
+                // VITAL: Ao avançar para o próximo dia, verificar novamente se é dia útil
+                while (!isBusinessDay(cursor)) {
+                    cursor.setDate(cursor.getDate() + 1);
+                    cursor = normalizeDate(cursor);
+                }
+                continue;
+            }
+
+            if (!firstAllocationDate) firstAllocationDate = new Date(cursor);
+
+            const allocation = Math.min(remaining, capacity);
+            remaining -= allocation;
+            tempLoads[dateKey] = currentLoad + allocation; // Simulando consumo
+
+            if (remaining > 0.001) {
+                cursor.setDate(cursor.getDate() + 1);
+                cursor = normalizeDate(cursor);
+                
+                // VITAL: Verificar feriado novamente ao avançar o dia
+                while (!isBusinessDay(cursor)) {
+                    cursor.setDate(cursor.getDate() + 1);
+                    cursor = normalizeDate(cursor);
+                }
+            }
+            safety++;
+        }
+        
+        // Se falhou (safety), retorna data muito distante
+        if (safety >= 1000) {
+            const farFuture = new Date();
+            farFuture.setFullYear(2050);
+            return { finishDate: farFuture, startDate: farFuture };
+        }
+
+        return { finishDate: cursor, startDate: firstAllocationDate || cursor };
+    };
+
+    // Processa cada tarefa da fila
+    for (const task of queue) {
+        let bestDevId = null;
+        let bestFinishDate = new Date(8640000000000000); // Max date
+        let bestStartDate = new Date();
+
+        // Tenta alocar para CADA dev e vê quem termina antes
+        for (const dev of devsPool) {
+            const simulation = simulateAllocation(dev.id, task.estimatedHours);
+            
+            // Lógica de desempate:
+            // 1. Menor data de entrega ganha (Balanceamento agressivo)
+            // 2. Se data igual, prefere o responsável original (Stickiness)
+            // 3. Se data igual e sem dono original, mantém o primeiro encontrado
+            if (simulation.finishDate < bestFinishDate) {
+                bestFinishDate = simulation.finishDate;
+                bestStartDate = simulation.startDate;
+                bestDevId = dev.id;
+            } else if (simulation.finishDate.getTime() === bestFinishDate.getTime()) {
+                if (dev.id === task.originalAssigneeId) {
+                    bestDevId = dev.id; // Mantém original se empate
+                }
+            }
+        }
+
+        // Confirma a alocação no estado do Dev vencedor
+        if (bestDevId) {
+            const winnerState = devState[bestDevId];
+            let remaining = task.estimatedHours;
+            let cursor = new Date(bestStartDate);
+
+            // "Comita" o uso das horas no estado real do dev
+            while (remaining > 0.001) {
+                while (!isBusinessDay(cursor)) {
+                    cursor.setDate(cursor.getDate() + 1);
+                    cursor = normalizeDate(cursor);
+                }
+                
+                const dateKey = toLocalISOString(cursor);
+                const currentLoad = winnerState.dailyLoads[dateKey] || 0;
+                const capacity = 8 - currentLoad;
+                
+                // Deve ter capacidade, pois simulamos antes.
+                if (capacity <= 0.001) {
+                    cursor.setDate(cursor.getDate() + 1);
+                    cursor = normalizeDate(cursor);
+                    // VITAL Check
+                    while (!isBusinessDay(cursor)) {
+                        cursor.setDate(cursor.getDate() + 1);
+                        cursor = normalizeDate(cursor);
+                    }
+                    continue;
+                }
+
+                const allocation = Math.min(remaining, capacity);
+                winnerState.dailyLoads[dateKey] = currentLoad + allocation;
+                remaining -= allocation;
+
+                if (remaining > 0.001) {
+                    cursor.setDate(cursor.getDate() + 1);
+                    cursor = normalizeDate(cursor);
+                    // VITAL Check
+                    while (!isBusinessDay(cursor)) {
+                        cursor.setDate(cursor.getDate() + 1);
+                        cursor = normalizeDate(cursor);
+                    }
+                }
+            }
+            
+            // Otimização: Atualiza o cursor "nextFreeSlot" do dev
+            if (cursor > winnerState.nextFreeSlot) {
+                winnerState.nextFreeSlot = cursor;
+            }
+
+            // Adiciona à lista de updates para retornar ao Frontend/DB
+            updates.push({ 
+                id: task.id, 
+                startDate: toLocalISOString(bestStartDate), 
+                dueDate: toLocalISOString(bestFinishDate),
+                assigneeId: bestDevId !== 'unassigned' ? bestDevId : null
+            });
+        }
+    }
+
+    return updates;
+};
