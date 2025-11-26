@@ -18,7 +18,7 @@ const PRODUCT_TOOLTIPS: Record<string, string> = {
     "Retenção (D30)": "Porcentagem de usuários que retornaram ao produto 30 dias após o primeiro uso.",
     "Saúde Técnica": "Confiabilidade do sistema. Calculado como (100% - Taxa de Crashes).",
     "Time-to-Value (TTV)": "Tempo médio entre o cadastro do usuário e o momento em que ele percebe valor real no produto.",
-    "Taxa de Ativação": "Porcentagem de usuários que completaram o fluxo de onboarding ou realizaram a ação chave.",
+    "Taxa de Ativação": "Porcentagem da base ativa que utilizou uma funcionalidade específica pelo menos uma vez.",
     "Taxa de Reativação": "Usuários que estavam inativos (churned) e voltaram a usar o produto no período.",
     "Adoção de Features": "Porcentagem da base ativa que utilizou uma funcionalidade específica pelo menos uma vez."
 };
@@ -82,7 +82,7 @@ export const ProductIndicators: React.FC = () => {
         const Arrow = isPositive ? ArrowUpRight : ArrowDownRight;
 
         return (
-            <div className="glass-panel p-5 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-900/50 flex flex-col justify-between h-36 relative group overflow-visible">
+            <div className="glass-panel p-5 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-800/60 flex flex-col justify-between h-36 relative group overflow-visible">
                 <div className="flex justify-between items-start">
                     <div className="flex items-center">
                         <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{title}</span>
@@ -182,7 +182,7 @@ export const ProductIndicators: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
                 
                 {/* Feature Engagement Chart */}
-                <div className="lg:col-span-2 glass-panel p-6 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-900/50">
+                <div className="lg:col-span-2 glass-panel p-6 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-800/60">
                     <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
                         <MousePointer2 className="w-5 h-5 text-slate-400"/> Engajamento por Funcionalidade
                     </h3>
@@ -211,7 +211,7 @@ export const ProductIndicators: React.FC = () => {
 
                 {/* Detailed Metrics List */}
                 <div className="space-y-4">
-                    <div className="glass-panel p-5 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-900/50 flex items-center gap-4">
+                    <div className="glass-panel p-5 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-800/60 flex items-center gap-4">
                         <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500">
                             <Trophy className="w-6 h-6"/>
                         </div>
@@ -225,7 +225,7 @@ export const ProductIndicators: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="glass-panel p-5 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-900/50 flex items-center gap-4">
+                    <div className="glass-panel p-5 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-800/60 flex items-center gap-4">
                         <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500">
                             <UserPlus className="w-6 h-6"/>
                         </div>
@@ -239,7 +239,7 @@ export const ProductIndicators: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="glass-panel p-5 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-900/50 flex items-center gap-4">
+                    <div className="glass-panel p-5 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-800/60 flex items-center gap-4">
                         <div className="w-12 h-12 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-500">
                             <Timer className="w-6 h-6"/>
                         </div>
@@ -254,7 +254,7 @@ export const ProductIndicators: React.FC = () => {
 
             {/* Reativação e Insights */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-900/50">
+                <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-800/60">
                     <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
                         <RotateCcw className="w-5 h-5 text-slate-400"/> Taxa de Reativação
                     </h3>
@@ -269,7 +269,7 @@ export const ProductIndicators: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-900/50">
+                <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-800/60">
                     <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
                         <TrendingUp className="w-5 h-5 text-slate-400"/> Adoção de Features
                         <InfoTooltip text={PRODUCT_TOOLTIPS["Adoção de Features"]} />

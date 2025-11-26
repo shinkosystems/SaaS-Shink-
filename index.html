@@ -13,6 +13,20 @@
         theme: {
           extend: {
             colors: {
+              // OVERRIDE: Remapeando Slate (Azulado) para Zinc (Neutro) globalmente
+              slate: {
+                50: '#fafafa',
+                100: '#f4f4f5',
+                200: '#e4e4e7',
+                300: '#d4d4d8',
+                400: '#a1a1aa',
+                500: '#71717a',
+                600: '#52525b',
+                700: '#3f3f46',
+                800: '#27272a',
+                900: '#18181b',
+                950: '#09090b',
+              },
               shinko: {
                 primary: '#F59E0B', 
                 secondary: '#D97706',
@@ -67,27 +81,27 @@
       }
 
       .dark {
-        /* --- Dark Mode (Neutral Obsidian) --- */
-        /* Removed blue tones, shifted to pure black/neutral/amber */
-        --bg-color: #050505;
+        /* --- Dark Mode (Neutral Obsidian - Adjusted lighter) --- */
+        --bg-color: #09090b; /* Zinc 950 instead of Black */
         --bg-gradient: 
           radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.03), transparent 60%),
           radial-gradient(circle at 90% 90%, rgba(245, 158, 11, 0.04), transparent 50%),
-          linear-gradient(180deg, #050505 0%, #000000 100%);
+          linear-gradient(180deg, #09090b 0%, #000000 100%);
         
-        --text-primary: #f8fafc;
+        --text-primary: #f4f4f5; /* Zinc 100 */
         
-        /* Ultra Glass Dark - Enhanced Transparency */
-        --glass-surface: rgba(15, 15, 15, 0.4);
+        /* Ultra Glass Dark - Lighter & Neutral */
+        --glass-surface: rgba(39, 39, 42, 0.6); /* Zinc 800 with opacity */
         --glass-border: rgba(255, 255, 255, 0.08);
         --glass-highlight: rgba(255, 255, 255, 0.05);
         --glass-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.9);
 
-        --card-bg: rgba(30, 30, 30, 0.3);
+        /* Lighter Card Backgrounds for better contrast */
+        --card-bg: rgba(39, 39, 42, 0.4); /* Zinc 800 base */
         --card-border: rgba(255, 255, 255, 0.06);
-        --card-hover: rgba(40, 40, 40, 0.5);
+        --card-hover: rgba(63, 63, 70, 0.5); /* Zinc 700 hover */
 
-        --input-bg: rgba(10, 10, 10, 0.5);
+        --input-bg: rgba(24, 24, 27, 0.5); /* Zinc 900 */
       }
 
       body {

@@ -22,7 +22,7 @@ import { ResetPasswordModal } from './components/ResetPasswordModal';
 import { fetchOpportunities, createOpportunity, updateOpportunity, deleteOpportunity } from './services/opportunityService';
 import { createTask, createProject } from './services/projectService';
 import { supabase } from './services/supabaseClient';
-import { Loader2, Rocket, AlertTriangle, CheckCircle, PlayCircle, Clock, Flame, Snowflake, AlertCircle, Lock, ArrowDownRight, List as ListIcon, Search, Hash, XCircle, ShieldCheck, Sparkles, Plus, Filter, Target, Trash2 } from 'lucide-react';
+import { Loader2, Rocket, AlertTriangle, CheckCircle, PlayCircle, Clock, Flame, Snowflake, AlertCircle, Lock, ArrowDownRight, List as ListIcon, Search, Hash, XCircle, ShieldCheck, Sparkles, Plus, Filter, Target, Trash2, Edit } from 'lucide-react';
 import { OnboardingGuide } from './components/OnboardingGuide';
 import { logEvent } from './services/analyticsService';
 import { NpsSurvey } from './components/NpsSurvey';
@@ -487,7 +487,8 @@ const App: React.FC = () => {
          userData={userData}
       />
 
-      <main className="flex-1 flex flex-col relative h-full overflow-hidden">
+      {/* FIX: Add padding-top on mobile to avoid content being hidden behind fixed header */}
+      <main className="flex-1 flex flex-col relative h-full overflow-hidden pt-16 xl:pt-0">
         <div className={`flex-1 relative h-full ${view === 'project-detail' ? '' : 'overflow-y-auto p-6 md:p-10 custom-scrollbar'}`}>
             {view === 'dashboard' && userRole !== 'cliente' && (
                 <div className="text-white animate-in fade-in duration-500">
@@ -562,8 +563,18 @@ const App: React.FC = () => {
                                 {/* Status Stripe */}
                                 <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${opp.status === 'Active' ? 'bg-emerald-500' : opp.status === 'Negotiation' ? 'bg-blue-500' : opp.status === 'Future' ? 'bg-amber-500' : 'bg-slate-500'}`}></div>
                                 
-                                {userRole === 'dono' && (
-                                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                {/* Actions - Always Visible now for better UX */}
+                                <div className="absolute top-4 right-4 z-10 flex gap-2">
+                                     {userRole !== 'cliente' && (
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); setEditingOpp(opp); setIsWizardOpen(true); }}
+                                            className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-slate-400 hover:text-blue-500 rounded-lg transition-colors shadow-sm"
+                                            title="Editar Projeto"
+                                        >
+                                            <Edit className="w-4 h-4"/>
+                                        </button>
+                                     )}
+                                     {userRole === 'dono' && (
                                          <button 
                                             onClick={(e) => {
                                                 e.stopPropagation();
@@ -576,13 +587,13 @@ const App: React.FC = () => {
                                          >
                                             <Trash2 className="w-4 h-4"/>
                                         </button>
-                                    </div>
-                                )}
+                                     )}
+                                </div>
 
                                 <div className="flex justify-between items-start pl-4">
                                     <div>
                                         <div className="flex items-center gap-3 mb-1">
-                                            <h3 className="font-bold text-lg text-slate-900 dark:text-white group-hover:text-shinko-primary transition-colors">{opp.title}</h3>
+                                            <h3 className="font-bold text-lg text-slate-900 dark:text-white group-hover:text-shinko-primary transition-colors pr-16">{opp.title}</h3>
                                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm ${getStatusColor(opp.status)}`}>
                                                 {getStatusLabel(opp.status)}
                                             </span>

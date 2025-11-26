@@ -1,3 +1,4 @@
+
 import { supabase } from './supabaseClient';
 import { Opportunity, ProjectStatus, DbProject, RDEStatus, Archetype, IntensityLevel, TadsCriteria, DbTask, BpmnTask, BpmnNode } from '../types';
 
@@ -162,16 +163,25 @@ export const deleteOpportunity = async (id: string): Promise<boolean> => {
     if (!supabase) return false;
 
     try {
-        await supabase.from('tasks').delete().eq('projeto', id);
+        // 1. EXCLUIR TAREFAS ASSOCIADAS PRIMEIRO (Obrigatório devido à FK)
+        const { error: tasksError } = await supabase.from('tasks').delete().eq('projeto', id);
+        
+        if (tasksError) {
+            console.warn('Supabase Delete Tasks Error:', tasksError.message);
+            // Se falhar ao deletar tarefas, aborta para não deixar estado inconsistente
+            return false; 
+        }
+
+        // 2. EXCLUIR O PROJETO
         const { error } = await supabase.from(TABLE_NAME).delete().eq('id', id);
 
         if (error) {
-            console.warn('Supabase Delete Error:', error.message);
+            console.warn('Supabase Delete Project Error:', error.message);
             return false;
         }
         return true;
     } catch (err) {
-        console.warn('Supabase Connection Unavailable (Delete).');
+        console.warn('Supabase Connection Unavailable (Delete).', err);
         return false;
     }
 };

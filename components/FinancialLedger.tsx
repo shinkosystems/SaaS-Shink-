@@ -151,9 +151,8 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
                 </div>
 
                 {/* Bottom Row: Search & Actions - Updated for Responsiveness */}
-                {/* Changed to flex-col on lg (tablet/small laptop) to ensure buttons are visible */}
-                <div className="flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center">
-                    <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto flex-1">
+                <div className="flex flex-col xl:flex-row gap-4 justify-between items-start xl:items-center">
+                    <div className="flex flex-col sm:flex-row gap-2 w-full xl:w-auto flex-1">
                         <div className="relative flex-1 min-w-[200px]">
                             <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400"/>
                             <input 
@@ -170,7 +169,9 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
                             <button onClick={() => setFilterType('outflow')} className={`px-3 py-1 text-xs font-bold rounded ${filterType === 'outflow' ? 'bg-red-100 text-red-600' : 'text-slate-500'}`}>Saídas</button>
                         </div>
                     </div>
-                    <div className="flex gap-2 w-full lg:w-auto justify-end flex-wrap shrink-0">
+                    
+                    {/* Actions Buttons - Wrapped to ensure visibility */}
+                    <div className="flex gap-2 w-full xl:w-auto justify-end flex-wrap shrink-0">
                         <button 
                             onClick={onSyncContracts}
                             disabled={isSyncing}

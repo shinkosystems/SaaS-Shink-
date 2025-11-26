@@ -49,27 +49,27 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
     <div className="h-full flex flex-col bg-slate-50/50 dark:bg-[#050505] overflow-hidden">
       
       {/* Header */}
-      <header className="h-16 border-b border-slate-200 dark:border-white/10 bg-white dark:bg-[#0a0a0a] flex items-center justify-between px-6 shrink-0 z-20">
-          <div className="flex items-center gap-4">
-              <button onClick={onBack} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg text-slate-500 transition-colors">
+      <header className="h-16 border-b border-slate-200 dark:border-white/10 bg-white dark:bg-[#0a0a0a] flex items-center justify-between px-6 shrink-0 z-20 gap-4">
+          <div className="flex items-center gap-4 min-w-0 flex-1">
+              <button onClick={onBack} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg text-slate-500 transition-colors shrink-0">
                   <ArrowLeft className="w-5 h-5"/>
               </button>
               
-              <div className="h-8 w-px bg-slate-200 dark:bg-white/10"></div>
+              <div className="h-8 w-px bg-slate-200 dark:bg-white/10 shrink-0"></div>
 
-              <div>
-                  <h1 className="text-lg font-bold text-slate-900 dark:text-white leading-none">{opportunity.title}</h1>
+              <div className="min-w-0 flex-1">
+                  <h1 className="text-lg font-bold text-slate-900 dark:text-white leading-none truncate" title={opportunity.title}>{opportunity.title}</h1>
                   <div className="flex items-center gap-2 mt-1">
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border uppercase ${getStatusColor(opportunity.status)}`}>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border uppercase shrink-0 ${getStatusColor(opportunity.status)}`}>
                           {opportunity.status}
                       </span>
-                      {opportunity.priorityLock && <Lock className="w-3 h-3 text-red-500"/>}
+                      {opportunity.priorityLock && <Lock className="w-3 h-3 text-red-500 shrink-0"/>}
                   </div>
               </div>
           </div>
 
           {!isClient && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                   <button onClick={() => onEdit(opportunity)} className="p-2 text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg transition-colors" title="Editar Detalhes">
                       <Edit className="w-4 h-4"/>
                   </button>

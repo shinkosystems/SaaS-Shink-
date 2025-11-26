@@ -373,7 +373,7 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [] })
         const bg = isGood ? 'bg-emerald-500/10' : 'bg-red-500/10';
 
         return (
-            <div className="glass-card p-5 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-900/50 hover:bg-white/80 dark:hover:bg-slate-800/80 transition-all relative group">
+            <div className="glass-card p-5 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-800/60 hover:bg-white/80 dark:hover:bg-slate-700/80 transition-all relative group">
                 <div className="flex justify-between items-start mb-2">
                     <div className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
                         {icon && icon} {label}
@@ -473,7 +473,7 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [] })
                             prefix="R$ "
                         />
                         
-                        <div className="glass-card p-5 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-900/50 hover:bg-white/80 dark:hover:bg-slate-800/80 transition-all relative group">
+                        <div className="glass-card p-5 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-800/60 hover:bg-white/80 dark:hover:bg-slate-700/80 transition-all relative group">
                             <div className="flex justify-between items-start mb-2">
                                 <div className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
                                     <Users className="w-3 h-3"/> Churn de Clientes
@@ -496,7 +496,7 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [] })
                             </div>
                         </div>
 
-                        <div className="glass-card p-5 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-900/50 hover:bg-white/80 dark:hover:bg-slate-800/80 transition-all relative group">
+                        <div className="glass-card p-5 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-800/60 hover:bg-white/80 dark:hover:bg-slate-700/80 transition-all relative group">
                             <div className="flex justify-between items-start mb-2">
                                 <div className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
                                     <DollarSign className="w-3 h-3"/> Churn Financeiro
@@ -550,7 +550,7 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [] })
                     <div>
                         <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><TrendingUp className="w-4 h-4"/> {timeRange === 'month' ? `Fluxo Diário - ${monthNames[selectedMonth]}` : timeRange === 'week' ? `Fluxo Semanal` : `Evolução Anual (${selectedYear})`}</h3>
                         <div className="grid grid-cols-1 gap-4 h-[350px]">
-                            <div className="glass-card p-0 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-900/50 overflow-hidden flex flex-col h-full shadow-sm">
+                            <div className="glass-card p-0 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-800/60 overflow-hidden flex flex-col h-full shadow-sm">
                                 <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
                                     <span className="text-xs font-bold text-slate-500 uppercase">Receita vs Despesas</span>
                                     <div className="flex gap-4 text-[10px] font-bold">

@@ -70,7 +70,7 @@ export const DevIndicators: React.FC = () => {
         const isGood = inverse ? !isPositive : isPositive; 
         
         return (
-            <div className="glass-panel p-5 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-900/50 flex flex-col justify-between h-32 relative group overflow-visible">
+            <div className="glass-panel p-5 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-800/60 flex flex-col justify-between h-32 relative group overflow-visible">
                 <div className="flex justify-between items-start z-10">
                     <div className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
                         <Icon className={`w-3 h-3 ${color.replace('bg-', 'text-')}`} /> 
@@ -104,7 +104,7 @@ export const DevIndicators: React.FC = () => {
         const style = ratingColors[data.rating as keyof typeof ratingColors] || ratingColors['Medium'];
 
         return (
-            <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-900/50 flex flex-col gap-4 overflow-visible group">
+            <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-800/60 flex flex-col gap-4 overflow-visible group">
                 <div className="flex justify-between items-start">
                     <div className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
                         <Icon className="w-4 h-4 text-slate-400"/> 
@@ -120,7 +120,7 @@ export const DevIndicators: React.FC = () => {
                     <span className="text-sm text-slate-500 font-bold mb-1">{data.unit}</span>
                 </div>
                 {/* Mini Bar */}
-                <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
                     <div 
                         className={`h-full ${style.split(' ')[0].replace('text-', 'bg-')}`} 
                         style={{ width: data.rating === 'Elite' ? '100%' : data.rating === 'High' ? '75%' : data.rating === 'Medium' ? '50%' : '25%' }}
@@ -243,7 +243,7 @@ export const DevIndicators: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
                 
                 {/* Chart: Throughput Trend */}
-                <div className="lg:col-span-2 glass-panel p-6 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-900/50">
+                <div className="lg:col-span-2 glass-panel p-6 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-800/60">
                     <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
                         <TrendingUp className="w-5 h-5 text-slate-400"/> Tendência de Throughput (Entregas)
                     </h3>
@@ -274,7 +274,7 @@ export const DevIndicators: React.FC = () => {
                         <Bug className="w-4 h-4"/> Qualidade de Código
                     </h3>
                     
-                    <div className="glass-panel p-5 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-900/50 flex items-center gap-4 overflow-visible group">
+                    <div className="glass-panel p-5 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-800/60 flex items-center gap-4 overflow-visible group">
                         <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center text-red-500">
                             <Bug className="w-6 h-6"/>
                         </div>
@@ -288,7 +288,7 @@ export const DevIndicators: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="glass-panel p-5 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-900/50 flex items-center gap-4 overflow-visible group">
+                    <div className="glass-panel p-5 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-800/60 flex items-center gap-4 overflow-visible group">
                         <div className="w-12 h-12 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-500">
                             <RotateCcw className="w-6 h-6"/>
                         </div>
