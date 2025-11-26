@@ -340,9 +340,23 @@ const App: React.FC = () => {
   };
 
   const handleDeleteOpportunity = async (id: string) => {
-      setOpportunities(prev => prev.filter(o => o.id !== id));
-      setSelectedOpp(null);
-      if (view === 'project-detail') setView('list');
+      setIsLoading(true);
+      try {
+          const success = await deleteOpportunity(id);
+          if (success) {
+              setOpportunities(prev => prev.filter(o => o.id !== id));
+              setSelectedOpp(null);
+              if (view === 'project-detail') setView('list');
+              logEvent('feature_use', { feature: 'Delete Project' });
+          } else {
+              alert("Não foi possível excluir o projeto. Tente novamente.");
+          }
+      } catch (err) {
+          console.error(err);
+          alert("Erro ao excluir projeto.");
+      } finally {
+          setIsLoading(false);
+      }
   };
 
   const getStatusColor = (status: string) => {

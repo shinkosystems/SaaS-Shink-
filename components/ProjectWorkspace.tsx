@@ -42,6 +42,12 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
       console.log("Task Updated in Workspace:", task.text);
   };
 
+  const handleDelete = () => {
+      if (window.confirm("Tem certeza que deseja excluir este projeto e todas as suas tarefas? Esta ação não pode ser desfeita.")) {
+          onDelete(opportunity.id);
+      }
+  };
+
   return (
     <div className="h-full flex flex-col bg-slate-50/50 dark:bg-[#050505] overflow-hidden">
       
@@ -69,6 +75,9 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
               <div className="flex items-center gap-2">
                   <button onClick={() => onEdit(opportunity)} className="p-2 text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg transition-colors" title="Editar Detalhes">
                       <Edit className="w-4 h-4"/>
+                  </button>
+                  <button onClick={handleDelete} className="p-2 text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors" title="Excluir Projeto">
+                      <Trash2 className="w-4 h-4"/>
                   </button>
                   {/* Additional header actions can go here */}
               </div>
