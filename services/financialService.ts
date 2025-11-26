@@ -58,6 +58,42 @@ export const addTransaction = async (transaction: Omit<FinancialTransaction, 'id
     };
 };
 
+export const updateTransaction = async (transaction: FinancialTransaction): Promise<FinancialTransaction | null> => {
+    const { id, ...updates } = transaction;
+    
+    const payload = {
+        date: updates.date,
+        description: updates.description,
+        amount: updates.amount,
+        type: updates.type,
+        category: updates.category,
+        organization_id: updates.organizationId
+    };
+
+    const { data, error } = await supabase
+        .from(TABLE)
+        .update(payload)
+        .eq('id', id)
+        .select()
+        .single();
+
+    if (error) {
+        console.error('Erro ao atualizar transação:', error.message);
+        return null;
+    }
+
+    return {
+        id: data.id,
+        date: data.date,
+        description: data.description,
+        amount: Number(data.amount),
+        type: data.type,
+        category: data.category,
+        organizationId: data.organization_id,
+        isContract: !!(data.metadata?.contractId)
+    };
+};
+
 export const deleteTransaction = async (id: string): Promise<boolean> => {
     const { error } = await supabase
         .from(TABLE)

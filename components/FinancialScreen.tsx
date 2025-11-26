@@ -5,7 +5,7 @@ import { FinancialLedger } from './FinancialLedger';
 import { LayoutDashboard, List, Loader2 } from 'lucide-react';
 import { FinancialTransaction } from '../types';
 import { supabase } from '../services/supabaseClient';
-import { fetchTransactions, addTransaction, deleteTransaction, syncContractTransactions } from '../services/financialService';
+import { fetchTransactions, addTransaction, updateTransaction, deleteTransaction, syncContractTransactions } from '../services/financialService';
 
 export const FinancialScreen: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'dashboard' | 'ledger'>('dashboard');
@@ -52,6 +52,21 @@ export const FinancialScreen: React.FC = () => {
         } else {
             setTransactions(prev => prev.filter(item => item.id !== tempId));
             alert("Erro ao salvar transação.");
+        }
+    };
+
+    const handleEditTransaction = async (t: FinancialTransaction) => {
+        if (!orgId) return;
+
+        // Optimistic Update
+        setTransactions(prev => prev.map(item => item.id === t.id ? t : item).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+
+        const updated = await updateTransaction(t);
+        if (updated) {
+            setTransactions(prev => prev.map(item => item.id === updated.id ? updated : item));
+        } else {
+            alert("Erro ao atualizar transação.");
+            loadData(); // Revert on error
         }
     };
 
@@ -127,6 +142,7 @@ export const FinancialScreen: React.FC = () => {
                             <FinancialLedger 
                                 transactions={transactions} 
                                 onAddTransaction={handleAddTransaction}
+                                onEditTransaction={handleEditTransaction}
                                 onDeleteTransaction={handleDeleteTransaction}
                                 onSyncContracts={handleSyncContracts}
                                 isSyncing={isSyncing}

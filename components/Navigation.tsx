@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { 
   LayoutGrid, 
@@ -111,7 +110,7 @@ const SidebarContent = ({ props }: { props: Props }) => (
       {/* Workspace Header */}
       <button 
         onClick={() => { props.onChangeView('profile'); props.setIsMobileOpen(false); }}
-        className="w-full mb-8 flex items-center gap-4 px-3 py-4 rounded-2xl hover:bg-white/5 transition-all group border border-transparent hover:border-white/5"
+        className="w-full mb-6 flex items-center gap-4 px-3 py-4 rounded-2xl hover:bg-white/5 transition-all group border border-transparent hover:border-white/5"
       >
           <div className="relative">
              <div className="absolute inset-0 bg-amber-500 blur-md opacity-20 rounded-full group-hover:opacity-40 transition-opacity"></div>
@@ -123,7 +122,18 @@ const SidebarContent = ({ props }: { props: Props }) => (
           </div>
       </button>
 
-      <div className="text-[10px] font-bold text-slate-500 dark:text-slate-600 px-4 mb-2 mt-4 uppercase tracking-widest">Menu Principal</div>
+      {/* Primary Action Button - Moved to Top */}
+      {props.userRole !== 'cliente' && (
+        <button 
+            onClick={() => { props.onOpenCreateTask(); props.setIsMobileOpen(false); }}
+            className="w-full h-11 flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-orange-600 text-white p-2 rounded-xl text-sm font-bold transition-all active:scale-95 shadow-lg shadow-amber-500/20 hover:brightness-110 hover:shadow-amber-500/40 mb-8"
+        >
+            <CheckSquare className="w-4 h-4" />
+            <span>Nova Tarefa</span>
+        </button>
+      )}
+
+      <div className="text-[10px] font-bold text-slate-500 dark:text-slate-600 px-4 mb-2 mt-2 uppercase tracking-widest">Menu Principal</div>
       
       {props.userRole !== 'cliente' && (
         <NavItem 
@@ -214,18 +224,6 @@ const SidebarContent = ({ props }: { props: Props }) => (
         isActive={props.currentView === 'settings'} 
         onClick={() => { props.onChangeView('settings'); props.setIsMobileOpen(false); }} 
       />
-
-      {props.userRole !== 'cliente' && (
-        <div className="mt-auto pt-6 pb-6 space-y-3">
-            <button 
-                onClick={() => { props.onOpenCreateTask(); props.setIsMobileOpen(false); }}
-                className="w-full h-12 flex items-center justify-center gap-2 glass-button text-slate-600 dark:text-slate-300 p-2 rounded-xl text-sm font-bold transition-all active:scale-95 hover:bg-white/10 dark:hover:bg-white/5"
-            >
-                <CheckSquare className="w-4 h-4" />
-                <span>Nova Tarefa</span>
-            </button>
-        </div>
-      )}
     </div>
 
     {/* Profile Footer Glass */}
