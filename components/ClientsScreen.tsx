@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, Search, Plus, FileText, DollarSign, Calendar, MapPin, Building2, Mail, Phone, UploadCloud, Loader2, Trash2, Edit, Camera, X } from 'lucide-react';
+import { Users, Search, Plus, FileText, DollarSign, Calendar, MapPin, Building2, Mail, Phone, UploadCloud, Loader2, Trash2, Edit, Camera, X, Lock } from 'lucide-react';
 import { fetchClients, createClient, updateClient, deleteClient } from '../services/clientService';
 import { supabase } from '../services/supabaseClient';
 import { DbClient } from '../types';
@@ -19,6 +19,11 @@ export const ClientsScreen: React.FC<Props> = ({ userRole }) => {
     
     // Form State
     const [formData, setFormData] = useState<Partial<DbClient>>({});
+    
+    // Auth State for New Clients
+    const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+
     const [isSaving, setIsSaving] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     
@@ -39,14 +44,19 @@ export const ClientsScreen: React.FC<Props> = ({ userRole }) => {
     const handleEdit = (client: DbClient) => {
         setEditingClient(client);
         setFormData(client);
+        // Reset passwords on edit mode (usually handled separately or not edited here)
+        setPassword('');
+        setConfirmPassword('');
         setShowModal(true);
     };
 
     const handleCreate = () => {
         setEditingClient(null);
+        setPassword('');
+        setConfirmPassword('');
         setFormData({
             status: 'Ativo',
-            tipo_pessoa: 'Jurídica', // Fixed type literal? Assuming string in DB
+            tipo_pessoa: 'Jurídica',
             numcolaboradores: 1,
             valormensal: 0,
             meses: 12,
@@ -72,6 +82,23 @@ export const ClientsScreen: React.FC<Props> = ({ userRole }) => {
             alert("Nome e E-mail são obrigatórios.");
             return;
         }
+
+        // New Client Validation
+        if (!editingClient) {
+            if (!password) {
+                alert("Para novos clientes, a senha é obrigatória para criar o usuário.");
+                return;
+            }
+            if (password.length < 6) {
+                alert("A senha deve ter no mínimo 6 caracteres.");
+                return;
+            }
+            if (password !== confirmPassword) {
+                alert("As senhas não coincidem.");
+                return;
+            }
+        }
+
         setIsSaving(true);
 
         try {
@@ -81,7 +108,8 @@ export const ClientsScreen: React.FC<Props> = ({ userRole }) => {
                     setClients(prev => prev.map(c => c.id === updated.id ? updated : c));
                 }
             } else {
-                const created = await createClient(formData);
+                // Create Client passing password for Auth User creation
+                const created = await createClient(formData, password);
                 if (created) {
                     setClients(prev => [...prev, created]);
                 }
@@ -89,7 +117,8 @@ export const ClientsScreen: React.FC<Props> = ({ userRole }) => {
             logEvent('feature_use', { feature: 'Save Client', type: editingClient ? 'edit' : 'create' });
             setShowModal(false);
         } catch (err: any) {
-            alert('Erro ao salvar: ' + err.message);
+            console.error(err);
+            alert('Erro ao salvar: ' + (err.message || "Erro desconhecido"));
         } finally {
             setIsSaving(false);
         }
@@ -269,7 +298,7 @@ export const ClientsScreen: React.FC<Props> = ({ userRole }) => {
                                         <div>
                                             <label className="block text-xs font-bold text-slate-500 mb-1">Tipo Pessoa</label>
                                             <select 
-                                                value={formData.tipo_pessoa} // Matches DbClient if mapped correctly
+                                                value={formData.tipo_pessoa} 
                                                 onChange={e => setFormData({...formData, tipo_pessoa: e.target.value as any})}
                                                 className="w-full glass-input rounded-lg p-2.5 text-sm outline-none"
                                             >
@@ -281,7 +310,7 @@ export const ClientsScreen: React.FC<Props> = ({ userRole }) => {
                                             <label className="block text-xs font-bold text-slate-500 mb-1">CPF / CNPJ</label>
                                             <input 
                                                 type="text" 
-                                                value={formData.cnpj || ''} // Mapped to CNPJ per schema
+                                                value={formData.cnpj || ''}
                                                 onChange={e => setFormData({...formData, cnpj: e.target.value})}
                                                 className="w-full glass-input rounded-lg p-2.5 text-sm outline-none"
                                             />
@@ -302,6 +331,37 @@ export const ClientsScreen: React.FC<Props> = ({ userRole }) => {
                                                 className="w-full glass-input rounded-lg p-2.5 text-sm outline-none"
                                             />
                                         </div>
+                                        
+                                        {/* Password Fields (Only when creating) */}
+                                        {!editingClient && (
+                                            <>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-slate-500 mb-1 flex items-center gap-1">
+                                                        <Lock className="w-3 h-3"/> Senha de Acesso
+                                                    </label>
+                                                    <input 
+                                                        type="password" 
+                                                        value={password}
+                                                        onChange={e => setPassword(e.target.value)}
+                                                        className="w-full glass-input rounded-lg p-2.5 text-sm outline-none"
+                                                        placeholder="Mínimo 6 caracteres"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-slate-500 mb-1 flex items-center gap-1">
+                                                        <Lock className="w-3 h-3"/> Confirmar Senha
+                                                    </label>
+                                                    <input 
+                                                        type="password" 
+                                                        value={confirmPassword}
+                                                        onChange={e => setConfirmPassword(e.target.value)}
+                                                        className="w-full glass-input rounded-lg p-2.5 text-sm outline-none"
+                                                        placeholder="Repita a senha"
+                                                    />
+                                                </div>
+                                            </>
+                                        )}
+
                                         <div>
                                             <label className="block text-xs font-bold text-slate-500 mb-1">Telefone</label>
                                             <input 
@@ -317,15 +377,6 @@ export const ClientsScreen: React.FC<Props> = ({ userRole }) => {
                                                 value={formData.endereco || ''}
                                                 onChange={e => setFormData({...formData, endereco: e.target.value})}
                                                 className="w-full glass-input rounded-lg p-2.5 text-sm outline-none resize-none h-24"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-500 mb-1">Nº Colaboradores</label>
-                                            <input 
-                                                type="number" 
-                                                value={formData.numcolaboradores || 1}
-                                                onChange={e => setFormData({...formData, numcolaboradores: parseInt(e.target.value)})}
-                                                className="w-full glass-input rounded-lg p-2.5 text-sm outline-none"
                                             />
                                         </div>
                                     </div>
@@ -346,6 +397,15 @@ export const ClientsScreen: React.FC<Props> = ({ userRole }) => {
                                                     className="w-full pl-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-sm font-bold text-slate-900 dark:text-white outline-none"
                                                 />
                                             </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 mb-1">Nº Colaboradores</label>
+                                            <input 
+                                                type="number" 
+                                                value={formData.numcolaboradores || 1}
+                                                onChange={e => setFormData({...formData, numcolaboradores: parseInt(e.target.value)})}
+                                                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-sm outline-none"
+                                            />
                                         </div>
                                         <div className="grid grid-cols-2 gap-3">
                                             <div>
@@ -397,7 +457,7 @@ export const ClientsScreen: React.FC<Props> = ({ userRole }) => {
                                     className="px-8 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-amber-900/20 transition-all active:scale-95 flex items-center gap-2"
                                 >
                                     {isSaving && <Loader2 className="w-4 h-4 animate-spin"/>}
-                                    Salvar Cliente
+                                    {editingClient ? 'Salvar Cliente' : 'Inserir Cliente'}
                                 </button>
                             </div>
                         </div>

@@ -562,7 +562,7 @@ const App: React.FC = () => {
                                 {/* Status Stripe */}
                                 <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${opp.status === 'Active' ? 'bg-emerald-500' : opp.status === 'Negotiation' ? 'bg-blue-500' : opp.status === 'Future' ? 'bg-amber-500' : 'bg-slate-500'}`}></div>
                                 
-                                {userRole !== 'cliente' && (
+                                {userRole === 'dono' && (
                                     <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                                          <button 
                                             onClick={(e) => {

@@ -151,9 +151,10 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
                 </div>
 
                 {/* Bottom Row: Search & Actions - Updated for Responsiveness */}
-                <div className="flex flex-col xl:flex-row gap-4 justify-between items-center">
-                    <div className="flex flex-col md:flex-row gap-2 w-full xl:w-auto">
-                        <div className="relative flex-1">
+                {/* Changed to flex-col on lg (tablet/small laptop) to ensure buttons are visible */}
+                <div className="flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center">
+                    <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto flex-1">
+                        <div className="relative flex-1 min-w-[200px]">
                             <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400"/>
                             <input 
                                 type="text" 
@@ -163,13 +164,13 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
                                 className="pl-9 pr-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none w-full shadow-sm"
                             />
                         </div>
-                        <div className="flex bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-1 shadow-sm self-start sm:self-auto">
+                        <div className="flex bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-1 shadow-sm self-start sm:self-auto shrink-0">
                             <button onClick={() => setFilterType('all')} className={`px-3 py-1 text-xs font-bold rounded ${filterType === 'all' ? 'bg-slate-200 dark:bg-slate-700' : 'text-slate-500'}`}>Todos</button>
                             <button onClick={() => setFilterType('inflow')} className={`px-3 py-1 text-xs font-bold rounded ${filterType === 'inflow' ? 'bg-emerald-100 text-emerald-600' : 'text-slate-500'}`}>Entradas</button>
                             <button onClick={() => setFilterType('outflow')} className={`px-3 py-1 text-xs font-bold rounded ${filterType === 'outflow' ? 'bg-red-100 text-red-600' : 'text-slate-500'}`}>Saídas</button>
                         </div>
                     </div>
-                    <div className="flex gap-2 w-full xl:w-auto justify-end flex-wrap">
+                    <div className="flex gap-2 w-full lg:w-auto justify-end flex-wrap shrink-0">
                         <button 
                             onClick={onSyncContracts}
                             disabled={isSyncing}
