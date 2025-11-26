@@ -22,7 +22,7 @@ import { ResetPasswordModal } from './components/ResetPasswordModal';
 import { fetchOpportunities, createOpportunity, updateOpportunity, deleteOpportunity } from './services/opportunityService';
 import { createTask, createProject } from './services/projectService';
 import { supabase } from './services/supabaseClient';
-import { Loader2, Rocket, AlertTriangle, CheckCircle, PlayCircle, Clock, Flame, Snowflake, AlertCircle, Lock, ArrowDownRight, List as ListIcon, Search, Hash, XCircle, ShieldCheck, Sparkles, Plus, Filter, Target } from 'lucide-react';
+import { Loader2, Rocket, AlertTriangle, CheckCircle, PlayCircle, Clock, Flame, Snowflake, AlertCircle, Lock, ArrowDownRight, List as ListIcon, Search, Hash, XCircle, ShieldCheck, Sparkles, Plus, Filter, Target, Trash2 } from 'lucide-react';
 import { OnboardingGuide } from './components/OnboardingGuide';
 import { logEvent } from './services/analyticsService';
 import { NpsSurvey } from './components/NpsSurvey';
@@ -69,7 +69,6 @@ const MOCK_DATA: Opportunity[] = [
         edges: []
     }
   },
-  // ... (Outros dados mockados mantidos para brevidade, o foco é a lógica de Auth)
 ];
 
 const App: React.FC = () => {
@@ -174,7 +173,6 @@ const App: React.FC = () => {
               setOpportunities(filteredOpps);
               setDbStatus('connected');
           } else {
-              // Fallback robusto se fetch falhar
               setOpportunities(MOCK_DATA);
               setDbStatus('error'); 
           }
@@ -213,7 +211,6 @@ const App: React.FC = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
         if (!mounted) return;
         
-        // Detecta evento de recuperação de senha
         if (event === 'PASSWORD_RECOVERY') {
             setShowResetPasswordModal(true);
         }
@@ -269,7 +266,6 @@ const App: React.FC = () => {
       setView('list');
   };
 
-  // Function to navigate to the project detail page
   const handleOpenProject = (opp: Opportunity) => {
       setSelectedOpp(opp);
       setView('project-detail');
@@ -334,9 +330,41 @@ const App: React.FC = () => {
   };
 
   const handleSaveOpportunity = async (opp: Opportunity) => {
-      console.log("Saving opp", opp);
-      setOpportunities(prev => [...prev, opp]); 
-      setIsWizardOpen(false);
+      setIsLoading(true);
+      try {
+          const isEditing = opportunities.some(o => o.id === opp.id);
+          
+          let result: Opportunity | null = null;
+
+          if (isEditing) {
+              result = await updateOpportunity(opp);
+          } else {
+              result = await createOpportunity(opp);
+          }
+
+          if (result) {
+              if (isEditing) {
+                  setOpportunities(prev => prev.map(o => o.id === result!.id ? result! : o));
+                  if (selectedOpp?.id === result.id) {
+                      setSelectedOpp(result);
+                  }
+              } else {
+                  setOpportunities(prev => [result!, ...prev]);
+              }
+              
+              setIsWizardOpen(false);
+              setEditingOpp(undefined);
+              
+              logEvent('feature_use', { feature: 'Save Opportunity', type: isEditing ? 'edit' : 'create' });
+          } else {
+              alert("Erro ao salvar o projeto. Verifique os dados e tente novamente.");
+          }
+      } catch (err) {
+          console.error("Erro ao salvar oportunidade:", err);
+          alert("Erro inesperado ao salvar.");
+      } finally {
+          setIsLoading(false);
+      }
   };
 
   const handleDeleteOpportunity = async (id: string) => {
@@ -534,6 +562,23 @@ const App: React.FC = () => {
                                 {/* Status Stripe */}
                                 <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${opp.status === 'Active' ? 'bg-emerald-500' : opp.status === 'Negotiation' ? 'bg-blue-500' : opp.status === 'Future' ? 'bg-amber-500' : 'bg-slate-500'}`}></div>
                                 
+                                {userRole !== 'cliente' && (
+                                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                         <button 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if(window.confirm(`ATENÇÃO: Deseja excluir o projeto "${opp.title}"?\n\nIsso excluirá permanentemente:\n1. Todas as tarefas e subtarefas associadas.\n2. O projeto em si.\n\nEsta ação não pode ser desfeita.`)) {
+                                                    handleDeleteOpportunity(opp.id);
+                                                }
+                                            }}
+                                            className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-red-100 dark:hover:bg-red-900/30 text-slate-400 hover:text-red-500 rounded-lg transition-colors shadow-sm"
+                                            title="Excluir Projeto e Tarefas"
+                                         >
+                                            <Trash2 className="w-4 h-4"/>
+                                        </button>
+                                    </div>
+                                )}
+
                                 <div className="flex justify-between items-start pl-4">
                                     <div>
                                         <div className="flex items-center gap-3 mb-1">
@@ -588,10 +633,26 @@ const App: React.FC = () => {
             {view === 'kanban' && <KanbanBoard onSelectOpportunity={handleOpenProject} userRole={userRole} />}
             {view === 'calendar' && <CalendarView opportunities={opportunities} onSelectOpportunity={handleOpenProject} onTaskUpdate={() => {}} userRole={userRole} onRefresh={loadAppData} />}
             {view === 'gantt' && <GanttView opportunities={opportunities} onSelectOpportunity={handleOpenProject} onTaskUpdate={() => {}} userRole={userRole} />}
-            {view === 'financial' && <FinancialScreen />}
+            
+            {/* Restricted Views */}
+            {view === 'financial' && userRole === 'dono' && <FinancialScreen />}
             {view === 'clients' && <ClientsScreen userRole={userRole} />}
-            {view === 'product' && <ProductIndicators />}
-            {view === 'dev-metrics' && <DevIndicators />}
+            {view === 'product' && userRole === 'dono' && <ProductIndicators />}
+            {view === 'dev-metrics' && userRole === 'dono' && <DevIndicators />}
+            
+            {/* Access Denied Message */}
+            {(view === 'financial' || view === 'product' || view === 'dev-metrics') && userRole !== 'dono' && (
+                <div className="flex h-full items-center justify-center flex-col gap-4 animate-in zoom-in duration-300">
+                    <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center">
+                        <ShieldCheck className="w-8 h-8 text-red-500"/>
+                    </div>
+                    <h2 className="text-xl font-bold text-slate-900 dark:text-white">Acesso Restrito</h2>
+                    <p className="text-slate-500 text-sm max-w-xs text-center">
+                        Esta área é exclusiva para o perfil de Dono. Contate o administrador do workspace.
+                    </p>
+                </div>
+            )}
+
             {view === 'settings' && <SettingsScreen theme={theme} onToggleTheme={toggleTheme} />}
             {view === 'profile' && <ProfileScreen />}
             {view === 'search' && (

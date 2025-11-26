@@ -150,9 +150,9 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
                     </div>
                 </div>
 
-                {/* Bottom Row: Search & Actions */}
-                <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
-                    <div className="flex gap-2 w-full md:w-auto">
+                {/* Bottom Row: Search & Actions - Updated for Responsiveness */}
+                <div className="flex flex-col xl:flex-row gap-4 justify-between items-center">
+                    <div className="flex flex-col md:flex-row gap-2 w-full xl:w-auto">
                         <div className="relative flex-1">
                             <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400"/>
                             <input 
@@ -160,27 +160,27 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
                                 placeholder="Buscar lançamentos..." 
                                 value={searchTerm}
                                 onChange={e => setSearchTerm(e.target.value)}
-                                className="pl-9 pr-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none w-full md:w-64 shadow-sm"
+                                className="pl-9 pr-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none w-full shadow-sm"
                             />
                         </div>
-                        <div className="flex bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-1 shadow-sm">
+                        <div className="flex bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-1 shadow-sm self-start sm:self-auto">
                             <button onClick={() => setFilterType('all')} className={`px-3 py-1 text-xs font-bold rounded ${filterType === 'all' ? 'bg-slate-200 dark:bg-slate-700' : 'text-slate-500'}`}>Todos</button>
                             <button onClick={() => setFilterType('inflow')} className={`px-3 py-1 text-xs font-bold rounded ${filterType === 'inflow' ? 'bg-emerald-100 text-emerald-600' : 'text-slate-500'}`}>Entradas</button>
                             <button onClick={() => setFilterType('outflow')} className={`px-3 py-1 text-xs font-bold rounded ${filterType === 'outflow' ? 'bg-red-100 text-red-600' : 'text-slate-500'}`}>Saídas</button>
                         </div>
                     </div>
-                    <div className="flex gap-2 w-full md:w-auto justify-end">
+                    <div className="flex gap-2 w-full xl:w-auto justify-end flex-wrap">
                         <button 
                             onClick={onSyncContracts}
                             disabled={isSyncing}
-                            className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm active:scale-95 transition-transform disabled:opacity-50 whitespace-nowrap"
+                            className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm active:scale-95 transition-transform disabled:opacity-50 whitespace-nowrap flex-shrink-0"
                         >
                             <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`}/> 
                             {isSyncing ? 'Sincronizando...' : 'Buscar Contratos'}
                         </button>
                         <button 
                             onClick={() => setShowModal(true)}
-                            className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-lg active:scale-95 transition-transform whitespace-nowrap"
+                            className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-lg active:scale-95 transition-transform whitespace-nowrap flex-shrink-0"
                         >
                             <Plus className="w-4 h-4"/> Novo Lançamento
                         </button>
@@ -191,7 +191,7 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
             {/* Table */}
             <div className="flex-1 overflow-y-auto custom-scrollbar">
                 <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-50 dark:bg-slate-950 text-slate-500 sticky top-0 z-10 border-b border-slate-200 dark:border-slate-800">
+                    <thead className="bg-slate-5 dark:bg-slate-950 text-slate-500 sticky top-0 z-10 border-b border-slate-200 dark:border-slate-800">
                         <tr>
                             <th className="p-4 font-medium w-32">Data</th>
                             <th className="p-4 font-medium">Descrição</th>

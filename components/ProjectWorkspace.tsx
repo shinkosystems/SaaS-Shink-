@@ -36,14 +36,11 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
 
   // Reusing logic from OpportunityDetail for internal updates
   const handleTaskUpdate = (oppId: string, nodeId: string, task: BpmnTask) => {
-      // This is a simplified handler. Ideally, ProjectWorkspace should manage or delegate state updates.
-      // Since Kanban/Gantt/Calendar manage their own data fetching, we primarily use this for 
-      // updating the parent opportunity state if needed, though most child components fetch directly from DB now.
       console.log("Task Updated in Workspace:", task.text);
   };
 
   const handleDelete = () => {
-      if (window.confirm("Tem certeza que deseja excluir este projeto e todas as suas tarefas? Esta ação não pode ser desfeita.")) {
+      if (window.confirm(`ATENÇÃO: Esta ação excluirá:\n\n1. Todas as tarefas e subtarefas vinculadas a este projeto.\n2. O projeto "${opportunity.title}" inteiro.\n\nTem certeza absoluta?`)) {
           onDelete(opportunity.id);
       }
   };
@@ -76,10 +73,16 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
                   <button onClick={() => onEdit(opportunity)} className="p-2 text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg transition-colors" title="Editar Detalhes">
                       <Edit className="w-4 h-4"/>
                   </button>
-                  <button onClick={handleDelete} className="p-2 text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors" title="Excluir Projeto">
-                      <Trash2 className="w-4 h-4"/>
-                  </button>
-                  {/* Additional header actions can go here */}
+                  {userRole === 'dono' && (
+                      <button 
+                        onClick={handleDelete} 
+                        className="flex items-center gap-2 px-3 py-2 text-red-500 hover:text-white hover:bg-red-500 bg-red-500/10 rounded-lg transition-colors text-xs font-bold" 
+                        title="Excluir Projeto e Tarefas"
+                      >
+                          <Trash2 className="w-4 h-4"/>
+                          <span className="hidden sm:inline">Excluir</span>
+                      </button>
+                  )}
               </div>
           )}
       </header>
@@ -111,27 +114,14 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
       <div className="flex-1 overflow-hidden relative">
           
           {activeTab === 'overview' && (
-              // We reuse OpportunityDetail but strip its modal overlay via CSS or Logic if needed.
-              // Since OpportunityDetail is built as a modal, we render it directly. 
-              // Ideally, we refactor OpportunityDetail to separate content from modal wrapper.
-              // For now, we will use it as the "Overview" content provider by just mounting it 
-              // and letting it handle its internal tabs (Files, Storytime, etc).
-              // To avoid double headers, we might need to adjust OpportunityDetail or accept redundancy.
-              // *Strategy*: We use OpportunityDetail but pass a prop to hide header? 
-              // OR simpler: Just replicate overview logic here if simple. 
-              // *Better*: Render OpportunityDetail fully as the "Overview" module.
               <div className="h-full w-full">
                   <OpportunityDetail 
                       opportunity={opportunity} 
-                      onClose={onBack} // Not really closing, but acts as exit if inside logic triggers it
+                      onClose={onBack} 
                       onEdit={onEdit}
                       onDelete={onDelete}
                       onUpdate={onUpdate}
                       userRole={userRole}
-                      // We force a "page mode" style override via class if possible or accept the modal look for now.
-                      // Actually, let's just render it. It has a fixed position z-index. 
-                      // We need to modify OpportunityDetail to support inline rendering.
-                      // See Change #4 below for OpportunityDetail tweak.
                   />
               </div>
           )}

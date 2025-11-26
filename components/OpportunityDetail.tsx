@@ -26,6 +26,10 @@ const OpportunityDetail: React.FC<Props> = ({ opportunity: initialOpp, onClose, 
   const [editingTask, setEditingTask] = useState<{nodeId: string, nodeLabel: string, task: BpmnTask} | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [newComment, setNewComment] = useState('');
+  
+  // Editable Description State
+  const [editableDescription, setEditableDescription] = useState(initialOpp.description || '');
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isClient = userRole === 'cliente';
@@ -178,24 +182,6 @@ const OpportunityDetail: React.FC<Props> = ({ opportunity: initialOpp, onClose, 
       }
   };
 
-  const toggleFreeze = async () => {
-      const newStatus = opportunity.status === 'Frozen' ? 'Active' : 'Frozen';
-      const comments = addToStorytime(opportunity, `Projeto ${newStatus === 'Frozen' ? 'CONGELADO' : 'ATIVADO'} manualmente.`);
-      const updatedOpp = { ...opportunity, status: newStatus, comments } as Opportunity;
-      setOpportunity(updatedOpp);
-      onUpdate(updatedOpp); 
-      await updateOpportunity(updatedOpp);
-  };
-
-  const togglePriorityLock = async () => {
-      const newLock = !opportunity.priorityLock;
-      const comments = addToStorytime(opportunity, `Prioridade ${newLock ? 'TRAVADA' : 'DESTRAVADA'}.`);
-      const updatedOpp = { ...opportunity, priorityLock: newLock, comments };
-      setOpportunity(updatedOpp);
-      onUpdate(updatedOpp);
-      await updateOpportunity(updatedOpp);
-  };
-
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
@@ -249,15 +235,20 @@ const OpportunityDetail: React.FC<Props> = ({ opportunity: initialOpp, onClose, 
       setNewComment('');
   };
 
+  const handleDescriptionSave = async () => {
+      if (editableDescription !== opportunity.description) {
+          const updatedOpp = { ...opportunity, description: editableDescription };
+          setOpportunity(updatedOpp);
+          onUpdate(updatedOpp);
+          await updateOpportunity(updatedOpp);
+      }
+  };
+
   const score = opportunity.prioScore || 0;
-  const isFrozen = opportunity.status === 'Frozen';
   
   const totalTasks = opportunity.bpmn?.nodes?.reduce((acc, node) => acc + (node.checklist ? node.checklist.length : 0), 0) || 0;
   const completedTasks = opportunity.bpmn?.nodes?.reduce((acc, node) => acc + (node.checklist ? node.checklist.filter(t => t.completed).length : 0), 0) || 0;
 
-  // NOTE: This component is now mainly used within ProjectWorkspace as the "Overview" tab.
-  // We remove the fixed overlay to let it flow in the workspace container.
-  
   const tabs = [
         { id: 'overview', icon: LayoutDashboard, label: 'Visão Geral' },
         { id: 'files', icon: Paperclip, label: 'Arquivos', badge: opportunity.attachments?.length },
@@ -288,11 +279,18 @@ const OpportunityDetail: React.FC<Props> = ({ opportunity: initialOpp, onClose, 
             {activeTab === 'overview' && (
                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-ios-pop duration-500">
                     <div className="lg:col-span-2 space-y-6">
-                        <div className="glass-panel rounded-3xl p-8">
+                        <div className="glass-panel rounded-3xl p-8 group border border-white/10 focus-within:border-amber-500/50 transition-colors">
                              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-3">
                                 <FileText className="w-6 h-6 text-slate-400"/> Descrição
+                                <span className="text-[10px] text-slate-400 font-normal opacity-0 group-hover:opacity-100 transition-opacity ml-auto bg-white/5 px-2 py-1 rounded">Clique para editar</span>
                              </h3>
-                             <p className="text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap text-lg font-light">{opportunity.description}</p>
+                             <textarea 
+                                className="w-full bg-transparent text-lg font-light text-slate-700 dark:text-slate-300 leading-relaxed resize-none outline-none h-[300px] custom-scrollbar"
+                                value={editableDescription}
+                                onChange={(e) => setEditableDescription(e.target.value)}
+                                onBlur={handleDescriptionSave}
+                                placeholder="Adicione uma descrição detalhada do projeto..."
+                             />
                         </div>
                         <div className="glass-panel rounded-3xl p-8">
                              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-3">
@@ -349,7 +347,7 @@ const OpportunityDetail: React.FC<Props> = ({ opportunity: initialOpp, onClose, 
                                         <div className="text-xs text-slate-500 mt-1">{file.size}</div>
                                     </div>
                                 </div>
-                                {!isClient && <button onClick={(e) => {e.stopPropagation(); handleDeleteFile(file);}} className="p-3 hover:bg-slate-200 dark:hover:bg-white/10 rounded-xl text-slate-500 hover:text-red-500 dark:hover:text-red-400 transition-colors"><Trash className="w-5 h-5"/></button>}
+                                {!isClient && userRole === 'dono' && <button onClick={(e) => {e.stopPropagation(); handleDeleteFile(file);}} className="p-3 hover:bg-slate-200 dark:hover:bg-white/10 rounded-xl text-slate-500 hover:text-red-500 dark:hover:text-red-400 transition-colors"><Trash className="w-5 h-5"/></button>}
                             </div>
                         ))}
                     </div>

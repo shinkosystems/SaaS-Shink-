@@ -384,12 +384,12 @@ export const ClientsScreen: React.FC<Props> = ({ userRole }) => {
                         </div>
 
                         <div className="p-6 border-t border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/5 flex justify-between items-center">
-                            {editingClient && (
+                            {editingClient && userRole === 'dono' && (
                                 <button onClick={() => handleDelete(editingClient.id)} className="text-red-500 hover:text-red-600 text-sm font-bold flex items-center gap-2">
                                     <Trash2 className="w-4 h-4"/> Excluir Cliente
                                 </button>
                             )}
-                            <div className="flex gap-3 ml-auto">
+                            <div className={`flex gap-3 ${editingClient && userRole === 'dono' ? 'ml-auto' : 'w-full justify-end'}`}>
                                 <button onClick={() => setShowModal(false)} className="px-6 py-3 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors">Cancelar</button>
                                 <button 
                                     onClick={handleSave}

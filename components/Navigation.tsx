@@ -258,7 +258,7 @@ const SidebarContent = ({ props }: { props: Props }) => (
 
 export const Sidebar = (props: Props) => {
   return (
-    <aside className="hidden md:block w-[270px] h-full flex-shrink-0 z-30 relative">
+    <aside className="hidden lg:block w-[270px] h-full flex-shrink-0 z-30 relative">
       {/* Ultra Glassmorphism Sidebar Background */}
       <div className="absolute inset-0 bg-white/60 dark:bg-black/40 backdrop-blur-[50px] saturate-150 border-r border-white/20 dark:border-white/5 shadow-[5px_0_30px_rgba(0,0,0,0.05)] dark:shadow-[5px_0_30px_rgba(0,0,0,0.5)]"></div>
       <div className="relative h-full z-10 flex flex-col">
@@ -273,7 +273,7 @@ export const MobileDrawer = (props: Props) => {
 
   return (
     <>
-       <header className="md:hidden h-16 bg-white/80 dark:bg-black/60 backdrop-blur-xl border-b border-slate-200 dark:border-white/5 flex items-center justify-between px-4 fixed top-0 left-0 right-0 z-40">
+       <header className="lg:hidden h-16 bg-white/80 dark:bg-black/60 backdrop-blur-xl border-b border-slate-200 dark:border-white/5 flex items-center justify-between px-4 fixed top-0 left-0 right-0 z-40">
           <div className="flex items-center gap-4">
             <button 
               onClick={() => props.setIsMobileOpen(true)}
@@ -297,7 +297,7 @@ export const MobileDrawer = (props: Props) => {
        </header>
 
        {props.isMobileOpen && (
-         <div className="fixed inset-0 z-50 flex md:hidden">
+         <div className="fixed inset-0 z-50 flex lg:hidden">
            <div 
              className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300"
              onClick={() => props.setIsMobileOpen(false)}
