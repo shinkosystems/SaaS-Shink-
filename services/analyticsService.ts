@@ -3,6 +3,7 @@ import { supabase } from './supabaseClient';
 import { ProductMetricsData, ProductEvent, DevMetricsData, Opportunity, BpmnTask } from '../types';
 
 const EVENTS_TABLE = 'eventos';
+const NPS_TABLE = 'nps';
 
 // Mock Data generator for demo/fallback
 const getMockMetrics = (range: 'week' | 'month' | 'year' = 'month'): ProductMetricsData => {
@@ -56,15 +57,54 @@ export const logEvent = async (
     }
 };
 
-export const submitNpsResponse = async (score: number, feedback?: string) => {
-    const category = score >= 9 ? 'promoter' : score >= 7 ? 'passive' : 'detractor';
-    
-    await logEvent('nps_response', {
-        score,
-        feedback,
-        category,
-        client_timestamp: new Date().toISOString()
-    });
+export const checkUserNpsEligibility = async (userId: string): Promise<boolean> => {
+    try {
+        // Busca a última resposta deste usuário
+        const { data, error } = await supabase
+            .from(NPS_TABLE)
+            .select('created_at')
+            .eq('user', userId)
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+        if (error) {
+            console.error("Erro ao verificar NPS:", error);
+            return false;
+        }
+
+        // Se não tem dados, nunca respondeu -> Elegível
+        if (!data || data.length === 0) {
+            return true;
+        }
+
+        // Se tem dados, verifica se faz mais de 30 dias
+        const lastResponseDate = new Date(data[0].created_at);
+        const now = new Date();
+        const diffTime = Math.abs(now.getTime() - lastResponseDate.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        return diffDays > 30;
+
+    } catch (err) {
+        return false;
+    }
+};
+
+export const submitNpsResponse = async (score: number, feedback: string, userId: string) => {
+    try {
+        await supabase.from(NPS_TABLE).insert({
+            user: userId,
+            nota: score,
+            comentario: feedback
+        });
+        
+        // Opcional: Logar também na tabela de eventos para analytics agregado rápido
+        const category = score >= 9 ? 'promoter' : score >= 7 ? 'passive' : 'detractor';
+        await logEvent('nps_response', { score, category });
+
+    } catch (err) {
+        console.error("Erro ao salvar NPS:", err);
+    }
 };
 
 export const fetchProductMetrics = async (range: 'week' | 'month' | 'year' = 'month'): Promise<ProductMetricsData> => {

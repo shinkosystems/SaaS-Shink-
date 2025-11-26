@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { X, Send, MessageSquare, Smile, Frown, Meh } from 'lucide-react';
-import { submitNpsResponse } from '../services/analyticsService';
+import { submitNpsResponse, checkUserNpsEligibility } from '../services/analyticsService';
 
 interface Props {
     userId?: string;
@@ -16,39 +17,27 @@ export const NpsSurvey: React.FC<Props> = ({ userId, userRole }) => {
     useEffect(() => {
         if (!userId) return;
 
-        // Verifica se o usuário já respondeu nos últimos 30 dias (Key única por usuário)
-        const storageKeyLast = `shinko_nps_last_${userId}`;
-        const storageKeyDismissed = `shinko_nps_dismissed_${userId}`;
+        const checkAndShow = async () => {
+            // 1. Verifica "Soneca" Local (Se usuário fechou no X recentemente)
+            const storageKeyDismissed = `shinko_nps_dismissed_${userId}`;
+            const dismissedAt = localStorage.getItem(storageKeyDismissed);
+            const now = Date.now();
+            const threeDays = 3 * 24 * 60 * 60 * 1000;
 
-        const lastResponse = localStorage.getItem(storageKeyLast);
-        const dismissedAt = localStorage.getItem(storageKeyDismissed);
-        const now = Date.now();
+            if (dismissedAt && (now - parseInt(dismissedAt) < threeDays)) {
+                return; // Não mostra se fechou recentemente
+            }
 
-        const thirtyDays = 30 * 24 * 60 * 60 * 1000;
-        const threeDays = 3 * 24 * 60 * 60 * 1000;
+            // 2. Verifica no Banco de Dados se é elegível (Nunca respondeu OU > 30 dias)
+            const isEligible = await checkUserNpsEligibility(userId);
 
-        let shouldShow = true;
+            if (isEligible) {
+                // Delay suave para não assustar o usuário ao entrar
+                setTimeout(() => setIsVisible(true), 5000);
+            }
+        };
 
-        // Lógica de Negócio: Focar a pesquisa prioritariamente em CLIENTES
-        // Se for cliente, mostra com mais insistência (regras normais). 
-        // Se for colaborador, pode ser menos frequente ou opcional, mas aqui mantemos a lógica geral.
-        // O importante é que o CLIENTE veja.
-        
-        // Se já respondeu recentemente
-        if (lastResponse && (now - parseInt(lastResponse) < thirtyDays)) {
-            shouldShow = false;
-        }
-
-        // Se fechou recentemente
-        if (dismissedAt && (now - parseInt(dismissedAt) < threeDays)) {
-            shouldShow = false;
-        }
-
-        // Delay de 5 segundos para não aparecer instantaneamente no load
-        if (shouldShow) {
-            const timer = setTimeout(() => setIsVisible(true), 5000);
-            return () => clearTimeout(timer);
-        }
+        checkAndShow();
     }, [userId, userRole]);
 
     const handleScore = (val: number) => {
@@ -64,11 +53,8 @@ export const NpsSurvey: React.FC<Props> = ({ userId, userRole }) => {
     };
 
     const handleSubmit = async () => {
-        if (score !== null) {
-            await submitNpsResponse(score, feedback);
-            if (userId) {
-                localStorage.setItem(`shinko_nps_last_${userId}`, Date.now().toString());
-            }
+        if (score !== null && userId) {
+            await submitNpsResponse(score, feedback, userId);
             setStep('thanks');
             setTimeout(() => setIsVisible(false), 3000);
         }

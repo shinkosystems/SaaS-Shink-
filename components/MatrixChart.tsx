@@ -42,12 +42,12 @@ const MatrixChart: React.FC<Props> = ({ data, onClick, theme = 'dark' }) => {
 
   return (
     <div id="matrix-chart-container" className="w-full h-full relative">
-        <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 absolute top-6 left-6 z-10 drop-shadow-md">Matriz MVV</h3>
+        <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 absolute top-6 left-6 z-10 drop-shadow-md pointer-events-none">Matriz MVV</h3>
         
-        <div className="absolute top-14 right-12 text-xs font-bold text-emerald-600 dark:text-emerald-400 text-right z-0 opacity-60">Veloz & Viável<br/>(Atacar)</div>
-        <div className="absolute top-14 left-16 text-xs font-bold text-yellow-600 dark:text-yellow-400 z-0 opacity-60">Lento & Viável<br/>(Estratégico)</div>
-        <div className="absolute bottom-14 right-12 text-xs font-bold text-orange-600 dark:text-orange-400 text-right z-0 opacity-60">Veloz & Difícil<br/>(Parceria/MVP)</div>
-        <div className="absolute bottom-14 left-16 text-xs font-bold text-red-600 dark:text-red-400 z-0 opacity-60">Lento & Difícil<br/>(Estudar)</div>
+        <div className="absolute top-14 right-12 text-xs font-bold text-emerald-600 dark:text-emerald-400 text-right z-0 opacity-60 pointer-events-none">Veloz & Viável<br/>(Atacar)</div>
+        <div className="absolute top-14 left-16 text-xs font-bold text-yellow-600 dark:text-yellow-400 z-0 opacity-60 pointer-events-none">Lento & Viável<br/>(Estratégico)</div>
+        <div className="absolute bottom-14 right-12 text-xs font-bold text-orange-600 dark:text-orange-400 text-right z-0 opacity-60 pointer-events-none">Veloz & Difícil<br/>(Parceria/MVP)</div>
+        <div className="absolute bottom-14 left-16 text-xs font-bold text-red-600 dark:text-red-400 z-0 opacity-60 pointer-events-none">Lento & Difícil<br/>(Estudar)</div>
 
       <ResponsiveContainer width="100%" height="100%">
         <ScatterChart margin={{ top: 50, right: 40, bottom: 40, left: 40 }}>
@@ -58,7 +58,11 @@ const MatrixChart: React.FC<Props> = ({ data, onClick, theme = 'dark' }) => {
 
           <XAxis type="number" dataKey="x" name="Velocidade" domain={[0, 6]} stroke={colors.text} tickCount={6} axisLine={false} tickLine={false} />
           <YAxis type="number" dataKey="y" name="Viabilidade" domain={[0, 6]} stroke={colors.text} tickCount={6} axisLine={false} tickLine={false} />
-          <Tooltip content={<CustomTooltip />} cursor={{ strokeDasharray: '3 3', stroke: colors.grid }} />
+          <Tooltip 
+            content={<CustomTooltip />} 
+            cursor={{ strokeDasharray: '3 3', stroke: colors.grid }} 
+            wrapperStyle={{ zIndex: 100, pointerEvents: 'none' }}
+          />
           
           <Scatter name="Oportunidades" data={chartData} fill="#3b82f6" onClick={(node) => onClick && onClick(node.payload as Opportunity)}>
             {chartData.map((entry, index) => (
@@ -66,7 +70,7 @@ const MatrixChart: React.FC<Props> = ({ data, onClick, theme = 'dark' }) => {
                 entry.x >= 3 && entry.y >= 3 ? '#10b981' : 
                 entry.x < 3 && entry.y >= 3 ? '#f59e0b' : 
                 entry.x >= 3 && entry.y < 3 ? '#f97316' : '#ef4444'
-              } stroke="rgba(255,255,255,0.2)" strokeWidth={1} className="hover:opacity-80 cursor-pointer transition-all duration-300 hover:scale-110" />
+              } stroke="rgba(255,255,255,0.2)" strokeWidth={1} className="cursor-pointer hover:opacity-80" />
             ))}
           </Scatter>
         </ScatterChart>
