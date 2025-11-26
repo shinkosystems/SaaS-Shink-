@@ -19,7 +19,7 @@ import { ProfileScreen } from './components/ProfileScreen';
 import { SettingsScreen } from './components/SettingsScreen';
 import { QuickTaskModal } from './components/QuickTaskModal';
 import { ResetPasswordModal } from './components/ResetPasswordModal';
-import { Dashboard } from './components/Dashboard'; // Import Dashboard Component
+import { Dashboard } from './components/Dashboard';
 import { fetchOpportunities, createOpportunity, updateOpportunity, deleteOpportunity } from './services/opportunityService';
 import { createTask, createProject } from './services/projectService';
 import { supabase } from './services/supabaseClient';
@@ -544,27 +544,36 @@ const App: React.FC = () => {
                         {opportunities
                             .filter(o => listFilterStatus === 'All' || o.status === listFilterStatus)
                             .map(opp => (
-                            <div key={opp.id} onClick={() => handleOpenProject(opp)} className="glass-card p-5 rounded-2xl cursor-pointer hover:bg-white/80 dark:hover:bg-white/5 transition-all border border-white/20 dark:border-white/5 shadow-sm hover:shadow-md group relative overflow-hidden flex flex-col gap-3 hover:z-10">
+                            <div 
+                                key={opp.id} 
+                                onClick={() => handleOpenProject(opp)} 
+                                className="glass-card p-5 rounded-2xl cursor-pointer 
+                                bg-white dark:bg-slate-900 
+                                hover:bg-slate-50 dark:hover:bg-slate-800 
+                                transition-all border border-slate-200 dark:border-slate-800 
+                                shadow-sm hover:shadow-xl 
+                                group relative overflow-hidden flex flex-col gap-3 hover:z-50 duration-300"
+                            >
                                 {/* Status Stripe */}
                                 <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${opp.status === 'Active' ? 'bg-emerald-500' : opp.status === 'Negotiation' ? 'bg-blue-500' : opp.status === 'Future' ? 'bg-amber-500' : 'bg-slate-500'}`}></div>
                                 
                                 <div className="pl-3 flex justify-between items-start gap-4">
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                            <h3 className="font-bold text-lg text-slate-900 dark:text-white truncate group-hover:text-shinko-primary transition-colors">{opp.title}</h3>
-                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm ${getStatusColor(opp.status)}`}>
+                                            <h3 className="font-bold text-lg text-slate-900 dark:text-white truncate max-w-full group-hover:text-shinko-primary transition-colors mr-2">{opp.title}</h3>
+                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm shrink-0 ${getStatusColor(opp.status)}`}>
                                                 {getStatusLabel(opp.status)}
                                             </span>
                                         </div>
-                                        <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2">{opp.description}</p>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">{opp.description}</p>
                                     </div>
 
-                                    {/* Actions Block - Now Relative Flex Item to prevent overlap */}
-                                    <div className="flex gap-2 shrink-0 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity self-start ml-4">
+                                    {/* Actions Block - DESKTOP ONLY */}
+                                    <div className="hidden md:flex gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity self-start ml-4">
                                          {userRole !== 'cliente' && (
                                             <button 
                                                 onClick={(e) => { e.stopPropagation(); setEditingOpp(opp); setIsWizardOpen(true); }}
-                                                className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-slate-400 hover:text-blue-500 rounded-lg transition-colors shadow-sm"
+                                                className="p-2 bg-slate-100 dark:bg-slate-700 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-slate-400 hover:text-blue-500 rounded-lg transition-colors shadow-sm"
                                                 title="Editar Projeto"
                                             >
                                                 <Edit className="w-4 h-4"/>
@@ -578,7 +587,7 @@ const App: React.FC = () => {
                                                         handleDeleteOpportunity(opp.id);
                                                     }
                                                 }}
-                                                className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-red-100 dark:hover:bg-red-900/30 text-slate-400 hover:text-red-500 rounded-lg transition-colors shadow-sm"
+                                                className="p-2 bg-slate-100 dark:bg-slate-700 hover:bg-red-100 dark:hover:bg-red-900/30 text-slate-400 hover:text-red-500 rounded-lg transition-colors shadow-sm"
                                                 title="Excluir Projeto e Tarefas"
                                              >
                                                 <Trash2 className="w-4 h-4"/>
@@ -588,18 +597,41 @@ const App: React.FC = () => {
                                 </div>
 
                                 {/* Footer Info */}
-                                <div className="pl-3 flex items-center justify-between mt-auto pt-2 border-t border-slate-100 dark:border-white/5">
+                                <div className="pl-3 flex flex-col sm:flex-row items-start sm:items-center justify-between mt-auto pt-3 border-t border-slate-100 dark:border-slate-800 gap-3">
                                     <div className="flex items-center gap-3">
-                                        <div className="flex items-center gap-1 text-xs text-slate-500 font-bold bg-slate-100 dark:bg-white/5 px-2 py-1 rounded">
+                                        <div className="flex items-center gap-1 text-xs text-slate-500 font-bold bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
                                             <Rocket className="w-3 h-3"/> {opp.archetype}
                                         </div>
                                         {opp.prioScore > 0 && (
-                                            <div className="flex items-center gap-1 text-xs text-slate-500 font-bold bg-slate-100 dark:bg-white/5 px-2 py-1 rounded">
+                                            <div className="flex items-center gap-1 text-xs text-slate-500 font-bold bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
                                                 <Target className="w-3 h-3 text-amber-500"/> {opp.prioScore.toFixed(1)}
                                             </div>
                                         )}
+                                        <span className="text-xs text-slate-400 hidden sm:inline">{new Date(opp.createdAt).toLocaleDateString()}</span>
                                     </div>
-                                    <span className="text-xs text-slate-400">{new Date(opp.createdAt).toLocaleDateString()}</span>
+
+                                    {/* Actions Block - MOBILE ONLY (Always Visible) */}
+                                    <div className="flex md:hidden gap-2 w-full sm:w-auto justify-end border-t sm:border-t-0 border-slate-100 dark:border-slate-800 pt-2 sm:pt-0">
+                                         {userRole !== 'cliente' && (
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); setEditingOpp(opp); setIsWizardOpen(true); }}
+                                                className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs font-bold rounded-lg flex items-center gap-2"
+                                            >
+                                                <Edit className="w-3 h-3"/> Editar
+                                            </button>
+                                         )}
+                                         {userRole === 'dono' && (
+                                             <button 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if(window.confirm(`Excluir projeto?`)) handleDeleteOpportunity(opp.id);
+                                                }}
+                                                className="px-3 py-1.5 bg-red-50 dark:bg-red-900/20 text-red-500 text-xs font-bold rounded-lg flex items-center gap-2"
+                                             >
+                                                <Trash2 className="w-3 h-3"/> Excluir
+                                            </button>
+                                         )}
+                                    </div>
                                 </div>
                             </div>
                         ))}

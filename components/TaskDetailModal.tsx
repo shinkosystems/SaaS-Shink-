@@ -1,11 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BpmnTask, BpmnSubTask, TaskStatus } from '../types';
-import { X, User, Calendar as CalendarIcon, CheckSquare, Square, Plus, Trash2, AlignLeft, Clock, PlayCircle, CheckCircle, BarChart3, Timer, Sparkles, Loader2, ArrowLeft, Layers, Hash, Eye, ShieldCheck } from 'lucide-react';
+import { X, User, Calendar as CalendarIcon, CheckSquare, Square, Plus, Trash2, AlignLeft, Clock, PlayCircle, CheckCircle, BarChart3, Timer, Sparkles, Loader2, ArrowLeft, Layers, Hash, Eye, ShieldCheck, CornerDownRight, ChevronDown, Check } from 'lucide-react';
 import { generateSubtasksForTask } from '../services/geminiService';
 import { supabase } from '../services/supabaseClient';
 import { logEvent } from '../services/analyticsService';
-import { syncSubtasks } from '../services/projectService';
+import { syncSubtasks, updateTask } from '../services/projectService';
 
 interface Props {
   task: BpmnTask;
@@ -14,6 +14,7 @@ interface Props {
   onSave: (updatedTask: BpmnTask) => void;
   onClose: () => void;
   onOpenProject?: () => void;
+  onDelete?: (id: string) => void;
 }
 
 export interface OrgMember {
@@ -22,22 +23,122 @@ export interface OrgMember {
     perfil: string;
 }
 
-const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, onSave, onClose, onOpenProject }) => {
+// Helper to format ISO string to datetime-local input format (YYYY-MM-DDThh:mm)
+const toInputFormat = (isoString?: string) => {
+    if (!isoString) return '';
+    try {
+        const d = new Date(isoString);
+        if (isNaN(d.getTime())) return '';
+        const pad = (n: number) => n.toString().padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    } catch (e) {
+        return '';
+    }
+};
+
+// Helper to convert datetime-local input back to ISO string
+const fromInputFormat = (inputValue: string) => {
+    if (!inputValue) return undefined;
+    try {
+        return new Date(inputValue).toISOString();
+    } catch (e) {
+        return undefined;
+    }
+};
+
+// --- INTERNAL MULTI-SELECT COMPONENT ---
+const MultiUserSelect = ({ 
+    members, 
+    selectedIds, 
+    onChange, 
+    label = "Selecionar" 
+}: { 
+    members: OrgMember[], 
+    selectedIds: string[], 
+    onChange: (ids: string[]) => void,
+    label?: string
+}) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const wrapperRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    const toggleId = (id: string) => {
+        if (selectedIds.includes(id)) {
+            onChange(selectedIds.filter(sid => sid !== id));
+        } else {
+            onChange([...selectedIds, id]);
+        }
+    };
+
+    const selectedCount = selectedIds.length;
+    const displayLabel = selectedCount === 0 ? label : 
+                         selectedCount === 1 ? members.find(m => m.id === selectedIds[0])?.nome.split(' ')[0] : 
+                         `${selectedCount} selecionados`;
+
+    return (
+        <div className="relative" ref={wrapperRef}>
+            <button 
+                onClick={() => setIsOpen(!isOpen)}
+                className="flex items-center gap-1 text-xs font-bold bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 px-2 py-1.5 rounded hover:border-purple-500 transition-colors min-w-[120px] justify-between text-slate-700 dark:text-slate-300"
+            >
+                <span className="truncate max-w-[100px]">{displayLabel}</span>
+                <ChevronDown className="w-3 h-3 opacity-50"/>
+            </button>
+
+            {isOpen && (
+                <div className="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto p-1">
+                    {members.map(m => {
+                        const isSelected = selectedIds.includes(m.id);
+                        return (
+                            <div 
+                                key={m.id} 
+                                onClick={() => toggleId(m.id)}
+                                className={`flex items-center gap-2 p-2 text-xs cursor-pointer rounded hover:bg-slate-100 dark:hover:bg-white/5 ${isSelected ? 'text-purple-600 dark:text-purple-400 font-bold' : 'text-slate-600 dark:text-slate-400'}`}
+                            >
+                                <div className={`w-3 h-3 rounded border flex items-center justify-center ${isSelected ? 'bg-purple-500 border-purple-500' : 'border-slate-400'}`}>
+                                    {isSelected && <Check className="w-2 h-2 text-white"/>}
+                                </div>
+                                {m.nome}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+};
+
+const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, onSave, onClose, onOpenProject, onDelete }) => {
   const [formData, setFormData] = useState<BpmnTask>({
     ...task,
     subtasks: task.subtasks || [],
     status: task.status || (task.completed ? 'done' : 'todo'),
     gut: task.gut || { g: 1, u: 1, t: 1 },
     estimatedHours: task.estimatedHours || 2,
-    startDate: task.startDate || new Date().toISOString().split('T')[0],
-    dueDate: task.dueDate || new Date().toISOString().split('T')[0]
+    startDate: task.startDate || new Date().toISOString(),
+    dueDate: task.dueDate || new Date().toISOString()
   });
 
   const [newSubtask, setNewSubtask] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
+  
+  // Modified state to include assigneeId per suggestion
+  const [aiSuggestions, setAiSuggestions] = useState<{title: string, hours: number, assigneeIds: string[]}[]>([]);
+  
   const [orgMembers, setOrgMembers] = useState<OrgMember[]>([]);
   const [currentUser, setCurrentUser] = useState<{id: string, nome: string} | null>(null);
+  
+  // State for bulk assignment of AI tasks
+  const [bulkAssigneeIds, setBulkAssigneeIds] = useState<string[]>([]);
 
   // Fetch Users from Organization
   useEffect(() => {
@@ -52,6 +153,7 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
 
               if (userData) {
                   setCurrentUser({ id: userData.id, nome: userData.nome });
+                  setBulkAssigneeIds([userData.id]); // Default to current user
 
                   if (userData.organizacao) {
                       const { data: members } = await supabase
@@ -126,11 +228,25 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
       setIsGenerating(true);
       setAiSuggestions([]); // Reset previous suggestions
       try {
-          const context = `${nodeTitle} - ${opportunityTitle || ''}`;
+          const context = `${nodeTitle} - ${opportunityTitle || ''}. Start: ${formData.startDate}. Due: ${formData.dueDate}`;
           const generated = await generateSubtasksForTask(formData.text, context);
           
           if (generated && generated.length > 0) {
-              setAiSuggestions(generated);
+              // BALANCEAMENTO (Round Robin)
+              // Se houver usuários selecionados em massa, distribui as tarefas sequencialmente entre eles
+              // em vez de duplicar a tarefa para todos.
+              const defaultIds = bulkAssigneeIds.length > 0 ? bulkAssigneeIds : (currentUser?.id ? [currentUser.id] : []);
+              
+              const mappedSuggestions = generated.map((item, index) => {
+                  // Round robin: index % numero_de_usuarios
+                  const balancedUserId = defaultIds[index % defaultIds.length];
+                  return {
+                      ...item,
+                      assigneeIds: [balancedUserId] // Atribui apenas um usuário por tarefa para balancear
+                  };
+              });
+
+              setAiSuggestions(mappedSuggestions);
               logEvent('feature_use', { feature: 'AI Subtasks Generated' });
           } else {
               alert("A IA não gerou sugestões. Tente melhorar o título da tarefa ou adicionar mais contexto na descrição.");
@@ -143,31 +259,149 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
       }
   };
 
-  const confirmAiSuggestions = () => {
+  const handleBulkAssignChange = (newIds: string[]) => {
+      setBulkAssigneeIds(newIds);
+      
+      // Ao mudar a seleção em massa, redistribuímos as tarefas existentes (Round Robin)
+      // para não criar duplicatas, mas sim balancear a carga.
+      if (newIds.length > 0) {
+          setAiSuggestions(prev => prev.map((item, index) => {
+              const balancedUserId = newIds[index % newIds.length];
+              return {
+                  ...item,
+                  assigneeIds: [balancedUserId]
+              };
+          }));
+      } else {
+          // Se limpar a seleção, volta para o usuário atual (fallback)
+          const fallbackId = currentUser?.id ? [currentUser.id] : [];
+          setAiSuggestions(prev => prev.map(item => ({ ...item, assigneeIds: fallbackId })));
+      }
+  };
+
+  const handleIndividualAssignChange = (index: number, newIds: string[]) => {
+      setAiSuggestions(prev => prev.map((item, i) => 
+          i === index ? { ...item, assigneeIds: newIds } : item
+      ));
+  };
+
+  const confirmAiSuggestions = async () => {
       if (aiSuggestions.length === 0) return;
 
-      const today = new Date();
+      // SMART SCHEDULING ALGORITHM (Reajuste Realista)
+      const parentStart = formData.startDate ? new Date(formData.startDate) : new Date();
+      const originalParentEnd = formData.dueDate ? new Date(formData.dueDate) : new Date();
+      
+      // Cursor for planning - Start from Parent Start
+      let currentCursor = new Date(parentStart);
+      
+      // Daily work hours assumption
+      const WORK_HOURS_PER_DAY = 8;
+      let totalCalculatedHours = 0;
+      
+      // Track max end date to update parent task later if needed
+      let newMaxEndDate = new Date(parentStart);
 
-      const newSubs: BpmnSubTask[] = aiSuggestions.map((txt, index) => {
-          const targetDate = new Date(today);
-          targetDate.setDate(today.getDate() + (index + 1));
-          const dateStr = targetDate.toISOString().split('T')[0];
+      const newSubs: BpmnSubTask[] = [];
 
-          return {
-              id: crypto.randomUUID(),
-              text: txt,
-              completed: false,
-              dueDate: dateStr,
-              // Explicitly assign to current user as requested
-              assigneeId: currentUser?.id,
-              assignee: currentUser?.nome
-          };
+      // Process Suggestions and Split if Multiple Assignees (caso o usuário force manualmente múltiplos na linha)
+      aiSuggestions.forEach((item) => {
+          const targetAssignees = item.assigneeIds.length > 0 ? item.assigneeIds : [currentUser?.id];
+          
+          targetAssignees.forEach(userId => {
+              if (!userId) return; // Skip invalid
+
+              const start = new Date(currentCursor);
+              
+              // Accumulate total hours for the parent task estimation
+              totalCalculatedHours += item.hours;
+
+              // Calculate duration in days (rounding up)
+              const durationDays = Math.ceil(item.hours / WORK_HOURS_PER_DAY);
+              const end = new Date(currentCursor);
+              
+              // Set end date (Duration - 1 day because start counts as day 1, but minimum same day)
+              end.setDate(end.getDate() + (durationDays > 0 ? durationDays - 1 : 0));
+              end.setHours(18, 0, 0, 0); // End of business day
+
+              // Update Global Max End Date tracking
+              if (end > newMaxEndDate) {
+                  newMaxEndDate = new Date(end);
+              }
+
+              // Find assignee Name for UI
+              const assigneeObj = orgMembers.find(m => m.id === userId);
+
+              newSubs.push({
+                  id: crypto.randomUUID(),
+                  text: item.title, // Keep original title, assignee column distinguishes them
+                  completed: false,
+                  startDate: start.toISOString(),
+                  dueDate: end.toISOString(),
+                  estimatedHours: item.hours,
+                  assigneeId: userId,
+                  assignee: assigneeObj?.nome || 'Desconhecido'
+              });
+          });
+
+          // After processing this item (for all users), advance the cursor
+          // If allocated to multiple people, we assume they work in parallel, so we advance based on the item duration once
+          // OR simpler: Sequential. Let's do sequential to be safe on deadlines.
+          const durationDays = Math.ceil(item.hours / WORK_HOURS_PER_DAY);
+          currentCursor.setDate(currentCursor.getDate() + durationDays);
+          currentCursor.setHours(9, 0, 0, 0); // Start of business day
       });
 
-      setFormData(prev => ({
-          ...prev,
-          subtasks: [...(prev.subtasks || []), ...newSubs]
-      }));
+      // Check if we need to extend the parent task deadline
+      let updatedDueDate = formData.dueDate;
+      let deadlineExtended = false;
+
+      if (newMaxEndDate > originalParentEnd) {
+          updatedDueDate = newMaxEndDate.toISOString();
+          deadlineExtended = true;
+      }
+
+      // 1. Update Local State
+      const updatedFormData = {
+          ...formData,
+          subtasks: [...(formData.subtasks || []), ...newSubs],
+          estimatedHours: totalCalculatedHours, // Update total hours to sum of subtasks
+          dueDate: updatedDueDate
+      };
+      setFormData(updatedFormData);
+
+      // 2. Sync to DB Immediately (Parent Update + Subtasks Insert)
+      if (!isNaN(Number(formData.id))) {
+          try {
+              // Update Parent Task (New Deadline + New Hours)
+              await updateTask(Number(formData.id), {
+                  duracaohoras: totalCalculatedHours,
+                  datafim: updatedDueDate,
+                  deadline: updatedDueDate
+              });
+
+              // Insert Subtasks
+              await syncSubtasks(Number(formData.id), newSubs.map(s => ({
+                  nome: s.text,
+                  status: 'todo',
+                  dueDate: s.dueDate,
+                  startDate: s.startDate,
+                  estimatedHours: s.estimatedHours,
+                  assigneeId: s.assigneeId
+              })));
+
+              let alertMsg = `${newSubs.length} subtarefas criadas!`;
+              if (deadlineExtended) {
+                  alertMsg += `\n\nNota: A data de entrega da tarefa principal foi estendida automaticamente para ${newMaxEndDate.toLocaleDateString()} para acomodar o trabalho.`;
+              }
+              alert(alertMsg);
+
+          } catch (err) {
+              console.error("Erro ao salvar subtarefas automáticas:", err);
+              alert("Erro ao salvar no banco de dados, mas adicionadas localmente.");
+          }
+      }
+
       setAiSuggestions([]); // Clear suggestions after adding
       logEvent('feature_use', { feature: 'AI Subtasks Confirmed' });
   };
@@ -179,18 +413,32 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
   const handleSave = async () => {
     logEvent('feature_use', { feature: 'Save Task' });
     
-    // Save main task updates (calls parent handler which likely calls updateTask)
+    // Save main task updates directly to DB
+    if (!isNaN(Number(formData.id))) {
+        await updateTask(Number(formData.id), {
+            titulo: formData.text,
+            descricao: formData.description,
+            status: formData.status,
+            responsavel: formData.assigneeId,
+            duracaohoras: formData.estimatedHours,
+            datainicio: formData.startDate,
+            datafim: formData.dueDate,
+            gravidade: formData.gut?.g,
+            urgencia: formData.gut?.u,
+            tendencia: formData.gut?.t
+        });
+    }
+
+    // Propagate up
     onSave(formData);
 
-    // Sync subtasks to DB if this is a real numeric ID task (DB Task)
+    // Sync any *new* manually added subtasks (non-numeric ID) to DB
     if (!isNaN(Number(formData.id))) {
-        // We only want to insert NEW subtasks (those with non-numeric IDs generated by crypto.randomUUID)
-        // Existing subtasks already have numeric IDs from DB and shouldn't be re-inserted by syncSubtasks
         const newSubs = (formData.subtasks || []).filter(s => isNaN(Number(s.id))).map(s => ({
             nome: s.text,
             status: s.completed ? 'done' : 'pending',
             dueDate: s.dueDate,
-            assigneeId: s.assigneeId || currentUser?.id // Fallback to current user if missing
+            assigneeId: s.assigneeId || currentUser?.id
         }));
         
         if (newSubs.length > 0) {
@@ -199,6 +447,12 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
     }
 
     onClose();
+  };
+
+  const handleDelete = () => {
+      if (onDelete && window.confirm("Tem certeza que deseja excluir esta tarefa? Isso removerá também todas as subtarefas vinculadas.")) {
+          onDelete(task.id);
+      }
   };
 
   const gutScore = (formData.gut?.g || 1) * (formData.gut?.u || 1) * (formData.gut?.t || 1);
@@ -211,12 +465,14 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
       { id: 'done', label: 'Concluído', icon: CheckCircle, color: 'text-emerald-500' },
   ];
 
+  const isSubtask = formData.isSubtask;
+
   return (
     <div className="fixed inset-0 z-[70] flex justify-end">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={onClose}></div>
       
-      {/* Slide-in Panel with Glass Effect */}
-      <div className="relative w-full md:w-[800px] h-full glass-panel border-l border-white/10 flex flex-col animate-ios-slide-left md:rounded-l-[32px] shadow-2xl">
+      {/* Slide-in Panel with Glass Effect - Increased Width for better spacing */}
+      <div className="relative w-full md:w-[1000px] h-full glass-panel border-l border-white/10 flex flex-col animate-ios-slide-left md:rounded-l-[32px] shadow-2xl">
         
       {/* Top Navigation Bar */}
       <header className="bg-white/50 dark:bg-white/5 border-b border-slate-200 dark:border-white/10 h-20 flex items-center px-6 md:px-8 justify-between shrink-0 z-20 backdrop-blur-md rounded-tl-[32px]">
@@ -233,7 +489,13 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
                       <span className="bg-slate-200 dark:bg-black/40 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded font-mono font-bold flex items-center gap-0.5">
                           <Hash className="w-3 h-3"/> {task.id}
                       </span>
-                      <span className="uppercase tracking-wider font-bold text-blue-600 dark:text-blue-500">Tarefa</span>
+                      {isSubtask ? (
+                          <span className="uppercase tracking-wider font-bold text-purple-500 flex items-center gap-1">
+                              <CornerDownRight className="w-3 h-3"/> Subtarefa
+                          </span>
+                      ) : (
+                          <span className="uppercase tracking-wider font-bold text-blue-600 dark:text-blue-500">Tarefa</span>
+                      )}
                       {opportunityTitle && (
                           <>
                             <span>/</span>
@@ -249,6 +511,15 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
           </div>
 
           <div className="flex items-center gap-3">
+              {onDelete && (
+                  <button 
+                    onClick={handleDelete}
+                    className="p-2 hover:bg-red-100 dark:hover:bg-red-900/20 text-slate-400 hover:text-red-500 rounded-lg transition-colors"
+                    title="Excluir Tarefa"
+                  >
+                      <Trash2 className="w-5 h-5"/>
+                  </button>
+              )}
               <button 
                 onClick={handleSave} 
                 className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-900/20 transition-transform active:scale-95"
@@ -261,10 +532,10 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
 
       {/* Content Body */}
       <div className="flex-1 overflow-y-auto custom-scrollbar p-6 md:p-10 bg-slate-50/50 dark:bg-transparent">
-        <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
             
-            {/* Left Column: Main Info */}
-            <div className="lg:col-span-2 space-y-6">
+            {/* Left Column: Main Info (Wider) */}
+            <div className="lg:col-span-8 space-y-6">
                 
                 {/* Title Input */}
                 <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/40 dark:bg-black/20">
@@ -290,125 +561,160 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
                      </div>
                 </div>
 
-                {/* Checklist Section */}
-                <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/40 dark:bg-black/20">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                            <CheckSquare className="w-5 h-5 text-purple-500"/> Checklist
-                        </h3>
-                        <button 
-                            onClick={handleAiGenerate}
-                            disabled={isGenerating}
-                            className="text-xs flex items-center gap-1 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 px-3 py-1.5 rounded-lg border border-purple-200 dark:border-purple-500/20 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors disabled:opacity-50"
-                        >
-                            {isGenerating ? <Loader2 className="w-3 h-3 animate-spin"/> : <Sparkles className="w-3 h-3"/>}
-                            {isGenerating ? 'Gerando...' : 'Gerar IA'}
-                        </button>
-                    </div>
-                    
-                    {/* AI Suggestions Preview */}
-                    {aiSuggestions.length > 0 && (
-                        <div className="mb-6 p-4 bg-purple-50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-500/30 rounded-xl animate-in fade-in slide-in-from-top-2">
-                            <h4 className="text-xs font-bold text-purple-700 dark:text-purple-300 uppercase mb-3 flex items-center gap-2">
-                                <Sparkles className="w-3 h-3"/> Sugestões da IA
-                            </h4>
-                            <ul className="space-y-2 mb-4">
-                                {aiSuggestions.map((s, i) => (
-                                    <li key={i} className="text-sm text-slate-700 dark:text-slate-300 flex items-start gap-2">
-                                        <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-purple-400 shrink-0"></span>
-                                        {s}
-                                    </li>
-                                ))}
-                            </ul>
-                            <div className="flex gap-2">
-                                <button onClick={confirmAiSuggestions} className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-lg shadow-sm transition-colors flex items-center gap-2">
-                                    <CheckCircle className="w-3 h-3"/> Inserir no Checklist
-                                </button>
-                                <button onClick={discardAiSuggestions} className="px-4 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-700 transition-colors">
-                                    Descartar
-                                </button>
-                            </div>
+                {/* Checklist Section - ONLY FOR PARENT TASKS */}
+                {!isSubtask && (
+                    <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/40 dark:bg-black/20">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                <CheckSquare className="w-5 h-5 text-purple-500"/> Checklist
+                            </h3>
+                            <button 
+                                onClick={handleAiGenerate}
+                                disabled={isGenerating}
+                                className="text-xs flex items-center gap-1 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 px-3 py-1.5 rounded-lg border border-purple-200 dark:border-purple-500/20 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors disabled:opacity-50"
+                            >
+                                {isGenerating ? <Loader2 className="w-3 h-3 animate-spin"/> : <Sparkles className="w-3 h-3"/>}
+                                {isGenerating ? 'Gerando...' : 'Gerar IA'}
+                            </button>
                         </div>
-                    )}
+                        
+                        {/* AI Suggestions Preview */}
+                        {aiSuggestions.length > 0 && (
+                            <div className="mb-6 p-4 bg-purple-50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-500/30 rounded-xl animate-in fade-in slide-in-from-top-2">
+                                <h4 className="text-xs font-bold text-purple-700 dark:text-purple-300 uppercase mb-3 flex items-center gap-2">
+                                    <Sparkles className="w-3 h-3"/> Sugestões da IA (Agendamento Automático)
+                                </h4>
+                                
+                                {/* Bulk Assignee Selector (MULTI) */}
+                                <div className="flex items-center gap-2 mb-4 bg-white/50 dark:bg-white/5 p-2 rounded-lg border border-purple-100 dark:border-white/5">
+                                    <User className="w-4 h-4 text-purple-500"/>
+                                    <span className="text-xs text-slate-600 dark:text-slate-300 font-medium">Atribuir e balancear entre:</span>
+                                    <MultiUserSelect 
+                                        members={orgMembers} 
+                                        selectedIds={bulkAssigneeIds} 
+                                        onChange={handleBulkAssignChange} 
+                                        label="Selecionar"
+                                    />
+                                </div>
 
-                    <div className="space-y-2 mb-4">
-                        {(formData.subtasks || []).map(sub => (
-                            <div key={sub.id} className="group border border-slate-100 dark:border-white/5 rounded-xl transition-all hover:bg-white/50 dark:hover:bg-white/5 bg-white/30 dark:bg-black/20 p-3">
-                                <div className="flex items-start gap-3">
-                                    <button onClick={() => toggleSubtask(sub.id)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white mt-0.5 shrink-0">
-                                        {sub.completed 
-                                            ? <CheckSquare className="w-5 h-5 text-emerald-500"/> 
-                                            : <Square className="w-5 h-5"/>
-                                        }
-                                    </button>
-                                    <div className="flex-1 min-w-0">
-                                        <span className={`text-sm leading-snug block ${sub.completed ? 'text-slate-400 line-through' : 'text-slate-700 dark:text-slate-300'}`}>
-                                            {sub.text}
-                                        </span>
-                                        
-                                        {/* Subtask Meta Controls */}
-                                        <div className="flex items-center gap-4 mt-2">
-                                            <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-white/5 px-2 py-1 rounded text-xs border border-slate-200 dark:border-white/5 hover:border-blue-400 transition-colors">
-                                                <CalendarIcon className="w-3 h-3 text-slate-400"/>
-                                                <input 
-                                                    type="date" 
-                                                    value={sub.dueDate || ''}
-                                                    onChange={(e) => updateSubtask(sub.id, 'dueDate', e.target.value)}
-                                                    className="bg-transparent outline-none text-slate-600 dark:text-slate-300 w-[85px] cursor-pointer"
-                                                />
+                                <ul className="space-y-2 mb-4">
+                                    {aiSuggestions.map((s, i) => (
+                                        <li key={i} className="text-sm text-slate-700 dark:text-slate-300 flex items-center justify-between gap-2 border-b border-white/5 pb-1 last:border-0">
+                                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-purple-400 shrink-0"></span>
+                                                <span className="truncate">{s.title}</span>
                                             </div>
                                             
-                                            <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-white/5 px-2 py-1 rounded text-xs border border-slate-200 dark:border-white/5 hover:border-blue-400 transition-colors relative">
-                                                <User className="w-3 h-3 text-slate-400"/>
-                                                <select 
-                                                    value={sub.assigneeId || ''}
-                                                    onChange={(e) => {
-                                                        const id = e.target.value;
-                                                        const member = orgMembers.find(m => m.id === id);
-                                                        updateSubtask(sub.id, 'assigneeId', id);
-                                                        updateSubtask(sub.id, 'assignee', member?.nome);
-                                                    }}
-                                                    className="bg-transparent outline-none text-slate-600 dark:text-slate-300 appearance-none pr-4 cursor-pointer max-w-[100px] truncate"
-                                                >
-                                                    <option value="">-- Resp. --</option>
-                                                    {orgMembers.map(m => (
-                                                        <option key={m.id} value={m.id}>{m.nome}</option>
-                                                    ))}
-                                                </select>
-                                                <div className="absolute right-1 pointer-events-none opacity-50">▼</div>
+                                            <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-1">
+                                                    <User className="w-3 h-3 text-slate-400"/>
+                                                    <MultiUserSelect 
+                                                        members={orgMembers}
+                                                        selectedIds={s.assigneeIds}
+                                                        onChange={(newIds) => handleIndividualAssignChange(i, newIds)}
+                                                        label="Resp."
+                                                    />
+                                                </div>
+                                                <span className="text-xs font-mono text-slate-500 bg-white/10 px-1.5 py-0.5 rounded w-[40px] text-center">{s.hours}h</span>
                                             </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <button onClick={() => deleteSubtask(sub.id)} className="p-1.5 rounded hover:bg-red-100 dark:hover:bg-red-900/20 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <Trash2 className="w-4 h-4"/>
+                                        </li>
+                                    ))}
+                                </ul>
+                                <div className="flex gap-2">
+                                    <button onClick={confirmAiSuggestions} className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-lg shadow-sm transition-colors flex items-center gap-2">
+                                        <CheckCircle className="w-3 h-3"/> Inserir e Reajustar Cronograma
+                                    </button>
+                                    <button onClick={discardAiSuggestions} className="px-4 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-700 transition-colors">
+                                        Descartar
                                     </button>
                                 </div>
                             </div>
-                        ))}
-                    </div>
+                        )}
 
-                    <div className="flex gap-2 mt-4 pt-4 border-t border-slate-200 dark:border-white/5">
-                        <div className="relative flex-1">
-                            <Plus className="absolute left-3 top-2.5 w-4 h-4 text-slate-500"/>
-                            <input 
-                                type="text" 
-                                value={newSubtask}
-                                onChange={e => setNewSubtask(e.target.value)}
-                                onKeyDown={e => e.key === 'Enter' && addSubtask()}
-                                className="w-full glass-input rounded-xl pl-10 pr-4 py-2 text-sm text-slate-900 dark:text-white focus:border-blue-500 outline-none"
-                                placeholder="Adicionar novo item..."
-                            />
+                        <div className="space-y-2 mb-4">
+                            {(formData.subtasks || []).map(sub => (
+                                <div key={sub.id} className="group border border-slate-100 dark:border-white/5 rounded-xl transition-all hover:bg-white/50 dark:hover:bg-white/5 bg-white/30 dark:bg-black/20 p-3">
+                                    <div className="flex items-start gap-3">
+                                        <button onClick={() => toggleSubtask(sub.id)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white mt-0.5 shrink-0">
+                                            {sub.completed 
+                                                ? <CheckSquare className="w-5 h-5 text-emerald-500"/> 
+                                                : <Square className="w-5 h-5"/>
+                                            }
+                                        </button>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex justify-between">
+                                                <span className={`text-sm leading-snug block ${sub.completed ? 'text-slate-400 line-through' : 'text-slate-700 dark:text-slate-300'}`}>
+                                                    {sub.text}
+                                                </span>
+                                                {sub.estimatedHours && (
+                                                    <span className="text-[10px] font-mono text-slate-500 bg-slate-100 dark:bg-white/5 px-1.5 py-0.5 rounded">{sub.estimatedHours}h</span>
+                                                )}
+                                            </div>
+                                            
+                                            {/* Subtask Meta Controls */}
+                                            <div className="flex items-center gap-4 mt-2">
+                                                <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-white/5 px-2 py-1 rounded text-xs border border-slate-200 dark:border-white/5 hover:border-blue-400 transition-colors">
+                                                    <CalendarIcon className="w-3 h-3 text-slate-400"/>
+                                                    <input 
+                                                        type="date" 
+                                                        value={sub.dueDate ? sub.dueDate.split('T')[0] : ''}
+                                                        onChange={(e) => updateSubtask(sub.id, 'dueDate', e.target.value)}
+                                                        className="bg-transparent outline-none text-slate-600 dark:text-slate-300 w-[85px] cursor-pointer"
+                                                    />
+                                                </div>
+                                                
+                                                <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-white/5 px-2 py-1 rounded text-xs border border-slate-200 dark:border-white/5 hover:border-blue-400 transition-colors relative">
+                                                    <User className="w-3 h-3 text-slate-400"/>
+                                                    <select 
+                                                        value={sub.assigneeId || ''}
+                                                        onChange={(e) => {
+                                                            const id = e.target.value;
+                                                            const member = orgMembers.find(m => m.id === id);
+                                                            updateSubtask(sub.id, 'assigneeId', id);
+                                                            updateSubtask(sub.id, 'assignee', member?.nome);
+                                                        }}
+                                                        className="bg-transparent outline-none text-slate-600 dark:text-slate-300 appearance-none pr-4 cursor-pointer max-w-[100px] truncate"
+                                                    >
+                                                        <option value="">-- Resp. --</option>
+                                                        {orgMembers.map(m => (
+                                                            <option key={m.id} value={m.id}>{m.nome}</option>
+                                                        ))}
+                                                    </select>
+                                                    <div className="absolute right-1 pointer-events-none opacity-50">▼</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <button onClick={() => deleteSubtask(sub.id)} className="p-1.5 rounded hover:bg-red-100 dark:hover:bg-red-900/20 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <Trash2 className="w-4 h-4"/>
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
-                        <button onClick={addSubtask} className="glass-button hover:bg-white/10 px-4 py-2 rounded-xl font-medium text-sm">
-                            Adicionar
-                        </button>
+
+                        <div className="flex gap-2 mt-4 pt-4 border-t border-slate-200 dark:border-white/5">
+                            <div className="relative flex-1">
+                                <Plus className="absolute left-3 top-2.5 w-4 h-4 text-slate-500"/>
+                                <input 
+                                    type="text" 
+                                    value={newSubtask}
+                                    onChange={e => setNewSubtask(e.target.value)}
+                                    onKeyDown={e => e.key === 'Enter' && addSubtask()}
+                                    className="w-full glass-input rounded-xl pl-10 pr-4 py-2 text-sm text-slate-900 dark:text-white focus:border-blue-500 outline-none"
+                                    placeholder="Adicionar novo item..."
+                                />
+                            </div>
+                            <button onClick={addSubtask} className="glass-button hover:bg-white/10 px-4 py-2 rounded-xl font-medium text-sm">
+                                Adicionar
+                            </button>
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
 
-            {/* Right Column: Settings & Meta */}
-            <div className="space-y-6">
+            {/* Right Column: Settings & Meta (Narrower) */}
+            <div className="lg:col-span-4 space-y-6">
                 
                 {/* Status Card */}
                 <div className="glass-panel p-5 rounded-2xl border border-white/10 bg-white/40 dark:bg-black/20">
@@ -462,7 +768,7 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
                         </select>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-4">
                          <div>
                             <label className="block text-xs text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
                                 <Timer className="w-4 h-4"/> Horas
@@ -474,26 +780,27 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
                                 className="w-full glass-input rounded-xl p-3 text-sm text-slate-900 dark:text-white focus:border-blue-500 outline-none"
                             />
                         </div>
-                        <div className="col-span-2 grid grid-cols-2 gap-4 border-t border-white/5 pt-4 mt-2">
+                        
+                        <div className="border-t border-white/5 pt-4 space-y-4">
                             <div>
                                 <label className="block text-xs text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
-                                    <CalendarIcon className="w-4 h-4 text-blue-500"/> Início
+                                    <CalendarIcon className="w-4 h-4 text-blue-500"/> Início (Data & Hora)
                                 </label>
                                 <input 
-                                    type="date"
-                                    value={formData.startDate || ''}
-                                    onChange={e => handleChange('startDate', e.target.value)}
+                                    type="datetime-local"
+                                    value={toInputFormat(formData.startDate)}
+                                    onChange={e => handleChange('startDate', fromInputFormat(e.target.value))}
                                     className="w-full glass-input rounded-xl p-3 text-sm text-slate-700 dark:text-slate-300 focus:border-blue-500 outline-none"
                                 />
                             </div>
                             <div>
                                 <label className="block text-xs text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
-                                    <CalendarIcon className="w-4 h-4 text-red-500"/> Entrega
+                                    <CalendarIcon className="w-4 h-4 text-red-500"/> Entrega (Data & Hora)
                                 </label>
                                 <input 
-                                    type="date"
-                                    value={formData.dueDate || ''}
-                                    onChange={e => handleChange('dueDate', e.target.value)}
+                                    type="datetime-local"
+                                    value={toInputFormat(formData.dueDate)}
+                                    onChange={e => handleChange('dueDate', fromInputFormat(e.target.value))}
                                     className="w-full glass-input rounded-xl p-3 text-sm text-slate-700 dark:text-slate-300 focus:border-blue-500 outline-none"
                                 />
                             </div>

@@ -144,6 +144,8 @@ export interface BpmnSubTask {
   completed: boolean;
   dbId?: number;
   dueDate?: string;
+  startDate?: string;
+  estimatedHours?: number;
   assignee?: string;
   assigneeId?: string;
 }

@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, User, Clock, Zap, 
 import TaskDetailModal from './TaskDetailModal';
 import { optimizeSchedule } from '../services/geminiService';
 import { supabase } from '../services/supabaseClient';
-import { fetchDevelopers, updateTask, fetchAllTasks } from '../services/projectService';
+import { fetchDevelopers, updateTask, fetchAllTasks, deleteTask } from '../services/projectService';
 
 interface Props {
   opportunities: Opportunity[];
@@ -101,15 +101,16 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
       if (projectId) setFilterProject(projectId);
   }, [projectId]);
 
+  const loadTasks = async () => {
+      setIsLoadingTasks(true);
+      const tasks = await fetchAllTasks();
+      setDbTasks(tasks);
+      setIsLoadingTasks(false);
+  };
+
   // Carrega todas as tarefas (DB) ao montar ou dar refresh
   useEffect(() => {
-      const load = async () => {
-          setIsLoadingTasks(true);
-          const tasks = await fetchAllTasks();
-          setDbTasks(tasks);
-          setIsLoadingTasks(false);
-      };
-      load();
+      loadTasks();
   }, [onRefresh]);
 
   useEffect(() => {
@@ -157,19 +158,30 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
     dbTasks.forEach(dbTask => {
         // Filtros
         if (filterProject !== 'all') {
-            if (dbTask.projeto?.toString() !== filterProject) return;
+            if (filterProject === 'adhoc') {
+                // Se o filtro é "Tarefas Avulsas", pula se tiver projeto
+                if (dbTask.projeto) return;
+            } else {
+                // Se for projeto específico
+                if (dbTask.projeto?.toString() !== filterProject) return;
+            }
         }
+
         if (filterAssignee !== 'all') {
             if (dbTask.responsavelData?.nome !== filterAssignee) return;
         }
         
         // Determina cor e título
-        let meta = { title: 'Tarefa Avulsa', color: 'bg-neutral-500', opp: undefined as any };
+        let meta = { title: 'Projeto Desconhecido', color: 'bg-slate-400', opp: undefined as any };
+        
         if (dbTask.projeto && projectMeta.has(dbTask.projeto)) {
             meta = projectMeta.get(dbTask.projeto)!;
         } else if (!dbTask.projeto) {
-            // Explicitly handling Adhoc tasks
-            meta = { title: 'Avulsa', color: 'bg-neutral-600', opp: undefined };
+            // Tarefas Avulsas (Sem projeto vinculado)
+            meta = { title: 'Tarefa Avulsa', color: 'bg-neutral-500 dark:bg-neutral-600', opp: undefined };
+        } else if (dbTask.projeto) {
+             // Tem projeto mas não está na lista carregada (ex: arquivado ou sem acesso)
+             meta = { title: dbTask.projetoData?.nome || 'Projeto Arquivado', color: 'bg-slate-400', opp: undefined as any };
         }
 
         const safeDateParse = (dateStr?: string) => {
@@ -187,15 +199,9 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
         if (start && end) {
             if (end < start) end = start; // Safety fix
 
-            // Se não for tarefa de projeto, mostra em todos os dias do intervalo, senão filtra dias úteis
-            // Otimização: Para visualização, se for manualmente agendada em fim de semana, mostramos.
-            // O filtro de business day é mais para cálculo de horas úteis.
             const businessDays = getBusinessDatesInRange(start, end);
-            // Se businessDays for vazio (ex: tarefa só no domingo), usamos o range completo para exibir, 
-            // mas com carga horária zerada se não for dia útil (logica visual abaixo lida com isso)
             let effectiveDays = businessDays.length > 0 ? businessDays : [end];
             
-            // Se o usuário marcou manualmente num fim de semana, mostramos lá.
             if (start.getDay() === 0 || start.getDay() === 6) {
                  if (!effectiveDays.find(d => d.getTime() === start!.getTime())) effectiveDays.push(start);
             }
@@ -203,7 +209,6 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
             const totalHours = Number(dbTask.duracaohoras) || 2;
             const dailyLoad = parseFloat((totalHours / Math.max(1, effectiveDays.length)).toFixed(1));
 
-            // Adapter for BpmnTask interface used by Edit Modal
             const taskAdapter: BpmnTask = {
                 id: dbTask.id.toString(),
                 text: dbTask.titulo,
@@ -216,7 +221,8 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
                 dueDate: dbTask.datafim || dbTask.deadline,
                 estimatedHours: dbTask.duracaohoras,
                 gut: { g: dbTask.gravidade, u: dbTask.urgencia, t: dbTask.tendencia },
-                assigneeIsDev: dbTask.responsavelData?.desenvolvedor
+                assigneeIsDev: dbTask.responsavelData?.desenvolvedor,
+                isSubtask: dbTask.sutarefa
             };
 
             effectiveDays.forEach((dateObj, index) => {
@@ -233,7 +239,7 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
                     taskId: dbTask.id,
                     task: taskAdapter, 
                     taskText: dbTask.titulo,
-                    isSubtask: dbTask.sutarefa, // Flag para renderização visual
+                    isSubtask: dbTask.sutarefa, 
                     status: effectiveStatus,
                     completed: effectiveStatus === 'done',
                     assignee: dbTask.responsavelData?.nome,
@@ -257,7 +263,6 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
   const handleBalanceClick = async () => {
       setIsBalancing(true);
       try {
-          // 1. Fetch Organization and Developers
           const { data: { user } } = await supabase.auth.getUser();
           let orgId = 3;
           if (user) {
@@ -266,7 +271,6 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
           }
           const availableDevs = await fetchDevelopers(orgId);
 
-          // 2. Gather tasks to balance - Use dbTasks directly!
           const globalPendingTasks = dbTasks
             .filter(t => t.status !== 'done' && t.status !== 'Archived' && t.organizacao === orgId)
             .map(t => ({
@@ -284,10 +288,8 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
               return;
           }
 
-          // 3. Optimize
           const updates = await optimizeSchedule(globalPendingTasks, availableDevs);
           
-          // 4. Apply Updates Directly to DB
           if (updates && updates.length > 0) {
               let updateCount = 0;
               for (const update of updates) {
@@ -307,6 +309,7 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
               }
               
               alert(`Otimização Concluída!\n${updateCount} tarefas foram ajustadas e/ou realocadas.\nData de Início e Fim atualizadas.`);
+              loadTasks();
               if (onRefresh) onRefresh();
           } else {
               alert("A agenda já estava otimizada.");
@@ -374,7 +377,6 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
   const titleFormat = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' });
   const dateFormat = new Intl.DateTimeFormat('pt-BR', { weekday: 'short', day: 'numeric' });
 
-  // --- YEAR RENDERER ---
   const renderYearView = () => {
       const year = currentDate.getFullYear();
       const months = Array.from({ length: 12 }, (_, i) => {
@@ -390,7 +392,6 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
                   const intensity = Math.min(1, m.load / 200); // Cap at 200h for visual heat
                   return (
                       <div key={i} className="bg-white dark:bg-[#0f0f0f] border border-slate-200 dark:border-white/5 rounded-xl p-4 relative overflow-hidden group hover:border-amber-500/50 transition-all">
-                          {/* Heatmap Background */}
                           <div 
                               className="absolute bottom-0 left-0 right-0 bg-amber-500/10 dark:bg-amber-500/20 transition-all"
                               style={{ height: `${intensity * 100}%` }}
@@ -464,13 +465,12 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
                             ${!isHoliday && !isToday && !isWeekend ? 'bg-white dark:bg-[#050505] hover:bg-slate-50 dark:hover:bg-[#0f0f0f]' : ''}
                         `}
                     >
-                        {/* Hachura para dias não úteis (Fins de semana e feriados) */}
                         {isNonBusiness && (
                             <div className="absolute inset-0 opacity-30 pointer-events-none" 
                                  style={{ 
                                      backgroundImage: 'linear-gradient(45deg, #000 5%, transparent 5%, transparent 50%, #000 50%, #000 55%, transparent 55%, transparent)', 
                                      backgroundSize: '8px 8px',
-                                     filter: 'invert(0.1)' // Low contrast hatch
+                                     filter: 'invert(0.1)' 
                                  }}
                             ></div>
                         )}
@@ -486,7 +486,7 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
                             <div className="flex flex-col gap-1 items-end w-full pl-2">
                                 {Object.values(dailyLoad).map((data: any) => {
                                     const isOverloaded = data.remaining > 8.01;
-                                    const isBadScheduling = isNonBusiness; // Alerta se agendado em dia não útil
+                                    const isBadScheduling = isNonBusiness; 
                                     return (
                                         <div key={data.name} className={`text-[10px] px-1.5 py-0.5 rounded flex items-center gap-2 font-mono shadow-sm ${isOverloaded || (isBadScheduling && data.remaining > 0) ? 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-500/30 animate-pulse' : 'bg-slate-100 dark:bg-[#1a1a1a] text-slate-600 dark:text-neutral-400 border border-slate-200 dark:border-[#333]'}`}>
                                             <span className="font-bold">{data.name.split(' ')[0]}</span>
@@ -557,6 +557,7 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
                     <div className="relative group">
                         <select value={filterProject} onChange={e => setFilterProject(e.target.value)} className="appearance-none pl-9 pr-8 h-12 bg-white dark:bg-[#0a0a0a] border border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 rounded-xl text-sm font-medium text-slate-900 dark:text-white focus:border-amber-500 outline-none cursor-pointer min-w-[160px]">
                             <option value="all" className="dark:bg-black">Todos Projetos</option>
+                            <option value="adhoc" className="dark:bg-black text-amber-500">Tarefas Avulsas</option>
                             {projects.map(p => <option key={p.id} value={p.id} className="dark:bg-black">{p.title}</option>)}
                         </select>
                         <Hash className="w-4 h-4 absolute left-3 top-4 text-slate-500 pointer-events-none"/>
@@ -591,7 +592,7 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
                 </div>
                 <button onClick={handleNext} className="h-12 w-12 flex items-center justify-center bg-white dark:bg-[#0a0a0a] hover:bg-slate-100 dark:hover:bg-white/5 rounded text-slate-700 dark:text-white border border-slate-200 dark:border-white/10 shadow-sm transition-colors"><ChevronRight className="w-6 h-6" /></button>
             </div>
-            <button onClick={onRefresh} className="h-12 w-12 flex items-center justify-center bg-slate-200 dark:bg-[#151515] hover:bg-slate-300 dark:hover:bg-white/10 rounded text-slate-500 dark:text-white transition-colors ml-2">
+            <button onClick={loadTasks} className="h-12 w-12 flex items-center justify-center bg-slate-200 dark:bg-[#151515] hover:bg-slate-300 dark:hover:bg-white/10 rounded text-slate-500 dark:text-white transition-colors ml-2">
                 <RefreshCw className={`w-5 h-5 ${isLoadingTasks ? 'animate-spin' : ''}`}/>
             </button>
         </div>
@@ -620,9 +621,38 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
               opportunityTitle={editingContext.opportunity?.title}
               onClose={() => setEditingContext(null)}
               onOpenProject={() => { if (editingContext.opportunity) { onSelectOpportunity(editingContext.opportunity); setEditingContext(null); } }}
+              onDelete={async (id) => {
+                  if (!isNaN(Number(id))) {
+                      await deleteTask(Number(id));
+                      loadTasks();
+                      setEditingContext(null);
+                  }
+              }}
               onSave={async (updatedTask) => {
-                  await onTaskUpdate(editingContext.oppId, editingContext.nodeId, updatedTask);
-                  if (onRefresh) onRefresh(); // Ensure calendar refreshes after modal save
+                  // FIX: Handle DB Update directly to ensure consistency
+                  if (!isNaN(Number(updatedTask.id))) {
+                      await updateTask(Number(updatedTask.id), {
+                          titulo: updatedTask.text,
+                          descricao: updatedTask.description,
+                          status: updatedTask.status,
+                          responsavel: updatedTask.assigneeId,
+                          duracaohoras: updatedTask.estimatedHours,
+                          datainicio: updatedTask.startDate,
+                          datafim: updatedTask.dueDate,
+                          // Sync redundant fields for compatibility
+                          deadline: updatedTask.dueDate,
+                          dataproposta: updatedTask.dueDate, 
+                          gravidade: updatedTask.gut?.g,
+                          urgencia: updatedTask.gut?.u,
+                          tendencia: updatedTask.gut?.t
+                      });
+                  } else {
+                      // Legacy support
+                      await onTaskUpdate(editingContext.oppId, editingContext.nodeId, updatedTask);
+                  }
+                  
+                  loadTasks(); // Refresh local state
+                  if (onRefresh) onRefresh(); 
               }}
           />
       )}

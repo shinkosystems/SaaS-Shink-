@@ -62,8 +62,6 @@ export const createProject = async (nome: string, cliente: string | null, userId
 
 export const fetchAllTasks = async (): Promise<DbTask[]> => {
     try {
-        // 1. Fetch Raw Tasks with Project Data
-        // Note: We do NOT join with auth.users here because of complexity/restrictions.
         const { data: tasks, error } = await supabase
             .from(TASKS_TABLE)
             .select(`
@@ -75,10 +73,8 @@ export const fetchAllTasks = async (): Promise<DbTask[]> => {
         if (error) throw error;
         if (!tasks || tasks.length === 0) return [];
 
-        // 2. Extract unique User UUIDs from tasks (responsavel field)
         const userIds = [...new Set(tasks.map((t: any) => t.responsavel).filter(Boolean))];
 
-        // 3. Fetch User Profiles from public.users manually
         let userMap = new Map<string, any>();
         
         if (userIds.length > 0) {
@@ -92,7 +88,6 @@ export const fetchAllTasks = async (): Promise<DbTask[]> => {
             }
         }
 
-        // 4. Hydrate tasks with responsavelData
         const hydratedTasks: DbTask[] = tasks.map((t: any) => ({
             ...t,
             responsavelData: userMap.get(t.responsavel) || { nome: 'Desconhecido', desenvolvedor: false, organizacao: 0 }
@@ -117,7 +112,7 @@ export const fetchUserTasks = async (userId: string): Promise<DbTask[]> => {
             .eq('responsavel', userId)
             .neq('status', 'done')
             .neq('status', 'Archived')
-            .order('datafim', { ascending: true }); // Bring nearest deadlines first
+            .order('datafim', { ascending: true });
 
         if (error) throw error;
         return tasks as DbTask[];
@@ -148,28 +143,24 @@ export const createTask = async (task: Partial<DbTask>): Promise<DbTask | null> 
             throw new Error("Responsável (UUID) é obrigatório para criar tarefa.");
         }
 
-        // Mapping based on user request:
-        // dataproposta = Prazo (task.datafim or now)
-        // deadline = Prazo (task.datafim)
-        // datafim = Prazo (task.datafim)
         const prazo = task.datafim || new Date().toISOString();
 
         const payload = {
-            projeto: task.projeto || null, // Allow null for free tasks
+            projeto: task.projeto || null,
             titulo: task.titulo,
             descricao: task.descricao || 'VAZIO',
             status: task.status || 'todo',
-            responsavel: task.responsavel, // UUID (Required by Schema)
+            responsavel: task.responsavel,
             gravidade: task.gravidade || 1,
             urgencia: task.urgencia || 1,
             tendencia: task.tendencia || 1,
-            dataproposta: prazo, // Mapped to Prazo
-            deadline: prazo,     // Mapped to Prazo
+            dataproposta: prazo,
+            deadline: prazo,
             datainicio: task.datainicio || new Date().toISOString(),
-            datafim: prazo,      // Mapped to Prazo
+            datafim: prazo,
             duracaohoras: task.duracaohoras || 2,
             sutarefa: task.sutarefa || false,
-            tarefamae: task.tarefamae || null, // Set parent ID if it's a subtask
+            tarefamae: task.tarefamae || null,
             organizacao: task.organizacao || 3
         };
 
@@ -183,12 +174,11 @@ export const createTask = async (task: Partial<DbTask>): Promise<DbTask | null> 
         return data;
     } catch (error: any) {
         console.error('Erro ao criar tarefa (tasks):', error.message || error);
-        throw error; // Re-throw to be caught by UI
+        throw error;
     }
 };
 
 export const updateTask = async (id: number, updates: Partial<DbTask>): Promise<DbTask | null> => {
-    // Remove readonly/joined fields before update
     const { projetoData, responsavelData, createdat, id: _id, ...cleanUpdates } = updates as any;
 
     const { data, error } = await supabase
@@ -206,6 +196,13 @@ export const updateTask = async (id: number, updates: Partial<DbTask>): Promise<
 };
 
 export const deleteTask = async (id: number): Promise<boolean> => {
+    // 1. Delete Subtasks first to avoid constraint errors
+    const { error: subError } = await supabase.from(TASKS_TABLE).delete().eq('tarefamae', id);
+    if (subError) {
+        console.error('Erro ao deletar subtarefas:', subError);
+    }
+
+    // 2. Delete Main Task
     const { error } = await supabase.from(TASKS_TABLE).delete().eq('id', id);
     if (error) {
         console.error('Erro ao deletar tarefa:', error);
@@ -214,27 +211,23 @@ export const deleteTask = async (id: number): Promise<boolean> => {
     return true;
 };
 
-export const syncSubtasks = async (parentTaskId: number, subtasks: { nome: string, status: string, dueDate?: string, assigneeId?: string }[]) => {
-    // 1. Get parent info
+export const syncSubtasks = async (parentTaskId: number, subtasks: { nome: string, status: string, dueDate?: string, startDate?: string, estimatedHours?: number, assigneeId?: string }[]) => {
     const { data: parent } = await supabase.from(TASKS_TABLE).select('projeto, responsavel, organizacao').eq('id', parentTaskId).single();
     if (!parent) return;
 
-    // For this feature scope, we assume simple insertion of subtasks linked to the parent.
-    // In a real scenario we might want to upsert based on ID if provided.
-    
     const inserts = subtasks.map(sub => ({
         projeto: parent.projeto,
         titulo: sub.nome,
         status: sub.status,
-        // Use specific subtask assignee OR fallback to parent responsible (often user who created it)
         responsavel: sub.assigneeId || parent.responsavel, 
         organizacao: parent.organizacao,
         sutarefa: true,
-        tarefamae: parentTaskId, // Use the tarefamae column as requested
-        duracaohoras: 1,
+        tarefamae: parentTaskId,
+        duracaohoras: sub.estimatedHours || 2,
         gravidade: 1, urgencia: 1, tendencia: 1,
         dataproposta: new Date().toISOString(),
-        datafim: sub.dueDate || undefined, // Save individual due date
+        datainicio: sub.startDate || new Date().toISOString(),
+        datafim: sub.dueDate || undefined,
         deadline: sub.dueDate || undefined
     }));
 

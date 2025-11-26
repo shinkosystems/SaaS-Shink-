@@ -134,18 +134,33 @@ export const extractPdfContext = async (base64Pdf: string): Promise<string> => {
     }
 };
 
-export const generateSubtasksForTask = async (taskTitle: string, context: string): Promise<string[]> => {
+export const generateSubtasksForTask = async (taskTitle: string, context: string): Promise<{title: string, hours: number}[]> => {
     const ai = getAiClient();
     if (!ai) return [];
-    const prompt = `Crie um checklist técnico JSON para: "${taskTitle}". Contexto: ${context}. Return JSON array strings.`;
+    const prompt = `
+      Atue como um Project Manager Técnico Sênior.
+      Crie um checklist técnico detalhado para a tarefa: "${taskTitle}".
+      Contexto do Projeto: ${context}.
+      
+      Para cada item, estime o tempo em horas de forma REALISTA e VARIÁVEL baseada na complexidade (ex: 1, 2, 4, 8, 12).
+      NÃO use valores fixos (como 3 horas para tudo). Tarefas simples = menos horas. Complexas = mais horas.
+      
+      Retorne APENAS um JSON Array no formato: [{ "title": "Nome da Subtarefa", "hours": 4 }, ...].
+    `;
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
             config: { responseMimeType: 'application/json' }
         });
-        return JSON.parse(cleanJson(response.text || ""));
+        const parsed = JSON.parse(cleanJson(response.text || ""));
+        // Compatibilidade: se a IA retornar string array, converte
+        if (Array.isArray(parsed) && typeof parsed[0] === 'string') {
+            return parsed.map((t: string) => ({ title: t, hours: 2 }));
+        }
+        return parsed;
     } catch (error) {
+        console.error("Erro IA Subtasks:", error);
         return [];
     }
 };
@@ -166,14 +181,7 @@ export const generateBpmn = async (title: string, description: string, archetype
     }
 };
 
-/**
- * ALGORITMO DE ALOCAÇÃO "GRANULAR SPLIT" COM REALOCAÇÃO DE RESPONSÁVEIS
- * 
- * Objetivo: Encontrar a data de entrega mais cedo possível, respeitando 8h/dia.
- * Permite trocar o responsável se outro desenvolvedor puder entregar antes.
- */
 export const optimizeSchedule = async (tasks: any[], availableDevelopers: {id: string, nome: string}[] = []): Promise<any[]> => {
-    
     // Fila de tarefas (Priorizadas por Valor/GUT)
     const queue = tasks.map(t => ({
         id: t.taskId,
@@ -183,30 +191,21 @@ export const optimizeSchedule = async (tasks: any[], availableDevelopers: {id: s
         valueScore: t.gut ? (t.gut.g * t.gut.u * t.gut.t) : 1
     }));
 
-    console.log(`[Optimizer] Iniciando Alocação para ${queue.length} tarefas. Devs disponíveis: ${availableDevelopers.length}`);
-
     // Ordena por prioridade
     queue.sort((a, b) => b.valueScore - a.valueScore);
 
     const updates: any[] = [];
-    
-    // Inicializa o estado de carga dos desenvolvedores
-    // devState[devId] = { nextFreeSlot: Date, dailyLoads: { [isoDate]: hours } }
     const devState: Record<string, { nextFreeSlot: Date, dailyLoads: Record<string, number> }> = {};
 
-    // Data base = Amanhã
     const baseDate = new Date();
     baseDate.setDate(baseDate.getDate() + 1); 
     baseDate.setHours(12, 0, 0, 0);
 
-    // Se não tiver devs disponíveis, usa um placeholder "Unassigned" para simulação
     const devsPool = availableDevelopers.length > 0 
         ? availableDevelopers 
         : [{ id: 'unassigned', nome: 'Sem Dev' }];
 
-    // Inicializa cursores para cada Dev
     devsPool.forEach(dev => {
-        // Avança para próximo dia útil inicial
         let start = new Date(baseDate);
         while (!isBusinessDay(start)) {
             start.setDate(start.getDate() + 1);
@@ -218,55 +217,38 @@ export const optimizeSchedule = async (tasks: any[], availableDevelopers: {id: s
         };
     });
 
-    // Função auxiliar para simular alocação de uma tarefa para um dev específico
-    // Retorna a data de conclusão prevista se alocada para este dev
     const simulateAllocation = (devId: string, hoursNeeded: number): { finishDate: Date, startDate: Date } => {
         const state = devState[devId];
-        
-        // Começamos a procurar espaço a partir do próximo slot livre deste dev
         let cursor = new Date(state.nextFreeSlot);
         let remaining = hoursNeeded;
-        
-        // Clone loads to not affect real state yet during simulation
         const tempLoads = { ...state.dailyLoads };
         let firstAllocationDate: Date | null = null;
-
         let safety = 0;
         while (remaining > 0.001 && safety < 1000) {
-            // Se for feriado ou fds, pula IMEDIATAMENTE
             while (!isBusinessDay(cursor)) {
                 cursor.setDate(cursor.getDate() + 1);
                 cursor = normalizeDate(cursor);
             }
-
             const dateKey = toLocalISOString(cursor);
             const currentLoad = tempLoads[dateKey] || 0;
             const capacity = 8 - currentLoad;
 
             if (capacity <= 0.001) {
-                // Dia cheio, vai para o próximo
                 cursor.setDate(cursor.getDate() + 1);
                 cursor = normalizeDate(cursor);
-                
-                // VITAL: Ao avançar para o próximo dia, verificar novamente se é dia útil
                 while (!isBusinessDay(cursor)) {
                     cursor.setDate(cursor.getDate() + 1);
                     cursor = normalizeDate(cursor);
                 }
                 continue;
             }
-
             if (!firstAllocationDate) firstAllocationDate = new Date(cursor);
-
             const allocation = Math.min(remaining, capacity);
             remaining -= allocation;
-            tempLoads[dateKey] = currentLoad + allocation; // Simulando consumo
-
+            tempLoads[dateKey] = currentLoad + allocation;
             if (remaining > 0.001) {
                 cursor.setDate(cursor.getDate() + 1);
                 cursor = normalizeDate(cursor);
-                
-                // VITAL: Verificar feriado novamente ao avançar o dia
                 while (!isBusinessDay(cursor)) {
                     cursor.setDate(cursor.getDate() + 1);
                     cursor = normalizeDate(cursor);
@@ -274,92 +256,70 @@ export const optimizeSchedule = async (tasks: any[], availableDevelopers: {id: s
             }
             safety++;
         }
-        
-        // Se falhou (safety), retorna data muito distante
         if (safety >= 1000) {
             const farFuture = new Date();
             farFuture.setFullYear(2050);
             return { finishDate: farFuture, startDate: farFuture };
         }
-
         return { finishDate: cursor, startDate: firstAllocationDate || cursor };
     };
 
-    // Processa cada tarefa da fila
     for (const task of queue) {
         let bestDevId = null;
-        let bestFinishDate = new Date(8640000000000000); // Max date
+        let bestFinishDate = new Date(8640000000000000);
         let bestStartDate = new Date();
 
-        // Tenta alocar para CADA dev e vê quem termina antes
         for (const dev of devsPool) {
             const simulation = simulateAllocation(dev.id, task.estimatedHours);
-            
-            // Lógica de desempate:
-            // 1. Menor data de entrega ganha (Balanceamento agressivo)
-            // 2. Se data igual, prefere o responsável original (Stickiness)
-            // 3. Se data igual e sem dono original, mantém o primeiro encontrado
             if (simulation.finishDate < bestFinishDate) {
                 bestFinishDate = simulation.finishDate;
                 bestStartDate = simulation.startDate;
                 bestDevId = dev.id;
             } else if (simulation.finishDate.getTime() === bestFinishDate.getTime()) {
                 if (dev.id === task.originalAssigneeId) {
-                    bestDevId = dev.id; // Mantém original se empate
+                    bestDevId = dev.id;
                 }
             }
         }
 
-        // Confirma a alocação no estado do Dev vencedor
         if (bestDevId) {
             const winnerState = devState[bestDevId];
             let remaining = task.estimatedHours;
             let cursor = new Date(bestStartDate);
 
-            // "Comita" o uso das horas no estado real do dev
             while (remaining > 0.001) {
                 while (!isBusinessDay(cursor)) {
                     cursor.setDate(cursor.getDate() + 1);
                     cursor = normalizeDate(cursor);
                 }
-                
                 const dateKey = toLocalISOString(cursor);
                 const currentLoad = winnerState.dailyLoads[dateKey] || 0;
                 const capacity = 8 - currentLoad;
                 
-                // Deve ter capacidade, pois simulamos antes.
                 if (capacity <= 0.001) {
                     cursor.setDate(cursor.getDate() + 1);
                     cursor = normalizeDate(cursor);
-                    // VITAL Check
                     while (!isBusinessDay(cursor)) {
                         cursor.setDate(cursor.getDate() + 1);
                         cursor = normalizeDate(cursor);
                     }
                     continue;
                 }
-
                 const allocation = Math.min(remaining, capacity);
                 winnerState.dailyLoads[dateKey] = currentLoad + allocation;
                 remaining -= allocation;
-
                 if (remaining > 0.001) {
                     cursor.setDate(cursor.getDate() + 1);
                     cursor = normalizeDate(cursor);
-                    // VITAL Check
                     while (!isBusinessDay(cursor)) {
                         cursor.setDate(cursor.getDate() + 1);
                         cursor = normalizeDate(cursor);
                     }
                 }
             }
-            
-            // Otimização: Atualiza o cursor "nextFreeSlot" do dev
             if (cursor > winnerState.nextFreeSlot) {
                 winnerState.nextFreeSlot = cursor;
             }
-
-            // Adiciona à lista de updates para retornar ao Frontend/DB
             updates.push({ 
                 id: task.id, 
                 startDate: toLocalISOString(bestStartDate), 
@@ -368,6 +328,5 @@ export const optimizeSchedule = async (tasks: any[], availableDevelopers: {id: s
             });
         }
     }
-
     return updates;
 };

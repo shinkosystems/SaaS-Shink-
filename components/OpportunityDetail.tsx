@@ -2,12 +2,12 @@
 import React, { useState, useRef } from 'react';
 import { Opportunity, RDEStatus, BpmnData, ProjectStatus, BpmnTask, Attachment, Comment } from '../types';
 import { updateOpportunity } from '../services/opportunityService';
-import { updateTask, createTask } from '../services/projectService';
+import { updateTask, createTask, deleteTask } from '../services/projectService';
 import { supabase } from '../services/supabaseClient';
 import BpmnBuilder from './BpmnBuilder';
 import TaskDetailModal from './TaskDetailModal';
 import BurndownChart from './BurndownChart'; 
-import { X, Edit, Trash2, Target, CheckCircle, Clock, AlertTriangle, FileText, DollarSign, Zap, GitMerge, LayoutDashboard, Snowflake, PlayCircle, ChevronDown, Lock, Unlock, ListTodo, Calendar, User, CheckSquare, Square, Paperclip, History, Send, Download, File, Trash, ArrowLeft, ExternalLink, CloudLightning, Hash, Plus } from 'lucide-react';
+import { X, Edit, Trash2, Target, CheckCircle, Clock, AlertTriangle, FileText, DollarSign, Zap, GitMerge, LayoutDashboard, Snowflake, PlayCircle, ChevronDown, Lock, Unlock, ListTodo, Calendar, User, CheckSquare, Square, Paperclip, History, Send, Download, File, Trash, ArrowLeft, ExternalLink, CloudLightning, Hash, Plus, BarChart3, Save } from 'lucide-react';
 
 interface Props {
   opportunity: Opportunity;
@@ -132,6 +132,27 @@ const OpportunityDetail: React.FC<Props> = ({ opportunity: initialOpp, onClose, 
                   organizacao: opportunity.organizationId
               });
           }
+      }
+  };
+
+  const handleDeleteTask = async (nodeId: string, taskId: string) => {
+      // Remove from Local UI
+      if (!opportunity.bpmn || !opportunity.bpmn.nodes) return;
+      
+      const newNodes = opportunity.bpmn.nodes.map(node => {
+          if (node.id !== nodeId) return node;
+          return { ...node, checklist: node.checklist.filter(t => t.id !== taskId) };
+      });
+
+      const updatedBpmn = { ...opportunity.bpmn, nodes: newNodes };
+      const updatedOpp = { ...opportunity, bpmn: updatedBpmn };
+      setOpportunity(updatedOpp);
+      onUpdate(updatedOpp);
+      setEditingTask(null);
+
+      // Remove from DB
+      if (!isNaN(Number(taskId))) {
+          await deleteTask(Number(taskId));
       }
   };
 
@@ -260,7 +281,7 @@ const OpportunityDetail: React.FC<Props> = ({ opportunity: initialOpp, onClose, 
   return (
     <div className="relative w-full h-full flex flex-col overflow-hidden bg-slate-50/50 dark:bg-transparent">
       
-      {/* Top Tabs - Styled to fit Workspace */}
+      {/* Top Tabs */}
       <div className="border-b border-slate-200 dark:border-white/5 px-6 py-0 sticky top-0 z-10 bg-white/80 dark:bg-black/40 backdrop-blur-xl">
          <div className="flex gap-8 overflow-x-auto no-scrollbar">
             {tabs.map(tab => (
@@ -279,167 +300,215 @@ const OpportunityDetail: React.FC<Props> = ({ opportunity: initialOpp, onClose, 
             {activeTab === 'overview' && (
                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-ios-pop duration-500">
                     <div className="lg:col-span-2 space-y-6">
-                        <div className="glass-panel rounded-3xl p-8 group border border-white/10 focus-within:border-amber-500/50 transition-colors">
-                             <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-3">
-                                <FileText className="w-6 h-6 text-slate-400"/> Descrição
-                                <span className="text-[10px] text-slate-400 font-normal opacity-0 group-hover:opacity-100 transition-opacity ml-auto bg-white/5 px-2 py-1 rounded">Clique para editar</span>
-                             </h3>
-                             <textarea 
-                                className="w-full bg-transparent text-lg font-light text-slate-700 dark:text-slate-300 leading-relaxed resize-none outline-none h-[300px] custom-scrollbar"
+                        <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/40 dark:bg-black/20">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                    <FileText className="w-5 h-5 text-blue-500"/> Descrição do Projeto
+                                </h3>
+                                {editableDescription !== opportunity.description && (
+                                    <button onClick={handleDescriptionSave} className="text-xs font-bold text-emerald-500 hover:text-emerald-400 flex items-center gap-1">
+                                        <Save className="w-3 h-3"/> Salvar
+                                    </button>
+                                )}
+                            </div>
+                            <textarea 
                                 value={editableDescription}
-                                onChange={(e) => setEditableDescription(e.target.value)}
-                                onBlur={handleDescriptionSave}
-                                placeholder="Adicione uma descrição detalhada do projeto..."
-                             />
+                                onChange={e => setEditableDescription(e.target.value)}
+                                className="w-full bg-transparent text-slate-600 dark:text-slate-300 text-sm leading-relaxed outline-none resize-none h-48 custom-scrollbar"
+                                placeholder="Sem descrição."
+                            />
                         </div>
-                        <div className="glass-panel rounded-3xl p-8">
-                             <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-3">
-                                <Clock className="w-6 h-6 text-slate-400"/> Progresso
+
+                        <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/40 dark:bg-black/20">
+                             <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                                <BarChart3 className="w-5 h-5 text-amber-500"/> Progresso & Burndown
                              </h3>
                              <BurndownChart opportunity={opportunity} />
                         </div>
                     </div>
+
                     <div className="space-y-6">
-                        <div className="glass-panel rounded-3xl p-8 relative overflow-hidden">
-                             <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-transparent opacity-50"></div>
-                             <div className="relative z-10">
-                                <div className="flex justify-between items-center mb-4">
-                                    <span className="text-sm text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold">Score PRIO-6</span>
-                                    <div className={`text-5xl font-black drop-shadow-lg ${score >= 4.0 ? 'text-emerald-600 dark:text-emerald-400' : score >= 3.0 ? 'text-blue-600 dark:text-blue-400' : 'text-yellow-600 dark:text-yellow-400'}`}>{score.toFixed(2)}</div>
+                        <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/40 dark:bg-black/20">
+                            <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">Métricas Chave</h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-slate-100 dark:bg-white/5 p-4 rounded-xl">
+                                    <span className="text-xs text-slate-500 block mb-1">PRIO-6 Score</span>
+                                    <span className="text-2xl font-black text-slate-900 dark:text-white">{score.toFixed(1)}</span>
                                 </div>
-                                <div className="w-full h-3 bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden mt-4">
-                                    <div className={`h-full shadow-[0_0_15px_currentColor] ${score >= 4.0 ? 'bg-emerald-500 text-emerald-500' : score >= 3.0 ? 'bg-blue-500 text-blue-500' : 'bg-yellow-500 text-yellow-500'}`} style={{ width: `${(score/5)*100}%` }}></div>
+                                <div className="bg-slate-100 dark:bg-white/5 p-4 rounded-xl">
+                                    <span className="text-xs text-slate-500 block mb-1">Tarefas</span>
+                                    <span className="text-2xl font-black text-slate-900 dark:text-white">{completedTasks}/{totalTasks}</span>
                                 </div>
-                             </div>
+                                <div className="bg-slate-100 dark:bg-white/5 p-4 rounded-xl">
+                                    <span className="text-xs text-slate-500 block mb-1">Velocidade</span>
+                                    <span className="text-2xl font-black text-green-500">{opportunity.velocity}/5</span>
+                                </div>
+                                <div className="bg-slate-100 dark:bg-white/5 p-4 rounded-xl">
+                                    <span className="text-xs text-slate-500 block mb-1">Viabilidade</span>
+                                    <span className="text-2xl font-black text-blue-500">{opportunity.viability}/5</span>
+                                </div>
+                            </div>
                         </div>
-                        <div className="glass-panel rounded-3xl p-8 space-y-6">
-                            {[{ l: 'Arquétipo', v: opportunity.archetype, c: 'text-indigo-600 dark:text-indigo-400' }, { l: 'Intensidade', v: `Nível ${opportunity.intensity}`, c: 'text-pink-600 dark:text-pink-400' }, { l: 'RDE', v: opportunity.rde, c: opportunity.rde === 'Quente' ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400' }].map((stat, i) => (
-                                <div key={i}>
-                                    <span className="text-slate-500 text-xs uppercase block mb-2 font-bold tracking-widest">{stat.l}</span>
-                                    <span className={`${stat.c} font-bold text-xl tracking-tight`}>{stat.v}</span>
-                                    {i < 2 && <div className="w-full h-px bg-slate-200 dark:bg-white/5 mt-6"></div>}
-                                </div>
-                            ))}
+
+                        <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/40 dark:bg-black/20">
+                            <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">Arquétipo</h3>
+                            <div className="flex items-center gap-3 p-3 bg-indigo-500/10 border border-indigo-500/30 rounded-xl text-indigo-400">
+                                <Target className="w-5 h-5"/>
+                                <span className="font-bold">{opportunity.archetype}</span>
+                            </div>
                         </div>
                     </div>
                  </div>
             )}
-            
-            {activeTab === 'files' && (
-                <div className="h-full flex flex-col animate-ios-pop">
-                    <div className="flex justify-between items-center mb-8">
-                        <h3 className="text-2xl font-bold text-slate-900 dark:text-white">Arquivos</h3>
-                        <div className="relative">
-                            <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} disabled={isUploading} />
-                            <button onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="h-12 bg-amber-600 hover:bg-amber-500 text-white px-6 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors shadow-[0_0_20px_rgba(245,158,11,0.3)]">
-                                {isUploading ? <CloudLightning className="w-4 h-4 animate-pulse"/> : <Paperclip className="w-4 h-4"/>}
-                                Anexar
-                            </button>
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {(opportunity.attachments || []).map((file) => (
-                            <div key={file.id} onClick={() => window.open(file.url || '#', '_blank')} className="glass-panel p-6 rounded-2xl flex items-center justify-between group hover:border-amber-500/50 transition-all cursor-pointer hover:-translate-y-1">
-                                <div className="flex items-center gap-4 overflow-hidden flex-1 mr-4">
-                                    <div className="w-14 h-14 bg-slate-100 dark:bg-white/5 rounded-xl flex items-center justify-center text-slate-500 dark:text-slate-400 font-bold text-sm shrink-0 group-hover:text-amber-600 dark:group-hover:text-amber-400 group-hover:bg-slate-200 dark:group-hover:bg-white/10 transition-colors">{file.type}</div>
-                                    <div className="min-w-0 flex-1">
-                                        <div className="text-base font-bold text-slate-900 dark:text-white truncate group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">{file.name}</div>
-                                        <div className="text-xs text-slate-500 mt-1">{file.size}</div>
+
+            {activeTab === 'bpms' && (
+                <div className="h-full animate-in fade-in">
+                    <BpmnBuilder opportunity={opportunity} onSave={handleSaveBpmn} />
+                </div>
+            )}
+
+            {activeTab === 'tasks' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in">
+                    {opportunity.bpmn?.nodes.map(node => (
+                        <div key={node.id} className="glass-panel p-4 rounded-xl border border-white/10 bg-white/40 dark:bg-black/20 flex flex-col gap-3">
+                            <div className="flex justify-between items-center border-b border-white/10 pb-2">
+                                <h4 className="font-bold text-slate-900 dark:text-white truncate pr-2">{node.label}</h4>
+                                <button onClick={() => handleAddNewTask(node.id, node.label)} className="text-slate-500 hover:text-amber-500 transition-colors">
+                                    <Plus className="w-4 h-4"/>
+                                </button>
+                            </div>
+                            <div className="flex-1 space-y-2 overflow-y-auto max-h-[400px] custom-scrollbar">
+                                {(node.checklist || []).map(task => (
+                                    <div key={task.id} className="p-3 bg-white dark:bg-black/30 rounded-lg border border-slate-100 dark:border-white/5 hover:border-blue-500/50 transition-all group">
+                                        <div className="flex justify-between items-start gap-2">
+                                            <div className="flex gap-2 items-start flex-1 cursor-pointer" onClick={(e) => toggleTaskStatus(e, node.id, task.id)}>
+                                                {task.completed ? <CheckSquare className="w-4 h-4 text-emerald-500 mt-0.5"/> : <Square className="w-4 h-4 text-slate-400 mt-0.5"/>}
+                                                <div>
+                                                    <span className={`text-sm block leading-tight ${task.completed ? 'text-slate-500 line-through' : 'text-slate-800 dark:text-slate-200'}`}>{task.text}</span>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        {task.assignee && <span className="text-[10px] bg-slate-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-slate-500">{task.assignee}</span>}
+                                                        {task.estimatedHours && <span className="text-[10px] text-slate-400">{task.estimatedHours}h</span>}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button onClick={() => setEditingTask({nodeId: node.id, nodeLabel: node.label, task})} className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-white transition-opacity">
+                                                <Edit className="w-3 h-3"/>
+                                            </button>
+                                        </div>
                                     </div>
+                                ))}
+                                {(!node.checklist || node.checklist.length === 0) && (
+                                    <div className="text-center py-4 text-xs text-slate-500 italic">Sem tarefas nesta etapa.</div>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {activeTab === 'files' && (
+                <div className="space-y-6 animate-in fade-in">
+                    <div className="flex justify-between items-center">
+                        <h3 className="text-xl font-bold text-slate-900 dark:text-white">Arquivos do Projeto</h3>
+                        <label className="cursor-pointer bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition-all">
+                            {isUploading ? <Clock className="w-4 h-4 animate-spin"/> : <Paperclip className="w-4 h-4"/>}
+                            Upload
+                            <input type="file" className="hidden" onChange={handleFileUpload} disabled={isUploading}/>
+                        </label>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {opportunity.attachments?.map(file => (
+                            <div key={file.id} className="glass-panel p-4 rounded-xl border border-white/10 bg-white/40 dark:bg-black/20 flex items-center gap-4 group">
+                                <div className="w-12 h-12 bg-slate-100 dark:bg-white/5 rounded-lg flex items-center justify-center text-slate-500">
+                                    <File className="w-6 h-6"/>
                                 </div>
-                                {!isClient && userRole === 'dono' && <button onClick={(e) => {e.stopPropagation(); handleDeleteFile(file);}} className="p-3 hover:bg-slate-200 dark:hover:bg-white/10 rounded-xl text-slate-500 hover:text-red-500 dark:hover:text-red-400 transition-colors"><Trash className="w-5 h-5"/></button>}
+                                <div className="flex-1 min-w-0">
+                                    <h4 className="font-bold text-sm text-slate-900 dark:text-white truncate" title={file.name}>{file.name}</h4>
+                                    <p className="text-xs text-slate-500">{file.size} • {new Date(file.uploadedAt).toLocaleDateString()}</p>
+                                </div>
+                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <a href={file.url} target="_blank" download className="p-2 hover:bg-slate-200 dark:hover:bg-white/10 rounded text-slate-500 hover:text-blue-500 transition-colors">
+                                        <Download className="w-4 h-4"/>
+                                    </a>
+                                    <button onClick={() => handleDeleteFile(file)} className="p-2 hover:bg-red-100 dark:hover:bg-red-900/20 rounded text-slate-500 hover:text-red-500 transition-colors">
+                                        <Trash className="w-4 h-4"/>
+                                    </button>
+                                </div>
                             </div>
                         ))}
+                        {(!opportunity.attachments || opportunity.attachments.length === 0) && (
+                            <div className="col-span-full text-center py-12 text-slate-500 border-2 border-dashed border-slate-200 dark:border-white/10 rounded-xl">
+                                <CloudLightning className="w-12 h-12 mx-auto mb-2 opacity-50"/>
+                                <p>Nenhum arquivo anexado ainda.</p>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
 
             {activeTab === 'comments' && (
-                <div className="flex flex-col h-full max-w-5xl mx-auto w-full animate-ios-pop">
-                    <div className="flex-1 overflow-y-auto p-6 mb-6 custom-scrollbar glass-panel rounded-3xl">
-                        <div className="space-y-8">
-                            {[...(opportunity.comments || [])].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((comment) => (
-                                <div key={comment.id} className="relative pl-6 border-l-2 border-slate-200 dark:border-white/10 group hover:border-slate-400 dark:hover:border-white/30 transition-colors">
-                                    <div className={`absolute -left-[9px] top-0 w-4 h-4 rounded-full ${comment.type === 'system' ? 'bg-purple-500 shadow-[0_0_10px_#a855f7]' : 'bg-emerald-500 shadow-[0_0_10px_#10b981]'} border-4 border-white dark:border-[#050505]`}></div>
-                                    <div className="flex items-center gap-3 mb-2">
-                                        <span className={`text-xs font-bold uppercase tracking-wider ${comment.type === 'system' ? 'text-purple-600 dark:text-purple-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{comment.author}</span>
-                                        <span className="text-[10px] text-slate-500 dark:text-slate-600">{new Date(comment.createdAt).toLocaleString()}</span>
-                                    </div>
-                                    <div className="text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-white/5 p-4 rounded-2xl border border-slate-100 dark:border-white/5 leading-relaxed">{comment.text}</div>
+                <div className="h-full flex flex-col animate-in fade-in">
+                    <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 p-4">
+                        {opportunity.comments?.length === 0 && (
+                            <div className="text-center text-slate-500 py-10">
+                                <History className="w-12 h-12 mx-auto mb-2 opacity-50"/>
+                                <p>Nenhuma atividade registrada no Storytime.</p>
+                            </div>
+                        )}
+                        {opportunity.comments?.map(comment => (
+                            <div key={comment.id} className={`flex gap-4 ${comment.type === 'system' ? 'opacity-70' : ''}`}>
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                                    comment.type === 'system' ? 'bg-slate-200 dark:bg-white/10 text-slate-500' : 'bg-gradient-to-br from-amber-500 to-orange-600 text-white'
+                                }`}>
+                                    {comment.type === 'system' ? <Zap className="w-4 h-4"/> : comment.author.charAt(0).toUpperCase()}
                                 </div>
-                            ))}
-                        </div>
-                    </div>
-                    <div className="flex gap-4 items-center">
-                        <textarea value={newComment} onChange={e => setNewComment(e.target.value)} placeholder="Escreva uma atualização..." className="w-full glass-input rounded-2xl px-6 py-4 text-sm focus:ring-1 focus:ring-amber-500 h-16 resize-none shadow-inner" />
-                        <button onClick={handleSendComment} disabled={!newComment.trim()} className="h-16 w-16 flex items-center justify-center bg-amber-600 hover:bg-amber-500 text-white rounded-2xl transition-colors shadow-lg shadow-amber-900/20"><Send className="w-6 h-6"/></button>
-                    </div>
-                </div>
-            )}
-
-            {activeTab === 'tasks' && (
-                <div className="h-full flex flex-col animate-ios-pop">
-                    <div className="space-y-6 pb-10">
-                        {opportunity.bpmn?.nodes?.map(node => (
-                            <div key={node.id} className="glass-panel rounded-2xl overflow-hidden">
-                                <div className="bg-slate-100 dark:bg-white/5 px-6 py-4 flex items-center justify-between border-b border-slate-200 dark:border-white/5">
-                                    <h4 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide flex items-center gap-3">
-                                        <div className="w-2 h-2 rounded-full bg-amber-500 shadow-glow"></div> {node.label}
-                                    </h4>
-                                    <div className="flex items-center gap-3">
-                                        <span className="text-xs font-mono text-slate-500 bg-slate-200 dark:bg-black/30 px-2 py-1 rounded-lg border border-slate-300 dark:border-white/5">{node.checklist ? node.checklist.filter(t => t.completed).length : 0}/{node.checklist ? node.checklist.length : 0}</span>
-                                        {!isClient && (
-                                            <button 
-                                                onClick={() => handleAddNewTask(node.id, node.label)}
-                                                className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-200 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/20 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
-                                                title="Adicionar nova tarefa nesta etapa"
-                                            >
-                                                <Plus className="w-4 h-4"/>
-                                            </button>
+                                <div className="flex-1">
+                                    <div className="flex items-baseline gap-2 mb-1">
+                                        <span className="text-sm font-bold text-slate-900 dark:text-white">{comment.author}</span>
+                                        <span className="text-xs text-slate-500">{new Date(comment.createdAt).toLocaleString()}</span>
+                                    </div>
+                                    <div className={`text-sm p-3 rounded-xl rounded-tl-none inline-block max-w-3xl ${
+                                        comment.type === 'system' ? 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 italic font-mono text-xs' : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 shadow-sm border border-slate-200 dark:border-white/5'
+                                    }`}>
+                                        {comment.text}
+                                        {comment.metadata?.fileUrl && (
+                                            <a href={comment.metadata.fileUrl} target="_blank" className="block mt-2 text-blue-500 hover:underline flex items-center gap-1">
+                                                <ExternalLink className="w-3 h-3"/> Ver Anexo
+                                            </a>
                                         )}
                                     </div>
-                                </div>
-                                <div className="divide-y divide-slate-200 dark:divide-white/5">
-                                    {(node.checklist || []).map(task => (
-                                        <div key={task.id} onClick={() => canEditTask(task) && setEditingTask({nodeId: node.id, nodeLabel: node.label, task})} className={`flex items-center gap-6 p-6 transition-all ${canEditTask(task) ? 'cursor-pointer hover:bg-slate-50 dark:hover:bg-white/5' : 'opacity-60'} group`}>
-                                            <button onClick={(e) => toggleTaskStatus(e, node.id, task.id)} disabled={!canEditTask(task)} className={`shrink-0 transition-transform active:scale-90 ${canEditTask(task) ? 'text-slate-400 hover:text-slate-600 dark:hover:text-white' : 'text-slate-600'}`}>
-                                                {task.completed ? <CheckSquare className="w-6 h-6 text-emerald-500 drop-shadow-md"/> : <Square className="w-6 h-6"/>}
-                                            </button>
-                                            <div className="flex-1 min-w-0">
-                                                <span className={`text-base font-medium truncate block ${task.completed ? 'text-slate-500 line-through' : 'text-slate-700 dark:text-slate-200 group-hover:text-black dark:group-hover:text-white'}`}>{task.text}</span>
-                                            </div>
-                                            {task.assignee && <div className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 text-xs text-slate-500 dark:text-slate-300 flex items-center gap-2"><User className="w-3 h-3"/> {task.assignee}</div>}
-                                        </div>
-                                    ))}
-                                    {(!node.checklist || node.checklist.length === 0) && (
-                                        <div className="p-6 text-center text-sm text-slate-500 italic">
-                                            Nenhuma tarefa nesta etapa.
-                                        </div>
-                                    )}
                                 </div>
                             </div>
                         ))}
                     </div>
-                </div>
-            )}
-
-            {activeTab === 'bpms' && !isClient && (
-                <div className="h-full flex flex-col animate-ios-pop duration-300">
-                    <BpmnBuilder opportunity={opportunity} onSave={handleSaveBpmn} />
+                    <div className="p-4 bg-white dark:bg-black/40 border-t border-slate-200 dark:border-white/10 rounded-xl mt-4 flex gap-2 items-center">
+                        <input 
+                            type="text" 
+                            value={newComment}
+                            onChange={e => setNewComment(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && handleSendComment()}
+                            placeholder="Digite um comentário..."
+                            className="flex-1 bg-transparent outline-none text-sm text-slate-900 dark:text-white placeholder-slate-500"
+                        />
+                        <button onClick={handleSendComment} disabled={!newComment.trim()} className="p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                            <Send className="w-4 h-4"/>
+                        </button>
+                    </div>
                 </div>
             )}
 
           </div>
       </div>
 
+      {/* Task Detail Modal */}
       {editingTask && (
           <TaskDetailModal 
-             task={editingTask.task}
-             nodeTitle={editingTask.nodeLabel}
-             opportunityTitle={opportunity.title}
-             onClose={() => setEditingTask(null)}
-             onOpenProject={() => setEditingTask(null)} 
-             onSave={(updatedTask) => handleTaskUpdateFromModal(editingTask.nodeId, updatedTask)}
+              task={editingTask.task}
+              nodeTitle={editingTask.nodeLabel}
+              opportunityTitle={opportunity.title}
+              onClose={() => setEditingTask(null)}
+              onSave={(updatedTask) => handleTaskUpdateFromModal(editingTask.nodeId, updatedTask)}
+              onDelete={(id) => handleDeleteTask(editingTask.nodeId, id)}
           />
       )}
     </div>

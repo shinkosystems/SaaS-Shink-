@@ -114,12 +114,13 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onSave }) => {
             const task = node.checklist[i];
             // Only generate if no subtasks exist
             if (!task.subtasks || task.subtasks.length === 0) {
-                const subtasksTxt = await generateSubtasksForTask(task.text, opportunity.description);
-                if (subtasksTxt && subtasksTxt.length > 0) {
-                    const newSubs: BpmnSubTask[] = subtasksTxt.map(txt => ({
+                const generated = await generateSubtasksForTask(task.text, opportunity.description);
+                if (generated && generated.length > 0) {
+                    const newSubs: BpmnSubTask[] = generated.map(item => ({
                         id: crypto.randomUUID(),
-                        text: txt,
-                        completed: false
+                        text: item.title,
+                        completed: false,
+                        estimatedHours: item.hours
                     }));
                     node.checklist[i].subtasks = newSubs;
                     changed = true;
@@ -203,6 +204,26 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onSave }) => {
   };
 
   const layoutNodes = getLayoutedNodes(data);
+
+  const deleteTask = (nodeId: string, taskId: string) => {
+      const newNodes = data.nodes.map(n => {
+          if (n.id === nodeId) {
+              return {
+                  ...n,
+                  checklist: n.checklist.filter(t => t.id !== taskId)
+              };
+          }
+          return n;
+      });
+      
+      const updatedNode = newNodes.find(n => n.id === nodeId) || null;
+      setSelectedNode(updatedNode);
+      
+      const newData = { ...data, nodes: newNodes };
+      setData(newData);
+      onSave(newData, docsContext);
+      setEditingTask(null);
+  }
 
   return (
     <div className="flex flex-col lg:flex-row h-auto lg:h-[600px] border border-slate-700 rounded-xl overflow-hidden bg-slate-900 relative">
@@ -491,6 +512,7 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onSave }) => {
                 opportunityTitle={opportunity.title}
                 onClose={() => setEditingTask(null)}
                 onSave={(updatedTask) => updateTask(editingTask.nodeId, updatedTask)}
+                onDelete={(id) => deleteTask(editingTask.nodeId, id)}
             />
         )}
     </div>
