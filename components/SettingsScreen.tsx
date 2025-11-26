@@ -47,6 +47,21 @@ export const SettingsScreen: React.FC<Props> = ({ theme, onToggleTheme }) => {
       }
   };
 
+  const handleStatusChange = async (userId: string, newStatus: string) => {
+      if (userProfile?.perfil !== 'dono') return;
+
+      const { error } = await supabase
+          .from('users')
+          .update({ status: newStatus })
+          .eq('id', userId);
+
+      if (error) {
+          alert('Erro ao atualizar status: ' + error.message);
+      } else {
+          setTeamMembers(prev => prev.map(m => m.id === userId ? { ...m, status: newStatus } : m));
+      }
+  };
+
   const toggle = (key: keyof typeof notifications) => {
     setNotifications(prev => ({ ...prev, [key]: !prev[key] }));
   };
@@ -140,9 +155,11 @@ export const SettingsScreen: React.FC<Props> = ({ theme, onToggleTheme }) => {
                     <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                         <Users className="w-5 h-5 text-blue-500"/> Equipe Interna
                     </h2>
-                    <button className="text-sm font-medium text-shinko-primary hover:text-amber-600 dark:hover:text-amber-400 flex items-center gap-2 opacity-50 cursor-not-allowed">
-                        <UserPlus className="w-4 h-4"/> Convidar Membro
-                    </button>
+                    {userProfile?.perfil === 'dono' && (
+                        <button className="text-sm font-medium text-shinko-primary hover:text-amber-600 dark:hover:text-amber-400 flex items-center gap-2 opacity-50 cursor-not-allowed">
+                            <UserPlus className="w-4 h-4"/> Convidar Membro
+                        </button>
+                    )}
                 </div>
 
                 <div className="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-xl">
@@ -166,9 +183,31 @@ export const SettingsScreen: React.FC<Props> = ({ theme, onToggleTheme }) => {
                                         </span>
                                     </td>
                                     <td className="p-3 text-right">
-                                        <span className="text-xs font-bold text-emerald-500">
-                                            {user.status || 'Ativo'}
-                                        </span>
+                                        {userProfile?.perfil === 'dono' ? (
+                                            <div className="relative inline-block">
+                                                <select 
+                                                    value={user.status || 'Ativo'}
+                                                    onChange={(e) => handleStatusChange(user.id, e.target.value)}
+                                                    className={`appearance-none pl-2 pr-6 py-1 rounded text-xs font-bold uppercase cursor-pointer transition-colors outline-none border border-transparent hover:border-slate-300 dark:hover:border-slate-600 bg-transparent text-right w-full ${
+                                                        (user.status === 'Ativo' || !user.status) ? 'text-emerald-500' : 
+                                                        user.status === 'Pendente' ? 'text-amber-500' : 
+                                                        'text-red-500'
+                                                    }`}
+                                                >
+                                                    <option value="Ativo" className="text-slate-900 dark:text-white bg-white dark:bg-slate-800">Ativo</option>
+                                                    <option value="Pendente" className="text-slate-900 dark:text-white bg-white dark:bg-slate-800">Pendente</option>
+                                                    <option value="Bloqueado" className="text-slate-900 dark:text-white bg-white dark:bg-slate-800">Bloqueado</option>
+                                                </select>
+                                            </div>
+                                        ) : (
+                                            <span className={`text-xs font-bold ${
+                                                (user.status === 'Ativo' || !user.status) ? 'text-emerald-500' : 
+                                                user.status === 'Pendente' ? 'text-amber-500' : 
+                                                'text-red-500'
+                                            }`}>
+                                                {user.status || 'Ativo'}
+                                            </span>
+                                        )}
                                     </td>
                                 </tr>
                             ))}

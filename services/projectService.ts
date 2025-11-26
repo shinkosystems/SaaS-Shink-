@@ -1,3 +1,4 @@
+
 import { supabase } from './supabaseClient';
 import { DbProject, DbTask } from '../types';
 
@@ -101,6 +102,27 @@ export const fetchAllTasks = async (): Promise<DbTask[]> => {
 
     } catch (error) {
         console.error('Erro ao buscar tarefas (tasks):', error);
+        return [];
+    }
+};
+
+export const fetchUserTasks = async (userId: string): Promise<DbTask[]> => {
+    try {
+        const { data: tasks, error } = await supabase
+            .from(TASKS_TABLE)
+            .select(`
+                *,
+                projetoData:projetos(nome)
+            `)
+            .eq('responsavel', userId)
+            .neq('status', 'done')
+            .neq('status', 'Archived')
+            .order('datafim', { ascending: true }); // Bring nearest deadlines first
+
+        if (error) throw error;
+        return tasks as DbTask[];
+    } catch (error) {
+        console.error('Erro ao buscar tarefas do usuário:', error);
         return [];
     }
 };

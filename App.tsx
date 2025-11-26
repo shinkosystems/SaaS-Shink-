@@ -19,6 +19,7 @@ import { ProfileScreen } from './components/ProfileScreen';
 import { SettingsScreen } from './components/SettingsScreen';
 import { QuickTaskModal } from './components/QuickTaskModal';
 import { ResetPasswordModal } from './components/ResetPasswordModal';
+import { Dashboard } from './components/Dashboard'; // Import Dashboard Component
 import { fetchOpportunities, createOpportunity, updateOpportunity, deleteOpportunity } from './services/opportunityService';
 import { createTask, createProject } from './services/projectService';
 import { supabase } from './services/supabaseClient';
@@ -491,29 +492,13 @@ const App: React.FC = () => {
       <main className="flex-1 flex flex-col relative h-full overflow-hidden pt-16 xl:pt-0">
         <div className={`flex-1 relative h-full ${view === 'project-detail' ? '' : 'overflow-y-auto p-6 md:p-10 custom-scrollbar'}`}>
             {view === 'dashboard' && userRole !== 'cliente' && (
-                <div className="text-white animate-in fade-in duration-500">
-                    <h1 className="text-3xl font-bold mb-4 text-slate-900 dark:text-white">Dashboard</h1>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div onClick={() => handleDashboardCardClick('Active')} className="glass-card p-6 rounded-xl cursor-pointer hover:bg-white/10 transition-all">
-                            <h3 className="text-slate-500 uppercase text-xs font-bold mb-1">Sprint Atual</h3>
-                            <div className="text-4xl font-black text-emerald-500">{opportunities.filter(o => o.status === 'Active').length}</div>
-                            <span className="text-slate-400 text-xs">Projetos Ativos</span>
-                        </div>
-                        <div onClick={() => handleDashboardCardClick('Negotiation')} className="glass-card p-6 rounded-xl cursor-pointer hover:bg-white/10 transition-all">
-                            <h3 className="text-slate-500 uppercase text-xs font-bold mb-1">Comercial</h3>
-                            <div className="text-4xl font-black text-blue-500">{opportunities.filter(o => o.status === 'Negotiation').length}</div>
-                            <span className="text-slate-400 text-xs">Em Negociação</span>
-                        </div>
-                        <div onClick={() => handleDashboardCardClick('Future')} className="glass-card p-6 rounded-xl cursor-pointer hover:bg-white/10 transition-all">
-                            <h3 className="text-slate-500 uppercase text-xs font-bold mb-1">Pipeline</h3>
-                            <div className="text-4xl font-black text-amber-500">{opportunities.filter(o => o.status === 'Future').length}</div>
-                            <span className="text-slate-400 text-xs">Backlog Futuro</span>
-                        </div>
-                    </div>
-                    <div className="mt-8 h-96">
-                        <MatrixChart data={opportunities} onClick={handleOpenProject} theme={theme} />
-                    </div>
-                </div>
+                <Dashboard 
+                    opportunities={opportunities}
+                    onNavigate={(status) => handleDashboardCardClick(status)}
+                    onOpenProject={handleOpenProject}
+                    user={session?.user}
+                    theme={theme}
+                />
             )}
             
             {view === 'list' && (
@@ -559,61 +544,62 @@ const App: React.FC = () => {
                         {opportunities
                             .filter(o => listFilterStatus === 'All' || o.status === listFilterStatus)
                             .map(opp => (
-                            <div key={opp.id} onClick={() => handleOpenProject(opp)} className="glass-card p-6 rounded-2xl cursor-pointer hover:bg-white/80 dark:hover:bg-white/5 transition-all border border-white/20 dark:border-white/5 shadow-sm hover:shadow-md group relative overflow-hidden">
+                            <div key={opp.id} onClick={() => handleOpenProject(opp)} className="glass-card p-5 rounded-2xl cursor-pointer hover:bg-white/80 dark:hover:bg-white/5 transition-all border border-white/20 dark:border-white/5 shadow-sm hover:shadow-md group relative overflow-hidden flex flex-col gap-3 hover:z-10">
                                 {/* Status Stripe */}
                                 <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${opp.status === 'Active' ? 'bg-emerald-500' : opp.status === 'Negotiation' ? 'bg-blue-500' : opp.status === 'Future' ? 'bg-amber-500' : 'bg-slate-500'}`}></div>
                                 
-                                {/* Actions - Always Visible now for better UX */}
-                                <div className="absolute top-4 right-4 z-10 flex gap-2">
-                                     {userRole !== 'cliente' && (
-                                        <button 
-                                            onClick={(e) => { e.stopPropagation(); setEditingOpp(opp); setIsWizardOpen(true); }}
-                                            className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-slate-400 hover:text-blue-500 rounded-lg transition-colors shadow-sm"
-                                            title="Editar Projeto"
-                                        >
-                                            <Edit className="w-4 h-4"/>
-                                        </button>
-                                     )}
-                                     {userRole === 'dono' && (
-                                         <button 
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                if(window.confirm(`ATENÇÃO: Deseja excluir o projeto "${opp.title}"?\n\nIsso excluirá permanentemente:\n1. Todas as tarefas e subtarefas associadas.\n2. O projeto em si.\n\nEsta ação não pode ser desfeita.`)) {
-                                                    handleDeleteOpportunity(opp.id);
-                                                }
-                                            }}
-                                            className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-red-100 dark:hover:bg-red-900/30 text-slate-400 hover:text-red-500 rounded-lg transition-colors shadow-sm"
-                                            title="Excluir Projeto e Tarefas"
-                                         >
-                                            <Trash2 className="w-4 h-4"/>
-                                        </button>
-                                     )}
-                                </div>
-
-                                <div className="flex justify-between items-start pl-4">
-                                    <div>
-                                        <div className="flex items-center gap-3 mb-1">
-                                            <h3 className="font-bold text-lg text-slate-900 dark:text-white group-hover:text-shinko-primary transition-colors pr-16">{opp.title}</h3>
+                                <div className="pl-3 flex justify-between items-start gap-4">
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                            <h3 className="font-bold text-lg text-slate-900 dark:text-white truncate group-hover:text-shinko-primary transition-colors">{opp.title}</h3>
                                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm ${getStatusColor(opp.status)}`}>
                                                 {getStatusLabel(opp.status)}
                                             </span>
                                         </div>
-                                        <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 max-w-2xl">{opp.description}</p>
-                                        
-                                        <div className="flex items-center gap-4 mt-4">
-                                            <div className="flex items-center gap-1 text-xs text-slate-500 font-bold bg-slate-100 dark:bg-white/5 px-2 py-1 rounded">
-                                                <Rocket className="w-3 h-3"/> {opp.archetype}
-                                            </div>
-                                            {opp.prioScore > 0 && (
-                                                <div className="flex items-center gap-1 text-xs text-slate-500 font-bold bg-slate-100 dark:bg-white/5 px-2 py-1 rounded">
-                                                    <Target className="w-3 h-3 text-amber-500"/> Score: {opp.prioScore.toFixed(1)}
-                                                </div>
-                                            )}
+                                        <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2">{opp.description}</p>
+                                    </div>
+
+                                    {/* Actions Block - Now Relative Flex Item to prevent overlap */}
+                                    <div className="flex gap-2 shrink-0 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity self-start ml-4">
+                                         {userRole !== 'cliente' && (
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); setEditingOpp(opp); setIsWizardOpen(true); }}
+                                                className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-slate-400 hover:text-blue-500 rounded-lg transition-colors shadow-sm"
+                                                title="Editar Projeto"
+                                            >
+                                                <Edit className="w-4 h-4"/>
+                                            </button>
+                                         )}
+                                         {userRole === 'dono' && (
+                                             <button 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if(window.confirm(`ATENÇÃO: Deseja excluir o projeto "${opp.title}"?\n\nIsso excluirá permanentemente:\n1. Todas as tarefas e subtarefas associadas.\n2. O projeto em si.\n\nEsta ação não pode ser desfeita.`)) {
+                                                        handleDeleteOpportunity(opp.id);
+                                                    }
+                                                }}
+                                                className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-red-100 dark:hover:bg-red-900/30 text-slate-400 hover:text-red-500 rounded-lg transition-colors shadow-sm"
+                                                title="Excluir Projeto e Tarefas"
+                                             >
+                                                <Trash2 className="w-4 h-4"/>
+                                            </button>
+                                         )}
+                                    </div>
+                                </div>
+
+                                {/* Footer Info */}
+                                <div className="pl-3 flex items-center justify-between mt-auto pt-2 border-t border-slate-100 dark:border-white/5">
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex items-center gap-1 text-xs text-slate-500 font-bold bg-slate-100 dark:bg-white/5 px-2 py-1 rounded">
+                                            <Rocket className="w-3 h-3"/> {opp.archetype}
                                         </div>
+                                        {opp.prioScore > 0 && (
+                                            <div className="flex items-center gap-1 text-xs text-slate-500 font-bold bg-slate-100 dark:bg-white/5 px-2 py-1 rounded">
+                                                <Target className="w-3 h-3 text-amber-500"/> {opp.prioScore.toFixed(1)}
+                                            </div>
+                                        )}
                                     </div>
-                                    <div className="hidden md:flex flex-col items-end gap-2">
-                                        <span className="text-xs text-slate-400">{new Date(opp.createdAt).toLocaleDateString()}</span>
-                                    </div>
+                                    <span className="text-xs text-slate-400">{new Date(opp.createdAt).toLocaleDateString()}</span>
                                 </div>
                             </div>
                         ))}
