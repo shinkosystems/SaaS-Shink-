@@ -728,7 +728,7 @@ const App: React.FC = () => {
             )}
 
             {view === 'settings' && <SettingsScreen theme={theme} onToggleTheme={toggleTheme} onlineUsers={onlineUsers} />}
-            {view === 'profile' && <ProfileScreen />}
+            {view === 'profile' && <ProfileScreen currentPlan={currentPlan} onRefresh={loadAppData} />}
             {view === 'search' && (
                 <div className="space-y-4 animate-in fade-in">
                     <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-4">Resultados da Busca: "{searchQuery}"</h1>

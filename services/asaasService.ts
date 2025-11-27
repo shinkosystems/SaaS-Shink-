@@ -1,4 +1,3 @@
-
 import { AsaasPayment, SubscriptionPlan, AsaasSubscription } from '../types';
 import { supabase } from './supabaseClient';
 
@@ -151,6 +150,45 @@ export const getCurrentUserPlan = async (userId: string): Promise<string> => {
     }
 };
 
+export const createSubscriptionAndGetLink = async (
+    userId: string,
+    planId: string // e.g., 'plan_studio'
+): Promise<{ paymentLink: string }> => {
+    if (USE_REAL_ASAAS) {
+        try {
+            const { data, error } = await supabase.functions.invoke('asaas-integration', {
+                body: {
+                    action: 'CREATE_SUBSCRIPTION',
+                    userId,
+                    planId, 
+                }
+            });
+
+            if (error) {
+                console.error("Edge function error on subscription:", error);
+                throw new Error("Erro de comunicação ao criar assinatura.");
+            }
+            if (data?.error) {
+                console.error("Asaas API error on subscription:", data.error);
+                throw new Error(data.error || "Não foi possível criar a assinatura.");
+            }
+            if (!data?.paymentLink) {
+                throw new Error("Link de pagamento não retornado.");
+            }
+
+            return { paymentLink: data.paymentLink };
+
+        } catch (err: any) {
+            console.error("Falha crítica ao criar assinatura:", err);
+            throw err;
+        }
+    }
+    
+    console.warn("Mock mode: subscription link");
+    await new Promise(r => setTimeout(r, 1500));
+    return { paymentLink: 'https://www.asaas.com/c/mock_subscription_link' };
+};
+
 export const fetchSubscriptionPlans = async (): Promise<SubscriptionPlan[]> => {
     try {
         // Tenta buscar do banco de dados (Tabela 'plans' ou 'produtos')
@@ -204,14 +242,15 @@ export const getUserSubscriptions = async (userId: string): Promise<AsaasSubscri
             });
 
             if (error) {
-                // Fallback se a função não existir ou falhar
-                return _mockGetSubscriptions(userId);
+                // Fallback: Retorna vazio em vez de mock para não exibir dados falsos.
+                return [];
             }
             
             return data.subscriptions || [];
 
         } catch (err) {
-            return _mockGetSubscriptions(userId);
+            // Fallback: Retorna vazio em vez de mock.
+            return [];
         }
     }
 
@@ -286,14 +325,16 @@ export const getPaymentHistory = async (userId: string): Promise<AsaasPayment[]>
             });
 
             if (error) {
-                return MOCK_PAYMENTS; 
+                // Fallback: Retorna vazio para não exibir dados falsos.
+                return []; 
             }
             
             return data.payments || [];
 
         } catch (err) {
             console.error("Erro de conexão (Catch):", err);
-            return MOCK_PAYMENTS; // Fallback para Mock
+            // Fallback: Retorna vazio.
+            return [];
         }
     }
 

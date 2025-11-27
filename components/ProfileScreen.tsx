@@ -1,12 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Mail, Phone, Building2, MapPin, Save, Camera, Shield, CreditCard, Bell, Globe, Loader2, UploadCloud, Sparkles, Check, X, Copy, ExternalLink, FileText, History, ArrowUpRight, ArrowDownRight, Zap, Lock, Calendar, AlertTriangle, RefreshCw } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
-import { fetchSubscriptionPlans, createAsaasPayment, getPaymentHistory, checkPaymentStatus, calculateSubscriptionStatus, getFixedPaymentLink, getUserSubscriptions } from '../services/asaasService';
+import { fetchSubscriptionPlans, getPaymentHistory, calculateSubscriptionStatus, getUserSubscriptions, createSubscriptionAndGetLink } from '../services/asaasService';
 import { AsaasPayment, SubscriptionPlan, AsaasSubscription } from '../types';
 
 const DEFAULT_AVATAR = "https://zjssfnbcboibqeoubeou.supabase.co/storage/v1/object/public/fotoperfil/fotoperfil/1.png";
 
-export const ProfileScreen: React.FC = () => {
+interface Props {
+  currentPlan: string;
+  onRefresh: () => void;
+}
+
+export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
   const [activeTab, setActiveTab] = useState<'personal' | 'workspace'>('personal');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -24,22 +29,24 @@ export const ProfileScreen: React.FC = () => {
 
   // Finance State
   const [availablePlans, setAvailablePlans] = useState<SubscriptionPlan[]>([]);
-  const [currentPlan, setCurrentPlan] = useState('plan_start');
   const [payments, setPayments] = useState<AsaasPayment[]>([]);
   const [subscriptions, setSubscriptions] = useState<AsaasSubscription[]>([]);
-  const [showCheckout, setShowCheckout] = useState<SubscriptionPlan | null>(null);
-  const [processingPayment, setProcessingPayment] = useState(false);
-  const [pixData, setPixData] = useState<{qrCode: string, copyPaste: string} | null>(null);
-  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [processingSubscription, setProcessingSubscription] = useState<string | null>(null);
 
   // Subscription Info
   const [subscriptionInfo, setSubscriptionInfo] = useState<{daysRemaining: number, expireDate: Date, shouldWarn: boolean} | null>(null);
-
-  // Timer Ref for Polling
-  const pollTimerRef = useRef<number | null>(null);
+  
+  const activeSub = subscriptions.find(sub => sub.status === 'ACTIVE');
 
   // Fetch User Data on Mount
   useEffect(() => {
+    const pendingMessage = sessionStorage.getItem('shinko_subscription_pending');
+    if (pendingMessage) {
+        alert(pendingMessage);
+        sessionStorage.removeItem('shinko_subscription_pending');
+        onRefresh();
+    }
+      
     const loadUserData = async () => {
       setLoading(true);
       try {
@@ -84,7 +91,7 @@ export const ProfileScreen: React.FC = () => {
           setPayments(history || []);
           setSubscriptions(userSubs || []);
 
-          // 4. Determine current plan and Subscription Validity
+          // 4. Determine Subscription Validity
           const activeSub = (userSubs || []).find((s: AsaasSubscription) => s.status === 'ACTIVE');
           if (activeSub) {
              const nextDue = new Date(activeSub.nextDueDate);
@@ -97,16 +104,9 @@ export const ProfileScreen: React.FC = () => {
                  expireDate: nextDue,
                  shouldWarn: days <= 5 && days > 0
              });
-
-             const matchedPlan = plans.find(p => activeSub.description?.toLowerCase().includes(p.name.toLowerCase()));
-             if (matchedPlan) setCurrentPlan(matchedPlan.id);
-
           } else if ((history || []).length > 0) {
               const lastPaid = history.find((p: AsaasPayment) => p.status === 'RECEIVED' || p.status === 'CONFIRMED');
               if (lastPaid) {
-                  const matchedPlan = plans.find(p => lastPaid.description.toLowerCase().includes(p.name.toLowerCase()));
-                  if (matchedPlan) setCurrentPlan(matchedPlan.id);
-
                   const subStatus = calculateSubscriptionStatus(lastPaid.dateCreated);
                   if (subStatus.isValid) {
                       setSubscriptionInfo({
@@ -126,15 +126,7 @@ export const ProfileScreen: React.FC = () => {
     };
 
     loadUserData();
-
-    // Cleanup on unmount
-    return () => {
-        if (pollTimerRef.current !== null) {
-            window.clearInterval(pollTimerRef.current);
-            pollTimerRef.current = null;
-        }
-    };
-  }, []);
+  }, [onRefresh]);
 
   const handleSaveProfile = async () => {
     if (!userId) return;
@@ -205,89 +197,27 @@ export const ProfileScreen: React.FC = () => {
     }
   };
 
-  const handlePlanSelection = (plan: SubscriptionPlan) => {
+  const handlePlanSelection = async (plan: SubscriptionPlan) => {
+      if (plan.price === 0) return;
       if (plan.id === currentPlan && subscriptionInfo?.daysRemaining && subscriptionInfo.daysRemaining > 5) return;
-      setShowCheckout(plan);
-      setPixData(null);
-      setPaymentSuccess(false);
-  };
-
-  const handleExecutePayment = async (method: 'PIX' | 'CREDIT_CARD') => {
-      if (!showCheckout) return;
-      setProcessingPayment(true);
-
-      // Reset timer
-      if (pollTimerRef.current !== null) {
-          window.clearInterval(pollTimerRef.current);
-          pollTimerRef.current = null;
-      }
-
+      
+      setProcessingSubscription(plan.id);
       try {
-          const res = await createAsaasPayment(
-              userId, 
-              method, 
-              showCheckout.price, 
-              `Assinatura ShinkŌS - Plano ${showCheckout.name}`
-          );
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) throw new Error("Usuário não autenticado. Faça login novamente.");
 
-          if (method === 'PIX' && (res as any).qrCode) {
-              const r:any = res;
-              setPixData({ qrCode: r.qrCode, copyPaste: r.copyPaste || '' });
-
-              const pollId = window.setInterval(async () => {
-                  try {
-                    const status = await checkPaymentStatus(r.payment.id);
-                    if (status?.status === 'RECEIVED' || status?.status === 'CONFIRMED') {
-                        if (pollTimerRef.current !== null) window.clearInterval(pollTimerRef.current);
-                        setPaymentSuccess(true);
-                        setPixData(null);
-                        setCurrentPlan(showCheckout.id);
-
-                        const subStatus = calculateSubscriptionStatus(new Date().toISOString());
-                        setSubscriptionInfo({
-                            daysRemaining: subStatus.daysRemaining,
-                            expireDate: subStatus.expireDate,
-                            shouldWarn: false
-                        });
-
-                        setPayments(prev => [status, ...prev.filter(p => p.id !== status.id)]);
-                    }
-                  } catch (err) {
-                    console.error('Erro ao checar status do pagamento:', err);
-                  }
-              }, 3000) as unknown as number;
-
-              pollTimerRef.current = pollId;
-
-              setTimeout(() => {
-                  if (pollTimerRef.current === pollId) {
-                      window.clearInterval(pollId);
-                      pollTimerRef.current = null;
-                  }
-              }, 300000);
-
+          const result = await createSubscriptionAndGetLink(user.id, plan.id);
+          
+          if (result.paymentLink) {
+              sessionStorage.setItem('shinko_subscription_pending', `Aguardando confirmação para o plano ${plan.name}. A página será atualizada em breve assim que o pagamento for confirmado.`);
+              window.location.href = result.paymentLink;
           } else {
-              const r:any = res;
-              if (r.payment && (r.payment.status === 'RECEIVED' || r.payment.status === 'CONFIRMED' || r.payment.status === 'PENDING')) {
-                  setPaymentSuccess(true);
-                  setCurrentPlan(showCheckout.id);
-                  if (r.payment) setPayments(prev => [r.payment, ...prev]);
-
-                  const subStatus = calculateSubscriptionStatus(new Date().toISOString());
-                  setSubscriptionInfo({
-                      daysRemaining: subStatus.daysRemaining,
-                      expireDate: subStatus.expireDate,
-                      shouldWarn: false
-                  });
-              } else {
-                  alert("Pagamento não aprovado. Verifique seus dados.");
-              }
+              throw new Error("Não foi possível gerar o link de pagamento.");
           }
-
-      } catch (error: any) {
-          alert(error?.message || "Erro ao processar pagamento. Tente novamente.");
+      } catch (err: any) {
+          alert(err.message || 'Ocorreu um erro ao processar sua assinatura. Tente novamente.');
       } finally {
-          setProcessingPayment(false);
+          setProcessingSubscription(null);
       }
   };
 
@@ -465,12 +395,6 @@ export const ProfileScreen: React.FC = () => {
                                     Renove agora para evitar interrupção no acesso ao sistema.
                                 </p>
                             </div>
-                            <button 
-                                onClick={() => setShowCheckout(availablePlans.find(p => p.id === currentPlan) || availablePlans[0])}
-                                className="ml-auto bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded font-bold text-xs whitespace-nowrap transition-colors"
-                            >
-                                Renovar Agora
-                            </button>
                         </div>
                     )}
 
@@ -483,83 +407,64 @@ export const ProfileScreen: React.FC = () => {
                                  Gerencie sua assinatura e métodos de pagamento.
                              </p>
                          </div>
-                         <div className="flex gap-2 items-center">
-                             {subscriptionInfo ? (
-                                <div className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-2 border ${
-                                    subscriptionInfo.daysRemaining > 5 
-                                    ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800'
-                                    : 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-100 dark:border-red-800'
-                                }`}>
-                                    <div className={`w-2 h-2 rounded-full animate-pulse ${subscriptionInfo.daysRemaining > 5 ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
-                                    {subscriptionInfo.daysRemaining} Dias Restantes
-                                </div>
-                             ) : (
-                                <div className="px-4 py-2 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-800 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></div>
-                                    Trial / Free
-                                </div>
-                             )}
-                         </div>
                     </div>
-
-                    {/* SUBSCRIPTIONS LIST */}
-                    {subscriptions.length > 0 && (
-                        <div>
+                    
+                    {/* Active Subscription Card */}
+                    {activeSub && (
+                        <div className="mb-8">
                             <h3 className="text-sm font-bold text-slate-500 uppercase mb-4 flex items-center gap-2">
-                                <RefreshCw className="w-4 h-4"/> Assinatura Vigente
+                                <CreditCard className="w-4 h-4"/> Sua Assinatura
                             </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {subscriptions.map(sub => (
-                                    <div key={sub.id} className="p-5 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 flex justify-between items-center shadow-sm">
-                                        <div>
-                                            <div className="text-sm font-bold text-slate-900 dark:text-white mb-1">
-                                                {sub.description || 'Assinatura ShinkŌS'}
-                                            </div>
-                                            <div className="text-xs text-slate-500 flex items-center gap-2">
-                                                <CreditCard className="w-3 h-3"/> 
-                                                {sub.billingType} • Ciclo: {sub.cycle}
-                                            </div>
-                                            <div className="text-xs text-slate-500 mt-1 flex items-center gap-1">
-                                                <Calendar className="w-3 h-3"/>
-                                                Próxima: {new Date(sub.nextDueDate).toLocaleDateString()}
-                                            </div>
-                                        </div>
-                                        <div className="text-right">
-                                            <div className="text-lg font-black text-slate-900 dark:text-white">R$ {sub.value.toFixed(2)}</div>
-                                            <span className={`text-xs font-bold px-2 py-1 rounded uppercase mt-1 inline-block ${
-                                                sub.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' :
-                                                sub.status === 'OVERDUE' ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-600'
-                                            }`}>
-                                                {sub.status === 'ACTIVE' ? 'Ativa' : sub.status}
-                                            </span>
-                                        </div>
+                            <div className="p-5 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-emerald-200 dark:border-emerald-800 flex justify-between items-center shadow-sm ring-2 ring-emerald-500/20">
+                                <div>
+                                    <div className="text-sm font-bold text-slate-900 dark:text-white mb-1">
+                                        {activeSub.description || 'Assinatura Shinkō OS'}
                                     </div>
-                                ))}
+                                    <div className="text-xs text-slate-500 flex items-center gap-2">
+                                        <CreditCard className="w-3 h-3"/> 
+                                        {activeSub.billingType} • Ciclo: {activeSub.cycle}
+                                    </div>
+                                    <div className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                                        <Calendar className="w-3 h-3"/>
+                                        Próxima cobrança: {new Date(activeSub.nextDueDate).toLocaleDateString()}
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-lg font-black text-slate-900 dark:text-white">R$ {activeSub.value.toFixed(2)}</div>
+                                    <span className={`text-xs font-bold px-2 py-1 rounded uppercase mt-1 inline-block bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400`}>
+                                        Ativa
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     )}
 
+
                     {/* PLANS GRID */}
                     <div>
                         <h3 className="text-sm font-bold text-slate-500 uppercase mb-4">Planos Disponíveis</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                             {availablePlans.map(plan => (
                                 <div 
                                     key={plan.id} 
-                                    onClick={() => handlePlanSelection(plan)}
-                                    className={`relative p-6 rounded-xl border transition-all cursor-pointer flex flex-col justify-between h-64 glass-card hover:border-amber-500/50 ${
+                                    className={`relative p-6 rounded-2xl border transition-all duration-300 flex flex-col justify-between glass-card ${
                                         currentPlan === plan.id 
-                                        ? 'bg-slate-900 text-white border-slate-800 shadow-xl transform scale-105 z-10' 
-                                        : ''
+                                        ? 'border-amber-500 shadow-glow ring-2 ring-amber-500/20' 
+                                        : 'border-slate-200/50 dark:border-white/10 hover:border-amber-500/50 hover:-translate-y-1 cursor-pointer'
                                     }`}
                                 >
+                                    {currentPlan === plan.id && (
+                                        <div className="absolute top-3 right-3 bg-amber-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase shadow-sm z-10">
+                                            Seu Plano
+                                        </div>
+                                    )}
                                     {plan.recommended && (
                                         <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-500 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase shadow-sm">
                                             Mais Popular
                                         </div>
                                     )}
                                     <div>
-                                        <h4 className={`text-lg font-bold mb-2 ${currentPlan === plan.id ? 'text-white' : 'text-slate-900 dark:text-white'}`}>{plan.name}</h4>
+                                        <h4 className={`text-lg font-bold mb-2 ${currentPlan === plan.id ? 'text-amber-400' : 'text-slate-900 dark:text-white'}`}>{plan.name}</h4>
                                         <div className="flex items-baseline gap-1 mb-4">
                                             <span className="text-2xl font-black">R$ {plan.price.toFixed(2)}</span>
                                             <span className="text-xs opacity-60">/mês</span>
@@ -573,12 +478,17 @@ export const ProfileScreen: React.FC = () => {
                                         </ul>
                                     </div>
 
-                                    <button className={`w-full py-2 rounded-lg text-xs font-bold mt-4 transition-colors ${
-                                        currentPlan === plan.id
-                                        ? 'bg-white/20 text-white cursor-default'
-                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-amber-500 hover:text-white'
+                                    <button 
+                                        onClick={() => handlePlanSelection(plan)}
+                                        disabled={processingSubscription === plan.id}
+                                        className={`w-full py-2 rounded-lg text-xs font-bold mt-4 transition-colors ${
+                                            currentPlan === plan.id
+                                            ? 'bg-slate-200/50 dark:bg-white/20 text-white cursor-default'
+                                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-amber-500 hover:text-white'
                                     }`}>
-                                        {currentPlan === plan.id ? (subscriptionInfo?.shouldWarn ? 'Renovar Agora' : 'Plano Atual') : 'Selecionar'}
+                                        {processingSubscription === plan.id ? (
+                                            <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                                        ) : currentPlan === plan.id ? (subscriptionInfo?.shouldWarn ? 'Renovar Agora' : 'Plano Atual') : 'Selecionar'}
                                     </button>
                                 </div>
                             ))}
@@ -629,83 +539,6 @@ export const ProfileScreen: React.FC = () => {
                             </table>
                         </div>
                     </div>
-
-                    {/* CHECKOUT & PAYMENT MODALS */}
-                    {showCheckout && (
-                        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
-                            <div className="glass-panel w-full max-w-md rounded-2xl shadow-2xl overflow-hidden relative animate-ios-pop">
-
-                                <button onClick={() => setShowCheckout(null)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-900 dark:hover:text-white"><X className="w-5 h-5"/></button>
-
-                                <div className="p-6 border-b border-slate-100 dark:border-white/10 bg-white/50 dark:bg-white/5">
-                                    <div className="text-xs font-bold text-slate-500 uppercase mb-1">Checkout Seguro</div>
-                                    <h3 className="text-xl font-bold text-slate-900 dark:text-white">Plano {showCheckout.name}</h3>
-                                    <div className="text-3xl font-black text-shinko-primary mt-2">R$ {showCheckout.price.toFixed(2)} <span className="text-sm text-slate-400 font-medium">/mês</span></div>
-                                </div>
-
-                                <div className="p-6">
-                                    {paymentSuccess ? (
-                                        <div className="text-center py-8">
-                                            <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/20 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                                                <Check className="w-8 h-8"/>
-                                            </div>
-                                            <h4 className="text-lg font-bold text-emerald-600 dark:text-emerald-400">Pagamento Confirmado!</h4>
-                                            <p className="text-sm text-slate-500 mt-2">Sua assinatura está ativa. Aproveite.</p>
-                                            <button onClick={() => setShowCheckout(null)} className="mt-6 w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-black font-bold rounded-xl">Fechar</button>
-                                        </div>
-                                    ) : pixData ? (
-                                        <div className="space-y-6 text-center">
-                                            <div className="bg-white p-4 rounded-xl inline-block border border-slate-200">
-                                                <img src={pixData.qrCode} alt="QR Code Pix" className="w-48 h-48 object-contain"/>
-                                            </div>
-                                            <div>
-                                                <p className="text-sm font-bold text-slate-900 dark:text-white mb-2">Escaneie o QR Code ou Copie o Código</p>
-                                                <div className="flex items-center gap-2 bg-slate-100 dark:bg-white/10 p-3 rounded-xl border border-slate-200 dark:border-white/5">
-                                                    <code className="text-xs text-slate-600 dark:text-slate-300 flex-1 truncate font-mono">{pixData.copyPaste}</code>
-                                                    <button onClick={() => navigator.clipboard.writeText(pixData.copyPaste)} className="text-blue-500 hover:text-blue-600"><Copy className="w-4 h-4"/></button>
-                                                </div>
-                                            </div>
-                                            <div className="text-xs text-slate-400 flex items-center justify-center gap-2 animate-pulse">
-                                                <Loader2 className="w-3 h-3 animate-spin"/> Aguardando confirmação...
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-4">
-                                            <button 
-                                                onClick={() => handleExecutePayment('PIX')}
-                                                disabled={processingPayment}
-                                                className="w-full h-14 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl flex items-center justify-center gap-3 shadow-lg shadow-emerald-500/20 transition-all active:scale-95"
-                                            >
-                                                {processingPayment ? <Loader2 className="w-5 h-5 animate-spin"/> : <Zap className="w-5 h-5"/>}
-                                                Pagar com PIX (Instantâneo)
-                                            </button>
-
-                                            <div className="relative flex py-2 items-center">
-                                                <div className="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
-                                                <span className="flex-shrink-0 mx-4 text-xs text-slate-400 uppercase">Ou Cartão</span>
-                                                <div className="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
-                                            </div>
-
-                                            <button 
-                                                onClick={() => handleExecutePayment('CREDIT_CARD')}
-                                                disabled={processingPayment}
-                                                className="w-full h-14 bg-slate-900 dark:bg-white text-white dark:text-black font-bold rounded-xl flex items-center justify-center gap-3 shadow-lg transition-all active:scale-95"
-                                            >
-                                                {processingPayment ? <Loader2 className="w-5 h-5 animate-spin"/> : <CreditCard className="w-5 h-5"/>}
-                                                Cartão de Crédito
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="bg-slate-50 dark:bg-white/5 p-4 text-center border-t border-slate-100 dark:border-white/10">
-                                    <p className="text-[10px] text-slate-400 flex items-center justify-center gap-1">
-                                        <Lock className="w-3 h-3"/> Pagamentos processados via Asaas. Ambiente Seguro.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    )}
                 </div>
             )}
         </div>
