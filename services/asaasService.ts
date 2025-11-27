@@ -10,20 +10,62 @@ const USE_REAL_ASAAS = true;
 // Link fixo gerado pelo cliente
 const FIXED_PAYMENT_LINK = 'https://www.asaas.com/c/3xh5fsyxc16odebg';
 
-// Default fallback plans in case DB is empty or not set up yet
+// Default fallback plans
 const FALLBACK_PLANS: SubscriptionPlan[] = [
+    {
+        id: 'plan_free',
+        name: 'Starter',
+        price: 0,
+        features: [
+            '1 Usuário (Dono)',
+            'Até 3 Projetos Ativos',
+            'Metodologia Shinkō',
+            'Kanban & Cronograma',
+            'Sem Financeiro/Clientes'
+        ],
+        recommended: false,
+        cycle: 'MONTHLY'
+    },
+    {
+        id: 'plan_consultant',
+        name: 'Consultant',
+        price: 89.90,
+        features: [
+            '1 Usuário (Dono)',
+            'Projetos Ilimitados',
+            'Framework Shinkō (RDE & Prio-6)',
+            'Gantt & Kanban',
+            'IA Generativa Básica'
+        ],
+        recommended: false,
+        cycle: 'MONTHLY'
+    },
+    {
+        id: 'plan_studio',
+        name: 'Studio',
+        price: 297.00,
+        features: [
+            'Até 5 Usuários',
+            'Tudo do Consultor +',
+            'Módulo Financeiro & Contratos',
+            'Portal do Cliente Ilimitado',
+            'IA Leitura de Documentos (OCR)'
+        ],
+        recommended: true,
+        cycle: 'MONTHLY'
+    },
     {
         id: 'plan_scale',
         name: 'Scale',
-        price: 79.90,
+        price: 799.00,
         features: [
-            'Projetos Ilimitados', 
-            'Até 5 Colaboradores', 
-            'IA Gemini Integrada', 
-            'Upload de Arquivos (5GB)',
-            'Kanban Avançado & Storytime'
+            'Até 15 Usuários',
+            'Tudo do Studio +',
+            'Métricas de Engenharia (DORA)',
+            'Métricas de Produto (NPS/KPIs)',
+            'IA Avançada & Prioridade'
         ],
-        recommended: true,
+        recommended: false,
         cycle: 'MONTHLY'
     }
 ];
@@ -35,11 +77,11 @@ let MOCK_PAYMENTS: AsaasPayment[] = [
         dateCreated: new Date(Date.now() - 86400000 * 30).toISOString(),
         customer: 'cus_000001',
         paymentLink: null,
-        value: 79.90,
-        netValue: 78.00,
+        value: 297.90,
+        netValue: 290.00,
         billingType: 'CREDIT_CARD',
         status: 'RECEIVED',
-        description: 'Assinatura Scale (Fallback Mode)',
+        description: 'Assinatura Studio (Fallback Mode)',
         invoiceUrl: '#'
     }
 ];
@@ -65,15 +107,58 @@ export const calculateSubscriptionStatus = (lastPaymentDate: string | Date) => {
     };
 };
 
+export const getCurrentUserPlan = async (userId: string): Promise<string> => {
+    try {
+        // 1. Check for subscription in the new 'cliente_plano' table first
+        const { data: subData, error } = await supabase
+            .from('cliente_plano')
+            .select(`
+                datafim, 
+                plano (
+                    id, 
+                    nome
+                )
+            `)
+            .eq('dono', userId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+        if (subData) {
+            const endDate = subData.datafim ? new Date(subData.datafim) : new Date(2099, 0, 1);
+            if (endDate >= new Date()) {
+                const planName = subData.plano?.nome?.toLowerCase();
+                if (planName?.includes('scale')) return 'plan_scale';
+                if (planName?.includes('studio')) return 'plan_studio';
+                if (planName?.includes('consultant')) return 'plan_consultant';
+            }
+        }
+
+        // 2. Fallback to old behavior via Asaas
+        const subs = await getUserSubscriptions(userId);
+        const activeSub = subs.find(s => s.status === 'ACTIVE');
+        if (activeSub) {
+            const desc = activeSub.description?.toLowerCase() || '';
+            if (desc.includes('scale')) return 'plan_scale';
+            if (desc.includes('studio')) return 'plan_studio';
+            if (desc.includes('consultant')) return 'plan_consultant';
+        }
+
+        return 'plan_free';
+    } catch (e) {
+        console.error("Error getting user plan:", e);
+        return 'plan_free';
+    }
+};
+
 export const fetchSubscriptionPlans = async (): Promise<SubscriptionPlan[]> => {
     try {
         // Tenta buscar do banco de dados (Tabela 'plans' ou 'produtos')
         // Estrutura esperada: id, name, price, features (json/array), recommended (bool), active (bool)
         const { data, error } = await supabase
-            .from('plans')
+            .from('planos')
             .select('*')
-            .eq('active', true)
-            .order('price', { ascending: true });
+            .order('valor', { ascending: true });
 
         if (error) {
             console.warn("Erro ao buscar planos do banco (usando fallback):", error.message);
@@ -81,14 +166,23 @@ export const fetchSubscriptionPlans = async (): Promise<SubscriptionPlan[]> => {
         }
 
         if (data && data.length > 0) {
-            return data.map((plan: any) => ({
-                id: plan.id.toString(),
-                name: plan.name,
-                price: Number(plan.price),
-                features: Array.isArray(plan.features) ? plan.features : (plan.features ? JSON.parse(plan.features) : []),
-                recommended: plan.recommended,
-                cycle: plan.cycle || 'MONTHLY'
-            }));
+            return data.map((plan: any) => {
+                // Map DB Plan to UI Plan ID for logic
+                let planId = 'plan_free';
+                const nameLower = plan.nome.toLowerCase();
+                if (nameLower.includes('scale')) planId = 'plan_scale';
+                else if (nameLower.includes('studio')) planId = 'plan_studio';
+                else if (nameLower.includes('consultant')) planId = 'plan_consultant';
+
+                return {
+                    id: planId,
+                    name: plan.nome,
+                    price: Number(plan.valor),
+                    features: plan.descricao ? [plan.descricao] : [], // Simple description mapping
+                    recommended: nameLower.includes('studio'),
+                    cycle: 'MONTHLY'
+                };
+            });
         }
         
         return FALLBACK_PLANS;
@@ -110,16 +204,13 @@ export const getUserSubscriptions = async (userId: string): Promise<AsaasSubscri
             });
 
             if (error) {
-                console.warn("SHINKO DEBUG: Falha ao buscar assinaturas reais.", error);
                 // Fallback se a função não existir ou falhar
                 return _mockGetSubscriptions(userId);
             }
             
-            // O endpoint do Asaas retorna { data: [], ... }, então a edge function deve retornar { subscriptions: [...] }
             return data.subscriptions || [];
 
         } catch (err) {
-            console.error("Erro de conexão ao buscar assinaturas:", err);
             return _mockGetSubscriptions(userId);
         }
     }
@@ -138,8 +229,6 @@ export const createAsaasPayment = async (
     // 1. TENTATIVA MODO REAL (Via Supabase Edge Function)
     if (USE_REAL_ASAAS) {
         try {
-            console.log("Iniciando transação segura via Shinkō Edge...");
-            
             const { data, error } = await supabase.functions.invoke('asaas-integration', {
                 body: {
                     action: 'CREATE_PAYMENT',
@@ -152,10 +241,8 @@ export const createAsaasPayment = async (
 
             // Tratamento específico de erro da Edge Function
             if (error) {
-                // Tenta ler o corpo do erro se disponível
                 let errorMsg = "Erro de comunicação com o servidor de pagamentos.";
                 try {
-                    // Às vezes o erro vem como string JSON no message
                     const body = error instanceof Error ? error.message : JSON.stringify(error);
                     console.error("SHINKO DEBUG - Edge Function Error:", body);
                 } catch (e) {}
@@ -179,8 +266,6 @@ export const createAsaasPayment = async (
 
         } catch (err: any) {
             console.error("Falha crítica no pagamento real:", err);
-            // Em criação de pagamento, NÃO fazemos fallback silencioso para Mock para evitar falsa sensação de pagamento.
-            // Apenas repassamos o erro para a UI avisar o usuário.
             throw err; 
         }
     }
@@ -201,8 +286,6 @@ export const getPaymentHistory = async (userId: string): Promise<AsaasPayment[]>
             });
 
             if (error) {
-                console.warn("SHINKO DEBUG: Falha ao buscar histórico real.");
-                // Fallback gracioso para array vazio ou mock
                 return MOCK_PAYMENTS; 
             }
             
@@ -277,7 +360,6 @@ const _mockGetSubscriptions = async (userId: string): Promise<AsaasSubscription[
     await new Promise(r => setTimeout(r, 600));
     
     // Mock de uma assinatura ativa para testes de UI
-    // Em produção, isso só retornaria se a Edge Function falhasse
     return [
         {
             id: 'sub_mock_123',
@@ -285,10 +367,10 @@ const _mockGetSubscriptions = async (userId: string): Promise<AsaasSubscription[
             customer: userId,
             billingType: 'CREDIT_CARD',
             cycle: 'MONTHLY',
-            value: 79.90,
-            nextDueDate: new Date(Date.now() + 86400000 * 15).toISOString(), // Daqui 15 dias
+            value: 297.00,
+            nextDueDate: new Date(Date.now() + 86400000 * 15).toISOString(), 
             status: 'ACTIVE',
-            description: 'Assinatura Scale - Shinkō OS'
+            description: 'Assinatura Studio - Shinkō OS'
         }
     ];
 }

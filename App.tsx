@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { Opportunity, RDEStatus, Archetype, IntensityLevel, BpmnTask, BpmnNode, ProjectStatus } from './types';
+import { Opportunity, RDEStatus, Archetype, IntensityLevel, BpmnTask, BpmnNode, ProjectStatus, PLAN_LIMITS } from './types';
 import OpportunityWizard from './components/OpportunityWizard';
 import OpportunityDetail from './components/OpportunityDetail';
 import { ProjectWorkspace } from './components/ProjectWorkspace'; // Import new component
@@ -12,6 +12,7 @@ import { FinancialScreen } from './components/FinancialScreen';
 import { ClientsScreen } from './components/ClientsScreen';
 import { ProductIndicators } from './components/ProductIndicators'; 
 import { DevIndicators } from './components/DevIndicators';
+import { AdminManagerScreen } from './components/AdminManagerScreen'; // Import new Admin Screen
 import AuthScreen from './components/AuthScreen';
 import { LandingPage } from './components/LandingPage';
 import { Sidebar, MobileDrawer } from './components/Navigation';
@@ -25,8 +26,10 @@ import { createTask, createProject } from './services/projectService';
 import { supabase } from './services/supabaseClient';
 import { Loader2, Rocket, AlertTriangle, CheckCircle, PlayCircle, Clock, Flame, Snowflake, AlertCircle, Lock, ArrowDownRight, List as ListIcon, Search, Hash, XCircle, ShieldCheck, Sparkles, Plus, Filter, Target, Trash2, Edit } from 'lucide-react';
 import { OnboardingGuide } from './components/OnboardingGuide';
-import { logEvent } from './services/analyticsService';
+import { logEvent, trackUserAccess } from './services/analyticsService';
 import { NpsSurvey } from './components/NpsSurvey';
+import { getCurrentUserPlan } from './services/asaasService';
+import { subscribeToPresence } from './services/presenceService';
 
 const LOGO_URL = "https://zjssfnbcboibqeoubeou.supabase.co/storage/v1/object/public/fotoperfil/fotoperfil/1.png";
 
@@ -77,12 +80,16 @@ const App: React.FC = () => {
   const [isAuthChecking, setIsAuthChecking] = useState(true); 
   const [session, setSession] = useState<any>(null);
   const [userRole, setUserRole] = useState<string>('colaborador');
-  const [userData, setUserData] = useState<{name: string, avatar: string | null}>({ name: 'Usuário', avatar: null });
+  const [userData, setUserData] = useState<{name: string, avatar: string | null, email?: string}>({ name: 'Usuário', avatar: null });
   const [userOrgId, setUserOrgId] = useState<number | null>(null);
+  const [currentPlan, setCurrentPlan] = useState<string>('plan_free');
   const [isGuest, setIsGuest] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [showResetPasswordModal, setShowResetPasswordModal] = useState(false); 
+  
+  // Realtime Presence State
+  const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
 
   // Data & UI State
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
@@ -92,7 +99,7 @@ const App: React.FC = () => {
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [isQuickTaskOpen, setIsQuickTaskOpen] = useState(false);
 
-  const [view, setView] = useState<'dashboard' | 'list' | 'calendar' | 'profile' | 'settings' | 'search' | 'kanban' | 'gantt' | 'financial' | 'clients' | 'product' | 'dev-metrics' | 'project-detail'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'list' | 'calendar' | 'profile' | 'settings' | 'search' | 'kanban' | 'gantt' | 'financial' | 'clients' | 'product' | 'dev-metrics' | 'project-detail' | 'admin-manager'>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [listFilterStatus, setListFilterStatus] = useState<ProjectStatus | 'All'>('All');
   
@@ -118,12 +125,14 @@ const App: React.FC = () => {
       let currentRole = 'colaborador';
       let currentName = 'Usuário';
       let currentAvatar = null;
+      let currentEmail = '';
       let currentUserId = null;
       let currentOrgId: number | null = null;
 
       try {
           if (session?.user) {
               currentUserId = session.user.id;
+              currentEmail = session.user.email;
               const { data: profile } = await supabase.from('users').select('perfil, nome, organizacao').eq('id', currentUserId).maybeSingle();
               if (profile) {
                   currentRole = profile.perfil;
@@ -135,13 +144,17 @@ const App: React.FC = () => {
                   currentRole = session.user.user_metadata?.role || 'colaborador';
               }
               currentAvatar = session.user.user_metadata?.avatar_url || null;
+              
+              // Load Plan
+              const plan = await getCurrentUserPlan(currentUserId);
+              setCurrentPlan(plan);
           } 
           if (isGuest) currentOrgId = 3;
 
           setUserOrgId(currentOrgId);
           if (session?.user) {
               setUserRole(currentRole);
-              setUserData({ name: currentName, avatar: currentAvatar });
+              setUserData({ name: currentName, avatar: currentAvatar, email: currentEmail });
               
               if (currentRole === 'cliente') {
                   setView('list');
@@ -186,6 +199,18 @@ const App: React.FC = () => {
       }
   }, [session, isGuest]);
 
+  // --- PRESENCE EFFECT ---
+  useEffect(() => {
+      if (session?.user?.id && !isGuest) {
+          const unsubscribe = subscribeToPresence(session.user.id, (userIds) => {
+              setOnlineUsers(userIds);
+          });
+          return () => {
+              unsubscribe();
+          };
+      }
+  }, [session, isGuest]);
+
   // --- AUTH & DATA LOADING EFFECTS ---
   useEffect(() => {
     let mounted = true;
@@ -198,6 +223,7 @@ const App: React.FC = () => {
             const { data: { session: activeSession } } = await supabase.auth.getSession();
             if (mounted && activeSession) {
                 setSession(activeSession);
+                trackUserAccess(activeSession.user.id);
                 setIsLoginModalOpen(false);
             }
         } catch (e) {
@@ -218,6 +244,7 @@ const App: React.FC = () => {
 
         if (event === 'SIGNED_IN' && newSession) {
              setSession(newSession);
+             trackUserAccess(newSession.user.id);
              setIsLoginModalOpen(false);
              setIsAuthChecking(false); 
         } else if (event === 'SIGNED_OUT') {
@@ -330,6 +357,18 @@ const App: React.FC = () => {
       }
   };
 
+  const handleCreateProjectClick = () => {
+      // Plan Limit Check
+      const limits = PLAN_LIMITS[currentPlan] || PLAN_LIMITS['plan_free'];
+      if (opportunities.length >= limits.maxProjects) {
+          alert(`Limite de projetos atingido para o plano atual (${limits.maxProjects}). Faça upgrade para criar mais.`);
+          setView('profile'); // Send to profile to upgrade
+          return;
+      }
+      setEditingOpp(undefined);
+      setIsWizardOpen(true);
+  };
+
   const handleSaveOpportunity = async (opp: Opportunity) => {
       setIsLoading(true);
       try {
@@ -432,7 +471,7 @@ const App: React.FC = () => {
                         setIsGuest(true);
                         setIsLoginModalOpen(false);
                         if (persona) {
-                            setUserData({ name: persona.name, avatar: persona.avatar || null });
+                            setUserData({ name: persona.name, avatar: persona.avatar || null, email: persona.email });
                             setUserRole(persona.role);
                             if (persona.role === 'cliente') setView('list');
                             setUserOrgId(3);
@@ -471,6 +510,7 @@ const App: React.FC = () => {
         setIsMobileOpen={setIsMobileMenuOpen}
         userRole={userRole}
         userData={userData}
+        currentPlan={currentPlan}
       />
 
       <MobileDrawer 
@@ -501,6 +541,10 @@ const App: React.FC = () => {
                 />
             )}
             
+            {view === 'admin-manager' && userData.email === 'peboorba@gmail.com' && (
+                <AdminManagerScreen onlineUsers={onlineUsers} />
+            )}
+            
             {view === 'list' && (
                 <div className="h-full flex flex-col animate-in fade-in duration-500">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
@@ -510,7 +554,7 @@ const App: React.FC = () => {
                         </div>
                         {userRole !== 'cliente' && (
                             <button
-                                onClick={() => { setEditingOpp(undefined); setIsWizardOpen(true); }}
+                                onClick={handleCreateProjectClick}
                                 id="btn-new-project-list"
                                 className="bg-gradient-to-r from-amber-500 to-orange-600 text-white px-6 py-3 rounded-xl font-bold text-sm shadow-lg hover:shadow-amber-500/20 transition-all active:scale-95 flex items-center gap-2 hover:brightness-110"
                             >
@@ -627,7 +671,7 @@ const App: React.FC = () => {
                                                     if(window.confirm(`Excluir projeto?`)) handleDeleteOpportunity(opp.id);
                                                 }}
                                                 className="px-3 py-1.5 bg-red-50 dark:bg-red-900/20 text-red-500 text-xs font-bold rounded-lg flex items-center gap-2"
-                                             >
+                                            >
                                                 <Trash2 className="w-3 h-3"/> Excluir
                                             </button>
                                          )}
@@ -656,6 +700,7 @@ const App: React.FC = () => {
                         setSelectedOpp(updatedOpp);
                     }}
                     userRole={userRole}
+                    currentPlan={currentPlan}
                 />
             )}
 
@@ -664,10 +709,10 @@ const App: React.FC = () => {
             {view === 'gantt' && <GanttView opportunities={opportunities} onSelectOpportunity={handleOpenProject} onTaskUpdate={() => {}} userRole={userRole} />}
             
             {/* Restricted Views */}
-            {view === 'financial' && userRole === 'dono' && <FinancialScreen />}
-            {view === 'clients' && <ClientsScreen userRole={userRole} />}
-            {view === 'product' && userRole === 'dono' && <ProductIndicators />}
-            {view === 'dev-metrics' && userRole === 'dono' && <DevIndicators />}
+            {view === 'financial' && userRole === 'dono' && (PLAN_LIMITS[currentPlan]?.features.financial !== false ? <FinancialScreen /> : <AccessDenied plan={currentPlan} module="Financeiro" setView={setView}/>)}
+            {view === 'clients' && (PLAN_LIMITS[currentPlan]?.features.clients !== false ? <ClientsScreen userRole={userRole} onlineUsers={onlineUsers} /> : <AccessDenied plan={currentPlan} module="Clientes" setView={setView}/>)}
+            {view === 'product' && userRole === 'dono' && (PLAN_LIMITS[currentPlan]?.features.metrics !== false ? <ProductIndicators /> : <AccessDenied plan={currentPlan} module="Métricas de Produto" setView={setView}/>)}
+            {view === 'dev-metrics' && userRole === 'dono' && (PLAN_LIMITS[currentPlan]?.features.metrics !== false ? <DevIndicators /> : <AccessDenied plan={currentPlan} module="Métricas de Engenharia" setView={setView}/>)}
             
             {/* Access Denied Message */}
             {(view === 'financial' || view === 'product' || view === 'dev-metrics') && userRole !== 'dono' && (
@@ -682,7 +727,7 @@ const App: React.FC = () => {
                 </div>
             )}
 
-            {view === 'settings' && <SettingsScreen theme={theme} onToggleTheme={toggleTheme} />}
+            {view === 'settings' && <SettingsScreen theme={theme} onToggleTheme={toggleTheme} onlineUsers={onlineUsers} />}
             {view === 'profile' && <ProfileScreen />}
             {view === 'search' && (
                 <div className="space-y-4 animate-in fade-in">
@@ -730,5 +775,22 @@ const App: React.FC = () => {
     </div>
   );
 };
+
+// Access Denied Component for Plan Limits
+const AccessDenied = ({ plan, module, setView }: { plan: string, module: string, setView: (v: any) => void }) => (
+    <div className="flex h-full items-center justify-center flex-col gap-4 animate-in zoom-in duration-300 p-8">
+        <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/20 rounded-full flex items-center justify-center border-4 border-amber-50 dark:border-amber-900/10">
+            <Lock className="w-10 h-10 text-amber-500"/>
+        </div>
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Upgrade Necessário</h2>
+        <p className="text-slate-500 dark:text-slate-400 text-sm max-w-sm text-center leading-relaxed">
+            O módulo <strong>{module}</strong> não está disponível no seu plano atual (<strong>{plan.replace('plan_', '').toUpperCase()}</strong>).
+            Faça um upgrade para desbloquear ferramentas profissionais.
+        </p>
+        <button onClick={() => setView('profile')} className="mt-4 px-8 py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold rounded-xl shadow-lg hover:brightness-110 transition-all">
+            Ver Planos Disponíveis
+        </button>
+    </div>
+);
 
 export default App;

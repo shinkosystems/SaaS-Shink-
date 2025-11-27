@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { 
   LayoutGrid, 
@@ -15,12 +16,14 @@ import {
   DollarSign,
   Users,
   Activity,
-  Code2
+  Code2,
+  ShieldAlert
 } from 'lucide-react';
+import { PLAN_LIMITS } from '../types';
 
 interface Props {
-  currentView: 'dashboard' | 'list' | 'calendar' | 'profile' | 'settings' | 'search' | 'kanban' | 'gantt' | 'financial' | 'clients' | 'product' | 'dev-metrics';
-  onChangeView: (view: 'dashboard' | 'list' | 'calendar' | 'profile' | 'settings' | 'search' | 'kanban' | 'gantt' | 'financial' | 'clients' | 'product' | 'dev-metrics') => void;
+  currentView: 'dashboard' | 'list' | 'calendar' | 'profile' | 'settings' | 'search' | 'kanban' | 'gantt' | 'financial' | 'clients' | 'product' | 'dev-metrics' | 'admin-manager';
+  onChangeView: (view: 'dashboard' | 'list' | 'calendar' | 'profile' | 'settings' | 'search' | 'kanban' | 'gantt' | 'financial' | 'clients' | 'product' | 'dev-metrics' | 'admin-manager') => void;
   onOpenCreate: () => void;
   onOpenCreateTask: () => void;
   onToggleTheme: () => void;
@@ -31,7 +34,8 @@ interface Props {
   isMobileOpen: boolean;
   setIsMobileOpen: (isOpen: boolean) => void;
   userRole: string;
-  userData?: { name: string, avatar: string | null };
+  userData?: { name: string, avatar: string | null, email?: string };
+  currentPlan?: string;
 }
 
 const LOGO_URL = "https://zjssfnbcboibqeoubeou.supabase.co/storage/v1/object/public/fotoperfil/fotoperfil/1.png";
@@ -84,7 +88,11 @@ const NavItem = ({
   </button>
 );
 
-const SidebarContent = ({ props }: { props: Props }) => (
+const SidebarContent = ({ props }: { props: Props }) => {
+  const plan = props.currentPlan || 'plan_free';
+  const features = PLAN_LIMITS[plan]?.features || PLAN_LIMITS['plan_free'].features;
+
+  return (
   <div className="flex flex-col h-full">
     
     <div className="h-6"></div>
@@ -159,13 +167,17 @@ const SidebarContent = ({ props }: { props: Props }) => (
         isActive={props.currentView === 'kanban'} 
         onClick={() => { props.onChangeView('kanban'); props.setIsMobileOpen(false); }} 
       />
-      <NavItem 
-        icon={GanttChartSquare} 
-        label="Gantt" 
-        color="bg-teal-600"
-        isActive={props.currentView === 'gantt'} 
-        onClick={() => { props.onChangeView('gantt'); props.setIsMobileOpen(false); }} 
-      />
+      
+      {features.gantt && (
+          <NavItem 
+            icon={GanttChartSquare} 
+            label="Gantt" 
+            color="bg-teal-600"
+            isActive={props.currentView === 'gantt'} 
+            onClick={() => { props.onChangeView('gantt'); props.setIsMobileOpen(false); }} 
+          />
+      )}
+      
       <NavItem 
         icon={CalendarIcon} 
         label="Cronograma" 
@@ -175,41 +187,65 @@ const SidebarContent = ({ props }: { props: Props }) => (
         badge={3}
       />
 
+      {/* SUPER ADMIN (Specific Email Check) */}
+      {props.userData?.email === 'peboorba@gmail.com' && (
+          <>
+            <div className="text-[10px] font-bold text-purple-500 px-4 mb-2 mt-6 uppercase tracking-widest flex items-center gap-2">
+                <ShieldAlert className="w-3 h-3"/> Super Admin
+            </div>
+            <NavItem 
+                icon={Users} 
+                label="Gestão Global" 
+                color="bg-purple-600"
+                isActive={props.currentView === 'admin-manager'} 
+                onClick={() => { props.onChangeView('admin-manager'); props.setIsMobileOpen(false); }} 
+            />
+          </>
+      )}
+
       {props.userRole !== 'cliente' && (
         <>
             <div className="text-[10px] font-bold text-slate-500 dark:text-slate-600 px-4 mb-2 mt-6 uppercase tracking-widest">Gestão</div>
             
-            <NavItem 
-                icon={Users} 
-                label="Clientes" 
-                color="bg-indigo-600"
-                isActive={props.currentView === 'clients'} 
-                onClick={() => { props.onChangeView('clients'); props.setIsMobileOpen(false); }} 
-            />
+            {features.clients && (
+                <NavItem 
+                    icon={Users} 
+                    label="Clientes" 
+                    color="bg-indigo-600"
+                    isActive={props.currentView === 'clients'} 
+                    onClick={() => { props.onChangeView('clients'); props.setIsMobileOpen(false); }} 
+                />
+            )}
 
             {props.userRole === 'dono' && (
                 <>
-                    <NavItem 
-                        icon={DollarSign} 
-                        label="Financeiro" 
-                        color="bg-emerald-600"
-                        isActive={props.currentView === 'financial'} 
-                        onClick={() => { props.onChangeView('financial'); props.setIsMobileOpen(false); }} 
-                    />
-                    <NavItem 
-                        icon={Activity} 
-                        label="Produto" 
-                        color="bg-pink-600"
-                        isActive={props.currentView === 'product'} 
-                        onClick={() => { props.onChangeView('product'); props.setIsMobileOpen(false); }} 
-                    />
-                    <NavItem 
-                        icon={Code2} 
-                        label="Engenharia" 
-                        color="bg-cyan-600"
-                        isActive={props.currentView === 'dev-metrics'} 
-                        onClick={() => { props.onChangeView('dev-metrics'); props.setIsMobileOpen(false); }} 
-                    />
+                    {features.financial && (
+                        <NavItem 
+                            icon={DollarSign} 
+                            label="Financeiro" 
+                            color="bg-emerald-600"
+                            isActive={props.currentView === 'financial'} 
+                            onClick={() => { props.onChangeView('financial'); props.setIsMobileOpen(false); }} 
+                        />
+                    )}
+                    {features.metrics && (
+                        <NavItem 
+                            icon={Activity} 
+                            label="Produto" 
+                            color="bg-pink-600"
+                            isActive={props.currentView === 'product'} 
+                            onClick={() => { props.onChangeView('product'); props.setIsMobileOpen(false); }} 
+                        />
+                    )}
+                    {features.metrics && (
+                        <NavItem 
+                            icon={Code2} 
+                            label="Engenharia" 
+                            color="bg-cyan-600"
+                            isActive={props.currentView === 'dev-metrics'} 
+                            onClick={() => { props.onChangeView('dev-metrics'); props.setIsMobileOpen(false); }} 
+                        />
+                    )}
                 </>
             )}
         </>
@@ -252,7 +288,8 @@ const SidebarContent = ({ props }: { props: Props }) => (
         </button>
     </div>
   </div>
-);
+  );
+};
 
 export const Sidebar = (props: Props) => {
   // Changed from lg:block to xl:block to hide on standard tablets/smaller laptops

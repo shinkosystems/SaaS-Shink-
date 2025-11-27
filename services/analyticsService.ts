@@ -33,6 +33,37 @@ const getMockMetrics = (range: 'week' | 'month' | 'year' = 'month'): ProductMetr
     };
 };
 
+export const trackUserAccess = async (userId: string) => {
+    try {
+        // 1. Busca o contador atual para incrementar
+        const { data, error } = await supabase
+            .from('users')
+            .select('acessos')
+            .eq('id', userId)
+            .single();
+
+        if (error) {
+            // Se der erro (ex: usuário não existe na tabela users ainda), falha silenciosamente ou tenta criar
+            console.warn("Erro ao buscar contador de acessos:", error.message);
+            return;
+        }
+
+        const currentAccess = (data?.acessos || 0);
+
+        // 2. Atualiza contador e data
+        await supabase
+            .from('users')
+            .update({
+                acessos: currentAccess + 1,
+                ultimo_acesso: new Date().toISOString()
+            })
+            .eq('id', userId);
+
+    } catch (err) {
+        console.error("Falha ao registrar acesso do usuário:", err);
+    }
+};
+
 export const logEvent = async (
     eventType: ProductEvent['event_type'], 
     eventData: any = {}

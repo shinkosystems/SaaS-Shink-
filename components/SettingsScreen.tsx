@@ -7,9 +7,10 @@ import { ElasticSwitch } from './ElasticSwitch';
 interface Props {
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
+  onlineUsers?: string[];
 }
 
-export const SettingsScreen: React.FC<Props> = ({ theme, onToggleTheme }) => {
+export const SettingsScreen: React.FC<Props> = ({ theme, onToggleTheme, onlineUsers = [] }) => {
   const [notifications, setNotifications] = useState({
     email: true,
     push: true,
@@ -173,9 +174,14 @@ export const SettingsScreen: React.FC<Props> = ({ theme, onToggleTheme }) => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                            {teamMembers.map(user => (
+                            {teamMembers.map(user => {
+                                const isOnline = onlineUsers.includes(user.id);
+                                return (
                                 <tr key={user.id} className="hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors">
-                                    <td className="p-3 font-medium text-slate-900 dark:text-white">{user.nome}</td>
+                                    <td className="p-3 font-medium text-slate-900 dark:text-white flex items-center gap-2">
+                                        <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse shadow-[0_0_5px_#10b981]' : 'bg-slate-300 dark:bg-slate-700'}`} title={isOnline ? 'Online' : 'Offline'}></div>
+                                        {user.nome}
+                                    </td>
                                     <td className="p-3 text-slate-500">{user.email}</td>
                                     <td className="p-3">
                                         <span className="text-xs font-bold px-2 py-0.5 rounded capitalize bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
@@ -210,7 +216,7 @@ export const SettingsScreen: React.FC<Props> = ({ theme, onToggleTheme }) => {
                                         )}
                                     </td>
                                 </tr>
-                            ))}
+                            )})}
                             {teamMembers.length === 0 && (
                                 <tr>
                                     <td colSpan={4} className="p-4 text-center text-slate-500 italic">

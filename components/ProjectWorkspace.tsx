@@ -14,11 +14,12 @@ interface Props {
   onEdit: (opp: Opportunity) => void;
   onDelete: (id: string) => void;
   userRole?: string;
+  currentPlan?: string;
 }
 
 type Tab = 'overview' | 'kanban' | 'gantt' | 'calendar';
 
-export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdate, onEdit, onDelete, userRole }) => {
+export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdate, onEdit, onDelete, userRole, currentPlan }) => {
   const [activeTab, setActiveTab] = useState<Tab>('overview');
 
   const getStatusColor = (status: string) => {
@@ -122,6 +123,7 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
                       onDelete={onDelete}
                       onUpdate={onUpdate}
                       userRole={userRole}
+                      currentPlan={currentPlan}
                   />
               </div>
           )}

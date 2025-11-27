@@ -20,7 +20,54 @@ export enum IntensityLevel {
   L4 = 4
 }
 
+// --- PLAN CONFIGURATION ---
+export const PLAN_LIMITS: Record<string, { 
+    maxProjects: number; 
+    features: { 
+        financial: boolean; 
+        clients: boolean; 
+        metrics: boolean; 
+        pdfUpload: boolean; 
+        gantt: boolean;
+    } 
+}> = {
+    'plan_free': {
+        maxProjects: 3,
+        features: { financial: false, clients: false, metrics: false, pdfUpload: false, gantt: true }
+    },
+    'plan_consultant': {
+        maxProjects: 9999,
+        features: { financial: false, clients: false, metrics: false, pdfUpload: false, gantt: true }
+    },
+    'plan_studio': {
+        maxProjects: 9999,
+        features: { financial: true, clients: true, metrics: false, pdfUpload: true, gantt: true }
+    },
+    'plan_scale': {
+        maxProjects: 9999,
+        features: { financial: true, clients: true, metrics: true, pdfUpload: true, gantt: true }
+    }
+};
+
 // --- DB SCHEMA TYPES (POSTGRESQL) ---
+
+export interface DbPlan {
+  id: number;
+  nome: string;
+  valor: number;
+  meses: number;
+  descricao: string;
+}
+
+export interface DbClientPlan {
+  id: number;
+  created_at: string;
+  dono: string; // UUID
+  plano: number; // FK
+  datainicio: string;
+  datafim: string;
+  valor: number;
+}
 
 export interface DbClient {
   id: string; // UUID

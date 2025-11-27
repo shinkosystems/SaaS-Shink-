@@ -8,9 +8,10 @@ import { logEvent } from '../services/analyticsService';
 
 interface Props {
     userRole?: string;
+    onlineUsers?: string[];
 }
 
-export const ClientsScreen: React.FC<Props> = ({ userRole }) => {
+export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [] }) => {
     const [clients, setClients] = useState<DbClient[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -189,16 +190,20 @@ export const ClientsScreen: React.FC<Props> = ({ userRole }) => {
             {/* Table Area */}
             <div className="flex-1 overflow-y-auto p-6 pt-2 custom-scrollbar">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredClients.map(client => (
+                    {filteredClients.map(client => {
+                        const isOnline = onlineUsers.includes(client.id);
+                        return (
                         <div key={client.id} className="glass-card p-6 rounded-2xl border border-white/20 bg-white/60 dark:bg-slate-900/60 hover:bg-white dark:hover:bg-slate-800 transition-all group relative overflow-hidden">
                             <div className="flex justify-between items-start mb-4">
                                 <div className="flex items-center gap-4">
-                                    <div className="w-14 h-14 rounded-xl bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 overflow-hidden flex items-center justify-center shrink-0">
+                                    <div className="w-14 h-14 rounded-xl bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 overflow-hidden flex items-center justify-center shrink-0 relative">
                                         {client.logo_url ? (
                                             <img src={client.logo_url} alt={client.nome} className="w-full h-full object-cover"/>
                                         ) : (
                                             <Building2 className="w-6 h-6 text-slate-400"/>
                                         )}
+                                        {/* Online Badge */}
+                                        <div className={`absolute bottom-1 right-1 w-2.5 h-2.5 rounded-full border border-white dark:border-slate-800 ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400 hidden'}`} title="Online"></div>
                                     </div>
                                     <div>
                                         <h3 className="font-bold text-lg text-slate-900 dark:text-white leading-tight">{client.nome}</h3>
@@ -243,7 +248,7 @@ export const ClientsScreen: React.FC<Props> = ({ userRole }) => {
                                 </a>
                             )}
                         </div>
-                    ))}
+                    )})}
                 </div>
             </div>
 

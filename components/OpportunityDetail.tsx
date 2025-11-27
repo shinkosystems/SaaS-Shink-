@@ -18,9 +18,10 @@ interface Props {
   userRole?: string;
   currentUserId?: string;
   userName?: string;
+  currentPlan?: string;
 }
 
-const OpportunityDetail: React.FC<Props> = ({ opportunity: initialOpp, onClose, onEdit, onDelete, onUpdate, userRole, currentUserId, userName }) => {
+const OpportunityDetail: React.FC<Props> = ({ opportunity: initialOpp, onClose, onEdit, onDelete, onUpdate, userRole, currentUserId, userName, currentPlan }) => {
   const [opportunity, setOpportunity] = useState(initialOpp);
   const [activeTab, setActiveTab] = useState<'overview' | 'bpms' | 'tasks' | 'files' | 'comments'>('overview');
   const [editingTask, setEditingTask] = useState<{nodeId: string, nodeLabel: string, task: BpmnTask} | null>(null);
@@ -363,7 +364,7 @@ const OpportunityDetail: React.FC<Props> = ({ opportunity: initialOpp, onClose, 
 
             {activeTab === 'bpms' && (
                 <div className="h-full animate-in fade-in">
-                    <BpmnBuilder opportunity={opportunity} onSave={handleSaveBpmn} />
+                    <BpmnBuilder opportunity={opportunity} onSave={handleSaveBpmn} currentPlan={currentPlan} />
                 </div>
             )}
 

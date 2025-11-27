@@ -1,18 +1,19 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Opportunity, BpmnData, BpmnNode, BpmnTask, BpmnSubTask } from '../types';
+import { Opportunity, BpmnData, BpmnNode, BpmnTask, BpmnSubTask, PLAN_LIMITS } from '../types';
 import { generateBpmn, extractPdfContext, generateSubtasksForTask } from '../services/geminiService';
 import TaskDetailModal from './TaskDetailModal';
-import { Loader2, Sparkles, PlayCircle, CheckSquare, Square, Save, RefreshCw, Plus, Trash2, ArrowRight, FileText, X, UploadCloud, FileType, Calendar as CalendarIcon, MoreHorizontal, User, BarChart3, CalendarClock, Layers, Hash } from 'lucide-react';
+import { Loader2, Sparkles, PlayCircle, CheckSquare, Square, Save, RefreshCw, Plus, Trash2, ArrowRight, FileText, X, UploadCloud, FileType, Calendar as CalendarIcon, MoreHorizontal, User, BarChart3, CalendarClock, Layers, Hash, Lock } from 'lucide-react';
 
 interface Props {
   opportunity: Opportunity;
   onSave: (data: BpmnData, docsContext?: string) => void;
+  currentPlan?: string;
 }
 
 const generateDisplayId = () => Math.floor(100000 + Math.random() * 900000);
 
-const BpmnBuilder: React.FC<Props> = ({ opportunity, onSave }) => {
+const BpmnBuilder: React.FC<Props> = ({ opportunity, onSave, currentPlan }) => {
   const [data, setData] = useState<BpmnData>(opportunity.bpmn || { lanes: [], nodes: [], edges: [] });
   const [docsContext, setDocsContext] = useState<string>(opportunity.docsContext || '');
   const [isLoading, setIsLoading] = useState(false);
@@ -23,6 +24,8 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onSave }) => {
   const [showDocs, setShowDocs] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const canUploadPdf = PLAN_LIMITS[currentPlan || 'plan_free']?.features.pdfUpload !== false;
 
   // Sync state if opportunity changes externally
   useEffect(() => {
@@ -373,28 +376,38 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onSave }) => {
                 </div>
                 
                 {/* PDF Upload Area */}
-                <div className="mb-4 p-4 border border-dashed border-slate-600 rounded-lg bg-slate-800/50 text-center group hover:border-blue-500 transition-colors relative">
-                    <input 
-                        type="file" 
-                        accept="application/pdf"
-                        ref={fileInputRef}
-                        onChange={handleFileUpload}
-                        disabled={isReadingPdf}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
-                    />
-                    {isReadingPdf ? (
-                        <div className="flex flex-col items-center text-blue-400">
-                            <Loader2 className="w-6 h-6 animate-spin mb-2"/>
-                            <span className="text-xs font-bold">Lendo PDF...</span>
+                {canUploadPdf ? (
+                    <div className="mb-4 p-4 border border-dashed border-slate-600 rounded-lg bg-slate-800/50 text-center group hover:border-blue-500 transition-colors relative">
+                        <input 
+                            type="file" 
+                            accept="application/pdf"
+                            ref={fileInputRef}
+                            onChange={handleFileUpload}
+                            disabled={isReadingPdf}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                        />
+                        {isReadingPdf ? (
+                            <div className="flex flex-col items-center text-blue-400">
+                                <Loader2 className="w-6 h-6 animate-spin mb-2"/>
+                                <span className="text-xs font-bold">Lendo PDF...</span>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center text-slate-400 group-hover:text-blue-300">
+                                <UploadCloud className="w-6 h-6 mb-2"/>
+                                <span className="text-xs font-bold">Upload PDF</span>
+                                <span className="text-[10px] opacity-70">Extração automática via AI</span>
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div className="mb-4 p-4 border border-slate-700 rounded-lg bg-slate-800/50 text-center opacity-70">
+                        <div className="flex flex-col items-center text-slate-500">
+                            <Lock className="w-6 h-6 mb-2"/>
+                            <span className="text-xs font-bold">Upload PDF Bloqueado</span>
+                            <span className="text-[10px]">Disponível no plano Studio.</span>
                         </div>
-                    ) : (
-                        <div className="flex flex-col items-center text-slate-400 group-hover:text-blue-300">
-                            <UploadCloud className="w-6 h-6 mb-2"/>
-                            <span className="text-xs font-bold">Upload PDF</span>
-                            <span className="text-[10px] opacity-70">Extração automática via AI</span>
-                        </div>
-                    )}
-                </div>
+                    </div>
+                )}
 
                 <div className="mb-2 text-xs text-slate-400">
                     Conteúdo de Contexto:
