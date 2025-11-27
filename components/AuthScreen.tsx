@@ -182,8 +182,25 @@ const AuthScreen: React.FC<Props> = ({ onGuestLogin, onClose }) => {
         
         if (error) throw error;
 
-        // Se login for bem sucedido, fecha o modal imediatamente
+        // Se login for bem sucedido, checa o status antes de fechar
         if (data.session) {
+            const { data: profile } = await supabase
+                .from('users')
+                .select('status')
+                .eq('id', data.user.id)
+                .single();
+
+            const status = profile?.status || 'Pendente';
+
+            if (status !== 'Ativo' && status !== 'Aprovado') {
+                await supabase.auth.signOut(); // Desloga o usuário
+                let message = "Sua conta está pendente de aprovação pelo administrador.";
+                if (status === 'Bloqueado') {
+                    message = "Sua conta está bloqueada. Por favor, contate o administrador.";
+                }
+                throw new Error(message);
+            }
+
             logEvent('login', { method: 'email' });
             onClose(); // Force close on success
         }

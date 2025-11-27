@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { fetchAllOwners, updateGlobalClientData, fetchPlans, fetchGlobalMetrics, AdminUser, GlobalMetrics } from '../services/adminService';
+import { fetchAllOwners, updateGlobalClientData, fetchPlans, fetchGlobalMetrics, AdminUser, GlobalMetrics, updateUserStatus } from '../services/adminService';
 import { DbPlan } from '../types';
 import { Shield, Search, CreditCard, Loader2, Edit, CheckCircle, AlertTriangle, User, Zap, Building2, Users, DollarSign, TrendingUp, Activity, Filter, Calendar, Heart, UserMinus, Gem, MousePointer2, X, Clock, BarChart3, Wifi, Lock } from 'lucide-react';
 
@@ -153,6 +153,18 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
             alert(`Erro ao atualizar: ${result.msg}`);
         }
         setIsSaving(false);
+    };
+
+    const handleStatusChange = async (userId: string, newStatus: string) => {
+        const originalUsers = [...users];
+        setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: newStatus } : u));
+        
+        const result = await updateUserStatus(userId, newStatus);
+        
+        if (!result.success) {
+            alert('Falha ao atualizar status do usuário.');
+            setUsers(originalUsers);
+        }
     };
 
     // --- FILTER LOGIC ---
@@ -476,10 +488,17 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                                                     <span className="text-xs text-slate-500 flex items-center gap-1">
                                                         <Users className="w-3 h-3"/> Max: {user.orgColaboradores}
                                                     </span>
-                                                    {/* FIXED STATUS BADGE COLOR LOGIC */}
-                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase border ${getStatusBadge(user.status)}`}>
-                                                        {user.status || 'Pendente'}
-                                                    </span>
+                                                    <select
+                                                        value={user.status || 'Pendente'}
+                                                        onChange={(e) => handleStatusChange(user.id, e.target.value)}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className={`appearance-none text-[10px] px-1.5 py-0.5 rounded font-bold uppercase border cursor-pointer focus:ring-2 focus:ring-purple-500 outline-none ${getStatusBadge(user.status)}`}
+                                                    >
+                                                        <option value="Ativo" className="dark:bg-slate-900 font-sans">Ativo</option>
+                                                        <option value="Aprovado" className="dark:bg-slate-900 font-sans">Aprovado</option>
+                                                        <option value="Pendente" className="dark:bg-slate-900 font-sans">Pendente</option>
+                                                        <option value="Bloqueado" className="dark:bg-slate-900 font-sans">Bloqueado</option>
+                                                    </select>
                                                 </div>
                                             </div>
                                         </td>

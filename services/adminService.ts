@@ -301,3 +301,16 @@ export const updateGlobalClientData = async (data: UpdatePayload): Promise<{ suc
 export const updateUserSubscription = async (userId: string, data: { planId: number, start: string, end: string, value: number }): Promise<{ success: boolean, msg?: string }> => {
     return { success: false, msg: "Função obsoleta. Use updateGlobalClientData." };
 };
+
+export const updateUserStatus = async (userId: string, newStatus: string): Promise<{ success: boolean }> => {
+    const { error } = await supabase
+        .from('users')
+        .update({ status: newStatus })
+        .eq('id', userId);
+    
+    if (error) {
+        console.error('Error updating user status:', error.message);
+        return { success: false };
+    }
+    return { success: true };
+};

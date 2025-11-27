@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Mail, Phone, Building2, MapPin, Save, Camera, Shield, CreditCard, Bell, Globe, Loader2, UploadCloud, Sparkles, Check, X, Copy, ExternalLink, FileText, History, ArrowUpRight, ArrowDownRight, Zap, Lock, Calendar, AlertTriangle, RefreshCw } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
-import { fetchSubscriptionPlans, getPaymentHistory, calculateSubscriptionStatus, getUserSubscriptions, createSubscriptionAndGetLink } from '../services/asaasService';
+import { fetchSubscriptionPlans, getPaymentHistory, calculateSubscriptionStatus, getUserSubscriptions, uploadReceiptAndNotify } from '../services/asaasService';
 import { AsaasPayment, SubscriptionPlan, AsaasSubscription } from '../types';
 
 const DEFAULT_AVATAR = "https://zjssfnbcboibqeoubeou.supabase.co/storage/v1/object/public/fotoperfil/fotoperfil/1.png";
+const PIX_KEY = "60.428.589/0001-55"; // CNPJ
 
 interface Props {
   currentPlan: string;
@@ -31,7 +32,13 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
   const [availablePlans, setAvailablePlans] = useState<SubscriptionPlan[]>([]);
   const [payments, setPayments] = useState<AsaasPayment[]>([]);
   const [subscriptions, setSubscriptions] = useState<AsaasSubscription[]>([]);
-  const [processingSubscription, setProcessingSubscription] = useState<string | null>(null);
+  
+  // Manual PIX Flow State
+  const [showPixModal, setShowPixModal] = useState(false);
+  const [selectedPlanForPix, setSelectedPlanForPix] = useState<SubscriptionPlan | null>(null);
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [isUploadingReceipt, setIsUploadingReceipt] = useState(false);
+  const [pixKeyCopied, setPixKeyCopied] = useState(false);
 
   // Subscription Info
   const [subscriptionInfo, setSubscriptionInfo] = useState<{daysRemaining: number, expireDate: Date, shouldWarn: boolean} | null>(null);
@@ -196,30 +203,45 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
       setUploading(false);
     }
   };
-
-  const handlePlanSelection = async (plan: SubscriptionPlan) => {
+  
+  const handlePlanSelection = (plan: SubscriptionPlan) => {
       if (plan.price === 0) return;
       if (plan.id === currentPlan && subscriptionInfo?.daysRemaining && subscriptionInfo.daysRemaining > 5) return;
       
-      setProcessingSubscription(plan.id);
-      try {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user) throw new Error("Usuário não autenticado. Faça login novamente.");
-
-          const result = await createSubscriptionAndGetLink(user.id, plan.id);
-          
-          if (result.paymentLink) {
-              sessionStorage.setItem('shinko_subscription_pending', `Aguardando confirmação para o plano ${plan.name}. A página será atualizada em breve assim que o pagamento for confirmado.`);
-              window.location.href = result.paymentLink;
-          } else {
-              throw new Error("Não foi possível gerar o link de pagamento.");
-          }
-      } catch (err: any) {
-          alert(err.message || 'Ocorreu um erro ao processar sua assinatura. Tente novamente.');
-      } finally {
-          setProcessingSubscription(null);
-      }
+      setSelectedPlanForPix(plan);
+      setReceiptFile(null);
+      setShowPixModal(true);
   };
+
+  const handleReceiptSubmit = async () => {
+    if (!receiptFile || !selectedPlanForPix || !userId) {
+        alert("Por favor, anexe o comprovante de pagamento.");
+        return;
+    }
+    setIsUploadingReceipt(true);
+    try {
+        const result = await uploadReceiptAndNotify(userId, selectedPlanForPix.id, selectedPlanForPix.price, receiptFile);
+        if (result.success) {
+            setShowPixModal(false);
+            alert("Comprovante enviado com sucesso! Sua assinatura será ativada em até 24h úteis.");
+            onRefresh();
+        } else {
+            throw new Error(result.error || 'Erro desconhecido');
+        }
+    } catch (err: any) {
+        alert(`Erro ao enviar comprovante: ${err.message}`);
+    } finally {
+        setIsUploadingReceipt(false);
+    }
+  };
+  
+  const copyToClipboard = (text: string) => {
+      navigator.clipboard.writeText(text).then(() => {
+          setPixKeyCopied(true);
+          setTimeout(() => setPixKeyCopied(false), 2000);
+      });
+  };
+
 
   if (loading) {
     return (
@@ -450,7 +472,7 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
                                     className={`relative p-6 rounded-2xl border transition-all duration-300 flex flex-col justify-between glass-card ${
                                         currentPlan === plan.id 
                                         ? 'border-amber-500 shadow-glow ring-2 ring-amber-500/20' 
-                                        : 'border-slate-200/50 dark:border-white/10 hover:border-amber-500/50 hover:-translate-y-1 cursor-pointer'
+                                        : 'border-slate-200/50 dark:border-white/10 hover:border-amber-500/50 hover:-translate-y-1'
                                     }`}
                                 >
                                     {currentPlan === plan.id && (
@@ -480,15 +502,12 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
 
                                     <button 
                                         onClick={() => handlePlanSelection(plan)}
-                                        disabled={processingSubscription === plan.id}
                                         className={`w-full py-2 rounded-lg text-xs font-bold mt-4 transition-colors ${
                                             currentPlan === plan.id
                                             ? 'bg-slate-200/50 dark:bg-white/20 text-white cursor-default'
-                                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-amber-500 hover:text-white'
+                                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-amber-500 hover:text-white cursor-pointer'
                                     }`}>
-                                        {processingSubscription === plan.id ? (
-                                            <Loader2 className="w-4 h-4 animate-spin mx-auto" />
-                                        ) : currentPlan === plan.id ? (subscriptionInfo?.shouldWarn ? 'Renovar Agora' : 'Plano Atual') : 'Selecionar'}
+                                        {currentPlan === plan.id ? (subscriptionInfo?.shouldWarn ? 'Renovar Agora' : 'Plano Atual') : 'Selecionar'}
                                     </button>
                                 </div>
                             ))}
@@ -543,6 +562,72 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
             )}
         </div>
     </div>
+
+    {/* PIX Payment Modal */}
+    {showPixModal && selectedPlanForPix && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in">
+            <div className="glass-panel w-full max-w-lg p-8 rounded-3xl shadow-2xl border border-white/10 animate-ios-pop flex flex-col max-h-[90vh]">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                        <Zap className="w-5 h-5 text-emerald-400"/> Pagamento Manual via PIX
+                    </h3>
+                    <button onClick={() => setShowPixModal(false)} className="text-slate-400 hover:text-white"><X className="w-5 h-5"/></button>
+                </div>
+
+                <div className="space-y-4 text-sm text-slate-300 overflow-y-auto custom-scrollbar pr-2">
+                    <p>Para ativar o plano <strong>{selectedPlanForPix.name}</strong>, siga os passos:</p>
+                    
+                    <ol className="list-decimal list-inside space-y-3 p-4 bg-white/5 rounded-xl border border-white/10">
+                        <li>
+                            Copie a chave PIX (CNPJ) abaixo.
+                            <div className="flex gap-2 mt-2">
+                                <input type="text" value={PIX_KEY} readOnly className="flex-1 glass-input p-2 rounded text-xs font-mono"/>
+                                <button onClick={() => copyToClipboard(PIX_KEY)} className="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded text-xs font-bold">
+                                    {pixKeyCopied ? 'Copiado!' : 'Copiar'}
+                                </button>
+                            </div>
+                        </li>
+                        <li>
+                            Faça o pagamento no valor exato de <strong className="text-amber-400">R$ {selectedPlanForPix.price.toFixed(2)}</strong>.
+                        </li>
+                        <li>
+                            Anexe o comprovante de pagamento (imagem ou PDF) abaixo.
+                            <div className="mt-2">
+                                <label className={`flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${receiptFile ? 'border-emerald-500 bg-emerald-900/20' : 'border-slate-600 hover:border-slate-500 bg-slate-800/50'}`}>
+                                    <div className="flex flex-col items-center justify-center pt-5 pb-6 text-xs">
+                                        <UploadCloud className="w-6 h-6 mb-2 text-slate-400"/>
+                                        {receiptFile ? (
+                                            <span className="font-bold text-emerald-400">{receiptFile.name}</span>
+                                        ) : (
+                                            <p className="text-slate-400">Clique para anexar o comprovante</p>
+                                        )}
+                                    </div>
+                                    <input type="file" className="hidden" onChange={(e) => setReceiptFile(e.target.files?.[0] || null)} accept="image/*,.pdf"/>
+                                </label>
+                            </div>
+                        </li>
+                        <li>
+                            Clique em "Enviar Comprovante". Sua assinatura será ativada em até 24h úteis.
+                        </li>
+                    </ol>
+                </div>
+
+                <div className="mt-8 flex justify-end gap-3">
+                    <button onClick={() => setShowPixModal(false)} className="px-4 py-2 rounded-xl text-sm font-bold text-slate-400 hover:text-white hover:bg-white/5">
+                        Cancelar
+                    </button>
+                    <button 
+                        onClick={handleReceiptSubmit}
+                        disabled={!receiptFile || isUploadingReceipt}
+                        className="px-6 py-2 rounded-xl text-sm font-bold bg-amber-500 text-white hover:bg-amber-400 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isUploadingReceipt ? <Loader2 className="w-4 h-4 animate-spin"/> : 'Enviar Comprovante'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    )}
+
   </div>
   );
 };

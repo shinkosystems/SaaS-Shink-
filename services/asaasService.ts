@@ -150,43 +150,49 @@ export const getCurrentUserPlan = async (userId: string): Promise<string> => {
     }
 };
 
-export const createSubscriptionAndGetLink = async (
+// A função `createSubscriptionAndGetLink`, que estava causando instabilidade, foi removida.
+// Foi substituída por um fluxo de pagamento manual com envio de comprovante.
+export const uploadReceiptAndNotify = async (
     userId: string,
-    planId: string // e.g., 'plan_studio'
-): Promise<{ paymentLink: string }> => {
-    if (USE_REAL_ASAAS) {
-        try {
-            const { data, error } = await supabase.functions.invoke('asaas-integration', {
-                body: {
-                    action: 'CREATE_SUBSCRIPTION',
-                    userId,
-                    planId, 
-                }
+    planId: string,
+    planPrice: number,
+    receiptFile: File
+): Promise<{ success: boolean; error?: string }> => {
+    try {
+        const fileExt = receiptFile.name.split('.').pop();
+        const fileName = `comprovantes/${userId}-${planId}-${Date.now()}.${fileExt}`;
+
+        // Usa o bucket 'documentos' para simplificar, idealmente seria 'comprovantes'
+        const { error: uploadError } = await supabase.storage
+            .from('documentos') 
+            .upload(fileName, receiptFile);
+
+        if (uploadError) throw new Error(`Erro no upload: ${uploadError.message}`);
+
+        const { data: urlData } = supabase.storage
+            .from('documentos')
+            .getPublicUrl(fileName);
+
+        if (!urlData?.publicUrl) throw new Error("Não foi possível obter a URL do arquivo.");
+        
+        // Assume a existência da tabela 'pagamentos_pendentes'
+        const { error: insertError } = await supabase
+            .from('pagamentos_pendentes')
+            .insert({
+                user_id: userId,
+                plan_id: planId,
+                receipt_url: urlData.publicUrl,
+                valor: planPrice,
+                status: 'PENDENTE'
             });
 
-            if (error) {
-                console.error("Edge function error on subscription:", error);
-                throw new Error("Erro de comunicação ao criar assinatura.");
-            }
-            if (data?.error) {
-                console.error("Asaas API error on subscription:", data.error);
-                throw new Error(data.error || "Não foi possível criar a assinatura.");
-            }
-            if (!data?.paymentLink) {
-                throw new Error("Link de pagamento não retornado.");
-            }
-
-            return { paymentLink: data.paymentLink };
-
-        } catch (err: any) {
-            console.error("Falha crítica ao criar assinatura:", err);
-            throw err;
-        }
+        if (insertError) throw new Error(`Erro ao registrar pagamento: ${insertError.message}`);
+        
+        return { success: true };
+    } catch (err: any) {
+        console.error("Erro no envio de comprovante:", err);
+        return { success: false, error: err.message };
     }
-    
-    console.warn("Mock mode: subscription link");
-    await new Promise(r => setTimeout(r, 1500));
-    return { paymentLink: 'https://www.asaas.com/c/mock_subscription_link' };
 };
 
 export const fetchSubscriptionPlans = async (): Promise<SubscriptionPlan[]> => {
@@ -235,10 +241,10 @@ export const getUserSubscriptions = async (userId: string): Promise<AsaasSubscri
     if (USE_REAL_ASAAS) {
         try {
             const { data, error } = await supabase.functions.invoke('asaas-integration', {
-                body: {
+                body: JSON.stringify({
                     action: 'GET_SUBSCRIPTIONS',
                     userId
-                }
+                })
             });
 
             if (error) {
@@ -269,13 +275,13 @@ export const createAsaasPayment = async (
     if (USE_REAL_ASAAS) {
         try {
             const { data, error } = await supabase.functions.invoke('asaas-integration', {
-                body: {
+                body: JSON.stringify({
                     action: 'CREATE_PAYMENT',
                     userId,
                     billingType,
                     value,
                     description
-                }
+                })
             });
 
             // Tratamento específico de erro da Edge Function
@@ -318,10 +324,10 @@ export const getPaymentHistory = async (userId: string): Promise<AsaasPayment[]>
     if (USE_REAL_ASAAS) {
         try {
             const { data, error } = await supabase.functions.invoke('asaas-integration', {
-                body: {
+                body: JSON.stringify({
                     action: 'GET_HISTORY',
                     userId
-                }
+                })
             });
 
             if (error) {
@@ -347,7 +353,7 @@ export const checkPaymentStatus = async (paymentId: string): Promise<AsaasPaymen
     if (USE_REAL_ASAAS) {
         try {
             const { data, error } = await supabase.functions.invoke('asaas-integration', {
-                body: { action: 'CHECK_STATUS', paymentId }
+                body: JSON.stringify({ action: 'CHECK_STATUS', paymentId })
             });
             
             if (error) return null;
