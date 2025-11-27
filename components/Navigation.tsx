@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { 
   LayoutGrid, 
@@ -207,49 +206,46 @@ const SidebarContent = ({ props }: { props: Props }) => {
         <>
             <div className="text-[10px] font-bold text-slate-500 dark:text-slate-600 px-4 mb-2 mt-6 uppercase tracking-widest">Gestão</div>
             
-            {features.clients && (
-                <NavItem 
-                    icon={Users} 
-                    label="Clientes" 
-                    color="bg-indigo-600"
-                    isActive={props.currentView === 'clients'} 
-                    onClick={() => { props.onChangeView('clients'); props.setIsMobileOpen(false); }} 
-                />
+            {/* Clientes: Visível para Dono (sempre) ou outros perfis se o plano permitir */}
+            {(props.userRole === 'dono' || features.clients) && (
+              <NavItem 
+                  icon={Users} 
+                  label="Clientes" 
+                  color="bg-indigo-600"
+                  isActive={props.currentView === 'clients'} 
+                  onClick={() => { props.onChangeView('clients'); props.setIsMobileOpen(false); }} 
+              />
             )}
 
+            {/* Dono: Sempre vê os botões; o acesso é controlado na página */}
             {props.userRole === 'dono' && (
                 <>
-                    {features.financial && (
-                        <NavItem 
-                            icon={DollarSign} 
-                            label="Financeiro" 
-                            color="bg-emerald-600"
-                            isActive={props.currentView === 'financial'} 
-                            onClick={() => { props.onChangeView('financial'); props.setIsMobileOpen(false); }} 
-                        />
-                    )}
-                    {features.metrics && (
-                        <NavItem 
-                            icon={Activity} 
-                            label="Produto" 
-                            color="bg-pink-600"
-                            isActive={props.currentView === 'product'} 
-                            onClick={() => { props.onChangeView('product'); props.setIsMobileOpen(false); }} 
-                        />
-                    )}
-                    {features.metrics && (
-                        <NavItem 
-                            icon={Code2} 
-                            label="Engenharia" 
-                            color="bg-cyan-600"
-                            isActive={props.currentView === 'dev-metrics'} 
-                            onClick={() => { props.onChangeView('dev-metrics'); props.setIsMobileOpen(false); }} 
-                        />
-                    )}
+                    <NavItem 
+                        icon={DollarSign} 
+                        label="Financeiro" 
+                        color="bg-emerald-600"
+                        isActive={props.currentView === 'financial'} 
+                        onClick={() => { props.onChangeView('financial'); props.setIsMobileOpen(false); }} 
+                    />
+                    <NavItem 
+                        icon={Activity} 
+                        label="Produto" 
+                        color="bg-pink-600"
+                        isActive={props.currentView === 'product'} 
+                        onClick={() => { props.onChangeView('product'); props.setIsMobileOpen(false); }} 
+                    />
+                    <NavItem 
+                        icon={Code2} 
+                        label="Engenharia" 
+                        color="bg-cyan-600"
+                        isActive={props.currentView === 'dev-metrics'} 
+                        onClick={() => { props.onChangeView('dev-metrics'); props.setIsMobileOpen(false); }} 
+                    />
                 </>
             )}
         </>
       )}
+
 
       <div className="text-[10px] font-bold text-slate-500 dark:text-slate-600 px-4 mb-2 mt-6 uppercase tracking-widest">Sistema</div>
       
