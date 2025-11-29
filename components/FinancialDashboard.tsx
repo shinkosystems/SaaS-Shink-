@@ -117,6 +117,8 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [] })
                         });
 
                         const monthTrans = manualTransactions.filter(t => {
+                            // Safe parsing
+                            if (!t.date) return false;
                             const [tYear, tMonth] = t.date.split('-').map(Number);
                             return tMonth - 1 === month && tYear === year;
                         });

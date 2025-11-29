@@ -1,18 +1,9 @@
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, Suspense } from 'react';
 import { Opportunity, RDEStatus, Archetype, IntensityLevel, BpmnTask, BpmnNode, ProjectStatus, PLAN_LIMITS } from './types';
 import OpportunityWizard from './components/OpportunityWizard';
 import OpportunityDetail from './components/OpportunityDetail';
-import { ProjectWorkspace } from './components/ProjectWorkspace'; // Import new component
-import MatrixChart from './components/MatrixChart';
-import { CalendarView } from './components/CalendarView';
-import { KanbanBoard } from './components/KanbanBoard';
-import { GanttView } from './components/GanttView';
-import { FinancialScreen } from './components/FinancialScreen';
-import { ClientsScreen } from './components/ClientsScreen';
-import { ProductIndicators } from './components/ProductIndicators'; 
-import { DevIndicators } from './components/DevIndicators';
-import { AdminManagerScreen } from './components/AdminManagerScreen'; // Import new Admin Screen
+import { ProjectWorkspace } from './components/ProjectWorkspace'; 
 import AuthScreen from './components/AuthScreen';
 import { LandingPage } from './components/LandingPage';
 import { Sidebar, MobileDrawer } from './components/Navigation';
@@ -31,6 +22,17 @@ import { NpsSurvey } from './components/NpsSurvey';
 import { getCurrentUserPlan } from './services/asaasService';
 import { subscribeToPresence } from './services/presenceService';
 import { updateOrgDetails, uploadLogo } from './services/organizationService';
+
+// --- LAZY LOAD COMPONENTS (Code Splitting) ---
+const MatrixChart = React.lazy(() => import('./components/MatrixChart'));
+const CalendarView = React.lazy(() => import('./components/CalendarView').then(module => ({ default: module.CalendarView })));
+const KanbanBoard = React.lazy(() => import('./components/KanbanBoard').then(module => ({ default: module.KanbanBoard })));
+const GanttView = React.lazy(() => import('./components/GanttView').then(module => ({ default: module.GanttView })));
+const FinancialScreen = React.lazy(() => import('./components/FinancialScreen').then(module => ({ default: module.FinancialScreen })));
+const ClientsScreen = React.lazy(() => import('./components/ClientsScreen').then(module => ({ default: module.ClientsScreen })));
+const ProductIndicators = React.lazy(() => import('./components/ProductIndicators').then(module => ({ default: module.ProductIndicators })));
+const DevIndicators = React.lazy(() => import('./components/DevIndicators').then(module => ({ default: module.DevIndicators })));
+const AdminManagerScreen = React.lazy(() => import('./components/AdminManagerScreen').then(module => ({ default: module.AdminManagerScreen })));
 
 const LOGO_URL = "https://zjssfnbcboibqeoubeou.supabase.co/storage/v1/object/public/fotoperfil/fotoperfil/1.png";
 
@@ -75,6 +77,12 @@ const MOCK_DATA: Opportunity[] = [
     }
   },
 ];
+
+const LoadingFallback = () => (
+    <div className="flex items-center justify-center h-full w-full">
+        <Loader2 className="w-8 h-8 animate-spin text-shinko-primary" />
+    </div>
+);
 
 const App: React.FC = () => {
   // Auth & User State
@@ -674,241 +682,243 @@ const App: React.FC = () => {
       {/* FIX: Add padding-top on mobile to avoid content being hidden behind fixed header */}
       <main className="flex-1 flex flex-col relative h-full overflow-hidden pt-16 xl:pt-0">
         <div className={`flex-1 relative h-full ${view === 'project-detail' ? '' : 'overflow-y-auto p-6 md:p-10 custom-scrollbar'}`}>
-            {view === 'dashboard' && userRole !== 'cliente' && (
-                <Dashboard 
-                    opportunities={opportunities}
-                    onNavigate={(status) => handleDashboardCardClick(status)}
-                    onOpenProject={handleOpenProject}
-                    user={session?.user}
-                    theme={theme}
-                    userRole={userRole}
-                    whitelabel={orgDetails.whitelabel}
-                    onActivateWhitelabel={() => setView('settings')}
-                    organizationId={userOrgId || undefined}
-                />
-            )}
-            
-            {view === 'admin-manager' && userData.email === 'peboorba@gmail.com' && (
-                <AdminManagerScreen onlineUsers={onlineUsers} />
-            )}
-            
-            {view === 'list' && (
-                <div className="h-full flex flex-col animate-in fade-in duration-500">
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                        <div>
-                            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Projetos</h1>
-                            <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Gerencie seu portfólio de inovação e demandas.</p>
-                        </div>
-                        {userRole !== 'cliente' && (
-                            <button
-                                onClick={handleCreateProjectClick}
-                                id="btn-new-project-list"
-                                className="bg-gradient-to-r from-shinko-primary to-shinko-secondary text-white px-6 py-3 rounded-xl font-bold text-sm shadow-lg hover:shadow-shinko-primary/20 transition-all active:scale-95 flex items-center gap-2 hover:brightness-110"
-                            >
-                                <Plus className="w-5 h-5"/> Novo Projeto
-                            </button>
-                        )}
-                    </div>
-
-                    {/* Filters Toolbar */}
-                    <div className="flex gap-2 mb-6 overflow-x-auto pb-2 no-scrollbar items-center">
-                        <Filter className="w-4 h-4 text-slate-400 mr-2 shrink-0"/>
-                        {['All', 'Active', 'Negotiation', 'Future', 'Frozen', 'Archived'].map(status => {
-                            const isActive = listFilterStatus === status;
-                            return (
+            <Suspense fallback={<LoadingFallback />}>
+                {view === 'dashboard' && userRole !== 'cliente' && (
+                    <Dashboard 
+                        opportunities={opportunities}
+                        onNavigate={(status) => handleDashboardCardClick(status)}
+                        onOpenProject={handleOpenProject}
+                        user={session?.user}
+                        theme={theme}
+                        userRole={userRole}
+                        whitelabel={orgDetails.whitelabel}
+                        onActivateWhitelabel={() => setView('settings')}
+                        organizationId={userOrgId || undefined}
+                    />
+                )}
+                
+                {view === 'admin-manager' && userData.email === 'peboorba@gmail.com' && (
+                    <AdminManagerScreen onlineUsers={onlineUsers} />
+                )}
+                
+                {view === 'list' && (
+                    <div className="h-full flex flex-col animate-in fade-in duration-500">
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                            <div>
+                                <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Projetos</h1>
+                                <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Gerencie seu portfólio de inovação e demandas.</p>
+                            </div>
+                            {userRole !== 'cliente' && (
                                 <button
-                                    key={status}
-                                    onClick={() => setListFilterStatus(status as any)}
-                                    className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all border ${
-                                        isActive 
-                                        ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-transparent shadow-md' 
-                                        : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
-                                    }`}
+                                    onClick={handleCreateProjectClick}
+                                    id="btn-new-project-list"
+                                    className="bg-gradient-to-r from-shinko-primary to-shinko-secondary text-white px-6 py-3 rounded-xl font-bold text-sm shadow-lg hover:shadow-shinko-primary/20 transition-all active:scale-95 flex items-center gap-2 hover:brightness-110"
                                 >
-                                    {status === 'All' ? 'Todos' : getStatusLabel(status)}
+                                    <Plus className="w-5 h-5"/> Novo Projeto
                                 </button>
-                            )
-                        })}
-                    </div>
+                            )}
+                        </div>
 
-                    <div className="grid grid-cols-1 gap-4 pb-20">
-                        {opportunities
-                            .filter(o => listFilterStatus === 'All' || o.status === listFilterStatus)
-                            .map(opp => (
-                            <div 
-                                key={opp.id} 
-                                onClick={() => handleOpenProject(opp)} 
-                                className="glass-card p-5 rounded-2xl cursor-pointer 
-                                bg-white dark:bg-slate-900 
-                                hover:bg-slate-50 dark:hover:bg-slate-800 
-                                transition-all border border-slate-200 dark:border-slate-800 
-                                shadow-sm hover:shadow-xl 
-                                group relative overflow-hidden flex flex-col gap-3 hover:z-50 duration-300"
-                            >
-                                {/* Status Stripe */}
-                                <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${opp.status === 'Active' ? 'bg-emerald-500' : opp.status === 'Negotiation' ? 'bg-blue-500' : opp.status === 'Future' ? 'bg-amber-500' : 'bg-slate-500'}`}></div>
-                                
-                                <div className="pl-3 flex justify-between items-start gap-4">
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                            <h3 className="font-bold text-lg text-slate-900 dark:text-white truncate max-w-full group-hover:text-shinko-primary transition-colors mr-2">{opp.title}</h3>
-                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm shrink-0 ${getStatusColor(opp.status)}`}>
-                                                {getStatusLabel(opp.status)}
-                                            </span>
-                                        </div>
-                                        <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">{opp.description}</p>
-                                    </div>
+                        {/* Filters Toolbar */}
+                        <div className="flex gap-2 mb-6 overflow-x-auto pb-2 no-scrollbar items-center">
+                            <Filter className="w-4 h-4 text-slate-400 mr-2 shrink-0"/>
+                            {['All', 'Active', 'Negotiation', 'Future', 'Frozen', 'Archived'].map(status => {
+                                const isActive = listFilterStatus === status;
+                                return (
+                                    <button
+                                        key={status}
+                                        onClick={() => setListFilterStatus(status as any)}
+                                        className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all border ${
+                                            isActive 
+                                            ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-transparent shadow-md' 
+                                            : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+                                        }`}
+                                    >
+                                        {status === 'All' ? 'Todos' : getStatusLabel(status)}
+                                    </button>
+                                )
+                            })}
+                        </div>
 
-                                    {/* Actions Block - DESKTOP ONLY */}
-                                    <div className="hidden md:flex gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity self-start ml-4">
-                                         {userRole !== 'cliente' && (
-                                            <button 
-                                                onClick={(e) => { e.stopPropagation(); setEditingOpp(opp); setIsWizardOpen(true); }}
-                                                className="p-2 bg-slate-100 dark:bg-slate-700 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-slate-400 hover:text-blue-500 rounded-lg transition-colors shadow-sm"
-                                                title="Editar Projeto"
-                                            >
-                                                <Edit className="w-4 h-4"/>
-                                            </button>
-                                         )}
-                                         {userRole === 'dono' && (
-                                             <button 
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    if(window.confirm(`ATENÇÃO: Deseja excluir o projeto "${opp.title}"?\n\nIsso excluirá permanentemente:\n1. Todas as tarefas e subtarefas associadas.\n2. O projeto em si.\n\nEsta ação não pode ser desfeita.`)) {
-                                                        handleDeleteOpportunity(opp.id);
-                                                    }
-                                                }}
-                                                className="p-2 bg-slate-100 dark:bg-slate-700 hover:bg-red-100 dark:hover:bg-red-900/30 text-slate-400 hover:text-red-500 rounded-lg transition-colors shadow-sm"
-                                                title="Excluir Projeto e Tarefas"
-                                             >
-                                                <Trash2 className="w-4 h-4"/>
-                                            </button>
-                                         )}
-                                    </div>
-                                </div>
-
-                                {/* Footer Info */}
-                                <div className="pl-3 flex flex-col sm:flex-row items-start sm:items-center justify-between mt-auto pt-3 border-t border-slate-100 dark:border-slate-800 gap-3">
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex items-center gap-1 text-xs text-slate-500 font-bold bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
-                                            <Rocket className="w-3 h-3"/> {opp.archetype}
-                                        </div>
-                                        {opp.prioScore > 0 && (
-                                            <div className="flex items-center gap-1 text-xs text-slate-500 font-bold bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
-                                                <Target className="w-3 h-3 text-shinko-primary"/> {opp.prioScore.toFixed(1)}
+                        <div className="grid grid-cols-1 gap-4 pb-20">
+                            {opportunities
+                                .filter(o => listFilterStatus === 'All' || o.status === listFilterStatus)
+                                .map(opp => (
+                                <div 
+                                    key={opp.id} 
+                                    onClick={() => handleOpenProject(opp)} 
+                                    className="glass-card p-5 rounded-2xl cursor-pointer 
+                                    bg-white dark:bg-slate-900 
+                                    hover:bg-slate-50 dark:hover:bg-slate-800 
+                                    transition-all border border-slate-200 dark:border-slate-800 
+                                    shadow-sm hover:shadow-xl 
+                                    group relative overflow-hidden flex flex-col gap-3 hover:z-50 duration-300"
+                                >
+                                    {/* Status Stripe */}
+                                    <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${opp.status === 'Active' ? 'bg-emerald-500' : opp.status === 'Negotiation' ? 'bg-blue-500' : opp.status === 'Future' ? 'bg-amber-500' : 'bg-slate-500'}`}></div>
+                                    
+                                    <div className="pl-3 flex justify-between items-start gap-4">
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                                <h3 className="font-bold text-lg text-slate-900 dark:text-white truncate max-w-full group-hover:text-shinko-primary transition-colors mr-2">{opp.title}</h3>
+                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm shrink-0 ${getStatusColor(opp.status)}`}>
+                                                    {getStatusLabel(opp.status)}
+                                                </span>
                                             </div>
-                                        )}
-                                        <span className="text-xs text-slate-400 hidden sm:inline">{new Date(opp.createdAt).toLocaleDateString()}</span>
+                                            <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">{opp.description}</p>
+                                        </div>
+
+                                        {/* Actions Block - DESKTOP ONLY */}
+                                        <div className="hidden md:flex gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity self-start ml-4">
+                                            {userRole !== 'cliente' && (
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); setEditingOpp(opp); setIsWizardOpen(true); }}
+                                                    className="p-2 bg-slate-100 dark:bg-slate-700 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-slate-400 hover:text-blue-500 rounded-lg transition-colors shadow-sm"
+                                                    title="Editar Projeto"
+                                                >
+                                                    <Edit className="w-4 h-4"/>
+                                                </button>
+                                            )}
+                                            {userRole === 'dono' && (
+                                                <button 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if(window.confirm(`ATENÇÃO: Deseja excluir o projeto "${opp.title}"?\n\nIsso excluirá permanentemente:\n1. Todas as tarefas e subtarefas associadas.\n2. O projeto em si.\n\nEsta ação não pode ser desfeita.`)) {
+                                                            handleDeleteOpportunity(opp.id);
+                                                        }
+                                                    }}
+                                                    className="p-2 bg-slate-100 dark:bg-slate-700 hover:bg-red-100 dark:hover:bg-red-900/30 text-slate-400 hover:text-red-500 rounded-lg transition-colors shadow-sm"
+                                                    title="Excluir Projeto e Tarefas"
+                                                >
+                                                    <Trash2 className="w-4 h-4"/>
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
 
-                                    {/* Actions Block - MOBILE ONLY (Always Visible) */}
-                                    <div className="flex md:hidden gap-2 w-full sm:w-auto justify-end border-t sm:border-t-0 border-slate-100 dark:border-slate-800 pt-2 sm:pt-0">
-                                         {userRole !== 'cliente' && (
-                                            <button 
-                                                onClick={(e) => { e.stopPropagation(); setEditingOpp(opp); setIsWizardOpen(true); }}
-                                                className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs font-bold rounded-lg flex items-center gap-2"
-                                            >
-                                                <Edit className="w-3 h-3"/> Editar
-                                            </button>
-                                         )}
-                                         {userRole === 'dono' && (
-                                             <button 
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    if(window.confirm(`Excluir projeto?`)) handleDeleteOpportunity(opp.id);
-                                                }}
-                                                className="px-3 py-1.5 bg-red-50 dark:bg-red-900/20 text-red-500 text-xs font-bold rounded-lg flex items-center gap-2"
-                                            >
-                                                <Trash2 className="w-3 h-3"/> Excluir
-                                            </button>
-                                         )}
+                                    {/* Footer Info */}
+                                    <div className="pl-3 flex flex-col sm:flex-row items-start sm:items-center justify-between mt-auto pt-3 border-t border-slate-100 dark:border-slate-800 gap-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex items-center gap-1 text-xs text-slate-500 font-bold bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
+                                                <Rocket className="w-3 h-3"/> {opp.archetype}
+                                            </div>
+                                            {opp.prioScore > 0 && (
+                                                <div className="flex items-center gap-1 text-xs text-slate-500 font-bold bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
+                                                    <Target className="w-3 h-3 text-shinko-primary"/> {opp.prioScore.toFixed(1)}
+                                                </div>
+                                            )}
+                                            <span className="text-xs text-slate-400 hidden sm:inline">{new Date(opp.createdAt).toLocaleDateString()}</span>
+                                        </div>
+
+                                        {/* Actions Block - MOBILE ONLY (Always Visible) */}
+                                        <div className="flex md:hidden gap-2 w-full sm:w-auto justify-end border-t sm:border-t-0 border-slate-100 dark:border-slate-800 pt-2 sm:pt-0">
+                                            {userRole !== 'cliente' && (
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); setEditingOpp(opp); setIsWizardOpen(true); }}
+                                                    className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs font-bold rounded-lg flex items-center gap-2"
+                                                >
+                                                    <Edit className="w-3 h-3"/> Editar
+                                                </button>
+                                            )}
+                                            {userRole === 'dono' && (
+                                                <button 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if(window.confirm(`Excluir projeto?`)) handleDeleteOpportunity(opp.id);
+                                                    }}
+                                                    className="px-3 py-1.5 bg-red-50 dark:bg-red-900/20 text-red-500 text-xs font-bold rounded-lg flex items-center gap-2"
+                                                >
+                                                    <Trash2 className="w-3 h-3"/> Excluir
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
-                        {opportunities.filter(o => listFilterStatus === 'All' || o.status === listFilterStatus).length === 0 && (
-                            <div className="text-center py-20 opacity-50">
-                                <ListIcon className="w-12 h-12 mx-auto mb-4 text-slate-400"/>
-                                <p className="text-slate-500">Nenhum projeto encontrado com este status.</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {view === 'project-detail' && selectedOpp && (
-                <ProjectWorkspace 
-                    opportunity={selectedOpp}
-                    onBack={() => { setSelectedOpp(null); setView('list'); }}
-                    onEdit={(opp) => { setEditingOpp(opp); setIsWizardOpen(true); }}
-                    onDelete={handleDeleteOpportunity}
-                    onUpdate={(updatedOpp) => {
-                        setOpportunities(prev => prev.map(o => o.id === updatedOpp.id ? updatedOpp : o));
-                        setSelectedOpp(updatedOpp);
-                    }}
-                    userRole={userRole}
-                    currentPlan={currentPlan}
-                />
-            )}
-
-            {view === 'kanban' && <KanbanBoard onSelectOpportunity={handleOpenProject} userRole={userRole} organizationId={userOrgId || undefined} />}
-            {view === 'calendar' && <CalendarView opportunities={opportunities} onSelectOpportunity={handleOpenProject} onTaskUpdate={() => {}} userRole={userRole} onRefresh={loadAppData} organizationId={userOrgId || undefined} />}
-            {view === 'gantt' && <GanttView opportunities={opportunities} onSelectOpportunity={handleOpenProject} onTaskUpdate={() => {}} userRole={userRole} organizationId={userOrgId || undefined} />}
-            
-            {/* Restricted Views */}
-            {view === 'financial' && userRole === 'dono' && (PLAN_LIMITS[currentPlan]?.features.financial !== false ? <FinancialScreen /> : <AccessDenied plan={currentPlan} module="Financeiro" setView={setView}/>)}
-            {view === 'clients' && (PLAN_LIMITS[currentPlan]?.features.clients !== false ? <ClientsScreen userRole={userRole} onlineUsers={onlineUsers} organizationId={userOrgId || undefined} /> : <AccessDenied plan={currentPlan} module="Clientes" setView={setView}/>)}
-            {view === 'product' && userRole === 'dono' && (PLAN_LIMITS[currentPlan]?.features.metrics !== false ? <ProductIndicators /> : <AccessDenied plan={currentPlan} module="Métricas de Produto" setView={setView}/>)}
-            {view === 'dev-metrics' && userRole === 'dono' && (PLAN_LIMITS[currentPlan]?.features.metrics !== false ? <DevIndicators organizationId={userOrgId || undefined} /> : <AccessDenied plan={currentPlan} module="Métricas de Engenharia" setView={setView}/>)}
-            
-            {/* Access Denied Message */}
-            {(view === 'financial' || view === 'product' || view === 'dev-metrics') && userRole !== 'dono' && (
-                <div className="flex h-full items-center justify-center flex-col gap-4 animate-in zoom-in duration-300">
-                    <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center">
-                        <ShieldCheck className="w-8 h-8 text-red-500"/>
-                    </div>
-                    <h2 className="text-xl font-bold text-slate-900 dark:text-white">Acesso Restrito</h2>
-                    <p className="text-slate-500 text-sm max-w-xs text-center">
-                        Esta área é exclusiva para o perfil de Dono. Contate o administrador do workspace.
-                    </p>
-                </div>
-            )}
-
-            {view === 'settings' && <SettingsScreen 
-                theme={theme} 
-                onToggleTheme={toggleTheme} 
-                onlineUsers={onlineUsers} 
-                userOrgId={userOrgId}
-                orgDetails={orgDetails}
-                onUpdateOrgDetails={handleUpdateOrgDetails}
-                userRole={userRole}
-                userData={userData}
-                setView={setView}
-            />}
-            {view === 'profile' && <ProfileScreen currentPlan={currentPlan} onRefresh={loadAppData} />}
-            {view === 'search' && (
-                <div className="space-y-4 animate-in fade-in">
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-4">Resultados da Busca: "{searchQuery}"</h1>
-                    {searchResults.length === 0 && <p className="text-slate-500">Nenhum resultado encontrado.</p>}
-                    {searchResults.map(res => (
-                        <div key={res.id} className="glass-card p-6 rounded-xl border border-white/10 bg-white/5 dark:bg-slate-900/50">
-                            <h3 className="font-bold text-slate-900 dark:text-white text-lg cursor-pointer hover:text-shinko-primary" onClick={() => handleOpenProject(res)}>{res.title}</h3>
-                            <p className="text-sm text-slate-500 mb-4">{res.description}</p>
-                            {res.matchedTasks && res.matchedTasks.length > 0 && (
-                                <div className="space-y-2 pl-4 border-l-2 border-slate-200 dark:border-slate-700">
-                                    <p className="text-xs font-bold text-slate-400 uppercase">Tarefas Encontradas:</p>
-                                    {res.matchedTasks.map((t: any) => (
-                                        <div key={t.id} className="text-sm text-slate-300 flex items-center gap-2">
-                                            <div className={`w-2 h-2 rounded-full ${t.completed ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
-                                            {t.text}
-                                        </div>
-                                    ))}
+                            ))}
+                            {opportunities.filter(o => listFilterStatus === 'All' || o.status === listFilterStatus).length === 0 && (
+                                <div className="text-center py-20 opacity-50">
+                                    <ListIcon className="w-12 h-12 mx-auto mb-4 text-slate-400"/>
+                                    <p className="text-slate-500">Nenhum projeto encontrado com este status.</p>
                                 </div>
                             )}
                         </div>
-                    ))}
-                </div>
-            )}
+                    </div>
+                )}
+
+                {view === 'project-detail' && selectedOpp && (
+                    <ProjectWorkspace 
+                        opportunity={selectedOpp}
+                        onBack={() => { setSelectedOpp(null); setView('list'); }}
+                        onEdit={(opp) => { setEditingOpp(opp); setIsWizardOpen(true); }}
+                        onDelete={handleDeleteOpportunity}
+                        onUpdate={(updatedOpp) => {
+                            setOpportunities(prev => prev.map(o => o.id === updatedOpp.id ? updatedOpp : o));
+                            setSelectedOpp(updatedOpp);
+                        }}
+                        userRole={userRole}
+                        currentPlan={currentPlan}
+                    />
+                )}
+
+                {view === 'kanban' && <KanbanBoard onSelectOpportunity={handleOpenProject} userRole={userRole} organizationId={userOrgId || undefined} />}
+                {view === 'calendar' && <CalendarView opportunities={opportunities} onSelectOpportunity={handleOpenProject} onTaskUpdate={() => {}} userRole={userRole} onRefresh={loadAppData} organizationId={userOrgId || undefined} />}
+                {view === 'gantt' && <GanttView opportunities={opportunities} onSelectOpportunity={handleOpenProject} onTaskUpdate={() => {}} userRole={userRole} organizationId={userOrgId || undefined} />}
+                
+                {/* Restricted Views */}
+                {view === 'financial' && userRole === 'dono' && (PLAN_LIMITS[currentPlan]?.features.financial !== false ? <FinancialScreen /> : <AccessDenied plan={currentPlan} module="Financeiro" setView={setView}/>)}
+                {view === 'clients' && (PLAN_LIMITS[currentPlan]?.features.clients !== false ? <ClientsScreen userRole={userRole} onlineUsers={onlineUsers} organizationId={userOrgId || undefined} /> : <AccessDenied plan={currentPlan} module="Clientes" setView={setView}/>)}
+                {view === 'product' && userRole === 'dono' && (PLAN_LIMITS[currentPlan]?.features.metrics !== false ? <ProductIndicators /> : <AccessDenied plan={currentPlan} module="Métricas de Produto" setView={setView}/>)}
+                {view === 'dev-metrics' && userRole === 'dono' && (PLAN_LIMITS[currentPlan]?.features.metrics !== false ? <DevIndicators organizationId={userOrgId || undefined} /> : <AccessDenied plan={currentPlan} module="Métricas de Engenharia" setView={setView}/>)}
+                
+                {/* Access Denied Message */}
+                {(view === 'financial' || view === 'product' || view === 'dev-metrics') && userRole !== 'dono' && (
+                    <div className="flex h-full items-center justify-center flex-col gap-4 animate-in zoom-in duration-300">
+                        <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center">
+                            <ShieldCheck className="w-8 h-8 text-red-500"/>
+                        </div>
+                        <h2 className="text-xl font-bold text-slate-900 dark:text-white">Acesso Restrito</h2>
+                        <p className="text-slate-500 text-sm max-w-xs text-center">
+                            Esta área é exclusiva para o perfil de Dono. Contate o administrador do workspace.
+                        </p>
+                    </div>
+                )}
+
+                {view === 'settings' && <SettingsScreen 
+                    theme={theme} 
+                    onToggleTheme={toggleTheme} 
+                    onlineUsers={onlineUsers} 
+                    userOrgId={userOrgId}
+                    orgDetails={orgDetails}
+                    onUpdateOrgDetails={handleUpdateOrgDetails}
+                    userRole={userRole}
+                    userData={userData}
+                    setView={setView}
+                />}
+                {view === 'profile' && <ProfileScreen currentPlan={currentPlan} onRefresh={loadAppData} />}
+                {view === 'search' && (
+                    <div className="space-y-4 animate-in fade-in">
+                        <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-4">Resultados da Busca: "{searchQuery}"</h1>
+                        {searchResults.length === 0 && <p className="text-slate-500">Nenhum resultado encontrado.</p>}
+                        {searchResults.map(res => (
+                            <div key={res.id} className="glass-card p-6 rounded-xl border border-white/10 bg-white/5 dark:bg-slate-900/50">
+                                <h3 className="font-bold text-slate-900 dark:text-white text-lg cursor-pointer hover:text-shinko-primary" onClick={() => handleOpenProject(res)}>{res.title}</h3>
+                                <p className="text-sm text-slate-500 mb-4">{res.description}</p>
+                                {res.matchedTasks && res.matchedTasks.length > 0 && (
+                                    <div className="space-y-2 pl-4 border-l-2 border-slate-200 dark:border-slate-700">
+                                        <p className="text-xs font-bold text-slate-400 uppercase">Tarefas Encontradas:</p>
+                                        {res.matchedTasks.map((t: any) => (
+                                            <div key={t.id} className="text-sm text-slate-300 flex items-center gap-2">
+                                                <div className={`w-2 h-2 rounded-full ${t.completed ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
+                                                {t.text}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </Suspense>
         </div>
       </main>
 
