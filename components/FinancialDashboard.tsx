@@ -67,7 +67,7 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [] })
 
                 const { data: clients } = await supabase
                     .from('clientes')
-                    .select('id, valor_mensal, data_inicio, meses, status')
+                    .select('id, valormensal, data_inicio, meses, status')
                     .eq('organizacao', orgId);
 
                 const safeClients = clients || [];
@@ -80,6 +80,7 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [] })
                     for (let month = 0; month < 12; month++) {
                         const monthStart = new Date(year, month, 1);
                         const monthEnd = new Date(year, month + 1, 0); 
+                        monthEnd.setHours(23, 59, 59, 999);
                         
                         let monthMrr = 0;
                         let monthActive = 0;
@@ -100,7 +101,7 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [] })
                                 const isActiveContract = contractStart <= monthEnd && contractEnd >= monthStart;
                                 
                                 if (isActiveContract && c.status !== 'Bloqueado') {
-                                    monthMrr += Number(c.valormensal || 0); // Corrected column name from valormensal
+                                    monthMrr += Number(c.valormensal || 0);
                                     monthActive++;
                                 }
 
@@ -108,10 +109,9 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [] })
                                     newClients++;
                                 }
                                 
-                                // Simplified Churn Logic: blocked clients
+                                // Simplified Churn Logic
                                 if (c.status === 'Bloqueado') {
-                                    // ideally check when they churned, but using simple check for now
-                                    // assuming status reflects current state
+                                    // Placeholder logic for churn
                                 }
                             }
                         });
@@ -236,9 +236,6 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [] })
                 previousData.margin = previousData.revenue > 0 ? ((previousData.revenue - prevRecord.cogs) / previousData.revenue) * 100 : 0;
             }
 
-            // For Chart, we show the year trend but highlight the month? 
-            // Or show daily data if manualTransactions allow?
-            // Let's stick to Year trend for consistency but focus numbers on month.
             chartData = financialHistory
                 .filter(h => new Date(h.date).getFullYear() === selectedYear)
                 .map(r => ({
@@ -250,12 +247,11 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [] })
                 }));
         }
 
-        // WEEK VIEW (Approximation)
+        // WEEK VIEW
         else if (timeRange === 'week') {
             label = `Semana ${selectedWeek}`;
             comparisonLabel = `vs Semana Anterior`;
             
-            // Calculate week range
             const getWeekRange = (year: number, week: number) => {
                 const simple = new Date(year, 0, 1 + (week - 1) * 7);
                 const dow = simple.getDay();
@@ -280,13 +276,12 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [] })
                 const outflow = txs.filter(t => t.type === 'outflow').reduce((acc,t) => acc+t.amount, 0);
                 const cogs = txs.filter(t => t.type === 'outflow' && ['Infraestrutura', 'Operacional'].includes(t.category)).reduce((acc,t) => acc+t.amount, 0);
 
-                // Pro-rate MRR (Weekly MRR approx = Monthly / 4)
-                // Find month record for start date
+                // Pro-rate MRR
                 const mRec = financialHistory.find(h => {
                     const d = new Date(h.date);
                     return d.getMonth() === start.getMonth() && d.getFullYear() === start.getFullYear();
                 });
-                const weeklyMrr = (mRec?.mrr || 0) / 4.3; // Avg weeks in month
+                const weeklyMrr = (mRec?.mrr || 0) / 4.3; 
 
                 const revenue = inflow + weeklyMrr;
                 const expenses = outflow;
@@ -301,16 +296,14 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [] })
             currentData = calcRangeData(currRange.start, currRange.end);
             previousData = calcRangeData(prevRange.start, prevRange.end);
 
-            // Chart: Show Daily Breakdown for the week
             chartData = [];
             let cursor = new Date(currRange.start);
             while (cursor <= currRange.end) {
                 const dStr = cursor.toISOString().split('T')[0];
-                // Daily txs
                 const dTxs = manualTransactions.filter(t => t.date === dStr);
                 const dIn = dTxs.filter(t => t.type === 'inflow').reduce((a,b)=>a+b.amount,0);
                 const dOut = dTxs.filter(t => t.type === 'outflow').reduce((a,b)=>a+b.amount,0);
-                // Daily MRR
+                
                 const mRec = financialHistory.find(h => {
                     const d = new Date(h.date);
                     return d.getMonth() === cursor.getMonth() && d.getFullYear() === cursor.getFullYear();

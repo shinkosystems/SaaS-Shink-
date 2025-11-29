@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Opportunity, BpmnTask, DbTask, DbProject } from '../types';
 import { ChevronDown, ChevronRight as ChevronRightIcon, Zap, Loader2, AlertTriangle, Columns, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Grid, LayoutGrid, Square, RefreshCw, Layers, CornerDownRight, Hash, CheckCircle2 } from 'lucide-react';
 import TaskDetailModal from './TaskDetailModal';
@@ -63,6 +63,11 @@ export const GanttView: React.FC<Props> = ({ onSelectOpportunity, onTaskUpdate, 
       initialEndDate: Date;
       currentEndDate: Date;
   } | null>(null);
+
+  // --- Scroll Sync Refs ---
+  const leftPaneRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const rightPaneRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
       if (projectId) setFilterProject(projectId);
@@ -132,6 +137,17 @@ export const GanttView: React.FC<Props> = ({ onSelectOpportunity, onTaskUpdate, 
       if (viewMode === 'month') newDate.setMonth(newDate.getMonth() + 1);
       if (viewMode === 'year') newDate.setFullYear(newDate.getFullYear() + 1);
       setViewDate(newDate);
+  };
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+      // Sync Vertical Scroll (Left Pane)
+      if (leftPaneRef.current) {
+          leftPaneRef.current.scrollTop = e.currentTarget.scrollTop;
+      }
+      // Sync Horizontal Scroll (Header)
+      if (headerRef.current) {
+          headerRef.current.scrollLeft = e.currentTarget.scrollLeft;
+      }
   };
 
   const currentRangeLabel = useMemo(() => {
@@ -651,11 +667,14 @@ export const GanttView: React.FC<Props> = ({ onSelectOpportunity, onTaskUpdate, 
         <div className="flex-1 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden flex bg-white dark:bg-slate-900 shadow-xl">
             
             {/* Left Sidebar: Tree Structure */}
-            <div className="w-[300px] flex flex-col border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-black/20 shrink-0">
-                <div className="h-12 flex items-center px-4 border-b border-slate-200 dark:border-slate-700 font-bold text-xs text-slate-500 uppercase bg-white dark:bg-slate-900">
+            <div 
+                ref={leftPaneRef}
+                className="w-[300px] flex flex-col border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-black/20 shrink-0 overflow-hidden relative"
+            >
+                <div className="h-12 flex items-center px-4 border-b border-slate-200 dark:border-slate-700 font-bold text-xs text-slate-500 uppercase bg-white dark:bg-slate-900 sticky top-0 z-20">
                     Estrutura do Projeto
                 </div>
-                <div className="flex-1 overflow-y-hidden">
+                <div className="flex-1">
                     {rows.map(row => {
                         if (!row.visible) return null;
                         return (
@@ -684,9 +703,14 @@ export const GanttView: React.FC<Props> = ({ onSelectOpportunity, onTaskUpdate, 
             </div>
 
             {/* Right Sidebar: Timeline */}
-            <div className="flex-1 flex flex-col overflow-hidden relative bg-slate-50 dark:bg-slate-950">
+            <div 
+                className="flex-1 flex flex-col overflow-hidden relative bg-slate-50 dark:bg-slate-950"
+            >
                 {/* Header Dates */}
-                <div className="h-12 flex border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+                <div 
+                    ref={headerRef}
+                    className="h-12 flex border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden w-full"
+                >
                     {timelineCols.map((date, i) => (
                         <div 
                             key={i} 
@@ -698,8 +722,12 @@ export const GanttView: React.FC<Props> = ({ onSelectOpportunity, onTaskUpdate, 
                     ))}
                 </div>
 
-                {/* Bars */}
-                <div className="flex-1 overflow-auto relative custom-scrollbar">
+                {/* Bars - MASTER SCROLL CONTAINER */}
+                <div 
+                    ref={rightPaneRef}
+                    onScroll={handleScroll}
+                    className="flex-1 overflow-auto relative custom-scrollbar"
+                >
                     <div className="absolute inset-0 flex pointer-events-none h-full">
                         {timelineCols.map((_, i) => (
                             <div key={i} className="shrink-0 border-r border-slate-200/50 dark:border-slate-800/50 h-full" style={{ width: viewConfig.colWidth }}></div>
