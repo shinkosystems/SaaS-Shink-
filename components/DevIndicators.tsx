@@ -37,7 +37,11 @@ const InfoTooltip = ({ text }: { text: string }) => (
 
 type TimeRange = 'week' | 'month' | 'year';
 
-export const DevIndicators: React.FC = () => {
+interface Props {
+    organizationId?: number;
+}
+
+export const DevIndicators: React.FC<Props> = ({ organizationId }) => {
     const [metrics, setMetrics] = useState<DevMetricsData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [timeRange, setTimeRange] = useState<TimeRange>('month');
@@ -45,7 +49,7 @@ export const DevIndicators: React.FC = () => {
     useEffect(() => {
         const load = async () => {
             setIsLoading(true);
-            const opps = await fetchOpportunities();
+            const opps = await fetchOpportunities(organizationId);
             if (opps) {
                 const data = calculateDevMetrics(opps, timeRange);
                 setMetrics(data);
@@ -54,7 +58,7 @@ export const DevIndicators: React.FC = () => {
             logEvent('page_view', { page: 'Dev Indicators' });
         };
         load();
-    }, [timeRange]);
+    }, [timeRange, organizationId]);
 
     if (isLoading || !metrics) {
         return (

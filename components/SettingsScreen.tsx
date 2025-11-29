@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Bell, Moon, Sun, Smartphone, Mail, Shield, Monitor, Volume2, Users, UserPlus } from 'lucide-react';
+import { Bell, Moon, Sun, Smartphone, Mail, Shield, Monitor, Volume2, Users, UserPlus, Sparkles, Building2, Save, Loader2, Users2, Workflow, Lock } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { ElasticSwitch } from './ElasticSwitch';
 
@@ -8,9 +8,18 @@ interface Props {
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
   onlineUsers?: string[];
+  userOrgId: number | null;
+  orgDetails: { name: string; limit: number; logoUrl: string | null; primaryColor: string; whitelabel: boolean };
+  onUpdateOrgDetails: (updates: { logoFile?: File; color?: string; name?: string; limit?: number }) => Promise<void>;
+  setView: (view: any) => void;
+  userRole: string;
+  userData: { name: string; avatar: string | null; email?: string };
 }
 
-export const SettingsScreen: React.FC<Props> = ({ theme, onToggleTheme, onlineUsers = [] }) => {
+export const SettingsScreen: React.FC<Props> = ({ 
+    theme, onToggleTheme, onlineUsers = [], userOrgId, 
+    orgDetails, onUpdateOrgDetails, setView, userRole 
+}) => {
   const [notifications, setNotifications] = useState({
     email: true,
     push: true,
@@ -18,38 +27,45 @@ export const SettingsScreen: React.FC<Props> = ({ theme, onToggleTheme, onlineUs
     taskUpdates: true
   });
 
-  const [userProfile, setUserProfile] = useState<any>(null);
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [loadingTeam, setLoadingTeam] = useState(false);
+  
+  // Whitelabel State
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(orgDetails.logoUrl);
+  const [color, setColor] = useState(orgDetails.primaryColor);
+  const [orgName, setOrgName] = useState(orgDetails.name);
+  const [orgLimit, setOrgLimit] = useState(orgDetails.limit);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Sync local state if props change (e.g., after login or save)
+  useEffect(() => {
+    setLogoPreview(orgDetails.logoUrl);
+    setColor(orgDetails.primaryColor);
+    setOrgName(orgDetails.name);
+    setOrgLimit(orgDetails.limit);
+  }, [orgDetails]);
 
   useEffect(() => {
-      fetchProfile();
-  }, []);
-
-  const fetchProfile = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-          const { data } = await supabase.from('users').select('*').eq('id', user.id).single();
-          setUserProfile(data);
-
-          if (data && (data.perfil === 'dono' || data.perfil === 'admin')) {
+      const fetchTeamMembers = async () => {
+          if (userOrgId && (userRole === 'dono' || userRole === 'admin')) {
               setLoadingTeam(true);
-              // Fetch only internal team, exclude 'cliente' role which is handled in ClientsScreen
               const { data: usersData } = await supabase
                   .from('users')
                   .select('*')
-                  .eq('organizacao', data.organizacao)
+                  .eq('organizacao', userOrgId)
                   .neq('perfil', 'cliente') 
                   .order('nome');
               
               if (usersData) setTeamMembers(usersData);
               setLoadingTeam(false);
           }
-      }
-  };
+      };
+      fetchTeamMembers();
+  }, [userOrgId, userRole]);
 
   const handleStatusChange = async (userId: string, newStatus: string) => {
-      if (userProfile?.perfil !== 'dono') return;
+      if (userRole !== 'dono') return;
 
       const { error } = await supabase
           .from('users')
@@ -61,6 +77,27 @@ export const SettingsScreen: React.FC<Props> = ({ theme, onToggleTheme, onlineUs
       } else {
           setTeamMembers(prev => prev.map(m => m.id === userId ? { ...m, status: newStatus } : m));
       }
+  };
+  
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+          setLogoFile(file);
+          setLogoPreview(URL.createObjectURL(file));
+      }
+  };
+
+  const handleSaveBranding = async () => {
+      if (!userOrgId) return;
+      setIsSaving(true);
+      await onUpdateOrgDetails({ 
+          logoFile: logoFile || undefined, 
+          color,
+          name: orgName,
+          limit: orgLimit
+      });
+      setIsSaving(false);
+      setLogoFile(null);
   };
 
   const toggle = (key: keyof typeof notifications) => {
@@ -149,15 +186,119 @@ export const SettingsScreen: React.FC<Props> = ({ theme, onToggleTheme, onlineUs
           </div>
         </div>
 
+        {/* Whitelabel Section (Dono Only) */}
+        {userRole === 'dono' && (
+            <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm relative">
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-shinko-primary"/> Personalização (Whitelabel)
+                </h2>
+
+                {orgDetails.whitelabel ? (
+                    <>
+                        <div className="grid md:grid-cols-2 gap-6">
+                            {/* Column 1: Org Details */}
+                            <div className="space-y-6">
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
+                                        <Workflow className="w-4 h-4"/> Nome do Workspace
+                                    </label>
+                                    <input 
+                                        type="text"
+                                        value={orgName}
+                                        onChange={(e) => setOrgName(e.target.value)}
+                                        className="glass-input w-full h-12 rounded-lg px-4"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
+                                        <Users2 className="w-4 h-4"/> Limite de Colaboradores
+                                    </label>
+                                    <input 
+                                        type="number"
+                                        value={orgLimit}
+                                        onChange={(e) => setOrgLimit(Number(e.target.value))}
+                                        className="glass-input w-full h-12 rounded-lg px-4"
+                                    />
+                                </div>
+                            </div>
+                            
+                            {/* Column 2: Branding */}
+                            <div className="space-y-6">
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Logo do Workspace</label>
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-16 h-16 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center p-1">
+                                            {logoPreview ? (
+                                                <img src={logoPreview} alt="Preview" className="max-w-full max-h-full object-contain" />
+                                            ) : (
+                                                <Building2 className="w-8 h-8 text-slate-400"/>
+                                            )}
+                                        </div>
+                                        <label className="cursor-pointer bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-lg text-sm font-medium border border-slate-200 dark:border-slate-700">
+                                            {logoFile || logoPreview ? 'Trocar Logo' : 'Escolher Logo'}
+                                            <input type="file" accept="image/png, image/jpeg, image/svg+xml, image/webp" className="hidden" onChange={handleLogoChange} />
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Cor Primária da Marca</label>
+                                    <div className="flex items-center gap-3">
+                                        <input 
+                                            type="color"
+                                            value={color}
+                                            onChange={(e) => setColor(e.target.value)}
+                                            className="w-12 h-12 p-1 bg-transparent border-2 border-slate-300 dark:border-slate-600 rounded-lg cursor-pointer"
+                                        />
+                                        <input 
+                                            type="text"
+                                            value={color}
+                                            onChange={(e) => setColor(e.target.value)}
+                                            className="glass-input h-12 rounded-lg px-4 font-mono text-sm"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="border-t border-slate-200 dark:border-slate-800 pt-4 flex justify-end mt-6">
+                            <button 
+                                onClick={handleSaveBranding}
+                                disabled={isSaving}
+                                className="h-11 flex items-center gap-2 bg-shinko-primary text-white px-6 rounded-lg font-bold text-sm shadow-lg shadow-amber-900/20"
+                            >
+                                {isSaving ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4"/>}
+                                Salvar Personalização
+                            </button>
+                        </div>
+                    </>
+                ) : (
+                    <div className="absolute inset-0 bg-white/80 dark:bg-slate-900/90 backdrop-blur-md z-10 flex flex-col items-center justify-center p-8 rounded-2xl text-center">
+                        <Lock className="w-12 h-12 text-shinko-primary mb-4" />
+                        <h3 className="font-bold text-lg text-slate-800 dark:text-white">Ative o Whitelabel</h3>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 mb-6">
+                            Este recurso premium permite personalizar a marca do seu workspace. Faça upgrade para desbloquear.
+                        </p>
+                        <button 
+                            onClick={() => setView('profile')}
+                            className="bg-shinko-primary hover:brightness-110 text-white font-bold px-6 py-2 rounded-lg text-sm shadow-lg shadow-amber-500/20"
+                        >
+                            Ver Planos
+                        </button>
+                    </div>
+                )}
+            </div>
+        )}
+
         {/* TEAM SECTION (Internal Only) */}
-        {(userProfile?.perfil === 'dono' || userProfile?.perfil === 'admin') && (
+        {(userRole === 'dono' || userRole === 'admin') && (
              <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
                 <div className="flex justify-between items-center mb-6">
                     <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                         <Users className="w-5 h-5 text-blue-500"/> Equipe Interna
                     </h2>
-                    {userProfile?.perfil === 'dono' && (
-                        <button className="text-sm font-medium text-shinko-primary hover:text-amber-600 dark:hover:text-amber-400 flex items-center gap-2 opacity-50 cursor-not-allowed">
+                    {userRole === 'dono' && (
+                        <button className="text-sm font-medium text-shinko-primary hover:brightness-110 flex items-center gap-2 opacity-50 cursor-not-allowed">
                             <UserPlus className="w-4 h-4"/> Convidar Membro
                         </button>
                     )}
@@ -189,7 +330,7 @@ export const SettingsScreen: React.FC<Props> = ({ theme, onToggleTheme, onlineUs
                                         </span>
                                     </td>
                                     <td className="p-3 text-right">
-                                        {userProfile?.perfil === 'dono' ? (
+                                        {userRole === 'dono' ? (
                                             <div className="relative inline-block">
                                                 <select 
                                                     value={user.status || 'Ativo'}

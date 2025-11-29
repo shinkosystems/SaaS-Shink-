@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Mail, Phone, Building2, MapPin, Save, Camera, Shield, CreditCard, Bell, Globe, Loader2, UploadCloud, Sparkles, Check, X, Copy, ExternalLink, FileText, History, ArrowUpRight, ArrowDownRight, Zap, Lock, Calendar, AlertTriangle, RefreshCw } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
@@ -266,7 +267,7 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
                 {avatarUrl ? (
                   <img src={avatarUrl} alt="Profile" className="w-full h-full rounded-full object-cover" />
                 ) : (
-                  <div className="w-full h-full rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-5xl font-bold text-white">
+                  <div className="w-full h-full rounded-full bg-gradient-to-br from-shinko-primary to-shinko-secondary flex items-center justify-center text-5xl font-bold text-white">
                     {name.charAt(0) || 'U'}
                   </div>
                 )}
@@ -307,7 +308,7 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
                 onClick={() => setActiveTab('personal')}
                 className={`w-full h-12 flex items-center gap-3 px-4 rounded-lg text-sm font-medium transition-all ${
                     activeTab === 'personal' 
-                    ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900/50' 
+                    ? 'bg-shinko-primary/10 text-shinko-primary border border-shinko-primary/20' 
                     : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'
                 }`}
              >
@@ -317,7 +318,7 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
                 onClick={() => setActiveTab('workspace')}
                 className={`w-full h-12 flex items-center gap-3 px-4 rounded-lg text-sm font-medium transition-all ${
                     activeTab === 'workspace' 
-                    ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900/50' 
+                    ? 'bg-shinko-primary/10 text-shinko-primary border border-shinko-primary/20' 
                     : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'
                 }`}
              >
@@ -395,7 +396,7 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
                         <button 
                           onClick={handleSaveProfile}
                           disabled={saving}
-                          className="h-12 flex items-center gap-2 bg-shinko-primary hover:bg-shinko-secondary text-white px-8 rounded-lg font-bold text-sm shadow-lg shadow-amber-900/20 transition-transform active:scale-95 disabled:opacity-50"
+                          className="h-12 flex items-center gap-2 bg-shinko-primary hover:brightness-110 text-white px-8 rounded-lg font-bold text-sm shadow-lg shadow-amber-900/20 transition-transform active:scale-95 disabled:opacity-50"
                         >
                             {saving ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5" />}
                             {saving ? 'Salvando...' : 'Salvar Alterações'}
@@ -423,7 +424,7 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
                     <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-6">
                          <div>
                              <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                 <Building2 className="w-6 h-6 text-amber-500"/> Meu Workspace
+                                 <Building2 className="w-6 h-6 text-shinko-primary"/> Meu Workspace
                              </h2>
                              <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">
                                  Gerencie sua assinatura e métodos de pagamento.
@@ -471,22 +472,22 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
                                     key={plan.id} 
                                     className={`relative p-6 rounded-2xl border transition-all duration-300 flex flex-col justify-between glass-card ${
                                         currentPlan === plan.id 
-                                        ? 'border-amber-500 shadow-glow ring-2 ring-amber-500/20' 
-                                        : 'border-slate-200/50 dark:border-white/10 hover:border-amber-500/50 hover:-translate-y-1'
+                                        ? 'border-shinko-primary shadow-glow ring-2 ring-shinko-primary/20' 
+                                        : 'border-slate-200/50 dark:border-white/10 hover:border-shinko-primary/50 hover:-translate-y-1'
                                     }`}
                                 >
                                     {currentPlan === plan.id && (
-                                        <div className="absolute top-3 right-3 bg-amber-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase shadow-sm z-10">
+                                        <div className="absolute top-3 right-3 bg-shinko-primary text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase shadow-sm z-10">
                                             Seu Plano
                                         </div>
                                     )}
                                     {plan.recommended && (
-                                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-500 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase shadow-sm">
+                                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-shinko-primary text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase shadow-sm">
                                             Mais Popular
                                         </div>
                                     )}
                                     <div>
-                                        <h4 className={`text-lg font-bold mb-2 ${currentPlan === plan.id ? 'text-amber-400' : 'text-slate-900 dark:text-white'}`}>{plan.name}</h4>
+                                        <h4 className={`text-lg font-bold mb-2 ${currentPlan === plan.id ? 'text-shinko-primary' : 'text-slate-900 dark:text-white'}`}>{plan.name}</h4>
                                         <div className="flex items-baseline gap-1 mb-4">
                                             <span className="text-2xl font-black">R$ {plan.price.toFixed(2)}</span>
                                             <span className="text-xs opacity-60">/mês</span>
@@ -505,7 +506,7 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
                                         className={`w-full py-2 rounded-lg text-xs font-bold mt-4 transition-colors ${
                                             currentPlan === plan.id
                                             ? 'bg-slate-200/50 dark:bg-white/20 text-white cursor-default'
-                                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-amber-500 hover:text-white cursor-pointer'
+                                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-shinko-primary hover:text-white cursor-pointer'
                                     }`}>
                                         {currentPlan === plan.id ? (subscriptionInfo?.shouldWarn ? 'Renovar Agora' : 'Plano Atual') : 'Selecionar'}
                                     </button>

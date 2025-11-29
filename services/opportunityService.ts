@@ -4,18 +4,27 @@ import { Opportunity, ProjectStatus, DbProject, RDEStatus, Archetype, IntensityL
 
 const TABLE_NAME = 'projetos';
 
-export const fetchOpportunities = async (): Promise<Opportunity[] | null> => {
+export const fetchOpportunities = async (organizationId?: number): Promise<Opportunity[] | null> => {
   if (!supabase) return null;
   
+  // Strict Organization Filter: If no org ID is provided, return empty to prevent leak
+  if (organizationId === undefined || organizationId === null) {
+      console.warn("fetchOpportunities called without organizationId. Returning empty to prevent leakage.");
+      return [];
+  }
+
   try {
     // 1. Fetch Projects
-    const { data: projects, error } = await supabase
+    let query = supabase
       .from(TABLE_NAME)
       .select(`
         *,
         clienteData:clientes(nome, logo_url)
       `)
+      .eq('organizacao', organizationId) // Always filter
       .order('prioseis', { ascending: false });
+
+    const { data: projects, error } = await query;
 
     if (error) {
       console.warn('Supabase Fetch Error (Projetos):', error.message);
@@ -23,9 +32,12 @@ export const fetchOpportunities = async (): Promise<Opportunity[] | null> => {
     }
 
     // 2. Fetch Tasks separately to handle manual hydration
-    const { data: tasks, error: tasksError } = await supabase
-      .from('tasks')
-      .select('*'); // Fetching all tasks for now, could be optimized with .in('projeto', projectIds)
+    let tasksQuery = supabase
+        .from('tasks')
+        .select('*')
+        .eq('organizacao', organizationId); // Always filter
+
+    const { data: tasks, error: tasksError } = await tasksQuery;
 
     if (tasksError) console.warn('Supabase Fetch Error (Tasks):', tasksError.message);
 
@@ -125,7 +137,7 @@ export const createOpportunity = async (opp: Opportunity): Promise<Opportunity |
             }
         }
         
-        return fetchOpportunities().then(res => res ? res.find(o => o.id === projectData.id.toString()) || null : null);
+        return fetchOpportunities(opp.organizationId).then(res => res ? res.find(o => o.id === projectData.id.toString()) || null : null);
     } catch (err) {
         console.warn('Supabase Connection Unavailable (Insert).', err);
         return null;

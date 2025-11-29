@@ -5,7 +5,7 @@ import { X, User, Calendar as CalendarIcon, CheckSquare, Square, Plus, Trash2, A
 import { generateSubtasksForTask } from '../services/geminiService';
 import { supabase } from '../services/supabaseClient';
 import { logEvent } from '../services/analyticsService';
-import { syncSubtasks, updateTask } from '../services/projectService';
+import { syncSubtasks, updateTask, fetchSubtasks } from '../services/projectService';
 
 interface Props {
   task: BpmnTask;
@@ -139,6 +139,22 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
   
   // State for bulk assignment of AI tasks
   const [bulkAssigneeIds, setBulkAssigneeIds] = useState<string[]>([]);
+
+  // Carrega subtarefas frescas do banco ao montar
+  const loadSubtasks = async () => {
+      const taskId = Number(formData.id);
+      if (!isNaN(taskId)) {
+          const freshSubtasks = await fetchSubtasks(taskId);
+          setFormData(prev => ({
+              ...prev,
+              subtasks: freshSubtasks
+          }));
+      }
+  };
+
+  useEffect(() => {
+      loadSubtasks();
+  }, [task.id]);
 
   // Fetch Users from Organization
   useEffect(() => {
@@ -361,7 +377,7 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
           deadlineExtended = true;
       }
 
-      // 1. Update Local State
+      // 1. Update Local State (Provisório para UI responder rápido)
       const updatedFormData = {
           ...formData,
           subtasks: [...(formData.subtasks || []), ...newSubs],
@@ -377,7 +393,7 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
               await updateTask(Number(formData.id), {
                   duracaohoras: totalCalculatedHours,
                   datafim: updatedDueDate,
-                  deadline: updatedDueDate
+                  // deadline: updatedDueDate // REMOVED to avoid error
               });
 
               // Insert Subtasks
@@ -390,6 +406,9 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
                   assigneeId: s.assigneeId
               })));
 
+              // 3. Recarrega do banco para garantir que temos os IDs reais
+              await loadSubtasks();
+
               let alertMsg = `${newSubs.length} subtarefas criadas!`;
               if (deadlineExtended) {
                   alertMsg += `\n\nNota: A data de entrega da tarefa principal foi estendida automaticamente para ${newMaxEndDate.toLocaleDateString()} para acomodar o trabalho.`;
@@ -398,7 +417,7 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
 
           } catch (err) {
               console.error("Erro ao salvar subtarefas automáticas:", err);
-              alert("Erro ao salvar no banco de dados, mas adicionadas localmente.");
+              alert("Erro ao salvar no banco de dados.");
           }
       }
 
@@ -423,6 +442,7 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
             duracaohoras: formData.estimatedHours,
             datainicio: formData.startDate,
             datafim: formData.dueDate,
+            // REMOVED deadline and dataproposta to avoid errors on tables without these columns
             gravidade: formData.gut?.g,
             urgencia: formData.gut?.u,
             tendencia: formData.gut?.t
@@ -443,6 +463,8 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
         
         if (newSubs.length > 0) {
             await syncSubtasks(Number(formData.id), newSubs);
+            // Recarrega para obter IDs
+            await loadSubtasks();
         }
     }
 

@@ -2,8 +2,9 @@
 import React, { useEffect, useState } from 'react';
 import { Opportunity, DbTask, ProjectStatus } from '../types';
 import MatrixChart from './MatrixChart';
-import { fetchUserTasks, updateTask } from '../services/projectService';
-import { CheckCircle2, Circle, Clock, AlertTriangle, Calendar, Check, LayoutList, Smile } from 'lucide-react';
+import { fetchUserTasks, updateTask, deleteTask } from '../services/projectService';
+import TaskDetailModal from './TaskDetailModal';
+import { CheckCircle2, Circle, Clock, AlertTriangle, Calendar, Check, LayoutList, Smile, Sparkles } from 'lucide-react';
 
 interface Props {
     opportunities: Opportunity[];
@@ -11,43 +12,47 @@ interface Props {
     onOpenProject: (opp: Opportunity) => void;
     user: any;
     theme: 'dark' | 'light';
+    userRole?: string;
+    whitelabel?: boolean;
+    onActivateWhitelabel?: () => void;
+    organizationId?: number;
 }
 
-export const Dashboard: React.FC<Props> = ({ opportunities, onNavigate, onOpenProject, user, theme }) => {
+export const Dashboard: React.FC<Props> = ({ opportunities, onNavigate, onOpenProject, user, theme, userRole, whitelabel, onActivateWhitelabel, organizationId }) => {
     const [myTasks, setMyTasks] = useState<DbTask[]>([]);
     const [loadingTasks, setLoadingTasks] = useState(true);
+    const [selectedTask, setSelectedTask] = useState<DbTask | null>(null);
+
+    const refreshTasks = async () => {
+        if (!user?.id) return;
+        setLoadingTasks(true);
+        const tasks = await fetchUserTasks(user.id, organizationId);
+        
+        // Frontend Filter for "Today's Focus" + Security Check (Organization)
+        const today = new Date().toISOString().split('T')[0];
+        
+        const filtered = tasks.filter(t => {
+            // Strict Security: Ensure task belongs to current org context if provided
+            if (organizationId && t.organizacao && t.organizacao !== organizationId) return false;
+
+            const deadline = t.datafim ? t.datafim.split('T')[0] : '9999-99-99';
+            const start = t.datainicio ? t.datainicio.split('T')[0] : '9999-99-99';
+            
+            const isOverdue = deadline < today;
+            const isDueToday = deadline === today;
+            const isDoing = t.status === 'doing';
+            const shouldStart = start <= today;
+
+            return isOverdue || isDueToday || isDoing || shouldStart;
+        });
+
+        setMyTasks(filtered);
+        setLoadingTasks(false);
+    };
 
     useEffect(() => {
-        const loadTasks = async () => {
-            if (!user?.id) return;
-            setLoadingTasks(true);
-            const tasks = await fetchUserTasks(user.id);
-            
-            // Frontend Filter for "Today's Focus"
-            // Logic: 
-            // 1. Deadline is today or in the past (Overdue)
-            // 2. OR Status is 'doing' (In progress)
-            // 3. OR Start date is today or past
-            
-            const today = new Date().toISOString().split('T')[0];
-            
-            const filtered = tasks.filter(t => {
-                const deadline = t.datafim ? t.datafim.split('T')[0] : '9999-99-99';
-                const start = t.datainicio ? t.datainicio.split('T')[0] : '9999-99-99';
-                
-                const isOverdue = deadline < today;
-                const isDueToday = deadline === today;
-                const isDoing = t.status === 'doing';
-                const shouldStart = start <= today;
-
-                return isOverdue || isDueToday || isDoing || shouldStart;
-            });
-
-            setMyTasks(filtered);
-            setLoadingTasks(false);
-        };
-        loadTasks();
-    }, [user]);
+        refreshTasks();
+    }, [user, organizationId]);
 
     const handleCompleteTask = async (taskId: number) => {
         // Optimistic update
@@ -56,11 +61,47 @@ export const Dashboard: React.FC<Props> = ({ opportunities, onNavigate, onOpenPr
             await updateTask(taskId, { status: 'done' });
         } catch (e) {
             console.error("Error completing task", e);
+            refreshTasks(); // Revert on error
+        }
+    };
+
+    const handleDeleteTask = async (taskId: number) => {
+        if (window.confirm("Tem certeza que deseja excluir esta tarefa?")) {
+            // Optimistic update
+            setMyTasks(prev => prev.filter(t => t.id !== taskId));
+            setSelectedTask(null);
+            
+            try {
+                await deleteTask(taskId);
+            } catch (e) {
+                console.error("Erro ao excluir tarefa:", e);
+                refreshTasks(); // Revert on error
+            }
         }
     };
 
     return (
         <div className="text-slate-900 dark:text-white animate-in fade-in duration-500 h-full flex flex-col">
+            {userRole === 'dono' && !whitelabel && (
+                <div className="mb-6 bg-gradient-to-r from-slate-800 to-slate-900 border border-shinko-primary/20 rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-4 shadow-2xl relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-shinko-primary/5 group-hover:bg-shinko-primary/10 transition-colors pointer-events-none"></div>
+                    <div className="relative z-10">
+                        <h2 className="text-lg font-bold text-shinko-primary flex items-center gap-2">
+                            <Sparkles className="w-5 h-5"/> Plano Whitelabel
+                        </h2>
+                        <p className="text-sm text-slate-300 mt-1 max-w-2xl">
+                            Você está convidado a experimentar as funcionalidades do plano <strong>Whitelabel</strong>. Personalize o painel com sua marca e ofereça uma experiência exclusiva para seus clientes.
+                        </p>
+                    </div>
+                    <button 
+                        onClick={onActivateWhitelabel}
+                        className="relative z-10 bg-shinko-primary hover:brightness-110 text-white font-bold px-6 py-2.5 rounded-lg text-sm whitespace-nowrap transition-all shadow-lg hover:shadow-shinko-primary/20 active:scale-95"
+                    >
+                        Experimentar as funcionalidades
+                    </button>
+                </div>
+            )}
+
             <h1 className="text-3xl font-bold mb-6 text-slate-900 dark:text-white">Dashboard</h1>
             
             {/* Stats Cards */}
@@ -109,7 +150,7 @@ export const Dashboard: React.FC<Props> = ({ opportunities, onNavigate, onOpenPr
                     <div className="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-3">
                         {loadingTasks ? (
                             <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-2">
-                                <div className="w-6 h-6 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+                                <div className="w-6 h-6 border-2 border-shinko-primary border-t-transparent rounded-full animate-spin"></div>
                                 <span className="text-xs">Carregando tarefas...</span>
                             </div>
                         ) : myTasks.length === 0 ? (
@@ -128,9 +169,13 @@ export const Dashboard: React.FC<Props> = ({ opportunities, onNavigate, onOpenPr
                                 const isToday = deadline === today;
 
                                 return (
-                                    <div key={task.id} className="group bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 p-3 rounded-xl hover:border-amber-500/30 hover:shadow-md transition-all flex gap-3 items-start">
+                                    <div 
+                                        key={task.id} 
+                                        onClick={() => setSelectedTask(task)}
+                                        className="group bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 p-3 rounded-xl hover:border-shinko-primary/30 hover:shadow-md transition-all flex gap-3 items-start cursor-pointer"
+                                    >
                                         <button 
-                                            onClick={() => handleCompleteTask(task.id)}
+                                            onClick={(e) => { e.stopPropagation(); handleCompleteTask(task.id); }}
                                             className="mt-0.5 text-slate-400 hover:text-emerald-500 transition-colors shrink-0"
                                             title="Concluir Tarefa"
                                         >
@@ -164,6 +209,44 @@ export const Dashboard: React.FC<Props> = ({ opportunities, onNavigate, onOpenPr
                     </div>
                 </div>
             </div>
+
+            {selectedTask && (
+                <TaskDetailModal 
+                    task={{
+                        id: selectedTask.id.toString(),
+                        text: selectedTask.titulo,
+                        description: selectedTask.descricao,
+                        status: selectedTask.status as any,
+                        completed: selectedTask.status === 'done',
+                        assignee: selectedTask.responsavelData?.nome,
+                        assigneeId: selectedTask.responsavel,
+                        startDate: selectedTask.datainicio,
+                        dueDate: selectedTask.datafim,
+                        estimatedHours: selectedTask.duracaohoras,
+                        gut: { g: selectedTask.gravidade, u: selectedTask.urgencia, t: selectedTask.tendencia },
+                        assigneeIsDev: selectedTask.responsavelData?.desenvolvedor
+                    }}
+                    nodeTitle={selectedTask.projetoData?.nome || 'Tarefa Avulsa'}
+                    opportunityTitle={selectedTask.projetoData?.nome}
+                    onClose={() => setSelectedTask(null)}
+                    onSave={async (updatedTask) => {
+                        await updateTask(Number(selectedTask.id), {
+                            titulo: updatedTask.text,
+                            descricao: updatedTask.description,
+                            status: updatedTask.status,
+                            responsavel: updatedTask.assigneeId,
+                            duracaohoras: updatedTask.estimatedHours,
+                            datainicio: updatedTask.startDate,
+                            datafim: updatedTask.dueDate,
+                            gravidade: updatedTask.gut?.g,
+                            urgencia: updatedTask.gut?.u,
+                            tendencia: updatedTask.gut?.t
+                        });
+                        refreshTasks();
+                    }}
+                    onDelete={(id) => handleDeleteTask(Number(id))}
+                />
+            )}
         </div>
     );
 };

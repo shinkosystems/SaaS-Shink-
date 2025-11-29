@@ -133,7 +133,8 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
                   <KanbanBoard 
                       onSelectOpportunity={() => {}} 
                       userRole={userRole}
-                      projectId={opportunity.dbProjectId?.toString() || opportunity.id} 
+                      projectId={opportunity.dbProjectId?.toString() || opportunity.id}
+                      organizationId={opportunity.organizationId} 
                   />
               </div>
           )}
@@ -146,6 +147,7 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
                       onTaskUpdate={handleTaskUpdate} 
                       userRole={userRole}
                       projectId={opportunity.dbProjectId?.toString() || opportunity.id}
+                      organizationId={opportunity.organizationId}
                   />
               </div>
           )}
@@ -158,6 +160,7 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
                       onTaskUpdate={handleTaskUpdate} 
                       userRole={userRole}
                       projectId={opportunity.dbProjectId?.toString() || opportunity.id}
+                      organizationId={opportunity.organizationId}
                   />
               </div>
           )}

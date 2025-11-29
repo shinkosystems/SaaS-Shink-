@@ -16,7 +16,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
   };
 
   return (
-    <div className="fixed inset-0 h-full w-full bg-[#050505] text-white overflow-y-auto overflow-x-hidden selection:bg-amber-500/30 font-sans scroll-smooth z-[50]">
+    <div className="fixed inset-0 h-full w-full bg-[#050505] text-white overflow-y-auto overflow-x-hidden selection:bg-shinko-primary/30 font-sans scroll-smooth z-[50]">
       
       {/* Global Background Mesh */}
       <div className="fixed inset-0 z-0 pointer-events-none bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-[#050505] to-[#050505]">
@@ -24,7 +24,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
          <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff05_1px,transparent_1px),linear-gradient(to_bottom,#ffffff05_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
          
          <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-indigo-600/10 rounded-full blur-[150px] animate-pulse"></div>
-         <div className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] bg-amber-600/10 rounded-full blur-[150px]" style={{ animationDelay: '2s' }}></div>
+         <div className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] bg-shinko-primary/10 rounded-full blur-[150px]" style={{ animationDelay: '2s' }}></div>
       </div>
 
       {/* Glass Navbar */}
@@ -32,10 +32,10 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
            <div className="flex items-center gap-3 cursor-pointer group" onClick={onEnter}>
               <div className="relative w-10 h-10 transition-transform group-hover:scale-105">
-                  <div className="absolute inset-0 bg-amber-500 blur-lg opacity-40 rounded-lg"></div>
+                  <div className="absolute inset-0 bg-shinko-primary blur-lg opacity-40 rounded-lg"></div>
                   <img src={LOGO_URL} alt="Shinkō Logo" className="w-10 h-10 rounded-lg relative z-10 object-cover shadow-lg" />
               </div>
-              <span className="text-xl font-black tracking-tight text-white">Shink<span className="text-amber-500">ŌS</span></span>
+              <span className="text-xl font-black tracking-tight text-white">Shink<span className="text-shinko-primary">ŌS</span></span>
            </div>
            <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-400">
               <a href="#framework" className="hover:text-white transition-colors hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]">O Framework</a>
@@ -46,7 +46,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
                <button onClick={onEnter} className="text-sm font-bold text-slate-300 hover:text-white hidden md:block transition-colors">Login</button>
                <button 
                  onClick={onEnter}
-                 className="glass-button px-6 py-2.5 rounded-full text-sm font-bold hover:bg-white/10 hover:border-white/20 transition-all shadow-[0_0_20px_rgba(245,158,11,0.15)] border border-white/10"
+                 className="glass-button px-6 py-2.5 rounded-full text-sm font-bold hover:bg-white/10 hover:border-white/20 transition-all shadow-[0_0_20px_rgba(var(--brand-primary-rgb),0.15)] border border-white/10"
                >
                  Acessar OS
                </button>
@@ -59,8 +59,8 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
           <div className="max-w-6xl mx-auto text-center relative">
               
               {/* Glowing Badge */}
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass-panel border-white/10 text-amber-400 text-[10px] font-bold uppercase tracking-[0.2em] mb-10 animate-ios-pop shadow-[0_0_30px_rgba(245,158,11,0.2)]">
-                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shadow-[0_0_10px_#f59e0b]"></span> 
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass-panel border-white/10 text-shinko-primary text-[10px] font-bold uppercase tracking-[0.2em] mb-10 animate-ios-pop shadow-[0_0_30px_rgba(var(--brand-primary-rgb),0.2)]">
+                 <span className="w-1.5 h-1.5 rounded-full bg-shinko-primary animate-pulse shadow-[0_0_10px_var(--brand-primary)]"></span> 
                  ShinkŌS v2.5
               </div>
               
@@ -71,7 +71,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
               </h1>
               
               <p className="text-xl text-slate-400 max-w-2xl mx-auto mb-12 leading-relaxed font-light animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-100">
-                 O ShinkŌS é o sistema operacional que transforma ideias caóticas em <span className="text-white font-medium border-b border-amber-500/50">receita previsível</span> através de algoritmos de priorização e governança automatizada.
+                 O ShinkŌS é o sistema operacional que transforma ideias caóticas em <span className="text-white font-medium border-b border-shinko-primary/50">receita previsível</span> através de algoritmos de priorização e governança automatizada.
               </p>
 
               {/* CTAs */}
@@ -86,7 +86,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
                  </button>
                  
                  <button onClick={onEnter} className="h-16 px-8 rounded-full glass-panel border border-white/10 hover:bg-white/10 text-slate-300 hover:text-white font-medium transition-all flex items-center gap-3 group">
-                    <PlayCircle className="w-10 h-10 text-white/20 group-hover:text-amber-500 transition-colors" /> 
+                    <PlayCircle className="w-10 h-10 text-white/20 group-hover:text-shinko-primary transition-colors" /> 
                     <span className="text-sm text-left leading-tight">Ver Demo<br/><span className="text-[10px] opacity-60 uppercase tracking-widest">2 min</span></span>
                  </button>
               </div>
@@ -97,7 +97,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
       <section id="framework" className="py-32 relative z-10 border-t border-white/5 bg-black/40 backdrop-blur-sm">
           <div className="max-w-7xl mx-auto px-6">
              <div className="text-center mb-20">
-                <h2 className="text-4xl md:text-5xl font-black mb-6 tracking-tight text-white">O Framework <span className="text-amber-500">Shinkō</span></h2>
+                <h2 className="text-4xl md:text-5xl font-black mb-6 tracking-tight text-white">O Framework <span className="text-shinko-primary">Shinkō</span></h2>
                 <p className="text-xl text-slate-400 max-w-2xl mx-auto font-light">
                     Um funil de validação científica em 6 etapas para garantir que apenas projetos de alto potencial sobrevivam.
                 </p>
@@ -105,7 +105,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
 
              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 relative">
                 {/* Connecting Line (Desktop) */}
-                <div className="hidden lg:block absolute top-1/2 left-0 w-full h-px bg-gradient-to-r from-amber-500/0 via-amber-500/20 to-amber-500/0 -translate-y-1/2 z-0"></div>
+                <div className="hidden lg:block absolute top-1/2 left-0 w-full h-px bg-gradient-to-r from-shinko-primary/0 via-shinko-primary/20 to-shinko-primary/0 -translate-y-1/2 z-0"></div>
 
                 {[
                     { step: '01', title: 'Conceito', icon: BrainCircuit, desc: 'Definição clara da dor e solução.' },
@@ -116,7 +116,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
                     { step: '06', title: 'Score', icon: BarChart3, desc: 'Pontuação PRIO-6 matemática.' },
                 ].map((item, i) => (
                     <div key={i} className="glass-panel p-6 rounded-2xl border-white/10 relative z-10 hover:-translate-y-2 transition-transform group bg-[#0a0a0a]/80 backdrop-blur-xl">
-                        <div className="w-10 h-10 rounded-full bg-slate-900 border border-amber-500/30 flex items-center justify-center text-amber-500 font-bold text-sm mb-4 shadow-[0_0_15px_rgba(245,158,11,0.2)] group-hover:bg-amber-500 group-hover:text-white transition-colors relative mx-auto lg:mx-0">
+                        <div className="w-10 h-10 rounded-full bg-slate-900 border border-shinko-primary/30 flex items-center justify-center text-shinko-primary font-bold text-sm mb-4 shadow-[0_0_15px_rgba(var(--brand-primary-rgb),0.2)] group-hover:bg-shinko-primary group-hover:text-white transition-colors relative mx-auto lg:mx-0">
                            <item.icon className="w-5 h-5" />
                         </div>
                         <h3 className="font-bold text-white text-lg mb-2 text-center lg:text-left">{item.title}</h3>
@@ -173,7 +173,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
                         title: 'Governança Storytime', 
                         icon: History, 
                         desc: 'Log auditável imutável. Cada upload, comentário ou mudança de status fica registrado na linha do tempo.', 
-                        color: 'text-amber-500', bg: 'bg-amber-500/10' 
+                        color: 'text-shinko-primary', bg: 'bg-shinko-primary/10' 
                     },
                     { 
                         title: 'Ingestão de Docs (OCR)', 
@@ -205,7 +205,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
             </div>
             
             <div className="mt-12 text-center">
-                 <button onClick={onEnter} className="text-amber-500 hover:text-amber-400 font-bold text-sm flex items-center gap-2 mx-auto group transition-colors">
+                 <button onClick={onEnter} className="text-shinko-primary hover:text-white font-bold text-sm flex items-center gap-2 mx-auto group transition-colors">
                      Explorar o Sistema Completo <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform"/>
                  </button>
             </div>
@@ -226,7 +226,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
           <h2 className="text-3xl font-black text-center mb-12 tracking-tight">Perguntas Frequentes</h2>
           <div className="space-y-4">
               {[
-                  { q: "O ShinkŌS serve para minha empresa?", a: "Sim, se você gerencia múltiplos projetos e precisa de clareza sobre onde investir recursos. Ideal para consultorias, software houses e departamentos de inovação." },
+                  { q: "O ShinkōOS serve para minha empresa?", a: "Sim, se você gerencia múltiplos projetos e precisa de clareza sobre onde investir recursos. Ideal para consultorias, software houses e departamentos de inovação." },
                   { q: "Como a automação ajuda na prática?", a: "Utilizamos Gemini 2.5 Pro para ler documentos técnicos e gerar cronogramas, checklists e análises de risco automaticamente, economizando horas de planejamento manual." },
                   { q: "Posso convidar clientes externos?", a: "Sim! O sistema possui perfis de acesso específicos para clientes, permitindo que eles acompanhem o progresso e aprovem etapas sem ver dados sensíveis internos." },
                   { q: "Meus dados estão seguros?", a: "Absolutamente. Utilizamos criptografia de ponta a ponta, isolamento de dados por organização (RLS) e logs de auditoria imutáveis." }
@@ -234,7 +234,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
                   <div key={i} className="glass-panel border border-white/5 rounded-xl overflow-hidden transition-all hover:bg-white/5 bg-[#0a0a0a]/60">
                       <button onClick={() => toggleFaq(i)} className="w-full flex items-center justify-between p-6 text-left font-bold text-slate-200 hover:text-white transition-colors">
                           {item.q}
-                          {openFaq === i ? <Minus className="w-4 h-4 text-amber-500"/> : <Plus className="w-4 h-4 text-slate-500"/>}
+                          {openFaq === i ? <Minus className="w-4 h-4 text-shinko-primary"/> : <Plus className="w-4 h-4 text-slate-500"/>}
                       </button>
                       {openFaq === i && (
                           <div className="px-6 pb-6 text-slate-400 text-sm leading-relaxed border-t border-white/5 pt-4 animate-in slide-in-from-top-2">

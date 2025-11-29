@@ -30,6 +30,7 @@ import { logEvent, trackUserAccess } from './services/analyticsService';
 import { NpsSurvey } from './components/NpsSurvey';
 import { getCurrentUserPlan } from './services/asaasService';
 import { subscribeToPresence } from './services/presenceService';
+import { updateOrgDetails, uploadLogo } from './services/organizationService';
 
 const LOGO_URL = "https://zjssfnbcboibqeoubeou.supabase.co/storage/v1/object/public/fotoperfil/fotoperfil/1.png";
 
@@ -91,6 +92,15 @@ const App: React.FC = () => {
   // Realtime Presence State
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
 
+  // Whitelabel & Org State
+  const [orgDetails, setOrgDetails] = useState<{ name: string, limit: number, logoUrl: string | null, primaryColor: string, whitelabel: boolean }>({
+    name: 'ShinkōS',
+    limit: 1,
+    logoUrl: null,
+    primaryColor: '#F59E0B',
+    whitelabel: false,
+  });
+
   // Data & UI State
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [selectedOpp, setSelectedOpp] = useState<Opportunity | null>(null);
@@ -108,7 +118,10 @@ const App: React.FC = () => {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // --- THEME EFFECT (FIX DARK MODE) ---
+  // API Key State
+  const [needsApiKey, setNeedsApiKey] = useState(false);
+
+  // --- THEME & BRANDING EFFECTS ---
   useEffect(() => {
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
@@ -117,52 +130,76 @@ const App: React.FC = () => {
     }
   }, [theme]);
 
+  // Helper to convert hex to r,g,b string
+  const hexToRgb = (hex: string) => {
+      if (!hex || hex.length < 4) return '245, 158, 11'; // Fallback
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '245, 158, 11';
+  };
+
+  // Helper to darken color for secondary shade
+  const shadeColor = (color: string, percent: number) => {
+      let R = parseInt(color.substring(1,3),16);
+      let G = parseInt(color.substring(3,5),16);
+      let B = parseInt(color.substring(5,7),16);
+
+      R = parseInt(String(R * (100 + percent) / 100));
+      G = parseInt(String(G * (100 + percent) / 100));
+      B = parseInt(String(B * (100 + percent) / 100));
+
+      R = (R<255)?R:255;  
+      G = (G<255)?G:255;  
+      B = (B<255)?B:255;  
+
+      const RR = ((R.toString(16).length==1)?"0"+R.toString(16):R.toString(16));
+      const GG = ((G.toString(16).length==1)?"0"+G.toString(16):G.toString(16));
+      const BB = ((B.toString(16).length==1)?"0"+B.toString(16):B.toString(16));
+
+      return "#"+RR+GG+BB;
+  };
+
+  // Effect to apply theme color
+  useEffect(() => {
+      document.documentElement.style.setProperty('--brand-primary', orgDetails.primaryColor);
+      document.documentElement.style.setProperty('--brand-secondary', shadeColor(orgDetails.primaryColor, -15)); // 15% darker
+      document.documentElement.style.setProperty('--brand-primary-rgb', hexToRgb(orgDetails.primaryColor));
+  }, [orgDetails.primaryColor]);
+
+  // --- CHECK API KEY ---
+  useEffect(() => {
+      const checkApiKey = async () => {
+          if (typeof window !== 'undefined' && (window as any).aistudio) {
+              try {
+                  const hasKey = await (window as any).aistudio.hasSelectedApiKey();
+                  if (!hasKey) setNeedsApiKey(true);
+              } catch (e) {
+                  console.error("Failed to check API key status", e);
+              }
+          }
+      };
+      checkApiKey();
+  }, [session, isGuest]);
+
+  const handleConnectApiKey = async () => {
+      if ((window as any).aistudio) {
+          try {
+              await (window as any).aistudio.openSelectKey();
+              // Assume success as per instructions
+              setNeedsApiKey(false);
+              loadAppData(); 
+          } catch (e) {
+              console.error("API Key selection failed", e);
+          }
+      }
+  };
+
   // --- DATA LOADING FUNCTION ---
   const loadAppData = useCallback(async () => {
       if (!session && !isGuest) return;
       
       setIsLoading(true);
-      let currentRole = 'colaborador';
-      let currentName = 'Usuário';
-      let currentAvatar = null;
-      let currentEmail = '';
-      let currentUserId = null;
-      let currentOrgId: number | null = null;
 
       try {
-          if (session?.user) {
-              currentUserId = session.user.id;
-              currentEmail = session.user.email;
-              const { data: profile } = await supabase.from('users').select('perfil, nome, organizacao').eq('id', currentUserId).maybeSingle();
-              if (profile) {
-                  currentRole = profile.perfil;
-                  currentName = profile.nome;
-                  currentOrgId = profile.organizacao;
-              } else {
-                  currentName = session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Usuário';
-                  currentOrgId = session.user.user_metadata?.org_id;
-                  currentRole = session.user.user_metadata?.role || 'colaborador';
-              }
-              currentAvatar = session.user.user_metadata?.avatar_url || null;
-              
-              // Load Plan
-              const plan = await getCurrentUserPlan(currentUserId);
-              setCurrentPlan(plan);
-          } 
-          if (isGuest) currentOrgId = 3;
-
-          setUserOrgId(currentOrgId);
-          if (session?.user) {
-              setUserRole(currentRole);
-              setUserData({ name: currentName, avatar: currentAvatar, email: currentEmail });
-              
-              if (currentRole === 'cliente') {
-                  setView('list');
-              } else if (view === 'list' && currentRole !== 'cliente') {
-                  setView('dashboard');
-              }
-          }
-
           if (isGuest) {
                await new Promise(r => setTimeout(r, 800));
                setOpportunities(MOCK_DATA);
@@ -172,32 +209,75 @@ const App: React.FC = () => {
                return;
           }
 
-          const dataTimeout = new Promise<null>(r => setTimeout(() => r(null), 4000));
-          const fetchPromise = fetchOpportunities();
-          const allOpps = await Promise.race([fetchPromise, dataTimeout]);
+          if (session?.user) {
+              const { data: profile, error: profileError } = await supabase
+                .from('users')
+                .select(`
+                    *,
+                    organizacoes (
+                        *
+                    )
+                `)
+                .eq('id', session.user.id)
+                .single();
 
-          if (allOpps !== null) {
-              let filteredOpps = allOpps;
-              if (currentOrgId) {
-                  filteredOpps = allOpps.filter(opp => (opp.organizationId || 3) === currentOrgId);
+              if (profileError || !profile) {
+                  throw profileError || new Error("User profile not found");
               }
-              if (currentRole === 'cliente' && currentUserId) {
-                  filteredOpps = filteredOpps.filter(opp => opp.clientId === currentUserId);
+              
+              const orgDataFromProfile = profile.organizacoes;
+              const orgData = Array.isArray(orgDataFromProfile) ? orgDataFromProfile[0] : orgDataFromProfile;
+              
+              setUserRole(profile.perfil || 'colaborador');
+              setUserData({ name: profile.nome || 'Usuário', avatar: session.user.user_metadata?.avatar_url || null, email: profile.email });
+              const orgId = profile.organizacao || null;
+              setUserOrgId(orgId);
+
+              if (orgData) {
+                  setOrgDetails({
+                      name: orgData.nome || 'ShinkōS',
+                      limit: orgData.colaboradores || 1,
+                      logoUrl: orgData.logo || null,
+                      primaryColor: orgData.cor || '#F59E0B',
+                      whitelabel: (orgData.whitelabel === true || orgData.whitelable === true),
+                  });
+              }
+
+              const plan = await getCurrentUserPlan(session.user.id);
+              setCurrentPlan(plan);
+              
+              // Fetch Opportunities filtered by organization ID
+              // SECURITY: If orgId is not present, fetchOpportunities will return empty array
+              const allOpps = await fetchOpportunities(orgId);
+
+              // STRICT CLIENT-SIDE FILTERING TO PREVENT LEAKAGE (Double Safety)
+              let filteredOpps = allOpps || [];
+              if (orgId) {
+                  filteredOpps = filteredOpps.filter(opp => Number(opp.organizationId) === Number(orgId));
+              } else {
+                  filteredOpps = [];
+              }
+
+              if (profile.perfil === 'cliente') {
+                  filteredOpps = filteredOpps.filter(opp => opp.clientId === session.user.id);
+                  if (view === 'dashboard') setView('list');
               }
               setOpportunities(filteredOpps);
               setDbStatus('connected');
-          } else {
-              setOpportunities(MOCK_DATA);
-              setDbStatus('error'); 
           }
       } catch (error) {
           console.warn("Data Load Exception:", error);
-          setOpportunities(MOCK_DATA);
+          if (isGuest) {
+              setOpportunities(MOCK_DATA);
+          } else {
+              // SECURITY: Do not show mock data to authenticated users on error to prevent confusion/leakage fear
+              setOpportunities([]);
+          }
           setDbStatus('error');
       } finally {
           setIsLoading(false);
       }
-  }, [session, isGuest]);
+  }, [session, isGuest, view]);
 
   // --- PRESENCE EFFECT ---
   useEffect(() => {
@@ -280,6 +360,30 @@ const App: React.FC = () => {
     setIsLoginModalOpen(false);
     setIsLoading(false);
   };
+  
+  const handleUpdateOrgDetails = async (updates: { logoFile?: File; color?: string; name?: string; limit?: number }) => {
+      if (!userOrgId) return;
+      try {
+          let logoUrl;
+          if (updates.logoFile) {
+              logoUrl = await uploadLogo(userOrgId, updates.logoFile);
+          }
+
+          await updateOrgDetails(userOrgId, {
+              logoUrl: logoUrl,
+              primaryColor: updates.color,
+              name: updates.name,
+              limit: updates.limit
+          });
+          
+          alert('Personalização salva!');
+          await loadAppData(); 
+      } catch (error) {
+          console.error("Error updating org details:", error);
+          alert('Erro ao salvar personalização.');
+      }
+  };
+
 
   const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
 
@@ -322,6 +426,10 @@ const App: React.FC = () => {
   const handleSaveQuickTask = async (task: BpmnTask, projectId: string | null) => {
       setIsLoading(true);
       try {
+          if (!userOrgId) {
+              throw new Error("Erro de Segurança: Organização não identificada.");
+          }
+
           const projId = projectId && projectId !== "" ? parseInt(projectId) : null;
 
           const payload = {
@@ -338,7 +446,7 @@ const App: React.FC = () => {
               gravidade: task.gut?.g || 1,
               urgencia: task.gut?.u || 1,
               tendencia: task.gut?.t || 1,
-              organizacao: userOrgId || 3,
+              organizacao: userOrgId, // STRICT: Use actual user Org ID
               sutarefa: false
           };
 
@@ -453,7 +561,7 @@ const App: React.FC = () => {
       return (
           <div className="min-h-screen flex flex-col items-center justify-center bg-black">
               <div className="relative">
-                  <div className="absolute inset-0 bg-amber-500 blur-[80px] opacity-30 animate-pulse rounded-full"></div>
+                  <div className="absolute inset-0 bg-shinko-primary blur-[80px] opacity-30 animate-pulse rounded-full"></div>
                   <img src={LOGO_URL} className="w-24 h-24 relative z-10 animate-bounce" alt="Loading"/>
               </div>
           </div>
@@ -487,8 +595,39 @@ const App: React.FC = () => {
     );
   }
 
+  // --- API KEY REQUIRED SCREEN ---
+  if (needsApiKey) {
+      return (
+          <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/90 backdrop-blur-xl animate-in fade-in">
+              <div className="glass-panel p-8 rounded-2xl max-w-md text-center border border-shinko-primary/30 shadow-[0_0_50px_rgba(var(--brand-primary-rgb),0.2)] relative overflow-hidden">
+                  <div className="absolute inset-0 bg-shinko-primary/5 pointer-events-none"></div>
+                  <div className="relative z-10">
+                      <div className="w-16 h-16 bg-shinko-primary/20 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse border border-shinko-primary/30">
+                          <Sparkles className="w-8 h-8 text-shinko-primary"/>
+                      </div>
+                      <h2 className="text-2xl font-bold text-white mb-3">Conectar Inteligência Artificial</h2>
+                      <p className="text-slate-400 mb-8 leading-relaxed text-sm">
+                          Para habilitar as análises preditivas e automação do ShinkōOS, selecione sua chave de API do Google Gemini.
+                      </p>
+                      <button 
+                          onClick={handleConnectApiKey}
+                          className="w-full py-3.5 bg-gradient-to-r from-shinko-primary to-shinko-secondary hover:brightness-110 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+                      >
+                          <Sparkles className="w-4 h-4"/> Selecionar API Key
+                      </button>
+                      <p className="mt-6 text-[10px] text-slate-500">
+                          <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="hover:text-shinko-primary underline transition-colors">
+                              Documentação de Faturamento e Chaves
+                          </a>
+                      </p>
+                  </div>
+              </div>
+          </div>
+      );
+  }
+
   return (
-    <div className="flex h-screen overflow-hidden selection:bg-amber-500/30">
+    <div className="flex h-screen overflow-hidden selection:bg-shinko-primary/30">
       <OnboardingGuide run={showOnboarding} onFinish={() => setShowOnboarding(false)} />
       <NpsSurvey userId={session?.user?.id} userRole={userRole} />
 
@@ -511,6 +650,8 @@ const App: React.FC = () => {
         userRole={userRole}
         userData={userData}
         currentPlan={currentPlan}
+        customLogoUrl={orgDetails.logoUrl}
+        orgName={orgDetails.name}
       />
 
       <MobileDrawer 
@@ -526,6 +667,8 @@ const App: React.FC = () => {
          setIsMobileOpen={setIsMobileMenuOpen}
          userRole={userRole}
          userData={userData}
+         customLogoUrl={orgDetails.logoUrl}
+         orgName={orgDetails.name}
       />
 
       {/* FIX: Add padding-top on mobile to avoid content being hidden behind fixed header */}
@@ -538,6 +681,10 @@ const App: React.FC = () => {
                     onOpenProject={handleOpenProject}
                     user={session?.user}
                     theme={theme}
+                    userRole={userRole}
+                    whitelabel={orgDetails.whitelabel}
+                    onActivateWhitelabel={() => setView('settings')}
+                    organizationId={userOrgId || undefined}
                 />
             )}
             
@@ -556,7 +703,7 @@ const App: React.FC = () => {
                             <button
                                 onClick={handleCreateProjectClick}
                                 id="btn-new-project-list"
-                                className="bg-gradient-to-r from-amber-500 to-orange-600 text-white px-6 py-3 rounded-xl font-bold text-sm shadow-lg hover:shadow-amber-500/20 transition-all active:scale-95 flex items-center gap-2 hover:brightness-110"
+                                className="bg-gradient-to-r from-shinko-primary to-shinko-secondary text-white px-6 py-3 rounded-xl font-bold text-sm shadow-lg hover:shadow-shinko-primary/20 transition-all active:scale-95 flex items-center gap-2 hover:brightness-110"
                             >
                                 <Plus className="w-5 h-5"/> Novo Projeto
                             </button>
@@ -648,7 +795,7 @@ const App: React.FC = () => {
                                         </div>
                                         {opp.prioScore > 0 && (
                                             <div className="flex items-center gap-1 text-xs text-slate-500 font-bold bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
-                                                <Target className="w-3 h-3 text-amber-500"/> {opp.prioScore.toFixed(1)}
+                                                <Target className="w-3 h-3 text-shinko-primary"/> {opp.prioScore.toFixed(1)}
                                             </div>
                                         )}
                                         <span className="text-xs text-slate-400 hidden sm:inline">{new Date(opp.createdAt).toLocaleDateString()}</span>
@@ -704,15 +851,15 @@ const App: React.FC = () => {
                 />
             )}
 
-            {view === 'kanban' && <KanbanBoard onSelectOpportunity={handleOpenProject} userRole={userRole} />}
-            {view === 'calendar' && <CalendarView opportunities={opportunities} onSelectOpportunity={handleOpenProject} onTaskUpdate={() => {}} userRole={userRole} onRefresh={loadAppData} />}
-            {view === 'gantt' && <GanttView opportunities={opportunities} onSelectOpportunity={handleOpenProject} onTaskUpdate={() => {}} userRole={userRole} />}
+            {view === 'kanban' && <KanbanBoard onSelectOpportunity={handleOpenProject} userRole={userRole} organizationId={userOrgId || undefined} />}
+            {view === 'calendar' && <CalendarView opportunities={opportunities} onSelectOpportunity={handleOpenProject} onTaskUpdate={() => {}} userRole={userRole} onRefresh={loadAppData} organizationId={userOrgId || undefined} />}
+            {view === 'gantt' && <GanttView opportunities={opportunities} onSelectOpportunity={handleOpenProject} onTaskUpdate={() => {}} userRole={userRole} organizationId={userOrgId || undefined} />}
             
             {/* Restricted Views */}
             {view === 'financial' && userRole === 'dono' && (PLAN_LIMITS[currentPlan]?.features.financial !== false ? <FinancialScreen /> : <AccessDenied plan={currentPlan} module="Financeiro" setView={setView}/>)}
-            {view === 'clients' && (PLAN_LIMITS[currentPlan]?.features.clients !== false ? <ClientsScreen userRole={userRole} onlineUsers={onlineUsers} /> : <AccessDenied plan={currentPlan} module="Clientes" setView={setView}/>)}
+            {view === 'clients' && (PLAN_LIMITS[currentPlan]?.features.clients !== false ? <ClientsScreen userRole={userRole} onlineUsers={onlineUsers} organizationId={userOrgId || undefined} /> : <AccessDenied plan={currentPlan} module="Clientes" setView={setView}/>)}
             {view === 'product' && userRole === 'dono' && (PLAN_LIMITS[currentPlan]?.features.metrics !== false ? <ProductIndicators /> : <AccessDenied plan={currentPlan} module="Métricas de Produto" setView={setView}/>)}
-            {view === 'dev-metrics' && userRole === 'dono' && (PLAN_LIMITS[currentPlan]?.features.metrics !== false ? <DevIndicators /> : <AccessDenied plan={currentPlan} module="Métricas de Engenharia" setView={setView}/>)}
+            {view === 'dev-metrics' && userRole === 'dono' && (PLAN_LIMITS[currentPlan]?.features.metrics !== false ? <DevIndicators organizationId={userOrgId || undefined} /> : <AccessDenied plan={currentPlan} module="Métricas de Engenharia" setView={setView}/>)}
             
             {/* Access Denied Message */}
             {(view === 'financial' || view === 'product' || view === 'dev-metrics') && userRole !== 'dono' && (
@@ -727,7 +874,17 @@ const App: React.FC = () => {
                 </div>
             )}
 
-            {view === 'settings' && <SettingsScreen theme={theme} onToggleTheme={toggleTheme} onlineUsers={onlineUsers} />}
+            {view === 'settings' && <SettingsScreen 
+                theme={theme} 
+                onToggleTheme={toggleTheme} 
+                onlineUsers={onlineUsers} 
+                userOrgId={userOrgId}
+                orgDetails={orgDetails}
+                onUpdateOrgDetails={handleUpdateOrgDetails}
+                userRole={userRole}
+                userData={userData}
+                setView={setView}
+            />}
             {view === 'profile' && <ProfileScreen currentPlan={currentPlan} onRefresh={loadAppData} />}
             {view === 'search' && (
                 <div className="space-y-4 animate-in fade-in">
@@ -735,7 +892,7 @@ const App: React.FC = () => {
                     {searchResults.length === 0 && <p className="text-slate-500">Nenhum resultado encontrado.</p>}
                     {searchResults.map(res => (
                         <div key={res.id} className="glass-card p-6 rounded-xl border border-white/10 bg-white/5 dark:bg-slate-900/50">
-                            <h3 className="font-bold text-slate-900 dark:text-white text-lg cursor-pointer hover:text-amber-500" onClick={() => handleOpenProject(res)}>{res.title}</h3>
+                            <h3 className="font-bold text-slate-900 dark:text-white text-lg cursor-pointer hover:text-shinko-primary" onClick={() => handleOpenProject(res)}>{res.title}</h3>
                             <p className="text-sm text-slate-500 mb-4">{res.description}</p>
                             {res.matchedTasks && res.matchedTasks.length > 0 && (
                                 <div className="space-y-2 pl-4 border-l-2 border-slate-200 dark:border-slate-700">
@@ -780,14 +937,14 @@ const App: React.FC = () => {
 const AccessDenied = ({ plan, module, setView }: { plan: string, module: string, setView: (v: any) => void }) => (
     <div className="flex h-full items-center justify-center flex-col gap-4 animate-in zoom-in duration-300 p-8">
         <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/20 rounded-full flex items-center justify-center border-4 border-amber-50 dark:border-amber-900/10">
-            <Lock className="w-10 h-10 text-amber-500"/>
+            <Lock className="w-10 h-10 text-shinko-primary"/>
         </div>
         <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Upgrade Necessário</h2>
         <p className="text-slate-500 dark:text-slate-400 text-sm max-w-sm text-center leading-relaxed">
             O módulo <strong>{module}</strong> não está disponível no seu plano atual (<strong>{plan.replace('plan_', '').toUpperCase()}</strong>).
             Faça um upgrade para desbloquear ferramentas profissionais.
         </p>
-        <button onClick={() => setView('profile')} className="mt-4 px-8 py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold rounded-xl shadow-lg hover:brightness-110 transition-all">
+        <button onClick={() => setView('profile')} className="mt-4 px-8 py-3 bg-gradient-to-r from-shinko-primary to-shinko-secondary text-white font-bold rounded-xl shadow-lg hover:brightness-110 transition-all">
             Ver Planos Disponíveis
         </button>
     </div>

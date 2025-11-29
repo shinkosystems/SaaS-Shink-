@@ -13,24 +13,24 @@ const FIXED_PAYMENT_LINK = 'https://www.asaas.com/c/3xh5fsyxc16odebg';
 const FALLBACK_PLANS: SubscriptionPlan[] = [
     {
         id: 'plan_free',
-        name: 'Starter',
+        name: 'Free',
         price: 0,
         features: [
             '1 Usuário (Dono)',
             'Até 3 Projetos Ativos',
             'Metodologia Shinkō',
             'Kanban & Cronograma',
-            'Sem Financeiro/Clientes'
+            'Sem Módulo Financeiro'
         ],
         recommended: false,
         cycle: 'MONTHLY'
     },
     {
         id: 'plan_consultant',
-        name: 'Consultant',
+        name: 'Usuário',
         price: 89.90,
         features: [
-            '1 Usuário (Dono)',
+            '1 Usuário Adicional',
             'Projetos Ilimitados',
             'Framework Shinkō (RDE & Prio-6)',
             'Gantt & Kanban',
@@ -45,7 +45,7 @@ const FALLBACK_PLANS: SubscriptionPlan[] = [
         price: 297.00,
         features: [
             'Até 5 Usuários',
-            'Tudo do Consultor +',
+            'Tudo do Usuário +',
             'Módulo Financeiro & Contratos',
             'Portal do Cliente Ilimitado',
             'IA Leitura de Documentos (OCR)'
@@ -63,6 +63,20 @@ const FALLBACK_PLANS: SubscriptionPlan[] = [
             'Métricas de Engenharia (DORA)',
             'Métricas de Produto (NPS/KPIs)',
             'IA Avançada & Prioridade'
+        ],
+        recommended: false,
+        cycle: 'MONTHLY'
+    },
+    {
+        id: 'plan_agency',
+        name: 'Agency',
+        price: 1500.00,
+        features: [
+            'Tudo do Scale +',
+            'Whitelabel Completo',
+            'Painel de Gestão de Clientes',
+            'Suporte Prioritário',
+            'Taxa de R$ 49/usuário'
         ],
         recommended: false,
         cycle: 'MONTHLY'
@@ -108,45 +122,66 @@ export const calculateSubscriptionStatus = (lastPaymentDate: string | Date) => {
 
 export const getCurrentUserPlan = async (userId: string): Promise<string> => {
     try {
-        // 1. Check for subscription in the new 'cliente_plano' table first
-        const { data: subData, error } = await supabase
+        // 1. Get user's org and profile
+        const { data: userProfile, error: profileError } = await supabase
+            .from('users')
+            .select('organizacao, perfil')
+            .eq('id', userId)
+            .single();
+
+        if (profileError || !userProfile) {
+            console.warn("User profile not found for plan check, defaulting to free.");
+            return 'plan_free';
+        }
+
+        let ownerId = userId;
+        // 2. If user is not the owner, find the owner of the organization
+        if (userProfile.perfil !== 'dono' && userProfile.organizacao) {
+            const { data: ownerProfile, error: ownerError } = await supabase
+                .from('users')
+                .select('id')
+                .eq('organizacao', userProfile.organizacao)
+                .eq('perfil', 'dono')
+                .limit(1)
+                .single();
+            
+            if (ownerError || !ownerProfile) {
+                // This case can happen if org has no owner, fallback to free
+                return 'plan_free';
+            }
+            ownerId = ownerProfile.id;
+        }
+
+        // 3. Query the subscription plan using the owner's ID
+        const { data: subData, error: subError } = await supabase
             .from('cliente_plano')
-            .select(`
-                datafim, 
-                plano (
-                    id, 
-                    nome
-                )
-            `)
-            .eq('dono', userId)
+            .select('datafim, plano (id, nome)')
+            .eq('dono', ownerId)
             .order('created_at', { ascending: false })
             .limit(1)
             .single();
 
-        if (subData) {
-            const endDate = subData.datafim ? new Date(subData.datafim) : new Date(2099, 0, 1);
-            if (endDate >= new Date()) {
-                const planName = subData.plano?.nome?.toLowerCase();
-                if (planName?.includes('scale')) return 'plan_scale';
-                if (planName?.includes('studio')) return 'plan_studio';
-                if (planName?.includes('consultant')) return 'plan_consultant';
-            }
+        if (subError || !subData) {
+            return 'plan_free';
         }
 
-        // 2. Fallback to old behavior via Asaas
-        const subs = await getUserSubscriptions(userId);
-        const activeSub = subs.find(s => s.status === 'ACTIVE');
-        if (activeSub) {
-            const desc = activeSub.description?.toLowerCase() || '';
-            if (desc.includes('scale')) return 'plan_scale';
-            if (desc.includes('studio')) return 'plan_studio';
-            if (desc.includes('consultant')) return 'plan_consultant';
+        const endDate = new Date(subData.datafim || '2099-12-31');
+        if (endDate < new Date()) {
+            return 'plan_free'; // Subscription expired
         }
+        
+        // 4. Map plan name from DB to internal plan ID
+        const planName = subData.plano?.nome?.toLowerCase() || '';
+        if (planName.includes('agency')) return 'plan_agency';
+        if (planName.includes('scale')) return 'plan_scale';
+        if (planName.includes('studio')) return 'plan_studio';
+        if (planName.includes('consultant')) return 'plan_consultant';
 
         return 'plan_free';
+
     } catch (e) {
         console.error("Error getting user plan:", e);
-        return 'plan_free';
+        return 'plan_free'; // Default fallback
     }
 };
 
@@ -214,7 +249,8 @@ export const fetchSubscriptionPlans = async (): Promise<SubscriptionPlan[]> => {
                 // Map DB Plan to UI Plan ID for logic
                 let planId = 'plan_free';
                 const nameLower = plan.nome.toLowerCase();
-                if (nameLower.includes('scale')) planId = 'plan_scale';
+                if (nameLower.includes('agency')) planId = 'plan_agency';
+                else if (nameLower.includes('scale')) planId = 'plan_scale';
                 else if (nameLower.includes('studio')) planId = 'plan_studio';
                 else if (nameLower.includes('consultant')) planId = 'plan_consultant';
 
@@ -241,10 +277,10 @@ export const getUserSubscriptions = async (userId: string): Promise<AsaasSubscri
     if (USE_REAL_ASAAS) {
         try {
             const { data, error } = await supabase.functions.invoke('asaas-integration', {
-                body: JSON.stringify({
+                body: {
                     action: 'GET_SUBSCRIPTIONS',
                     userId
-                })
+                }
             });
 
             if (error) {
@@ -275,13 +311,13 @@ export const createAsaasPayment = async (
     if (USE_REAL_ASAAS) {
         try {
             const { data, error } = await supabase.functions.invoke('asaas-integration', {
-                body: JSON.stringify({
+                body: {
                     action: 'CREATE_PAYMENT',
                     userId,
                     billingType,
                     value,
                     description
-                })
+                }
             });
 
             // Tratamento específico de erro da Edge Function
@@ -324,10 +360,10 @@ export const getPaymentHistory = async (userId: string): Promise<AsaasPayment[]>
     if (USE_REAL_ASAAS) {
         try {
             const { data, error } = await supabase.functions.invoke('asaas-integration', {
-                body: JSON.stringify({
+                body: {
                     action: 'GET_HISTORY',
                     userId
-                })
+                }
             });
 
             if (error) {
@@ -353,7 +389,7 @@ export const checkPaymentStatus = async (paymentId: string): Promise<AsaasPaymen
     if (USE_REAL_ASAAS) {
         try {
             const { data, error } = await supabase.functions.invoke('asaas-integration', {
-                body: JSON.stringify({ action: 'CHECK_STATUS', paymentId })
+                body: { action: 'CHECK_STATUS', paymentId }
             });
             
             if (error) return null;

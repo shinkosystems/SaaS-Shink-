@@ -9,9 +9,10 @@ import { logEvent } from '../services/analyticsService';
 interface Props {
     userRole?: string;
     onlineUsers?: string[];
+    organizationId?: number; // Added organizationId requirement
 }
 
-export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [] }) => {
+export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [], organizationId }) => {
     const [clients, setClients] = useState<DbClient[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -32,12 +33,15 @@ export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [] }) =
     const logoInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
-        loadClients();
-    }, []);
+        if (organizationId) {
+            loadClients();
+        }
+    }, [organizationId]);
 
     const loadClients = async () => {
+        if (!organizationId) return;
         setIsLoading(true);
-        const data = await fetchClients();
+        const data = await fetchClients(organizationId);
         setClients(data);
         setIsLoading(false);
     };
@@ -63,7 +67,8 @@ export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [] }) =
             meses: 12,
             data_inicio: new Date().toISOString().split('T')[0],
             contrato: '',
-            logo_url: ''
+            logo_url: '',
+            organizacao: organizationId // Pre-fill Org ID
         });
         setShowModal(true);
     };
@@ -109,8 +114,11 @@ export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [] }) =
                     setClients(prev => prev.map(c => c.id === updated.id ? updated : c));
                 }
             } else {
+                // Ensure organization is set
+                const payload = { ...formData, organizacao: organizationId };
+                
                 // Create Client passing password for Auth User creation
-                const created = await createClient(formData, password);
+                const created = await createClient(payload, password);
                 if (created) {
                     setClients(prev => [...prev, created]);
                 }

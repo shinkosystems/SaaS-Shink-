@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { FinancialTransaction } from '../types';
 import { Plus, ArrowUpCircle, ArrowDownCircle, Trash2, Calendar, Tag, DollarSign, Filter, Search, RefreshCw, Lock, ChevronLeft, ChevronRight, XCircle, Edit } from 'lucide-react';
@@ -265,7 +264,8 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
                                 >
                                     <td className="p-4 text-slate-600 dark:text-slate-400 whitespace-nowrap font-mono text-xs">{displayDate}</td>
                                     <td className="p-4 font-medium text-slate-900 dark:text-white flex items-center gap-2">
-                                        {t.isContract && <RefreshCw className="w-3 h-3 text-emerald-500 shrink-0" title="Recorrente (Contrato)"/>}
+                                        {/* FIX: The `title` prop is not valid on lucide-react icons. Wrap in a span. */}
+                                        {t.isContract && <span title="Recorrente (Contrato)"><RefreshCw className="w-3 h-3 text-emerald-500 shrink-0"/></span>}
                                         {t.description}
                                     </td>
                                     <td className="p-4">

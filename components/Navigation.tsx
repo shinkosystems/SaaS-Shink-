@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { 
   LayoutGrid, 
@@ -21,8 +22,8 @@ import {
 import { PLAN_LIMITS } from '../types';
 
 interface Props {
-  currentView: 'dashboard' | 'list' | 'calendar' | 'profile' | 'settings' | 'search' | 'kanban' | 'gantt' | 'financial' | 'clients' | 'product' | 'dev-metrics' | 'admin-manager';
-  onChangeView: (view: 'dashboard' | 'list' | 'calendar' | 'profile' | 'settings' | 'search' | 'kanban' | 'gantt' | 'financial' | 'clients' | 'product' | 'dev-metrics' | 'admin-manager') => void;
+  currentView: 'dashboard' | 'list' | 'calendar' | 'profile' | 'settings' | 'search' | 'kanban' | 'gantt' | 'financial' | 'clients' | 'product' | 'dev-metrics' | 'project-detail' | 'admin-manager';
+  onChangeView: (view: 'dashboard' | 'list' | 'calendar' | 'profile' | 'settings' | 'search' | 'kanban' | 'gantt' | 'financial' | 'clients' | 'product' | 'dev-metrics' | 'project-detail' | 'admin-manager') => void;
   onOpenCreate: () => void;
   onOpenCreateTask: () => void;
   onToggleTheme: () => void;
@@ -35,6 +36,8 @@ interface Props {
   userRole: string;
   userData?: { name: string, avatar: string | null, email?: string };
   currentPlan?: string;
+  customLogoUrl?: string | null;
+  orgName?: string;
 }
 
 const LOGO_URL = "https://zjssfnbcboibqeoubeou.supabase.co/storage/v1/object/public/fotoperfil/fotoperfil/1.png";
@@ -99,7 +102,7 @@ const SidebarContent = ({ props }: { props: Props }) => {
     {/* Glass Search Bar */}
     <div className="px-4 py-4">
         <div className="relative group">
-            <Search className="absolute left-3 top-3.5 w-4 h-4 text-slate-400 dark:text-slate-500 group-focus-within:text-amber-500 dark:group-focus-within:text-white transition-colors" />
+            <Search className="absolute left-3 top-3.5 w-4 h-4 text-slate-400 dark:text-slate-500 group-focus-within:text-shinko-primary dark:group-focus-within:text-white transition-colors" />
             <input 
                 type="text" 
                 onChange={(e) => props.onSearch && props.onSearch(e.target.value)}
@@ -120,12 +123,22 @@ const SidebarContent = ({ props }: { props: Props }) => {
         className="w-full mb-6 flex items-center gap-4 px-3 py-4 rounded-2xl hover:bg-white/5 transition-all group border border-transparent hover:border-white/5"
       >
           <div className="relative">
-             <div className="absolute inset-0 bg-amber-500 blur-md opacity-20 rounded-full group-hover:opacity-40 transition-opacity"></div>
-             <img src={LOGO_URL} alt="Shinko" className="w-10 h-10 rounded-xl shadow-lg object-cover relative z-10" />
+             <div className="absolute inset-0 bg-shinko-primary blur-md opacity-20 rounded-full group-hover:opacity-40 transition-opacity"></div>
+             {props.customLogoUrl ? (
+                <img src={props.customLogoUrl} alt="Custom Logo" className="w-10 h-10 rounded-xl shadow-lg object-contain relative z-10 bg-white/20 p-1" />
+             ) : (
+                <img src={LOGO_URL} alt="Shinko" className="w-10 h-10 rounded-xl shadow-lg object-cover relative z-10" />
+             )}
           </div>
-          <div className="flex flex-col items-start">
-              <span className="text-xl font-black text-slate-900 dark:text-white leading-none mb-1 tracking-tight font-sans">Shink<span className="text-shinko-primary">ŌS</span></span>
-              <span className="text-[10px] text-slate-500 uppercase tracking-[0.2em] font-bold">Workspace</span>
+          <div className="flex flex-col items-start truncate">
+              {props.orgName && props.orgName !== 'ShinkōS' ? (
+                <span className="text-xl font-black text-slate-900 dark:text-white leading-none tracking-tight font-sans truncate w-full text-left" title={props.orgName}>{props.orgName}</span>
+              ) : (
+                <span className="text-xl font-black text-slate-900 dark:text-white leading-none mb-1 tracking-tight font-sans">Shink<span className="text-shinko-primary">ŌS</span></span>
+              )}
+              <span className="text-[10px] text-slate-500 uppercase tracking-[0.2em] font-bold">
+                  {props.customLogoUrl ? 'Personalizado' : 'Workspace'}
+              </span>
           </div>
       </button>
 
@@ -133,7 +146,7 @@ const SidebarContent = ({ props }: { props: Props }) => {
       {props.userRole !== 'cliente' && (
         <button 
             onClick={() => { props.onOpenCreateTask(); props.setIsMobileOpen(false); }}
-            className="w-full h-11 flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-orange-600 text-white p-2 rounded-xl text-sm font-bold transition-all active:scale-95 shadow-lg shadow-amber-500/20 hover:brightness-110 hover:shadow-amber-500/40 mb-8"
+            className="w-full h-11 flex items-center justify-center gap-2 bg-gradient-to-r from-shinko-primary to-shinko-secondary text-white p-2 rounded-xl text-sm font-bold transition-all active:scale-95 shadow-lg shadow-amber-500/20 hover:brightness-110 hover:shadow-amber-500/40 mb-8"
         >
             <CheckSquare className="w-4 h-4" />
             <span>Nova Tarefa</span>
@@ -307,14 +320,23 @@ export const MobileDrawer = (props: Props) => {
     <>
        {/* Changed to be visible up to xl (inclusive) */}
        <header className="xl:hidden h-16 bg-white/80 dark:bg-black/60 backdrop-blur-xl border-b border-slate-200 dark:border-white/5 flex items-center justify-between px-4 fixed top-0 left-0 right-0 z-40">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <button 
               onClick={() => props.setIsMobileOpen(true)}
               className="w-10 h-10 flex items-center justify-center text-slate-900 dark:text-white hover:bg-black/5 dark:hover:bg-white/10 rounded-xl transition-colors"
             >
               <Menu className="w-5 h-5" />
             </button>
-            <span className="text-lg font-black text-slate-900 dark:text-white tracking-tight">Shink<span className="text-amber-500">ŌS</span></span>
+            <div className="flex items-center gap-2">
+                {props.customLogoUrl ? (
+                    <img src={props.customLogoUrl} alt="Logo" className="w-8 h-8 rounded-lg object-contain bg-white/20 p-0.5" />
+                ) : null}
+                {props.orgName && props.orgName !== 'ShinkōS' ? (
+                    <span className="text-lg font-black text-slate-900 dark:text-white tracking-tight">{props.orgName}</span>
+                ) : (
+                    <span className="text-lg font-black text-slate-900 dark:text-white tracking-tight">Shink<span className="text-shinko-primary">ŌS</span></span>
+                )}
+            </div>
           </div>
           
           <button 

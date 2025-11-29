@@ -46,6 +46,10 @@ export const PLAN_LIMITS: Record<string, {
     'plan_scale': {
         maxProjects: 9999,
         features: { financial: true, clients: true, metrics: true, pdfUpload: true, gantt: true }
+    },
+    'plan_agency': {
+        maxProjects: 9999,
+        features: { financial: true, clients: true, metrics: true, pdfUpload: true, gantt: true }
     }
 };
 

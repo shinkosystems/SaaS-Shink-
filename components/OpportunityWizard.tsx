@@ -84,11 +84,23 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel }) =
           const { data: { user } } = await supabase.auth.getUser();
           if (!user) return;
 
-          // We might need to filter by organization if RLS is enabled, 
-          // assuming the query handles it or returns all visible clients.
+          // BUSCA A ORGANIZAÇÃO DO USUÁRIO PRIMEIRO
+          const { data: userProfile } = await supabase
+              .from('users')
+              .select('organizacao')
+              .eq('id', user.id)
+              .single();
+
+          if (!userProfile || !userProfile.organizacao) {
+              console.warn("Usuário sem organização definida. Não é possível listar clientes.");
+              return;
+          }
+
+          // FILTRA CLIENTES ESTRITAMENTE PELA ORGANIZAÇÃO
           let query = supabase
             .from('clientes')
             .select('id, nome, email')
+            .eq('organizacao', userProfile.organizacao) // FILTRO CRÍTICO DE SEGURANÇA
             .order('nome');
 
           const { data } = await query;
@@ -110,7 +122,12 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel }) =
 
           // Fetch user's organization to bind the new client
           const { data: userProfile } = await supabase.from('users').select('organizacao').eq('id', user.id).single();
-          const orgId = userProfile?.organizacao || 3;
+          
+          if (!userProfile?.organizacao) {
+              throw new Error("Erro de perfil: Organização não encontrada.");
+          }
+          
+          const orgId = userProfile.organizacao;
 
           // Match schema exactly: valormensal, numcolaboradores, cnpj, organizacao, contrato, logo_url
           const { data, error } = await supabase.from('clientes').insert({
@@ -200,29 +217,40 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel }) =
   const prevStep = () => setStep(s => Math.max(s - 1, 0));
 
   const handleFinalSave = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      let currentOrgId = undefined; // Force lookup
+      
+      if (user) {
+          const { data: userProfile } = await supabase.from('users').select('organizacao').eq('id', user.id).single();
+          if (userProfile) currentOrgId = userProfile.organizacao;
+      }
+
+      if (!currentOrgId) {
+          alert("Erro crítico: Organização não identificada. Não é possível salvar.");
+          return;
+      }
+
       const finalData = {
           ...formData,
           id: initialData?.id || crypto.randomUUID(),
           tadsScore,
           prioScore: calculatePrio6(),
           createdAt: initialData?.createdAt || new Date().toISOString(),
-          status: selectedStatus 
+          status: selectedStatus,
+          organizationId: currentOrgId // Force organization ID on save
       } as Opportunity;
 
       logEvent('feature_use', { feature: 'Save Opportunity', type: initialData?.id ? 'edit' : 'create' });
       
       // **CRITICAL STEP**: Se Status=Active, cria linha na tabela PROJETOS para o Kanban funcionar
-      if (selectedStatus === 'Active' && !formData.dbProjectId) {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
-              const newProj = await createProject(
-                  formData.title || 'Novo Projeto', 
-                  formData.clientId || null, 
-                  user.id
-              );
-              if (newProj) {
-                  finalData.dbProjectId = newProj.id;
-              }
+      if (selectedStatus === 'Active' && !formData.dbProjectId && user) {
+          const newProj = await createProject(
+              formData.title || 'Novo Projeto', 
+              formData.clientId || null, 
+              user.id
+          );
+          if (newProj) {
+              finalData.dbProjectId = newProj.id;
           }
       }
 
@@ -643,7 +671,7 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel }) =
         <div className="px-8 py-6 border-b border-slate-200/50 dark:border-white/5 flex justify-between items-center shrink-0">
           <div>
              <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-                {initialData ? <Target className="w-5 h-5 text-amber-500"/> : <Rocket className="w-5 h-5 text-amber-500"/>}
+                {initialData ? <Target className="w-5 h-5 text-shinko-primary"/> : <Rocket className="w-5 h-5 text-shinko-primary"/>}
                 {initialData ? 'Editar Oportunidade' : 'Novo Projeto'}
              </h2>
              <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1">Shinkō Framework v2.5</p>
@@ -656,7 +684,7 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel }) =
         {/* Progress Line */}
         <div className="h-1 bg-slate-100 dark:bg-white/5 w-full">
           <div 
-            className="h-full bg-gradient-to-r from-amber-500 to-orange-600 transition-all duration-500 ease-out shadow-[0_0_10px_rgba(245,158,11,0.5)]" 
+            className="h-full bg-gradient-to-r from-shinko-primary to-shinko-secondary transition-all duration-500 ease-out shadow-[0_0_10px_var(--brand-primary)]" 
             style={{ width: `${((step + 1) / STEPS.length) * 100}%` }}
           />
         </div>
@@ -664,7 +692,7 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel }) =
         {/* Body Content */}
         <div className="flex-1 overflow-y-auto p-8 custom-scrollbar relative">
              {/* Ambient Light inside modal */}
-             <div className="absolute top-[-20%] right-[-10%] w-64 h-64 bg-amber-500/5 rounded-full blur-3xl pointer-events-none"></div>
+             <div className="absolute top-[-20%] right-[-10%] w-64 h-64 bg-shinko-primary/5 rounded-full blur-3xl pointer-events-none"></div>
              <div className="relative z-10">
                 {renderStepContent()}
              </div>
@@ -683,7 +711,7 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel }) =
             
             <div className="flex gap-2">
                {STEPS.map((_, i) => (
-                   <div key={i} className={`w-2 h-2 rounded-full transition-all ${i === step ? 'bg-amber-500 w-6' : 'bg-slate-300 dark:bg-white/10'}`}></div>
+                   <div key={i} className={`w-2 h-2 rounded-full transition-all ${i === step ? 'bg-shinko-primary w-6' : 'bg-slate-300 dark:bg-white/10'}`}></div>
                ))}
             </div>
 

@@ -15,6 +15,7 @@ interface Props {
   onRefresh?: () => void;
   userRole?: string;
   projectId?: string; // Prop para filtrar
+  organizationId?: number; // Prop para filtrar por organização
 }
 
 interface EditableTaskContext {
@@ -85,7 +86,7 @@ const getBusinessDatesInRange = (startDate: Date, endDate: Date): Date[] => {
     return dates;
 };
 
-export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportunity, onTaskUpdate, onCreateAdhocTask, onRefresh, userRole, projectId }) => {
+export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportunity, onTaskUpdate, onCreateAdhocTask, onRefresh, userRole, projectId, organizationId }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [editingContext, setEditingContext] = useState<EditableTaskContext | null>(null);
@@ -103,7 +104,7 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
 
   const loadTasks = async () => {
       setIsLoadingTasks(true);
-      const tasks = await fetchAllTasks();
+      const tasks = await fetchAllTasks(organizationId);
       setDbTasks(tasks);
       setIsLoadingTasks(false);
   };
@@ -111,7 +112,7 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
   // Carrega todas as tarefas (DB) ao montar ou dar refresh
   useEffect(() => {
       loadTasks();
-  }, [onRefresh]);
+  }, [onRefresh, organizationId]);
 
   useEffect(() => {
       const fetchUsers = async () => {
@@ -639,9 +640,8 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
                           duracaohoras: updatedTask.estimatedHours,
                           datainicio: updatedTask.startDate,
                           datafim: updatedTask.dueDate,
-                          // Sync redundant fields for compatibility
-                          deadline: updatedTask.dueDate,
-                          dataproposta: updatedTask.dueDate, 
+                          // Sync redundant fields removed for safety
+                          // dataproposta: updatedTask.dueDate, 
                           gravidade: updatedTask.gut?.g,
                           urgencia: updatedTask.gut?.u,
                           tendencia: updatedTask.gut?.t

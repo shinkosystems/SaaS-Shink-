@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Opportunity, BpmnTask, DbTask, DbProject } from '../types';
 import { ChevronDown, ChevronRight as ChevronRightIcon, Zap, Loader2, AlertTriangle, Columns, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Grid, LayoutGrid, Square, RefreshCw, Layers, CornerDownRight, Hash, CheckCircle2 } from 'lucide-react';
@@ -12,6 +13,7 @@ interface Props {
   onTaskUpdate: (oppId: string, nodeId: string, task: BpmnTask) => void;
   userRole?: string;
   projectId?: string; // Prop para filtro
+  organizationId?: number; // Prop para filtrar por organização
 }
 
 // Estrutura Hierárquica para o Gantt
@@ -38,7 +40,7 @@ interface GanttRow {
 
 type ViewMode = 'day' | 'week' | 'month' | 'year';
 
-export const GanttView: React.FC<Props> = ({ onSelectOpportunity, onTaskUpdate, userRole, projectId }) => {
+export const GanttView: React.FC<Props> = ({ onSelectOpportunity, onTaskUpdate, userRole, projectId, organizationId }) => {
   const [filterProject, setFilterProject] = useState<string>(projectId || 'all');
   const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [viewDate, setViewDate] = useState(new Date());
@@ -68,14 +70,14 @@ export const GanttView: React.FC<Props> = ({ onSelectOpportunity, onTaskUpdate, 
 
   useEffect(() => {
       loadData();
-  }, []);
+  }, [organizationId]);
 
   const loadData = async () => {
       setIsLoading(true);
       try {
           const [projData, taskData] = await Promise.all([
-              fetchProjects(),
-              fetchAllTasks()
+              fetchProjects(organizationId),
+              fetchAllTasks(organizationId)
           ]);
           
           setDbProjects(projData);

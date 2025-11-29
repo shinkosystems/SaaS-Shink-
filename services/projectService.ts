@@ -7,14 +7,20 @@ const PROJECT_TABLE = 'projetos';
 
 // --- PROJETOS ---
 
-export const fetchProjects = async (): Promise<DbProject[]> => {
-    const { data, error } = await supabase
+export const fetchProjects = async (organizationId?: number): Promise<DbProject[]> => {
+    // Strict Organization Filter
+    if (!organizationId) return [];
+
+    let query = supabase
         .from(PROJECT_TABLE)
         .select(`
             *,
             clienteData:clientes(nome, logo_url)
         `)
+        .eq('organizacao', organizationId)
         .order('created_at', { ascending: false });
+
+    const { data, error } = await query;
 
     if (error) {
         console.error('Erro ao buscar projetos:', error);
@@ -25,7 +31,12 @@ export const fetchProjects = async (): Promise<DbProject[]> => {
 
 export const createProject = async (nome: string, cliente: string | null, userId: string): Promise<DbProject | null> => {
     const { data: userData } = await supabase.from('users').select('organizacao').eq('id', userId).single();
-    const orgId = userData?.organizacao || 3;
+    const orgId = userData?.organizacao;
+
+    if (!orgId) {
+        console.error("Erro Crítico: Tentativa de criar projeto sem organização definida.");
+        return null;
+    }
 
     const { data, error } = await supabase
         .from(PROJECT_TABLE)
@@ -60,15 +71,21 @@ export const createProject = async (nome: string, cliente: string | null, userId
 
 // --- TAREFAS (TASKS) ---
 
-export const fetchAllTasks = async (): Promise<DbTask[]> => {
+export const fetchAllTasks = async (organizationId?: number): Promise<DbTask[]> => {
+    // Strict Organization Filter
+    if (!organizationId) return [];
+
     try {
-        const { data: tasks, error } = await supabase
+        let query = supabase
             .from(TASKS_TABLE)
             .select(`
                 *,
                 projetoData:projetos(nome)
             `)
+            .eq('organizacao', organizationId)
             .order('dataproposta', { ascending: true });
+
+        const { data: tasks, error } = await query;
 
         if (error) throw error;
         if (!tasks || tasks.length === 0) return [];
@@ -101,23 +118,72 @@ export const fetchAllTasks = async (): Promise<DbTask[]> => {
     }
 };
 
-export const fetchUserTasks = async (userId: string): Promise<DbTask[]> => {
+export const fetchUserTasks = async (userId: string, organizationId?: number): Promise<DbTask[]> => {
+    // STRICT SECURITY: Organization ID is mandatory to prevent data leakage
+    if (!organizationId) return [];
+
     try {
-        const { data: tasks, error } = await supabase
+        let query = supabase
             .from(TASKS_TABLE)
             .select(`
                 *,
                 projetoData:projetos(nome)
             `)
             .eq('responsavel', userId)
+            .eq('organizacao', organizationId) // Always filter by organization
             .neq('status', 'done')
             .neq('status', 'Archived')
             .order('datafim', { ascending: true });
+
+        const { data: tasks, error } = await query;
 
         if (error) throw error;
         return tasks as DbTask[];
     } catch (error) {
         console.error('Erro ao buscar tarefas do usuário:', error);
+        return [];
+    }
+};
+
+export const fetchSubtasks = async (parentId: number): Promise<any[]> => {
+    try {
+        // Busca subtarefas ligadas ao pai
+        // REMOVED JOIN responsavelData:users(nome) because foreign key points to auth.users, not public.users
+        const { data, error } = await supabase
+            .from(TASKS_TABLE)
+            .select('*')
+            .eq('tarefamae', parentId)
+            .order('dataproposta', { ascending: true });
+
+        if (error) throw error;
+        if (!data || data.length === 0) return [];
+
+        // Manual Hydration
+        const userIds = [...new Set(data.map((t: any) => t.responsavel).filter(Boolean))];
+        let userMap = new Map<string, string>();
+
+        if (userIds.length > 0) {
+            const { data: users } = await supabase
+                .from('users')
+                .select('id, nome')
+                .in('id', userIds);
+            
+            users?.forEach(u => userMap.set(u.id, u.nome));
+        }
+
+        // Mapeia para o formato BpmnSubTask usado no frontend
+        return data.map((t: any) => ({
+            id: t.id.toString(),
+            text: t.titulo,
+            completed: t.status === 'done',
+            startDate: t.datainicio,
+            dueDate: t.datafim,
+            estimatedHours: t.duracaohoras,
+            assigneeId: t.responsavel,
+            assignee: userMap.get(t.responsavel) || 'Desconhecido'
+        }));
+    } catch (error: any) {
+        console.error('Erro ao buscar subtarefas:', error.message || error);
         return [];
     }
 };
@@ -143,25 +209,33 @@ export const createTask = async (task: Partial<DbTask>): Promise<DbTask | null> 
             throw new Error("Responsável (UUID) é obrigatório para criar tarefa.");
         }
 
-        const prazo = task.datafim || new Date().toISOString();
+        if (!task.organizacao) {
+            console.error("CREATE TASK FAILED: Missing organizacao ID");
+            throw new Error("Erro de Segurança: ID da Organização não fornecido.");
+        }
+
+        // Remover campos que não devem ir para o banco ou que podem estar undefined
+        const { projetoData, responsavelData, createdat, id, ...cleanTask } = task as any;
+
+        const prazo = cleanTask.datafim || new Date().toISOString();
 
         const payload = {
-            projeto: task.projeto || null,
-            titulo: task.titulo,
-            descricao: task.descricao || 'VAZIO',
-            status: task.status || 'todo',
-            responsavel: task.responsavel,
-            gravidade: task.gravidade || 1,
-            urgencia: task.urgencia || 1,
-            tendencia: task.tendencia || 1,
+            projeto: cleanTask.projeto || null,
+            titulo: cleanTask.titulo,
+            descricao: cleanTask.descricao || 'VAZIO',
+            status: cleanTask.status || 'todo',
+            responsavel: cleanTask.responsavel,
+            gravidade: cleanTask.gravidade || 1,
+            urgencia: cleanTask.urgencia || 1,
+            tendencia: cleanTask.tendencia || 1,
             dataproposta: prazo,
             deadline: prazo,
-            datainicio: task.datainicio || new Date().toISOString(),
+            datainicio: cleanTask.datainicio || new Date().toISOString(),
             datafim: prazo,
-            duracaohoras: task.duracaohoras || 2,
-            sutarefa: task.sutarefa || false,
-            tarefamae: task.tarefamae || null,
-            organizacao: task.organizacao || 3
+            duracaohoras: cleanTask.duracaohoras || 2,
+            sutarefa: cleanTask.sutarefa || false,
+            tarefamae: cleanTask.tarefamae || null,
+            organizacao: cleanTask.organizacao
         };
 
         const { data, error } = await supabase
@@ -179,17 +253,34 @@ export const createTask = async (task: Partial<DbTask>): Promise<DbTask | null> 
 };
 
 export const updateTask = async (id: number, updates: Partial<DbTask>): Promise<DbTask | null> => {
-    const { projetoData, responsavelData, createdat, id: _id, ...cleanUpdates } = updates as any;
+    // Explicitly clean payload: Remove undefined, null (unless intended), and extra hydration fields
+    const payload: any = {};
+    
+    Object.entries(updates).forEach(([key, value]) => {
+        // Exclude internal/hydration keys and undefined values
+        if (value !== undefined && key !== 'projetoData' && key !== 'responsavelData' && key !== 'createdat' && key !== 'id') {
+            payload[key] = value;
+        }
+    });
+
+    // Safety: Ensure we don't accidentally set responsavel to NULL if it's not allowed
+    if (payload.responsavel === null) {
+        delete payload.responsavel;
+    }
 
     const { data, error } = await supabase
         .from(TASKS_TABLE)
-        .update(cleanUpdates)
+        .update(payload)
         .eq('id', id)
         .select()
         .single();
 
     if (error) {
-        console.error('Erro ao atualizar tarefa (tasks):', error);
+        // Improve logging to show full error message instead of [object Object]
+        const errorMsg = typeof error === 'object' && error !== null && 'message' in error 
+            ? (error as any).message 
+            : JSON.stringify(error);
+        console.error(`Erro ao atualizar tarefa (ID: ${id}):`, errorMsg);
         return null;
     }
     return data;

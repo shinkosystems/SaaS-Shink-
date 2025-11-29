@@ -2,10 +2,14 @@
 import { supabase } from './supabaseClient';
 import { DbClient } from '../types';
 
-export const fetchClients = async (): Promise<DbClient[]> => {
+export const fetchClients = async (organizationId: number): Promise<DbClient[]> => {
+    // Security: If no organization ID is provided, do not return any data.
+    if (!organizationId) return [];
+
     const { data, error } = await supabase
         .from('clientes')
         .select('*')
+        .eq('organizacao', organizationId) // Strict Organization Filter
         .order('nome');
     
     if (error) {
@@ -17,8 +21,19 @@ export const fetchClients = async (): Promise<DbClient[]> => {
 
 export const createClient = async (client: Partial<DbClient>, password?: string): Promise<DbClient | null> => {
     const { data: user } = await supabase.auth.getUser();
-    // Fallback organization ID if not provided
-    const orgId = client.organizacao || 3; 
+    
+    // Ensure we use the Organization ID passed in the object or fetch from current user if missing
+    let orgId = client.organizacao;
+    
+    if (!orgId && user?.user) {
+         const { data: userData } = await supabase.from('users').select('organizacao').eq('id', user.user.id).single();
+         orgId = userData?.organizacao;
+    }
+
+    if (!orgId) {
+        console.error("Erro Crítico: ID da Organização é obrigatório para criar um cliente.");
+        throw new Error("Falha de Segurança: Organização não identificada. Ação bloqueada.");
+    }
 
     let newClientId = undefined;
 
@@ -48,7 +63,6 @@ export const createClient = async (client: Partial<DbClient>, password?: string)
     }
 
     // 2. Create the Client record in `clientes` table
-    // We try to use the Auth ID as the Client ID if possible to link them 1:1
     const payload: any = {
         nome: client.nome || '',
         email: client.email || '',
@@ -62,7 +76,7 @@ export const createClient = async (client: Partial<DbClient>, password?: string)
         contrato: client.contrato || '',
         logo_url: client.logo_url || '',
         status: client.status || 'Ativo',
-        organizacao: orgId
+        organizacao: orgId // Force Organization Link
     };
 
     if (newClientId) {
@@ -77,8 +91,6 @@ export const createClient = async (client: Partial<DbClient>, password?: string)
 
     if (error) {
         console.error('Erro ao criar cliente na tabela:', error);
-        // If auth user was created but table insert failed, we have a zombie user. 
-        // Ideally we would rollback (delete auth user), but for now just throw.
         throw new Error(error.message);
     }
     return data as DbClient;

@@ -13,6 +13,7 @@ interface Props {
   userRole?: string;
   userId?: string;
   projectId?: string; // Prop para filtrar por projeto específico
+  organizationId?: number; // Prop para filtrar por organização
 }
 
 interface KanbanColumn {
@@ -31,7 +32,7 @@ const COLUMNS: KanbanColumn[] = [
     { id: 'done', label: 'Concluído', color: 'bg-emerald-500' }
 ];
 
-export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, projectId }) => {
+export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, projectId, organizationId }) => {
     const [tasks, setTasks] = useState<DbTask[]>([]);
     const [projectsList, setProjectsList] = useState<{id: number, nome: string}[]>([]);
     const [loading, setLoading] = useState(true);
@@ -53,14 +54,14 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
     // Load Real Tasks from DB
     useEffect(() => {
         loadData();
-    }, []);
+    }, [organizationId]);
 
     const loadData = async () => {
         setLoading(true);
         try {
             const [tasksData, projectsData] = await Promise.all([
-                fetchAllTasks(),
-                fetchProjects()
+                fetchAllTasks(organizationId),
+                fetchProjects(organizationId)
             ]);
             
             // We show all tasks including subtasks in the board now
@@ -165,13 +166,13 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
                 <div className="flex justify-between items-center">
                     {!projectId && (
                         <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
-                            <Trello className="w-8 h-8 text-amber-500"/> Kanban
+                            <Trello className="w-8 h-8 text-shinko-primary"/> Kanban
                         </h1>
                     )}
                     
                     <div className="flex items-center gap-3 ml-auto">
                         {/* Current Value Display (The "Exibidor") */}
-                        <div className="bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 px-3 py-1.5 rounded-lg text-xs font-bold border border-amber-100 dark:border-amber-800 flex items-center gap-2">
+                        <div className="bg-shinko-primary/10 text-shinko-primary px-3 py-1.5 rounded-lg text-xs font-bold border border-shinko-primary/20 flex items-center gap-2">
                             <CalendarIcon className="w-3 h-3"/>
                             {getCurrentValueLabel()}
                         </div>
@@ -212,7 +213,7 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
                                 type="date" 
                                 value={filterDate}
                                 onChange={e => setFilterDate(e.target.value)}
-                                className="bg-white dark:bg-black/30 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2 text-sm text-slate-900 dark:text-white outline-none focus:border-amber-500"
+                                className="bg-white dark:bg-black/30 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2 text-sm text-slate-900 dark:text-white outline-none focus:border-shinko-primary"
                             />
                         </div>
                     )}
@@ -221,7 +222,7 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
 
                     {!projectId && (
                         <div className="relative group">
-                            <select value={filterProject} onChange={e => setFilterProject(e.target.value)} className="appearance-none pl-9 pr-8 py-2 bg-white dark:bg-black/30 border border-slate-200 dark:border-white/10 rounded-xl text-sm font-medium text-slate-900 dark:text-white focus:border-amber-500 outline-none cursor-pointer max-w-[200px] backdrop-blur-sm">
+                            <select value={filterProject} onChange={e => setFilterProject(e.target.value)} className="appearance-none pl-9 pr-8 py-2 bg-white dark:bg-black/30 border border-slate-200 dark:border-white/10 rounded-xl text-sm font-medium text-slate-900 dark:text-white focus:border-shinko-primary outline-none cursor-pointer max-w-[200px] backdrop-blur-sm">
                                 <option value="all" className="dark:bg-slate-900">Todos Projetos</option>
                                 {projectsList.map(p => <option key={p.id} value={p.id} className="dark:bg-slate-900">{p.nome}</option>)}
                             </select>
@@ -230,7 +231,7 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
                     )}
                     
                     <div className="relative group">
-                         <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)} className="appearance-none pl-9 pr-8 py-2 bg-white dark:bg-black/30 border border-slate-200 dark:border-white/10 rounded-xl text-sm font-medium text-slate-900 dark:text-white focus:border-amber-500 outline-none cursor-pointer backdrop-blur-sm">
+                         <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)} className="appearance-none pl-9 pr-8 py-2 bg-white dark:bg-black/30 border border-slate-200 dark:border-white/10 rounded-xl text-sm font-medium text-slate-900 dark:text-white focus:border-shinko-primary outline-none cursor-pointer backdrop-blur-sm">
                             <option value="all" className="dark:bg-slate-900">Todos Responsáveis</option>
                             {assignees.map(a => <option key={a} value={a} className="dark:bg-slate-900">{a}</option>)}
                         </select>

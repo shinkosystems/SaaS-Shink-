@@ -241,14 +241,14 @@ const AuthScreen: React.FC<Props> = ({ onGuestLogin, onClose }) => {
         {/* Logo Section */}
         <div className="text-center mb-8">
           <div className="w-20 h-20 mx-auto mb-4 relative group">
-             <div className="absolute inset-0 bg-amber-500/20 blur-xl rounded-full group-hover:bg-amber-500/30 transition-all duration-700"></div>
+             <div className="absolute inset-0 bg-shinko-primary/20 blur-xl rounded-full group-hover:bg-shinko-primary/30 transition-all duration-700"></div>
              <img 
                 src={LOGO_URL} 
                 alt="Shinko Logo" 
                 className="w-full h-full object-contain relative z-10 drop-shadow-2xl"
              />
           </div>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight font-sans">Shink<span className="text-amber-500">ŌS</span></h1>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight font-sans">Shink<span className="text-shinko-primary">ŌS</span></h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-1 tracking-widest uppercase text-[10px]">
               {isRecovering ? 'Recuperação de Acesso' : (isRegistering ? 'Criar Nova Conta' : 'Login do Sistema')}
           </p>
@@ -268,20 +268,20 @@ const AuthScreen: React.FC<Props> = ({ onGuestLogin, onClose }) => {
                     Informe seu e-mail para redefinir a senha.
                 </div>
                 <div className="relative group">
-                    <Mail className="absolute left-3 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-amber-500 transition-colors" />
+                    <Mail className="absolute left-3 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-shinko-primary transition-colors" />
                     <input 
                         type="email" 
                         required
                         value={email}
                         onChange={e => setEmail(e.target.value)}
                         placeholder="Seu e-mail"
-                        className="glass-input w-full rounded-xl py-3.5 pl-10 pr-4 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all"
+                        className="glass-input w-full rounded-xl py-3.5 pl-10 pr-4 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-shinko-primary/50 focus:border-shinko-primary outline-none transition-all"
                     />
                 </div>
                 <button 
                     type="submit" 
                     disabled={loading}
-                    className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-amber-900/20 transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full bg-shinko-primary hover:bg-shinko-secondary text-white font-bold py-3.5 rounded-xl shadow-lg shadow-amber-900/20 transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <KeyRound className="w-5 h-5"/>}
                     Enviar Link
@@ -308,36 +308,36 @@ const AuthScreen: React.FC<Props> = ({ onGuestLogin, onClose }) => {
             {isRegistering && (
                 <>
                 <div className="relative group animate-ios-slide-right animate-delay-100">
-                    <User className="absolute left-3 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-amber-500 transition-colors" />
+                    <User className="absolute left-3 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-shinko-primary transition-colors" />
                     <input 
                         type="text" 
                         required
                         value={name}
                         onChange={e => setName(e.target.value)}
                         placeholder="Nome Completo"
-                        className="glass-input w-full rounded-xl py-3.5 pl-10 pr-4 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all"
+                        className="glass-input w-full rounded-xl py-3.5 pl-10 pr-4 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-shinko-primary/50 focus:border-shinko-primary outline-none transition-all"
                     />
                 </div>
 
                 <div className="relative group animate-ios-slide-right animate-delay-100">
-                    <Phone className="absolute left-3 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-amber-500 transition-colors" />
+                    <Phone className="absolute left-3 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-shinko-primary transition-colors" />
                     <input 
                         type="tel" 
                         required
                         value={phone}
                         onChange={e => setPhone(e.target.value)}
                         placeholder="Telefone / WhatsApp"
-                        className="glass-input w-full rounded-xl py-3.5 pl-10 pr-4 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all"
+                        className="glass-input w-full rounded-xl py-3.5 pl-10 pr-4 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-shinko-primary/50 focus:border-shinko-primary outline-none transition-all"
                     />
                 </div>
 
                 <div className="relative group animate-ios-slide-right animate-delay-200">
-                    <Briefcase className="absolute left-3 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-amber-500 transition-colors" />
+                    <Briefcase className="absolute left-3 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-shinko-primary transition-colors" />
                     <select
                         required
                         value={role}
                         onChange={e => setRole(e.target.value)}
-                        className="glass-input w-full rounded-xl py-3.5 pl-10 pr-4 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all appearance-none cursor-pointer"
+                        className="glass-input w-full rounded-xl py-3.5 pl-10 pr-4 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-shinko-primary/50 focus:border-shinko-primary outline-none transition-all appearance-none cursor-pointer"
                     >
                         <option value="colaborador" className="bg-white dark:bg-slate-900">Colaborador</option>
                         <option value="cliente" className="bg-white dark:bg-slate-900">Cliente</option>
@@ -347,12 +347,12 @@ const AuthScreen: React.FC<Props> = ({ onGuestLogin, onClose }) => {
 
                 {showOrgSelect && (
                     <div className="relative group animate-ios-slide-right animate-delay-200">
-                        <Building2 className="absolute left-3 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-amber-500 transition-colors" />
+                        <Building2 className="absolute left-3 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-shinko-primary transition-colors" />
                         <select
                             required
                             value={selectedOrg}
                             onChange={e => setSelectedOrg(e.target.value)}
-                            className="glass-input w-full rounded-xl py-3.5 pl-10 pr-4 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all appearance-none cursor-pointer"
+                            className="glass-input w-full rounded-xl py-3.5 pl-10 pr-4 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-shinko-primary/50 focus:border-shinko-primary outline-none transition-all appearance-none cursor-pointer"
                         >
                             <option value="" className="bg-white dark:bg-slate-900">Selecione a Organização</option>
                             {organizations.map(org => (
@@ -364,13 +364,13 @@ const AuthScreen: React.FC<Props> = ({ onGuestLogin, onClose }) => {
 
                 {showNewOrgInput && (
                     <div className="relative group animate-ios-slide-right animate-delay-200">
-                        <Building2 className="absolute left-3 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-amber-500 transition-colors" />
+                        <Building2 className="absolute left-3 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-shinko-primary transition-colors" />
                         <input 
                         type="text" 
                         value={newOrgName}
                         onChange={e => setNewOrgName(e.target.value)}
                         placeholder="Nome da Sua Empresa"
-                        className="glass-input w-full rounded-xl py-3.5 pl-10 pr-4 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all"
+                        className="glass-input w-full rounded-xl py-3.5 pl-10 pr-4 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-shinko-primary/50 focus:border-shinko-primary outline-none transition-all"
                     />
                     </div>
                 )}
@@ -378,26 +378,26 @@ const AuthScreen: React.FC<Props> = ({ onGuestLogin, onClose }) => {
             )}
 
             <div className="relative group">
-                <Mail className="absolute left-3 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-amber-500 transition-colors" />
+                <Mail className="absolute left-3 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-shinko-primary transition-colors" />
                 <input 
                     type="email" 
                     required
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                     placeholder="E-mail corporativo"
-                    className="glass-input w-full rounded-xl py-3.5 pl-10 pr-4 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all"
+                    className="glass-input w-full rounded-xl py-3.5 pl-10 pr-4 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-shinko-primary/50 focus:border-shinko-primary outline-none transition-all"
                 />
             </div>
 
             <div className="relative group">
-                <Lock className="absolute left-3 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-amber-500 transition-colors" />
+                <Lock className="absolute left-3 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-shinko-primary transition-colors" />
                 <input 
                     type="password" 
                     required
                     value={password}
                     onChange={e => setPassword(e.target.value)}
                     placeholder="Senha de acesso"
-                    className="glass-input w-full rounded-xl py-3.5 pl-10 pr-4 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all"
+                    className="glass-input w-full rounded-xl py-3.5 pl-10 pr-4 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-shinko-primary/50 focus:border-shinko-primary outline-none transition-all"
                 />
             </div>
 
@@ -406,7 +406,7 @@ const AuthScreen: React.FC<Props> = ({ onGuestLogin, onClose }) => {
                     <button 
                         type="button"
                         onClick={() => { setIsRecovering(true); setError(null); }}
-                        className="text-xs font-medium text-amber-500 hover:text-amber-400 transition-colors"
+                        className="text-xs font-medium text-shinko-primary hover:brightness-110 transition-colors"
                     >
                         Esqueceu a senha?
                     </button>
@@ -416,7 +416,7 @@ const AuthScreen: React.FC<Props> = ({ onGuestLogin, onClose }) => {
             <button 
                 type="submit" 
                 disabled={loading}
-                className="w-full bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-amber-900/20 transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed mt-4 hover:shadow-amber-500/30 border border-white/10"
+                className="w-full bg-gradient-to-r from-shinko-primary to-shinko-secondary hover:brightness-110 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-amber-900/20 transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed mt-4 hover:shadow-shinko-primary/30 border border-white/10"
             >
                 {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (isRegistering ? <ShieldCheck className="w-5 h-5"/> : <ArrowRight className="w-5 h-5"/>)}
                 {isRegistering ? 'Finalizar Cadastro' : 'Entrar'}
@@ -441,7 +441,7 @@ const AuthScreen: React.FC<Props> = ({ onGuestLogin, onClose }) => {
                     onClick={handleRandomGuest}
                     className="w-full py-2.5 glass-button hover:bg-white/20 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-xl text-sm font-medium transition-colors border border-slate-200 dark:border-white/10 flex items-center justify-center gap-2 group shadow-sm"
                 >
-                    <Sparkles className="w-4 h-4 text-amber-500 group-hover:text-amber-600 dark:group-hover:text-amber-300 transition-colors"/>
+                    <Sparkles className="w-4 h-4 text-shinko-primary group-hover:brightness-110 transition-colors"/>
                     Entrar como Convidado (Demo)
                 </button>
             </div>
