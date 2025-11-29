@@ -1,5 +1,5 @@
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { Opportunity } from "../types";
 
 const getAiClient = () => {
@@ -136,29 +136,43 @@ export const extractPdfContext = async (base64Pdf: string): Promise<string> => {
 
 export const generateSubtasksForTask = async (taskTitle: string, context: string): Promise<{title: string, hours: number}[]> => {
     const ai = getAiClient();
-    if (!ai) return [];
+    if (!ai) {
+        console.error("GenerateSubtasks: AI Client not initialized.");
+        return [];
+    }
+
     const prompt = `
       Atue como um Project Manager Técnico Sênior.
       Crie um checklist técnico detalhado para a tarefa: "${taskTitle}".
       Contexto do Projeto: ${context}.
       
-      Para cada item, estime o tempo em horas de forma REALISTA e VARIÁVEL baseada na complexidade (ex: 1, 2, 4, 8, 12).
-      NÃO use valores fixos (como 3 horas para tudo). Tarefas simples = menos horas. Complexas = mais horas.
-      
-      Retorne APENAS um JSON Array no formato: [{ "title": "Nome da Subtarefa", "hours": 4 }, ...].
+      Para cada item, estime o tempo em horas de forma REALISTA e VARIÁVEL baseada na complexidade.
     `;
+
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
-            config: { responseMimeType: 'application/json' }
+            config: { 
+                responseMimeType: 'application/json',
+                responseSchema: {
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            title: { type: Type.STRING },
+                            hours: { type: Type.NUMBER }
+                        },
+                        required: ['title', 'hours']
+                    }
+                }
+            }
         });
-        const parsed = JSON.parse(cleanJson(response.text || ""));
-        // Compatibilidade: se a IA retornar string array, converte
-        if (Array.isArray(parsed) && typeof parsed[0] === 'string') {
-            return parsed.map((t: string) => ({ title: t, hours: 2 }));
+        
+        if (response.text) {
+            return JSON.parse(response.text);
         }
-        return parsed;
+        return [];
     } catch (error) {
         console.error("Erro IA Subtasks:", error);
         return [];

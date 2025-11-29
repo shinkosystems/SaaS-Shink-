@@ -241,6 +241,11 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
   };
 
   const handleAiGenerate = async () => {
+      if (!formData.text.trim()) {
+          alert("Por favor, adicione um título à tarefa antes de gerar o checklist.");
+          return;
+      }
+
       setIsGenerating(true);
       setAiSuggestions([]); // Reset previous suggestions
       try {
