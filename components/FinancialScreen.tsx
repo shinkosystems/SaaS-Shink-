@@ -99,7 +99,7 @@ export const FinancialScreen: React.FC = () => {
     };
 
     return (
-        <div className="h-full flex flex-col animate-in fade-in duration-500 p-6 md:p-10 overflow-hidden">
+        <div className="w-full flex flex-col animate-in fade-in duration-500">
             
             {/* Tab Switcher */}
             <div className="flex justify-center mb-6">
@@ -127,28 +127,25 @@ export const FinancialScreen: React.FC = () => {
                 </div>
             </div>
 
-            {/* Content Area */}
-            <div className="flex-1 overflow-hidden relative">
+            {/* Content Area - No fixed height, no overflow hidden */}
+            <div className="w-full">
                 {loading ? (
-                    <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-full py-20 flex items-center justify-center">
                         <Loader2 className="w-8 h-8 animate-spin text-shinko-primary"/>
                     </div>
                 ) : (
-                    <>
-                        <div className={`absolute inset-0 transition-opacity duration-300 ${activeTab === 'dashboard' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
-                            <FinancialDashboard manualTransactions={transactions} />
-                        </div>
-                        <div className={`absolute inset-0 transition-opacity duration-300 ${activeTab === 'ledger' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
-                            <FinancialLedger 
-                                transactions={transactions} 
-                                onAddTransaction={handleAddTransaction}
-                                onEditTransaction={handleEditTransaction}
-                                onDeleteTransaction={handleDeleteTransaction}
-                                onSyncContracts={handleSyncContracts}
-                                isSyncing={isSyncing}
-                            />
-                        </div>
-                    </>
+                    activeTab === 'dashboard' ? (
+                        <FinancialDashboard manualTransactions={transactions} />
+                    ) : (
+                        <FinancialLedger 
+                            transactions={transactions} 
+                            onAddTransaction={handleAddTransaction}
+                            onEditTransaction={handleEditTransaction}
+                            onDeleteTransaction={handleDeleteTransaction}
+                            onSyncContracts={handleSyncContracts}
+                            isSyncing={isSyncing}
+                        />
+                    )
                 )}
             </div>
         </div>

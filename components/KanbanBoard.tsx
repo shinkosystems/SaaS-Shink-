@@ -177,7 +177,7 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
                             {getCurrentValueLabel()}
                         </div>
 
-                        <button onClick={loadData} className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-white/10 transition-colors">
+                        <button onClick={loadData} className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-white/10 transition-colors min-h-[48px] min-w-[48px] flex items-center justify-center">
                             <RefreshCw className={`w-5 h-5 text-slate-500 ${loading ? 'animate-spin' : ''}`}/>
                         </button>
                         <div className="px-3 py-1 bg-blue-500/20 text-blue-600 dark:text-blue-300 rounded-full font-bold border border-blue-500/30 text-xs backdrop-blur-sm">
@@ -190,12 +190,12 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
                     <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-sm font-bold mr-2"><Filter className="w-4 h-4"/> Filtros:</div>
                     
                     {/* Time Filter Buttons */}
-                    <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700 overflow-x-auto">
                         {['all', 'day', 'week', 'month', 'year'].map((tf) => (
                             <button
                                 key={tf}
                                 onClick={() => setTimeFilter(tf as TimeFilter)}
-                                className={`px-3 py-1.5 rounded-md text-xs font-bold capitalize transition-all ${
+                                className={`px-4 py-2 rounded-md text-xs font-bold capitalize transition-all min-h-[32px] whitespace-nowrap ${
                                     timeFilter === tf 
                                     ? 'bg-white dark:bg-slate-600 shadow text-slate-900 dark:text-white' 
                                     : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
@@ -213,29 +213,29 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
                                 type="date" 
                                 value={filterDate}
                                 onChange={e => setFilterDate(e.target.value)}
-                                className="bg-white dark:bg-black/30 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2 text-sm text-slate-900 dark:text-white outline-none focus:border-shinko-primary"
+                                className="bg-white dark:bg-black/30 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2 text-sm text-slate-900 dark:text-white outline-none focus:border-shinko-primary h-10"
                             />
                         </div>
                     )}
 
-                    <div className="w-px h-6 bg-slate-200 dark:bg-white/10 mx-2"></div>
+                    <div className="w-px h-6 bg-slate-200 dark:bg-white/10 mx-2 hidden sm:block"></div>
 
                     {!projectId && (
                         <div className="relative group">
-                            <select value={filterProject} onChange={e => setFilterProject(e.target.value)} className="appearance-none pl-9 pr-8 py-2 bg-white dark:bg-black/30 border border-slate-200 dark:border-white/10 rounded-xl text-sm font-medium text-slate-900 dark:text-white focus:border-shinko-primary outline-none cursor-pointer max-w-[200px] backdrop-blur-sm">
+                            <select value={filterProject} onChange={e => setFilterProject(e.target.value)} className="appearance-none pl-9 pr-8 py-2 h-10 bg-white dark:bg-black/30 border border-slate-200 dark:border-white/10 rounded-xl text-sm font-medium text-slate-900 dark:text-white focus:border-shinko-primary outline-none cursor-pointer max-w-[200px] backdrop-blur-sm">
                                 <option value="all" className="dark:bg-slate-900">Todos Projetos</option>
                                 {projectsList.map(p => <option key={p.id} value={p.id} className="dark:bg-slate-900">{p.nome}</option>)}
                             </select>
-                            <Briefcase className="w-4 h-4 absolute left-3 top-2.5 text-slate-500 pointer-events-none"/>
+                            <Briefcase className="w-4 h-4 absolute left-3 top-3 text-slate-500 pointer-events-none"/>
                         </div>
                     )}
                     
                     <div className="relative group">
-                         <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)} className="appearance-none pl-9 pr-8 py-2 bg-white dark:bg-black/30 border border-slate-200 dark:border-white/10 rounded-xl text-sm font-medium text-slate-900 dark:text-white focus:border-shinko-primary outline-none cursor-pointer backdrop-blur-sm">
+                         <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)} className="appearance-none pl-9 pr-8 py-2 h-10 bg-white dark:bg-black/30 border border-slate-200 dark:border-white/10 rounded-xl text-sm font-medium text-slate-900 dark:text-white focus:border-shinko-primary outline-none cursor-pointer backdrop-blur-sm">
                             <option value="all" className="dark:bg-slate-900">Todos Responsáveis</option>
                             {assignees.map(a => <option key={a} value={a} className="dark:bg-slate-900">{a}</option>)}
                         </select>
-                        <User className="w-4 h-4 absolute left-3 top-2.5 text-slate-500 pointer-events-none"/>
+                        <User className="w-4 h-4 absolute left-3 top-3 text-slate-500 pointer-events-none"/>
                     </div>
                 </div>
             </div>
@@ -259,7 +259,7 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
                             </div>
                             <div className="flex-1 p-3 overflow-y-auto custom-scrollbar space-y-3">
                                 {columnsData[col.id]?.map(task => (
-                                    <div key={task.id} draggable onDragStart={e => {setDraggedTask(task); e.dataTransfer.setData('text/plain', task.id.toString());}} onClick={() => setEditingTaskCtx(task)} className="glass-card p-4 rounded-2xl cursor-grab active:cursor-grabbing hover:bg-white/60 dark:hover:bg-white/10 border-slate-200 dark:border-white/5 transition-all hover:scale-[1.02] shadow-sm">
+                                    <div key={task.id} draggable onDragStart={e => {setDraggedTask(task); e.dataTransfer.setData('text/plain', task.id.toString());}} onClick={() => setEditingTaskCtx(task)} className="glass-card p-4 rounded-2xl cursor-grab active:cursor-grabbing hover:bg-white/60 dark:hover:bg-white/10 border-slate-200 dark:border-white/5 transition-all hover:scale-[1.02] shadow-sm active:scale-95 touch-manipulation">
                                         <div className="flex justify-between items-start mb-2">
                                             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate max-w-[140px]">{task.projetoData?.nome || 'Sem Projeto'}</span>
                                             <span className="text-[9px] font-mono text-slate-500 bg-slate-100 dark:bg-black/30 px-1 rounded">#{task.id}</span>
@@ -276,7 +276,7 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-2">
                                                 {task.responsavelData?.nome && (
-                                                     <div className="w-6 h-6 rounded-full overflow-hidden border border-slate-200 dark:border-white/10 shadow-sm bg-slate-100 dark:bg-black/50 flex items-center justify-center" title={task.responsavelData.nome}>
+                                                     <div className="w-7 h-7 rounded-full overflow-hidden border border-slate-200 dark:border-white/10 shadow-sm bg-slate-100 dark:bg-black/50 flex items-center justify-center" title={task.responsavelData.nome}>
                                                          <img src={getAvatarUrl(task.responsavelData.nome)} alt={task.responsavelData.nome} className="w-full h-full object-cover"/>
                                                      </div>
                                                 )}

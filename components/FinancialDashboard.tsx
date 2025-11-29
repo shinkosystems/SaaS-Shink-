@@ -324,7 +324,7 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [] })
     }, [financialHistory, timeRange, selectedYear, selectedMonth, selectedWeek, manualTransactions]);
 
     if (isLoading) {
-        return <div className="h-full flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-500"></div></div>;
+        return <div className="w-full py-20 flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-500"></div></div>;
     }
 
     const calcDelta = (curr: number, prev: number) => {
@@ -361,7 +361,7 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [] })
     };
 
     return (
-        <div className="h-full flex flex-col p-6 md:p-10 overflow-y-auto custom-scrollbar animate-in fade-in duration-500">
+        <div className="w-full flex flex-col animate-in fade-in duration-500">
             
             {/* Header Controls */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">

@@ -63,7 +63,7 @@ const NavItem = ({
   <button
     id={id}
     onClick={onClick}
-    className={`w-full flex items-center gap-3 px-3 py-3 text-sm font-medium transition-all duration-300 rounded-xl group mb-1 relative overflow-hidden border ${
+    className={`w-full flex items-center gap-3 px-3 py-3.5 min-h-[48px] text-sm font-medium transition-all duration-300 rounded-xl group mb-1 relative overflow-hidden border ${
       isActive 
         ? 'bg-white/20 dark:bg-white/10 border-white/20 dark:border-white/10 text-slate-900 dark:text-white shadow-sm' 
         : 'border-transparent text-slate-600 dark:text-slate-400 hover:bg-white/10 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'
@@ -102,14 +102,14 @@ const SidebarContent = ({ props }: { props: Props }) => {
     {/* Glass Search Bar */}
     <div className="px-4 py-4">
         <div className="relative group">
-            <Search className="absolute left-3 top-3.5 w-4 h-4 text-slate-400 dark:text-slate-500 group-focus-within:text-shinko-primary dark:group-focus-within:text-white transition-colors" />
+            <Search className="absolute left-3 top-4 w-4 h-4 text-slate-400 dark:text-slate-500 group-focus-within:text-shinko-primary dark:group-focus-within:text-white transition-colors" />
             <input 
                 type="text" 
                 onChange={(e) => props.onSearch && props.onSearch(e.target.value)}
                 placeholder="Buscar..."
-                className="w-full h-11 glass-input rounded-xl pl-10 pr-3 text-sm placeholder-slate-400 dark:placeholder-slate-500 outline-none transition-all"
+                className="w-full h-12 glass-input rounded-xl pl-10 pr-3 text-sm placeholder-slate-400 dark:placeholder-slate-500 outline-none transition-all"
             />
-            <div className="absolute right-3 top-3.5 flex items-center opacity-30">
+            <div className="absolute right-3 top-4 flex items-center opacity-30">
                 <Command className="w-3 h-3 text-slate-400 dark:text-white" />
             </div>
         </div>
@@ -120,7 +120,7 @@ const SidebarContent = ({ props }: { props: Props }) => {
       {/* Workspace Header */}
       <button 
         onClick={() => { props.onChangeView('profile'); props.setIsMobileOpen(false); }}
-        className="w-full mb-6 flex items-center gap-4 px-3 py-4 rounded-2xl hover:bg-white/5 transition-all group border border-transparent hover:border-white/5"
+        className="w-full mb-6 flex items-center gap-4 px-3 py-4 rounded-2xl hover:bg-white/5 transition-all group border border-transparent hover:border-white/5 min-h-[64px]"
       >
           <div className="relative">
              <div className="absolute inset-0 bg-shinko-primary blur-md opacity-20 rounded-full group-hover:opacity-40 transition-opacity"></div>
@@ -146,7 +146,7 @@ const SidebarContent = ({ props }: { props: Props }) => {
       {props.userRole !== 'cliente' && (
         <button 
             onClick={() => { props.onOpenCreateTask(); props.setIsMobileOpen(false); }}
-            className="w-full h-11 flex items-center justify-center gap-2 bg-gradient-to-r from-shinko-primary to-shinko-secondary text-white p-2 rounded-xl text-sm font-bold transition-all active:scale-95 shadow-lg shadow-amber-500/20 hover:brightness-110 hover:shadow-amber-500/40 mb-8"
+            className="w-full h-12 flex items-center justify-center gap-2 bg-gradient-to-r from-shinko-primary to-shinko-secondary text-white p-2 rounded-xl text-sm font-bold transition-all active:scale-95 shadow-lg shadow-amber-500/20 hover:brightness-110 hover:shadow-amber-500/40 mb-8 min-h-[48px]"
         >
             <CheckSquare className="w-4 h-4" />
             <span>Nova Tarefa</span>
@@ -272,9 +272,9 @@ const SidebarContent = ({ props }: { props: Props }) => {
     </div>
 
     {/* Profile Footer Glass */}
-    <div className="p-4 border-t border-white/20 dark:border-white/5 bg-white/40 dark:bg-black/20 backdrop-blur-xl mx-3 mb-3 rounded-2xl flex items-center justify-between gap-2">
+    <div className="p-4 border-t border-white/20 dark:border-white/5 bg-white/40 dark:bg-black/20 backdrop-blur-xl mx-3 mb-3 rounded-2xl flex items-center justify-between gap-2 min-h-[72px]">
         <div className="flex items-center gap-3 cursor-pointer w-full" onClick={() => props.onChangeView('profile')}>
-             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-900 ring-1 ring-black/5 dark:ring-white/20 flex items-center justify-center text-slate-700 dark:text-white text-xs font-bold shadow-lg overflow-hidden">
+             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-900 ring-1 ring-black/5 dark:ring-white/20 flex items-center justify-center text-slate-700 dark:text-white text-xs font-bold shadow-lg overflow-hidden shrink-0">
                  {props.userData?.avatar ? (
                      <img src={props.userData.avatar} alt="Avatar" className="w-full h-full object-cover" />
                  ) : (
@@ -291,9 +291,9 @@ const SidebarContent = ({ props }: { props: Props }) => {
         </div>
         <button 
             onClick={props.onLogout}
-            className="w-8 h-8 flex items-center justify-center text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+            className="w-10 h-10 flex items-center justify-center text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
         >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="w-5 h-5" />
         </button>
     </div>
   </div>
