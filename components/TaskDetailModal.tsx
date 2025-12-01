@@ -250,7 +250,21 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
       setAiSuggestions([]); // Reset previous suggestions
       try {
           const context = `${nodeTitle} - ${opportunityTitle || ''}. Start: ${formData.startDate}. Due: ${formData.dueDate}`;
-          const generated = await generateSubtasksForTask(formData.text, context);
+          let generated = await generateSubtasksForTask(formData.text, context);
+          
+          // Auto-fix mechanism for missing key (if result empty, try to open selector)
+          if (generated.length === 0 && (window as any).aistudio) {
+               try {
+                   const hasKey = await (window as any).aistudio.hasSelectedApiKey();
+                   if (!hasKey) {
+                       await (window as any).aistudio.openSelectKey();
+                       // Retry once
+                       generated = await generateSubtasksForTask(formData.text, context);
+                   }
+               } catch(e) {
+                   console.error("AI Key retry failed", e);
+               }
+          }
           
           if (generated && generated.length > 0) {
               // BALANCEAMENTO (Round Robin)
@@ -270,7 +284,7 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
               setAiSuggestions(mappedSuggestions);
               logEvent('feature_use', { feature: 'AI Subtasks Generated' });
           } else {
-              alert("A IA não gerou sugestões. Tente melhorar o título da tarefa ou adicionar mais contexto na descrição.");
+              alert("A IA não gerou sugestões. Verifique a chave de API ou o contexto.");
           }
       } catch (e) {
           console.error(e);

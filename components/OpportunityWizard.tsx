@@ -198,7 +198,20 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel }) =
     if (!formData.title || !formData.description) return;
     setIsLoadingAi(true);
     setAiSuggestion(null);
-    const result = await analyzeOpportunity(formData.title, formData.description);
+    
+    let result = await analyzeOpportunity(formData.title, formData.description);
+    
+    // Auto-fix mechanism for missing key
+    if ((result === "API Key not found." || result.includes("API Key")) && (window as any).aistudio) {
+        try {
+            await (window as any).aistudio.openSelectKey();
+            // Retry once
+            result = await analyzeOpportunity(formData.title, formData.description);
+        } catch (e) {
+            console.error("AI Key retry failed", e);
+        }
+    }
+
     setAiSuggestion(result);
     setIsLoadingAi(false);
     logEvent('feature_use', { feature: 'AI Analysis' });
@@ -207,7 +220,20 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel }) =
   const handleAiEvidence = async () => {
     if (!formData.title) return;
     setIsLoadingAi(true);
-    const result = await suggestEvidence(formData.title);
+    
+    let result = await suggestEvidence(formData.title);
+    
+    // Auto-fix mechanism for missing key
+    if ((result === "API Key not found." || result.includes("API Key")) && (window as any).aistudio) {
+        try {
+            await (window as any).aistudio.openSelectKey();
+            // Retry once
+            result = await suggestEvidence(formData.title);
+        } catch (e) {
+            console.error("AI Key retry failed", e);
+        }
+    }
+
     setAiSuggestion(result);
     setIsLoadingAi(false);
     logEvent('feature_use', { feature: 'AI Evidence' });

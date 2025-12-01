@@ -34,7 +34,6 @@ export const Dashboard: React.FC<Props> = ({ opportunities, onNavigate, onOpenPr
         const filtered = tasks.filter(t => {
             // Strict Security: Ensure task belongs to current org context if provided
             if (organizationId && t.organizacao && t.organizacao !== organizationId) return false;
-
             const deadline = t.datafim ? t.datafim.split('T')[0] : '9999-99-99';
             const start = t.datainicio ? t.datainicio.split('T')[0] : '9999-99-99';
             
