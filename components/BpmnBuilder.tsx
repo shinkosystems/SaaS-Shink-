@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Opportunity, BpmnData, BpmnNode, BpmnTask, BpmnSubTask, PLAN_LIMITS } from '../types';
 import { generateBpmn, extractPdfContext, generateSubtasksForTask } from '../services/geminiService';
+import { fetchAreasAtuacao, fetchOrgMembers } from '../services/projectService';
 import TaskDetailModal from './TaskDetailModal';
 import { Loader2, Sparkles, PlayCircle, CheckSquare, Square, Save, RefreshCw, Plus, Trash2, ArrowRight, FileText, X, UploadCloud, FileType, Calendar as CalendarIcon, MoreHorizontal, User, BarChart3, CalendarClock, Layers, Hash, Lock } from 'lucide-react';
 
@@ -23,6 +24,11 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onSave, currentPlan }) => {
   const [editingTask, setEditingTask] = useState<{nodeId: string, task: BpmnTask} | null>(null);
   const [showDocs, setShowDocs] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  
+  // Organization Context State
+  const [orgRoles, setOrgRoles] = useState<{id: number, nome: string}[]>([]);
+  const [orgMembers, setOrgMembers] = useState<{id: string, nome: string, cargo: number}[]>([]);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const canUploadPdf = PLAN_LIMITS[currentPlan || 'plan_free']?.features.pdfUpload !== false;
@@ -32,6 +38,21 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onSave, currentPlan }) => {
       if (opportunity.bpmn) setData(opportunity.bpmn);
       if (opportunity.docsContext) setDocsContext(opportunity.docsContext);
   }, [opportunity.id, opportunity.bpmn]); 
+
+  // Load Organization Context on Mount
+  useEffect(() => {
+      const loadOrgContext = async () => {
+          if (opportunity.organizationId) {
+              const [roles, members] = await Promise.all([
+                  fetchAreasAtuacao(),
+                  fetchOrgMembers(opportunity.organizationId)
+              ]);
+              setOrgRoles(roles);
+              setOrgMembers(members);
+          }
+      };
+      loadOrgContext();
+  }, [opportunity.organizationId]);
 
   // Simple layout calculation
   const getLayoutedNodes = (currentData: BpmnData) => {
@@ -65,24 +86,42 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onSave, currentPlan }) => {
   const handleGenerateAi = async () => {
       setIsLoading(true);
       try {
+          // Determine Org Type based on roles or string
+          const orgTypeStr = "Organizacional"; // This could be passed via prop if needed
+
           const result = await generateBpmn(
               opportunity.title, 
               opportunity.description, 
               opportunity.archetype,
-              docsContext
+              docsContext,
+              orgTypeStr,
+              orgRoles // Pass available roles to AI
           );
           
           if (result) {
-              // Inject IDs immediately for new tasks
+              // Inject IDs immediately for new tasks and Assign Users based on Role
               const hydratedResult = { ...result };
+              
               if (hydratedResult.nodes && Array.isArray(hydratedResult.nodes)) {
                   hydratedResult.nodes.forEach((node: BpmnNode) => {
-                      // Ensure checklist exists
                       if (!node.checklist) node.checklist = [];
                       
                       if (Array.isArray(node.checklist)) {
                           node.checklist.forEach((task: BpmnTask) => {
                               if (!task.displayId) task.displayId = generateDisplayId();
+                              
+                              // AUTO-ASSIGN LOGIC
+                              // If AI suggested a role ID, find a member with that role
+                              if (task.suggestedRoleId) {
+                                  const matchingMember = orgMembers.find(m => m.cargo === task.suggestedRoleId);
+                                  if (matchingMember) {
+                                      task.assigneeId = matchingMember.id;
+                                      task.assignee = matchingMember.nome;
+                                  }
+                              } else {
+                                  // Fallback: Assign to current user or leave unassigned
+                                  // Keep unassigned for now so user decides
+                              }
                           });
                       }
                   });

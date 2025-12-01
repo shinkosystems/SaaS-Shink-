@@ -79,14 +79,17 @@ const cleanJson = (text: string) => {
   return cleaned;
 };
 
-export const analyzeOpportunity = async (title: string, description: string): Promise<string> => {
+export const analyzeOpportunity = async (title: string, description: string, orgType?: string): Promise<string> => {
   const ai = getAiClient();
   if (!ai) return "API Key not found.";
 
+  const industryContext = orgType ? `Setor: ${orgType}.` : "Setor: Startup de Tecnologia.";
+
   const prompt = `
-    Atue como um consultor de inovação sênior da Shinkō.
+    Atue como um consultor sênior especialista em ${industryContext}.
     Analise a seguinte oportunidade: ${title} - ${description}
-    Seja direto.
+    
+    Seja direto, crítico e use terminologia adequada ao setor de ${orgType || 'Tecnologia'}.
   `;
 
   try {
@@ -101,17 +104,54 @@ export const analyzeOpportunity = async (title: string, description: string): Pr
   }
 };
 
-export const suggestEvidence = async (title: string): Promise<string> => {
+export const suggestEvidence = async (title: string, description: string, orgType?: string): Promise<{clientsAsk: string[], clientsSuffer: string[]} | null> => {
     const ai = getAiClient();
-    if (!ai) return "API Key not found.";
+    if (!ai) return null;
+    
+    const industryContext = orgType ? `Contexto: Empresa do setor de ${orgType}.` : "";
+
+    const prompt = `
+      Atue como um Especialista de Produto/Negócios.
+      Baseado no projeto "${title}" e na descrição: "${description}".
+      ${industryContext}
+
+      Gere duas listas de evidências para validar essa demanda:
+      1. "clientsAsk": O que o cliente pede explicitamente (Demandas Quentes). Ex: "Preciso de um relatório X", "Quero automatizar Y".
+      2. "clientsSuffer": O que o cliente sofre/sente (Dores Latentes). Ex: "Perde 3 horas fazendo Z", "Sente insegurança com processo W".
+
+      Seja específico, curto e direto. Máximo 3 itens por lista.
+    `;
+
     try {
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: `Liste 3 evidências para validar: "${title}".`,
+        contents: prompt,
+        config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    clientsAsk: {
+                        type: Type.ARRAY,
+                        items: { type: Type.STRING }
+                    },
+                    clientsSuffer: {
+                        type: Type.ARRAY,
+                        items: { type: Type.STRING }
+                    }
+                },
+                required: ['clientsAsk', 'clientsSuffer']
+            }
+        }
       });
-      return response.text || "Sem sugestões.";
+      
+      if (response.text) {
+          return JSON.parse(response.text);
+      }
+      return null;
     } catch (error) {
-      return "Erro na IA.";
+      console.error("Erro Evidence AI:", error);
+      return null;
     }
 };
 
@@ -134,19 +174,21 @@ export const extractPdfContext = async (base64Pdf: string): Promise<string> => {
     }
 };
 
-export const generateSubtasksForTask = async (taskTitle: string, context: string): Promise<{title: string, hours: number}[]> => {
+export const generateSubtasksForTask = async (taskTitle: string, context: string, orgType?: string): Promise<{title: string, hours: number}[]> => {
     const ai = getAiClient();
     if (!ai) {
         console.error("GenerateSubtasks: AI Client not initialized.");
         return [];
     }
 
+    const role = orgType && orgType !== 'Startup' ? `Gerente de Projetos de ${orgType}` : "Project Manager Técnico Sênior";
+
     const prompt = `
-      Atue como um Project Manager Técnico Sênior.
+      Atue como um ${role}.
       Crie um checklist técnico detalhado para a tarefa: "${taskTitle}".
       Contexto do Projeto: ${context}.
       
-      Para cada item, estime o tempo em horas de forma REALISTA e VARIÁVEL baseada na complexidade.
+      Para cada item, estime o tempo em horas de forma REALISTA e VARIÁVEL baseada na complexidade típica do setor de ${orgType || 'Tecnologia'}.
     `;
 
     try {
@@ -179,10 +221,35 @@ export const generateSubtasksForTask = async (taskTitle: string, context: string
     }
 };
 
-export const generateBpmn = async (title: string, description: string, archetype: string, docsContext?: string): Promise<any> => {
+export const generateBpmn = async (
+    title: string, 
+    description: string, 
+    archetype: string, 
+    docsContext?: string, 
+    orgType?: string,
+    availableRoles?: {id: number, nome: string}[]
+): Promise<any> => {
     const ai = getAiClient();
     if (!ai) return null;
-    const prompt = `Crie um BPMN JSON para "${title}" (${archetype}). Context: ${docsContext}. Structure: {lanes, nodes:[{checklist:[{text, estimatedHours}]}], edges}.`;
+    
+    const industryContext = orgType ? `Setor: ${orgType}. Use terminologia técnica correta para este setor.` : "";
+    
+    let roleInstructions = "";
+    if (availableRoles && availableRoles.length > 0) {
+        const rolesString = availableRoles.map(r => `${r.id}: ${r.nome}`).join(", ");
+        roleInstructions = `
+        IMPORTANTE: Para cada tarefa (checklist item), escolha o profissional mais adequado desta lista de cargos e atribua o ID no campo 'roleId'.
+        Lista de Cargos (ID: Nome): ${rolesString}.
+        Se nenhum se encaixar perfeitamente, tente o mais próximo.
+        `;
+    }
+
+    const prompt = `Crie um fluxo de trabalho estruturado (similar a BPMN) em JSON para "${title}" (${archetype}). 
+    ${industryContext}
+    Contexto adicional: ${docsContext || "Nenhum"}. 
+    ${roleInstructions}
+    Structure required: {lanes: [{id, label}], nodes:[{id, label, laneId, type, checklist:[{text, estimatedHours, roleId: number}]}], edges:[{from, to}]}.`;
+    
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
@@ -191,6 +258,7 @@ export const generateBpmn = async (title: string, description: string, archetype
         });
         return JSON.parse(cleanJson(response.text || ""));
     } catch (error) {
+        console.error("Gemini Error:", error);
         return null;
     }
 };

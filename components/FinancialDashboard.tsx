@@ -9,20 +9,19 @@ type TimeRange = 'week' | 'month' | 'year';
 
 interface Props {
     manualTransactions?: FinancialTransaction[];
+    orgType?: string;
 }
 
 // Glossário de Métricas
 const METRIC_TOOLTIPS: Record<string, string> = {
-    "Faturamento Bruto": "Soma total de todas as receitas recebidas (MRR + Serviços pontuais) no período.",
-    "Margem Bruta": "Percentual da receita que sobra após deduzir os custos diretos (infraestrutura, taxas, fornecedores).",
+    "Faturamento Bruto": "Soma total de todas as receitas recebidas no período.",
+    "Margem Bruta": "Percentual da receita que sobra após deduzir os custos diretos.",
     "Despesas Totais": "Soma de todos os custos operacionais, marketing, vendas e despesas administrativas.",
     "Lucro Líquido": "O que sobra no caixa: Faturamento menos todas as despesas e custos.",
-    "Churn de Clientes": "Percentual de clientes que cancelaram o contrato em relação ao total de clientes ativos.",
-    "Churn Financeiro": "Percentual de receita recorrente (MRR) perdida devido a cancelamentos ou downgrades.",
-    "CAC (Custo Aquisição)": "Custo médio para conquistar cada novo cliente (Investimento em Mkt + Vendas ÷ Novos Clientes).",
-    "LTV (Lifetime Value)": "Valor total estimado que um cliente gera para a empresa durante todo o tempo de contrato.",
-    "LTV / CAC": "Indica a saúde do crescimento. O ideal é que o cliente gere pelo menos 3x o que custou para ser adquirido.",
-    "Payback (Meses)": "Tempo necessário para recuperar o custo de aquisição do cliente através da margem de lucro gerada."
+    "Churn de Clientes": "Percentual de clientes que cancelaram o contrato.",
+    "Churn Financeiro": "Percentual de receita perdida.",
+    "CAC (Custo Aquisição)": "Custo médio para conquistar cada novo cliente.",
+    "LTV (Lifetime Value)": "Valor total estimado que um cliente gera para a empresa.",
 };
 
 const InfoTooltip = ({ text }: { text: string }) => (
@@ -35,7 +34,7 @@ const InfoTooltip = ({ text }: { text: string }) => (
     </div>
 );
 
-export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [] }) => {
+export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [], orgType = 'Startup' }) => {
     const [timeRange, setTimeRange] = useState<TimeRange>('month');
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth()); // 0-11
@@ -53,6 +52,14 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [] })
     const [isLoading, setIsLoading] = useState(true);
 
     const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
+    // Adaptação de Labels
+    const isService = orgType.includes('Engenharia') || orgType.includes('Arquitetura') || orgType.includes('Consultoria');
+    const LABELS = {
+        mrr: isService ? "Receita Mensal" : "MRR",
+        churn: isService ? "Cancelamentos" : "Churn Rate",
+        cogs: isService ? "Custos de Obra/Serviço" : "Custos Diretos (COGS)",
+    };
 
     // FETCH AND CALCULATE REAL DATA
     useEffect(() => {
@@ -130,7 +137,7 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [] })
                         
                         const directCosts = monthTrans.filter(t => 
                             t.type === 'outflow' && 
-                            ['Infraestrutura', 'Operacional'].includes(t.category)
+                            ['Infraestrutura', 'Operacional', 'Obra', 'Materiais'].includes(t.category)
                         ).reduce((acc, t) => acc + Number(t.amount), 0);
 
                         const totalOutflow = monthTrans.filter(t => t.type === 'outflow').reduce((acc, t) => acc + Number(t.amount), 0);
@@ -276,7 +283,7 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [] })
                 });
                 const inflow = txs.filter(t => t.type === 'inflow').reduce((acc,t) => acc+t.amount, 0);
                 const outflow = txs.filter(t => t.type === 'outflow').reduce((acc,t) => acc+t.amount, 0);
-                const cogs = txs.filter(t => t.type === 'outflow' && ['Infraestrutura', 'Operacional'].includes(t.category)).reduce((acc,t) => acc+t.amount, 0);
+                const cogs = txs.filter(t => t.type === 'outflow' && ['Infraestrutura', 'Operacional', 'Obra', 'Materiais'].includes(t.category)).reduce((acc,t) => acc+t.amount, 0);
 
                 // Pro-rate MRR
                 const mRec = financialHistory.find(h => {
@@ -372,7 +379,7 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [] })
                         <TrendingUp className="w-8 h-8 text-emerald-500"/> Performance Financeira
                     </h1>
                     <p className="text-slate-500 dark:text-slate-400 mt-2">
-                        Visão consolidada de caixa e indicadores de crescimento.
+                        {isService ? 'Controle de caixa e contratos.' : 'Visão consolidada de caixa e MRR.'}
                     </p>
                 </div>
 

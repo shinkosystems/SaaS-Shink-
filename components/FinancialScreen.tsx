@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { FinancialDashboard } from './FinancialDashboard';
 import { FinancialLedger } from './FinancialLedger';
@@ -7,7 +6,11 @@ import { FinancialTransaction } from '../types';
 import { supabase } from '../services/supabaseClient';
 import { fetchTransactions, addTransaction, updateTransaction, deleteTransaction, syncContractTransactions } from '../services/financialService';
 
-export const FinancialScreen: React.FC = () => {
+interface Props {
+    orgType?: string;
+}
+
+export const FinancialScreen: React.FC<Props> = ({ orgType }) => {
     const [activeTab, setActiveTab] = useState<'dashboard' | 'ledger'>('dashboard');
     const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
     const [loading, setLoading] = useState(true);
@@ -135,7 +138,7 @@ export const FinancialScreen: React.FC = () => {
                     </div>
                 ) : (
                     activeTab === 'dashboard' ? (
-                        <FinancialDashboard manualTransactions={transactions} />
+                        <FinancialDashboard manualTransactions={transactions} orgType={orgType} />
                     ) : (
                         <FinancialLedger 
                             transactions={transactions} 

@@ -80,7 +80,25 @@ const OpportunityDetail: React.FC<Props> = ({ opportunity: initialOpp, onClose, 
       if (!opportunity.bpmn || !opportunity.bpmn.nodes) return;
       
       const node = opportunity.bpmn.nodes.find(n => n.id === nodeId);
-      const taskExists = node?.checklist?.some(t => t.id === updatedTask.id);
+      const oldTask = node?.checklist?.find(t => t.id === updatedTask.id);
+      const taskExists = !!oldTask;
+
+      let newComments = opportunity.comments || [];
+
+      // STORYTIME LOGIC: Registrar apenas se for tarefa mãe (!isSubtask) e houve mudança de status
+      if (taskExists && oldTask && !updatedTask.isSubtask) {
+          if (oldTask.status !== updatedTask.status) {
+              const text = `Status da tarefa "${updatedTask.text}" alterado de '${oldTask.status}' para '${updatedTask.status}'.`;
+              const newComment: Comment = {
+                  id: crypto.randomUUID(),
+                  text,
+                  author: 'Shinkō System',
+                  createdAt: new Date().toISOString(),
+                  type: 'system'
+              };
+              newComments = [newComment, ...newComments];
+          }
+      }
 
       let newNodes;
       
@@ -97,9 +115,12 @@ const OpportunityDetail: React.FC<Props> = ({ opportunity: initialOpp, onClose, 
       }
 
       const updatedBpmn = { ...opportunity.bpmn, nodes: newNodes };
-      const updatedOpp = { ...opportunity, bpmn: updatedBpmn };
+      const updatedOpp = { ...opportunity, bpmn: updatedBpmn, comments: newComments };
       setOpportunity(updatedOpp);
       onUpdate(updatedOpp);
+
+      // Persist to DB
+      await updateOpportunity({ ...opportunity, comments: newComments }); // Save comments history
 
       if (taskExists) {
           if (updatedTask.dbId || !isNaN(Number(updatedTask.id))) {
@@ -181,6 +202,20 @@ const OpportunityDetail: React.FC<Props> = ({ opportunity: initialOpp, onClose, 
       const isNowDone = !task?.completed;
       const newStatus = isNowDone ? 'done' : 'todo';
 
+      // STORYTIME LOGIC for toggle
+      let newComments = opportunity.comments || [];
+      if (task && !task.isSubtask) {
+           const text = `Tarefa "${task.text}" marcada como ${isNowDone ? 'Concluída' : 'A Fazer'} (Status: ${newStatus}).`;
+           const newComment: Comment = {
+              id: crypto.randomUUID(),
+              text,
+              author: 'Shinkō System',
+              createdAt: new Date().toISOString(),
+              type: 'system'
+           };
+           newComments = [newComment, ...newComments];
+      }
+
       const newNodes = opportunity.bpmn.nodes.map(node => {
           if (node.id !== nodeId) return node;
           if (!node.checklist) return node;
@@ -194,9 +229,12 @@ const OpportunityDetail: React.FC<Props> = ({ opportunity: initialOpp, onClose, 
       });
 
       const updatedBpmn = { ...opportunity.bpmn, nodes: newNodes };
-      const updatedOpp = { ...opportunity, bpmn: updatedBpmn };
+      const updatedOpp = { ...opportunity, bpmn: updatedBpmn, comments: newComments };
       setOpportunity(updatedOpp);
       onUpdate(updatedOpp);
+
+      // Persist status and comments
+      await updateOpportunity({ ...opportunity, comments: newComments }); 
 
       if (task && (task.dbId || !isNaN(Number(task.id)))) {
           const dbId = task.dbId || Number(task.id);

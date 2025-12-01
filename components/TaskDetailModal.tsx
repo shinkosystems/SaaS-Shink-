@@ -15,6 +15,7 @@ interface Props {
   onClose: () => void;
   onOpenProject?: () => void;
   onDelete?: (id: string) => void;
+  orgType?: string; // New prop for context
 }
 
 export interface OrgMember {
@@ -117,7 +118,7 @@ const MultiUserSelect = ({
     );
 };
 
-const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, onSave, onClose, onOpenProject, onDelete }) => {
+const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, onSave, onClose, onOpenProject, onDelete, orgType }) => {
   const [formData, setFormData] = useState<BpmnTask>({
     ...task,
     subtasks: task.subtasks || [],
@@ -250,19 +251,27 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
       setAiSuggestions([]); // Reset previous suggestions
       try {
           const context = `${nodeTitle} - ${opportunityTitle || ''}. Start: ${formData.startDate}. Due: ${formData.dueDate}`;
-          let generated = await generateSubtasksForTask(formData.text, context);
+          // Pass orgType
+          let generated = await generateSubtasksForTask(formData.text, context, orgType);
           
           // Auto-fix mechanism for missing key (if result empty, try to open selector)
-          if (generated.length === 0 && (window as any).aistudio) {
-               try {
-                   const hasKey = await (window as any).aistudio.hasSelectedApiKey();
-                   if (!hasKey) {
-                       await (window as any).aistudio.openSelectKey();
-                       // Retry once
-                       generated = await generateSubtasksForTask(formData.text, context);
+          if (generated.length === 0) {
+               if ((window as any).aistudio) {
+                   try {
+                       const hasKey = await (window as any).aistudio.hasSelectedApiKey();
+                       if (!hasKey) {
+                           await (window as any).aistudio.openSelectKey();
+                           // Retry once
+                           generated = await generateSubtasksForTask(formData.text, context, orgType);
+                       }
+                   } catch(e) {
+                       console.error("AI Key retry failed", e);
                    }
-               } catch(e) {
-                   console.error("AI Key retry failed", e);
+               } else {
+                   // Se falhou e não tem o ambiente de teste, é Vercel/Prod sem ENV.
+                   alert("⚠️ Configuração Necessária\n\nA chave de API do Gemini não foi encontrada. No Vercel, adicione a variável de ambiente 'API_KEY'.");
+                   setIsGenerating(false);
+                   return;
                }
           }
           
@@ -284,7 +293,8 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
               setAiSuggestions(mappedSuggestions);
               logEvent('feature_use', { feature: 'AI Subtasks Generated' });
           } else {
-              alert("A IA não gerou sugestões. Verifique a chave de API ou o contexto.");
+              // Se mesmo após retry vier vazio, provavelmente erro na API ou key inválida
+              alert("A IA não gerou sugestões. Verifique se a chave de API está correta e ativa.");
           }
       } catch (e) {
           console.error(e);

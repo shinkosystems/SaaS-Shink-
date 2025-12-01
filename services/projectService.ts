@@ -1,6 +1,6 @@
 
 import { supabase } from './supabaseClient';
-import { DbProject, DbTask } from '../types';
+import { DbProject, DbTask, AreaAtuacao } from '../types';
 
 const TASKS_TABLE = 'tasks';
 const PROJECT_TABLE = 'projetos';
@@ -35,7 +35,7 @@ export const createProject = async (nome: string, cliente: string | null, userId
 
     if (!orgId) {
         console.error("Erro Crítico: Tentativa de criar projeto sem organização definida.");
-        return null;
+        throw new Error("Erro de Segurança: Organização não identificada.");
     }
 
     const { data, error } = await supabase
@@ -67,6 +67,42 @@ export const createProject = async (nome: string, cliente: string | null, userId
         return null;
     }
     return data;
+};
+
+// --- ÁREAS DE ATUAÇÃO & MEMBROS ---
+
+export const fetchAreasAtuacao = async (): Promise<AreaAtuacao[]> => {
+    const { data, error } = await supabase.from('area_atuacao').select('*').order('nome');
+    if (error) {
+        console.error('Erro ao buscar áreas de atuação:', error);
+        return [];
+    }
+    return data as AreaAtuacao[];
+};
+
+export const fetchOrgMembers = async (organizationId: number): Promise<{id: string, nome: string, cargo: number, area?: string}[]> => {
+    const { data, error } = await supabase
+        .from('users')
+        .select(`
+            id, 
+            nome, 
+            cargo,
+            areaData:area_atuacao(nome)
+        `)
+        .eq('organizacao', organizationId);
+
+    if (error) {
+        console.error('Erro ao buscar membros:', error);
+        return [];
+    }
+    
+    // Flatten result
+    return data.map((u: any) => ({
+        id: u.id,
+        nome: u.nome,
+        cargo: u.cargo,
+        area: u.areaData?.nome || 'Sem Cargo'
+    }));
 };
 
 // --- TAREFAS (TASKS) ---

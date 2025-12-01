@@ -55,6 +55,11 @@ export const PLAN_LIMITS: Record<string, {
 
 // --- DB SCHEMA TYPES (POSTGRESQL) ---
 
+export interface AreaAtuacao {
+    id: number;
+    nome: string;
+}
+
 export interface DbPlan {
   id: number;
   nome: string;
@@ -187,6 +192,9 @@ export interface BpmnTask {
   isSubtask?: boolean;
   parentId?: number;
   assigneeIsDev?: boolean; 
+  
+  // AI Role Suggestion
+  suggestedRoleId?: number;
 }
 
 export interface BpmnSubTask {

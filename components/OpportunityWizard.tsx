@@ -12,6 +12,7 @@ interface Props {
   initialData?: Partial<Opportunity>;
   onSave: (opp: Opportunity) => void;
   onCancel: () => void;
+  orgType?: string;
 }
 
 interface SimpleUser {
@@ -29,7 +30,72 @@ const STEPS = [
   'Aprovação'
 ];
 
-const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel }) => {
+// --- DOMAIN ADAPTATION MAP ---
+const DOMAIN_LABELS: any = {
+    'Engenharia': {
+        mvp: 'Estudo Preliminar',
+        mrr: 'Faturamento Recorrente',
+        churn: 'Cancelamento de Contrato',
+        archetypes: {
+            'SaaS de Entrada': 'Obra Residencial',
+            'SaaS Verticalizado': 'Obra Comercial',
+            'Serviço + Tecnologia': 'Consultoria Técnica',
+            'Plataforma de Automação': 'Laudo Estrutural',
+            'Interno / Marketing': 'Projeto Interno'
+        },
+        intensity: {
+            '1': { label: 'Vistoria / Laudo', desc: 'Visita técnica e relatório.' },
+            '2': { label: 'Projeto Legal', desc: 'Aprovação em prefeitura.' },
+            '3': { label: 'Projeto Executivo', desc: 'Detalhamento completo.' },
+            '4': { label: 'Gestão de Obra', desc: 'Execução e acompanhamento.' }
+        },
+        tads: {
+            mvpSpeed: 'Viabilidade Rápida',
+            recurring: 'Contrato Longo Prazo'
+        }
+    },
+    'Arquitetura': {
+        mvp: 'Estudo Preliminar',
+        mrr: 'Retainer Mensal',
+        archetypes: {
+            'SaaS de Entrada': 'Design de Interiores',
+            'SaaS Verticalizado': 'Residencial Unifamiliar',
+            'Serviço + Tecnologia': 'Comercial / Corporativo',
+            'Plataforma de Automação': 'Edifício Multifamiliar',
+            'Interno / Marketing': 'Urbanismo / Paisagismo'
+        },
+        intensity: {
+            '1': { label: 'Consultoria Express', desc: 'Layout e moodboard rápido.' },
+            '2': { label: 'Anteprojeto', desc: 'Concepção visual e 3D.' },
+            '3': { label: 'Projeto Executivo', desc: 'Detalhamento técnico para obra.' },
+            '4': { label: 'Obra & Acompanhamento', desc: 'Gestão total da execução.' }
+        },
+        tads: {
+            mvpSpeed: 'Aprovação Rápida',
+            recurring: 'Acompanhamento Obra'
+        }
+    },
+    'Consultoria': {
+        mvp: 'Diagnóstico',
+        mrr: 'Fee Mensal',
+        archetypes: {
+            'SaaS de Entrada': 'Mentoria Pontual',
+            'SaaS Verticalizado': 'Projeto Estratégico',
+            'Serviço + Tecnologia': 'Implementação',
+            'Plataforma de Automação': 'Treinamento In-Company',
+            'Interno / Marketing': 'Marketing / Branding'
+        },
+        intensity: {
+            '1': { label: 'Diagnóstico', desc: 'Análise situacional rápida.' },
+            '2': { label: 'Planejamento', desc: 'Definição de estratégia.' },
+            '3': { label: 'Implementação', desc: 'Execução hand-on.' },
+            '4': { label: 'Gestão Continuada', desc: 'Acompanhamento de longo prazo.' }
+        }
+    }
+    // Default fallback to SaaS terms defined in code
+};
+
+const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel, orgType = 'Startup' }) => {
   const [step, setStep] = useState(0);
   const [isLoadingAi, setIsLoadingAi] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
@@ -78,6 +144,28 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel }) =
     },
     status: 'Future' 
   });
+
+  // Helper to get labels based on orgType (Robust Matching)
+  const getLabel = (key: string, subKey?: string) => {
+      if (!orgType) return null;
+      
+      const typeClean = orgType.trim().toLowerCase();
+
+      // Find matching domain key (fuzzy match: e.g. "Empresa de Arquitetura" matches "Arquitetura")
+      const domainKey = Object.keys(DOMAIN_LABELS).find(k => 
+          typeClean.includes(k.toLowerCase()) || k.toLowerCase().includes(typeClean)
+      );
+      
+      const map = domainKey ? DOMAIN_LABELS[domainKey] : null;
+      
+      if (!map) return null; // Use default
+      
+      if (subKey) {
+          // Handle nested keys like 'intensity.1' or 'archetypes.SaaS de Entrada'
+          return map[key] ? map[key][subKey] : null;
+      }
+      return map[key];
+  };
 
   useEffect(() => {
       const fetchClients = async () => {
@@ -199,16 +287,21 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel }) =
     setIsLoadingAi(true);
     setAiSuggestion(null);
     
-    let result = await analyzeOpportunity(formData.title, formData.description);
+    // Pass orgType to prompt
+    let result = await analyzeOpportunity(formData.title, formData.description, orgType);
     
     // Auto-fix mechanism for missing key
-    if ((result === "API Key not found." || result.includes("API Key")) && (window as any).aistudio) {
-        try {
-            await (window as any).aistudio.openSelectKey();
-            // Retry once
-            result = await analyzeOpportunity(formData.title, formData.description);
-        } catch (e) {
-            console.error("AI Key retry failed", e);
+    if ((result === "API Key not found." || result.includes("API Key"))) {
+        if ((window as any).aistudio) {
+            try {
+                await (window as any).aistudio.openSelectKey();
+                // Retry once
+                result = await analyzeOpportunity(formData.title, formData.description, orgType);
+            } catch (e) {
+                console.error("AI Key retry failed", e);
+            }
+        } else {
+            alert("⚠️ Configuração Necessária\n\nA chave de API do Gemini não foi encontrada. No Vercel, adicione a variável de ambiente 'API_KEY'.");
         }
     }
 
@@ -221,20 +314,42 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel }) =
     if (!formData.title) return;
     setIsLoadingAi(true);
     
-    let result = await suggestEvidence(formData.title);
+    // Pass orgType to prompt
+    let result = await suggestEvidence(formData.title, formData.description || '', orgType);
     
     // Auto-fix mechanism for missing key
-    if ((result === "API Key not found." || result.includes("API Key")) && (window as any).aistudio) {
-        try {
-            await (window as any).aistudio.openSelectKey();
-            // Retry once
-            result = await suggestEvidence(formData.title);
-        } catch (e) {
-            console.error("AI Key retry failed", e);
+    if (!result) {
+        if ((window as any).aistudio) {
+            try {
+                const hasKey = await (window as any).aistudio.hasSelectedApiKey();
+                if (!hasKey) {
+                    await (window as any).aistudio.openSelectKey();
+                    // Retry once
+                    result = await suggestEvidence(formData.title, formData.description || '', orgType);
+                }
+            } catch (e) {
+                console.error("AI Key retry failed", e);
+            }
+        } else {
+            // Only alert if we suspect it's a key issue (null return usually means error)
+            // But suggestEvidence returns null on error, so we can check if it's production env without key
+            // This logic is a bit loose but works for now
         }
     }
 
-    setAiSuggestion(result);
+    if (result) {
+        setFormData(prev => ({
+            ...prev,
+            evidence: {
+                ...prev.evidence!,
+                clientsAsk: result.clientsAsk,
+                clientsSuffer: result.clientsSuffer
+            }
+        }));
+    } else {
+        setAiSuggestion("Não foi possível gerar evidências automaticamente. Verifique sua chave de API.");
+    }
+
     setIsLoadingAi(false);
     logEvent('feature_use', { feature: 'AI Evidence' });
   };
@@ -290,13 +405,13 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel }) =
           <div className="space-y-6 animate-ios-slide-right">
             <div className="grid gap-5">
               <label className="block">
-                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Nome do Projeto</span>
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Nome do Projeto / Demanda</span>
                 <input 
                   type="text" 
                   className="glass-input w-full mt-2 h-14 text-lg font-bold px-4 rounded-xl"
                   value={formData.title}
                   onChange={e => setFormData({...formData, title: e.target.value})}
-                  placeholder="Ex: Sistema de Gestão de Resíduos"
+                  placeholder="Ex: Sistema de Gestão, Projeto Residencial X..."
                   autoFocus
                 />
               </label>
@@ -327,12 +442,12 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel }) =
               </div>
               
               <label className="block">
-                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Descrição da Dor/Demanda</span>
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Descrição Detalhada</span>
                 <textarea 
                   className="glass-input w-full mt-2 p-4 rounded-xl h-32 resize-none leading-relaxed"
                   value={formData.description}
                   onChange={e => setFormData({...formData, description: e.target.value})}
-                  placeholder="Descreva a dor do cliente e a solução proposta..."
+                  placeholder="Descreva a dor do cliente, requisitos e a solução proposta..."
                 />
               </label>
 
@@ -405,7 +520,7 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel }) =
                   />
                   <div className="flex justify-between text-[10px] text-slate-400 mt-2 font-medium uppercase">
                       <span>Lento / Complexo</span>
-                      <span>Rápido / MVP</span>
+                      <span>Rápido / {getLabel('mvp') || 'MVP'}</span>
                   </div>
                 </div>
 
@@ -460,6 +575,23 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel }) =
           </div>
         );
       case 2:
+        const defaultIntensities = [
+            { val: IntensityLevel.L1, label: 'Nível 1 - Otimização', desc: 'Melhora o existente. Rápido.' },
+            { val: IntensityLevel.L2, label: 'Nível 2 - Automação', desc: 'Elimina etapas manuais. ROI alto.' },
+            { val: IntensityLevel.L3, label: 'Nível 3 - Transformação', desc: 'Muda a operação do setor.' },
+            { val: IntensityLevel.L4, label: 'Nível 4 - Disrupção', desc: 'Cria nova categoria.' },
+        ];
+
+        // Dynamic intensities based on orgType
+        const intensities = defaultIntensities.map(i => {
+            const dynamicLabel = getLabel('intensity', i.val.toString());
+            return {
+                val: i.val,
+                label: dynamicLabel?.label || i.label,
+                desc: dynamicLabel?.desc || i.desc
+            }
+        });
+
         return (
            <div className="space-y-8 animate-ios-slide-right">
               <div>
@@ -477,7 +609,9 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel }) =
                         : 'glass-panel hover:bg-white/10 text-slate-500 dark:text-slate-400'
                       }`}
                     >
-                      <span className={`font-bold text-base z-10 ${formData.archetype === arch ? 'text-indigo-300' : ''}`}>{arch}</span>
+                      <span className={`font-bold text-base z-10 ${formData.archetype === arch ? 'text-indigo-300' : ''}`}>
+                          {getLabel('archetypes', arch) || arch}
+                      </span>
                       {formData.archetype === arch && <div className="absolute -bottom-4 -right-4 w-16 h-16 bg-indigo-500/40 blur-xl rounded-full"></div>}
                     </button>
                   ))}
@@ -486,15 +620,10 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel }) =
 
               <div className="pt-4 border-t border-white/5">
                 <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                    <Rocket className="w-5 h-5 text-pink-500"/> Trilha de Intensidade
+                    <Rocket className="w-5 h-5 text-pink-500"/> Trilha de Intensidade ({orgType || 'Geral'})
                 </h3>
                 <div className="space-y-3">
-                  {[
-                    { val: IntensityLevel.L1, label: 'Nível 1 - Otimização', desc: 'Melhora o existente. Rápido.' },
-                    { val: IntensityLevel.L2, label: 'Nível 2 - Automação', desc: 'Elimina etapas manuais. ROI alto.' },
-                    { val: IntensityLevel.L3, label: 'Nível 3 - Transformação', desc: 'Muda a operação do setor.' },
-                    { val: IntensityLevel.L4, label: 'Nível 4 - Disrupção', desc: 'Cria nova categoria.' },
-                  ].map(item => (
+                  {intensities.map(item => (
                     <div 
                       key={item.val}
                       onClick={() => setFormData({...formData, intensity: item.val})}
@@ -535,8 +664,8 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel }) =
                     { k: 'scalability', q: 'Escalabilidade', d: 'O custo marginal tende a zero?' },
                     { k: 'integration', q: 'Integração', d: 'Conecta fácil com o ecossistema?' },
                     { k: 'painPoint', q: 'Dor Real', d: 'O cliente chora por essa solução?' },
-                    { k: 'recurring', q: 'Recorrência', d: 'Gera receita mensal (MRR)?' },
-                    { k: 'mvpSpeed', q: 'Velocidade MVP', d: 'Dá pra lançar em < 30 dias?' },
+                    { k: 'recurring', q: getLabel('tads', 'recurring') || 'Recorrência', d: 'Gera receita mensal (MRR)?' },
+                    { k: 'mvpSpeed', q: getLabel('tads', 'mvpSpeed') || 'Velocidade MVP', d: 'Dá pra lançar em < 30 dias?' },
                   ].map((item) => (
                     <div key={item.k} className="flex items-center justify-between p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-colors border border-white/5">
                       <div>
@@ -566,12 +695,12 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel }) =
                   disabled={isLoadingAi}
                   className="flex items-center gap-2 text-xs font-bold text-purple-400 hover:text-purple-300 transition-colors bg-purple-500/10 px-3 py-1.5 rounded-lg border border-purple-500/20"
                 >
-                  <Lightbulb className="w-3 h-3" />
+                  {isLoadingAi ? <Loader2 className="w-3 h-3 animate-spin"/> : <Lightbulb className="w-3 h-3" />}
                   Sugerir Evidências
               </button>
              </div>
 
-             {aiSuggestion && (
+             {aiSuggestion && !formData.evidence?.clientsAsk.length && (
                 <div className="glass-panel p-4 rounded-xl text-sm text-slate-300 mb-4 animate-ios-pop border-l-2 border-purple-500">
                   {aiSuggestion}
                 </div>
@@ -700,7 +829,9 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel }) =
                 {initialData ? <Target className="w-5 h-5 text-shinko-primary"/> : <Rocket className="w-5 h-5 text-shinko-primary"/>}
                 {initialData ? 'Editar Oportunidade' : 'Novo Projeto'}
              </h2>
-             <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1">Shinkō Framework v2.5</p>
+             <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1">
+                 Shinkō Framework ({orgType || 'v2.5'})
+             </p>
           </div>
           <button onClick={onCancel} className="w-10 h-10 rounded-full bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 flex items-center justify-center transition-colors text-slate-500 dark:text-white">
               <X className="w-5 h-5"/>
@@ -790,8 +921,7 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel }) =
                               className="glass-input w-full p-3 rounded-xl text-white"
                           />
                       </div>
-                      {/* Password logic removed as client creation via user auth usually handles invites or default passwords differently, simplified for this view */}
-
+                      
                       <div className="pt-4 border-t border-white/10 mt-4">
                           <h4 className="text-xs font-bold text-emerald-500 uppercase mb-3 flex items-center gap-2">
                               <DollarSign className="w-4 h-4"/> Dados do Contrato

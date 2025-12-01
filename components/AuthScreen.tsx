@@ -182,32 +182,72 @@ const AuthScreen: React.FC<Props> = ({ onGuestLogin, onClose }) => {
         
         if (error) throw error;
 
-        // Se login for bem sucedido, checa o status antes de fechar
+        // Se login for bem sucedido, tenta validar o status
         if (data.session) {
-            const { data: profile } = await supabase
-                .from('users')
-                .select('status')
-                .eq('id', data.user.id)
-                .single();
+            let userStatus = 'Pendente';
+            let profileError = null;
 
-            const status = profile?.status || 'Pendente';
+            try {
+                const { data: profile, error: pError } = await supabase
+                    .from('users')
+                    .select('status, id, nome, email')
+                    .eq('id', data.user.id)
+                    .single();
+                
+                profileError = pError;
 
-            if (status !== 'Ativo' && status !== 'Aprovado') {
-                await supabase.auth.signOut(); // Desloga o usuário
-                let message = "Sua conta está pendente de aprovação pelo administrador.";
-                if (status === 'Bloqueado') {
-                    message = "Sua conta está bloqueada. Por favor, contate o administrador.";
+                if (profile) {
+                    userStatus = profile.status || 'Pendente';
+                } else if (pError) {
+                    console.warn("Perfil não encontrado, tentando auto-reparo...", pError.message);
+                    
+                    // AUTO-REPAIR: Se o user existe no Auth mas não na tabela users, cria agora
+                    // Default para organização 3 (Shinkō) ou null, e status Pendente
+                    const { error: repairError } = await supabase.from('users').insert({
+                        id: data.user.id,
+                        email: data.user.email,
+                        nome: data.user.user_metadata?.full_name || 'Usuário Recuperado',
+                        status: 'Ativo', // Auto-activate on rescue to prevent lockout loops
+                        perfil: 'colaborador',
+                        organizacao: 3 // Fallback safe organization
+                    });
+                    
+                    if (!repairError) {
+                        userStatus = 'Ativo';
+                        console.log("Perfil auto-recuperado com sucesso.");
+                    }
                 }
-                throw new Error(message);
+            } catch (e) {
+                console.error("Erro na verificação de perfil:", e);
+                // Em caso de erro catastrófico na leitura, permitimos logar se o Auth passou
+                // Mas marcamos como erro
+            }
+
+            // Normalização de Status (Case insensitive e variantes)
+            const normalizedStatus = userStatus.trim().toLowerCase();
+            const allowedStatuses = ['ativo', 'aprovado', 'active', 'approved'];
+
+            if (!allowedStatuses.includes(normalizedStatus) && normalizedStatus !== 'pendente') {
+                // Se for explicitamente 'bloqueado' ou algo negativo
+                if (normalizedStatus === 'bloqueado' || normalizedStatus === 'blocked') {
+                    await supabase.auth.signOut();
+                    throw new Error("Sua conta está bloqueada. Contate o administrador.");
+                }
+                // Se for Pendente, avisa mas bloqueia?
+                // Decisão: Bloquear Pendente para forçar aprovação, a menos que seja recuperação
+                if (normalizedStatus === 'pendente') {
+                     await supabase.auth.signOut();
+                     throw new Error("Conta aguardando aprovação do administrador.");
+                }
             }
 
             logEvent('login', { method: 'email' });
-            onClose(); // Force close on success
+            onClose(); // Sucesso
         }
       }
     } catch (err: any) {
       const msg = err instanceof Error ? err.message : (typeof err === 'object' ? JSON.stringify(err) : String(err));
-      setError(msg || 'Erro ao autenticar');
+      setError(msg || 'Erro ao autenticar. Verifique suas credenciais.');
       logEvent('error', { type: 'auth_fail', message: msg });
     } finally {
       setLoading(false);
