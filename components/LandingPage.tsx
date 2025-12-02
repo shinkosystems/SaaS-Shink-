@@ -1,264 +1,362 @@
-
-import React, { useState } from 'react';
-import { ArrowRight, Rocket, PlayCircle, Plus, Minus, Target, BarChart3, GitMerge, History, Calendar as CalendarIcon, Layout, BrainCircuit, Layers, GanttChartSquare, Clock, FileSearch, Users, ShieldCheck } from 'lucide-react';
+import React from 'react';
+import { ArrowRight, Sparkles, Shield, Rocket, CheckCircle, Star, Quote, ChevronRight, Play, BarChart3, Users, DollarSign, Code2, Workflow, Calendar, Zap, Layout, Layers, BrainCircuit, Activity, TrendingUp } from 'lucide-react';
 
 interface Props {
   onEnter: () => void;
 }
 
-const LOGO_URL = "https://zjssfnbcboibqeoubeou.supabase.co/storage/v1/object/public/fotoperfil/fotoperfil/1.png";
-
 export const LandingPage: React.FC<Props> = ({ onEnter }) => {
-  const [openFaq, setOpenFaq] = useState<number | null>(null);
-
-  const toggleFaq = (index: number) => {
-    setOpenFaq(openFaq === index ? null : index);
-  };
-
   return (
-    <div className="fixed inset-0 h-full w-full bg-[#050505] text-white overflow-y-auto overflow-x-hidden selection:bg-shinko-primary/30 font-sans scroll-smooth z-[50]">
-      
-      {/* Global Background Mesh */}
-      <div className="fixed inset-0 z-0 pointer-events-none bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-[#050505] to-[#050505]">
-         {/* Grid Pattern Overlay */}
-         <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff05_1px,transparent_1px),linear-gradient(to_bottom,#ffffff05_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
-         
-         <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-indigo-600/10 rounded-full blur-[150px] animate-pulse"></div>
-         <div className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] bg-shinko-primary/10 rounded-full blur-[150px]" style={{ animationDelay: '2s' }}></div>
+    <div className="fixed inset-0 z-[200] bg-slate-950 text-white overflow-y-auto scroll-smooth custom-scrollbar">
+      {/* Dynamic Background */}
+      <div className="fixed inset-0 w-full h-full overflow-hidden pointer-events-none">
+          <div className="absolute top-[-10%] left-[-10%] w-[600px] h-[600px] bg-purple-600/10 rounded-full blur-[120px] animate-pulse"></div>
+          <div className="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-amber-500/5 rounded-full blur-[120px]"></div>
+          <div className="absolute top-[40%] left-[30%] w-[400px] h-[400px] bg-blue-500/5 rounded-full blur-[100px]"></div>
+          
+          {/* Grid Pattern */}
+          <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
+          <div className="absolute inset-0" style={{backgroundImage: 'radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px)', backgroundSize: '40px 40px', opacity: 0.3}}></div>
       </div>
 
-      {/* Glass Navbar */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-black/50 backdrop-blur-xl transition-all">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-           <div className="flex items-center gap-3 cursor-pointer group" onClick={onEnter}>
-              <div className="relative w-10 h-10 transition-transform group-hover:scale-105">
-                  <div className="absolute inset-0 bg-shinko-primary blur-lg opacity-40 rounded-lg"></div>
-                  <img src={LOGO_URL} alt="Shinkō Logo" className="w-10 h-10 rounded-lg relative z-10 object-cover shadow-lg" />
-              </div>
-              <span className="text-xl font-black tracking-tight text-white">Shink<span className="text-shinko-primary">ŌS</span></span>
-           </div>
-           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-400">
-              <a href="#framework" className="hover:text-white transition-colors hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]">O Framework</a>
-              <a href="#recursos" className="hover:text-white transition-colors hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]">Recursos</a>
-              <a href="#faq" className="hover:text-white transition-colors hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]">FAQ</a>
-           </div>
-           <div className="flex items-center gap-4">
-               <button onClick={onEnter} className="text-sm font-bold text-slate-300 hover:text-white hidden md:block transition-colors">Login</button>
-               <button 
-                 onClick={onEnter}
-                 className="glass-button px-6 py-2.5 rounded-full text-sm font-bold hover:bg-white/10 hover:border-white/20 transition-all shadow-[0_0_20px_rgba(var(--brand-primary-rgb),0.15)] border border-white/10"
-               >
-                 Acessar OS
-               </button>
-           </div>
-        </div>
+      {/* Header/Nav */}
+      <nav className="relative z-50 w-full max-w-7xl mx-auto px-6 py-6 flex justify-between items-center backdrop-blur-sm sticky top-0 bg-slate-950/50 border-b border-white/5">
+          <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center text-black font-bold shadow-lg shadow-amber-500/20">S</div>
+              <span className="font-bold text-xl tracking-tight">Shinkō OS</span>
+          </div>
+          <div className="flex gap-4">
+             <button onClick={onEnter} className="hidden md:block text-sm font-bold text-slate-300 hover:text-white transition-colors">Funcionalidades</button>
+             <button onClick={onEnter} className="hidden md:block text-sm font-bold text-slate-300 hover:text-white transition-colors">Cases</button>
+             <button onClick={onEnter} className="px-5 py-2 bg-white text-black font-bold text-sm rounded-full hover:bg-slate-200 transition-colors">Login</button>
+          </div>
       </nav>
 
-      {/* HERO SECTION */}
-      <section className="relative z-10 pt-32 pb-20 px-6 min-h-screen flex flex-col justify-center">
-          <div className="max-w-6xl mx-auto text-center relative">
-              
-              {/* Glowing Badge */}
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass-panel border-white/10 text-shinko-primary text-[10px] font-bold uppercase tracking-[0.2em] mb-10 animate-ios-pop shadow-[0_0_30px_rgba(var(--brand-primary-rgb),0.2)]">
-                 <span className="w-1.5 h-1.5 rounded-full bg-shinko-primary animate-pulse shadow-[0_0_10px_var(--brand-primary)]"></span> 
-                 ShinkŌS v2.5
-              </div>
-              
-              {/* Main Title */}
-              <h1 className="text-6xl md:text-8xl font-black tracking-tighter mb-8 leading-[0.95] animate-in fade-in slide-in-from-bottom-8 duration-1000 drop-shadow-2xl">
-                 <span className="block text-slate-300 opacity-50 text-4xl md:text-6xl mb-2 tracking-normal font-bold">Inovação não é sorte.</span>
-                 <span className="text-transparent bg-clip-text bg-gradient-to-b from-white via-white to-slate-400 drop-shadow-[0_0_30px_rgba(255,255,255,0.2)]">É Engenharia.</span>
-              </h1>
-              
-              <p className="text-xl text-slate-400 max-w-2xl mx-auto mb-12 leading-relaxed font-light animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-100">
-                 O ShinkŌS é o sistema operacional que transforma ideias caóticas em <span className="text-white font-medium border-b border-shinko-primary/50">receita previsível</span> através de algoritmos de priorização e governança automatizada.
-              </p>
-
-              {/* CTAs */}
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-6 animate-in fade-in zoom-in-95 duration-1000 delay-200">
-                 <button 
-                   onClick={onEnter}
-                   className="group h-16 px-10 rounded-full bg-white text-black font-bold text-lg shadow-[0_0_40px_rgba(255,255,255,0.3)] hover:shadow-[0_0_60px_rgba(255,255,255,0.5)] hover:scale-105 transition-all flex items-center gap-3 relative overflow-hidden"
-                 >
-                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-slate-200 to-transparent opacity-0 group-hover:opacity-50 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
-                   <Rocket className="w-5 h-5" />
-                   Iniciar Agora
-                 </button>
-                 
-                 <button onClick={onEnter} className="h-16 px-8 rounded-full glass-panel border border-white/10 hover:bg-white/10 text-slate-300 hover:text-white font-medium transition-all flex items-center gap-3 group">
-                    <PlayCircle className="w-10 h-10 text-white/20 group-hover:text-shinko-primary transition-colors" /> 
-                    <span className="text-sm text-left leading-tight">Ver Demo<br/><span className="text-[10px] opacity-60 uppercase tracking-widest">2 min</span></span>
-                 </button>
-              </div>
-          </div>
-      </section>
-
-      {/* FRAMEWORK SECTION */}
-      <section id="framework" className="py-32 relative z-10 border-t border-white/5 bg-black/40 backdrop-blur-sm">
-          <div className="max-w-7xl mx-auto px-6">
-             <div className="text-center mb-20">
-                <h2 className="text-4xl md:text-5xl font-black mb-6 tracking-tight text-white">O Framework <span className="text-shinko-primary">Shinkō</span></h2>
-                <p className="text-xl text-slate-400 max-w-2xl mx-auto font-light">
-                    Um funil de validação científica em 6 etapas para garantir que apenas projetos de alto potencial sobrevivam.
-                </p>
-             </div>
-
-             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 relative">
-                {/* Connecting Line (Desktop) */}
-                <div className="hidden lg:block absolute top-1/2 left-0 w-full h-px bg-gradient-to-r from-shinko-primary/0 via-shinko-primary/20 to-shinko-primary/0 -translate-y-1/2 z-0"></div>
-
-                {[
-                    { step: '01', title: 'Conceito', icon: BrainCircuit, desc: 'Definição clara da dor e solução.' },
-                    { step: '02', title: 'Decisão', icon: Target, desc: 'Matriz MVV: Velocidade vs Viabilidade.' },
-                    { step: '03', title: 'Arquétipo', icon: Layers, desc: 'Modelo de negócio e distribuição.' },
-                    { step: '04', title: 'Aderência', icon: MagnetIcon, desc: 'Teste TADS para escalabilidade.' },
-                    { step: '05', title: 'Evidências', icon: FileTextIcon, desc: 'Provas reais de demanda de mercado.' },
-                    { step: '06', title: 'Score', icon: BarChart3, desc: 'Pontuação PRIO-6 matemática.' },
-                ].map((item, i) => (
-                    <div key={i} className="glass-panel p-6 rounded-2xl border-white/10 relative z-10 hover:-translate-y-2 transition-transform group bg-[#0a0a0a]/80 backdrop-blur-xl">
-                        <div className="w-10 h-10 rounded-full bg-slate-900 border border-shinko-primary/30 flex items-center justify-center text-shinko-primary font-bold text-sm mb-4 shadow-[0_0_15px_rgba(var(--brand-primary-rgb),0.2)] group-hover:bg-shinko-primary group-hover:text-white transition-colors relative mx-auto lg:mx-0">
-                           <item.icon className="w-5 h-5" />
-                        </div>
-                        <h3 className="font-bold text-white text-lg mb-2 text-center lg:text-left">{item.title}</h3>
-                        <p className="text-xs text-slate-400 leading-relaxed text-center lg:text-left">{item.desc}</p>
-                    </div>
-                ))}
-             </div>
-          </div>
-      </section>
-
-      {/* RECURSOS / FEATURE CARDS */}
-      <section id="recursos" className="py-32 px-6 relative z-10">
-         <div className="max-w-7xl mx-auto">
-            <div className="mb-20 text-center">
-               <h2 className="text-4xl md:text-5xl font-black mb-6 tracking-tight">O Motor da Sua Inovação</h2>
-               <p className="text-xl text-slate-400 max-w-2xl mx-auto font-light">
-                  Um conjunto completo de ferramentas projetadas para eliminar fricção e acelerar resultados.
-               </p>
+      {/* Main Content */}
+      <div className="relative z-10 flex flex-col items-center w-full">
+          
+          {/* HERO SECTION */}
+          <section className="w-full max-w-6xl px-6 pt-24 pb-32 flex flex-col items-center text-center">
+            <div className="mb-8 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-xs font-bold uppercase tracking-widest text-amber-400 backdrop-blur-md animate-in fade-in slide-in-from-bottom-4 duration-700 shadow-glow">
+                <Sparkles className="w-4 h-4"/> Engineering Innovation Framework
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[
-                    { 
-                        title: 'Matriz RDE & Prio-6', 
-                        icon: BarChart3, 
-                        desc: 'Algoritmo proprietário que cruza Risco, Demanda e Execução para gerar um score matemático de prioridade.', 
-                        color: 'text-blue-500', bg: 'bg-blue-500/10' 
-                    },
-                    { 
-                        title: 'Gantt Chart Interativo', 
-                        icon: GanttChartSquare, 
-                        desc: 'Visualização cronológica completa com dependências, visão hierárquica (Projetos > Nós) e redimensionamento arrastável.', 
-                        color: 'text-teal-500', bg: 'bg-teal-500/10' 
-                    },
-                    { 
-                        title: 'Nivelamento de Recursos', 
-                        icon: Clock, 
-                        desc: 'Algoritmo "Granular Split" que divide tarefas automaticamente para respeitar o limite de 8h/dia por pessoa.', 
-                        color: 'text-purple-500', bg: 'bg-purple-500/10' 
-                    },
-                    { 
-                        title: 'BPMS & IA Generativa', 
-                        icon: BrainCircuit, 
-                        desc: 'A IA do Google Gemini 2.5 lê seus PDFs e gera fluxogramas BPMN e checklists técnicos automaticamente.', 
-                        color: 'text-indigo-500', bg: 'bg-indigo-500/10' 
-                    },
-                    { 
-                        title: 'Gestão Visual Kanban', 
-                        icon: Layout, 
-                        desc: 'Acompanhe o fluxo de trabalho em tempo real, com colunas personalizáveis e filtros por responsável.', 
-                        color: 'text-pink-500', bg: 'bg-pink-500/10' 
-                    },
-                    { 
-                        title: 'Governança Storytime', 
-                        icon: History, 
-                        desc: 'Log auditável imutável. Cada upload, comentário ou mudança de status fica registrado na linha do tempo.', 
-                        color: 'text-shinko-primary', bg: 'bg-shinko-primary/10' 
-                    },
-                    { 
-                        title: 'Ingestão de Docs (OCR)', 
-                        icon: FileSearch, 
-                        desc: 'Extração de contexto de PDFs e documentos técnicos para enriquecer as tarefas sem digitação manual.', 
-                        color: 'text-cyan-500', bg: 'bg-cyan-500/10' 
-                    },
-                    { 
-                        title: 'Triângulo da Decisão', 
-                        icon: Target, 
-                        desc: 'Balanceamento visual entre Velocidade, Viabilidade e Receita para garantir que você ataca os problemas certos.', 
-                        color: 'text-emerald-500', bg: 'bg-emerald-500/10' 
-                    },
-                    { 
-                        title: 'Portal do Cliente', 
-                        icon: Users, 
-                        desc: 'Acesso restrito para stakeholders externos acompanharem o progresso e aprovarem etapas críticas.', 
-                        color: 'text-orange-500', bg: 'bg-orange-500/10' 
-                    },
-                ].map((feat, i) => (
-                    <div key={i} className="glass-panel p-8 rounded-2xl border border-white/10 hover:border-white/20 transition-all hover:-translate-y-1 group bg-[#0a0a0a]/40 backdrop-blur-md flex flex-col">
-                        <div className={`w-12 h-12 rounded-lg ${feat.bg} flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300`}>
-                            <feat.icon className={`w-6 h-6 ${feat.color}`}/>
-                        </div>
-                        <h3 className="text-lg font-bold text-white mb-3">{feat.title}</h3>
-                        <p className="text-sm text-slate-400 leading-relaxed">{feat.desc}</p>
-                    </div>
-                ))}
+            <h1 className="text-5xl md:text-7xl lg:text-8xl font-black mb-8 tracking-tight leading-tight bg-clip-text text-transparent bg-gradient-to-b from-white via-slate-200 to-slate-500 animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-100">
+                Transforme Incerteza <br/> em <span className="text-amber-500">Resultado.</span>
+            </h1>
+
+            <p className="text-lg md:text-2xl text-slate-400 max-w-3xl mb-12 leading-relaxed animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-200">
+                O primeiro <strong>Sistema Operacional de Inovação</strong> que integra estratégia, engenharia, financeiro e IA em um único fluxo contínuo.
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-4 animate-in fade-in zoom-in duration-500 delay-300">
+                <button 
+                    onClick={onEnter}
+                    className="group relative px-8 py-4 bg-amber-500 hover:bg-amber-400 text-black font-bold text-lg rounded-full flex items-center justify-center gap-3 transition-all shadow-[0_0_40px_-10px_rgba(245,158,11,0.5)] hover:shadow-[0_0_60px_-10px_rgba(245,158,11,0.7)] hover:scale-105"
+                >
+                    Acessar Plataforma
+                    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform"/>
+                </button>
+                <button onClick={onEnter} className="px-8 py-4 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-lg rounded-full flex items-center justify-center gap-3 transition-all backdrop-blur-md hover:scale-105">
+                    <Play className="w-5 h-5 fill-white"/> Ver Demonstração
+                </button>
             </div>
             
-            <div className="mt-12 text-center">
-                 <button onClick={onEnter} className="text-shinko-primary hover:text-white font-bold text-sm flex items-center gap-2 mx-auto group transition-colors">
-                     Explorar o Sistema Completo <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform"/>
-                 </button>
+            {/* Dashboard Preview Mockup (Abstract) */}
+            <div className="mt-20 w-full max-w-5xl aspect-[16/9] bg-slate-900 rounded-2xl border border-white/10 shadow-2xl relative overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-500 group cursor-pointer" onClick={onEnter}>
+                <div className="absolute inset-0 bg-gradient-to-b from-transparent to-slate-950/80 z-10"></div>
+                <div className="absolute inset-0 flex items-center justify-center z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="px-6 py-3 bg-amber-500 text-black font-bold rounded-full shadow-lg transform scale-110">Explorar Interface</span>
+                </div>
+                {/* Fake UI Elements */}
+                <div className="p-6 grid grid-cols-4 gap-4 h-full opacity-50 group-hover:opacity-30 transition-opacity">
+                    <div className="col-span-1 bg-slate-800 rounded-xl h-full"></div>
+                    <div className="col-span-3 grid grid-rows-3 gap-4">
+                        <div className="row-span-1 grid grid-cols-3 gap-4">
+                             <div className="bg-slate-800 rounded-xl"></div>
+                             <div className="bg-slate-800 rounded-xl"></div>
+                             <div className="bg-slate-800 rounded-xl"></div>
+                        </div>
+                        <div className="row-span-2 bg-slate-800 rounded-xl"></div>
+                    </div>
+                </div>
             </div>
-         </div>
-      </section>
+          </section>
 
-      {/* PAIN VS GAIN */}
-      <section className="py-32 relative border-t border-white/5 bg-black/40">
-          <div className="max-w-7xl mx-auto px-6 flex flex-col items-center justify-center">
-              <h2 className="text-4xl font-black tracking-tight text-center mb-16">
-                  Pronto para <br/> <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-500">profissionalizar</span> <br/> sua inovação?
-              </h2>
-          </div>
-      </section>
-
-      {/* FAQ */}
-      <section id="faq" className="py-24 px-6 max-w-3xl mx-auto">
-          <h2 className="text-3xl font-black text-center mb-12 tracking-tight">Perguntas Frequentes</h2>
-          <div className="space-y-4">
-              {[
-                  { q: "O ShinkōOS serve para minha empresa?", a: "Sim, se você gerencia múltiplos projetos e precisa de clareza sobre onde investir recursos. Ideal para consultorias, software houses e departamentos de inovação." },
-                  { q: "Como a automação ajuda na prática?", a: "Utilizamos Gemini 2.5 Pro para ler documentos técnicos e gerar cronogramas, checklists e análises de risco automaticamente, economizando horas de planejamento manual." },
-                  { q: "Posso convidar clientes externos?", a: "Sim! O sistema possui perfis de acesso específicos para clientes, permitindo que eles acompanhem o progresso e aprovem etapas sem ver dados sensíveis internos." },
-                  { q: "Meus dados estão seguros?", a: "Absolutamente. Utilizamos criptografia de ponta a ponta, isolamento de dados por organização (RLS) e logs de auditoria imutáveis." }
-              ].map((item, i) => (
-                  <div key={i} className="glass-panel border border-white/5 rounded-xl overflow-hidden transition-all hover:bg-white/5 bg-[#0a0a0a]/60">
-                      <button onClick={() => toggleFaq(i)} className="w-full flex items-center justify-between p-6 text-left font-bold text-slate-200 hover:text-white transition-colors">
-                          {item.q}
-                          {openFaq === i ? <Minus className="w-4 h-4 text-shinko-primary"/> : <Plus className="w-4 h-4 text-slate-500"/>}
-                      </button>
-                      {openFaq === i && (
-                          <div className="px-6 pb-6 text-slate-400 text-sm leading-relaxed border-t border-white/5 pt-4 animate-in slide-in-from-top-2">
-                              {item.a}
+          {/* FEATURE STRIP 1: STRATEGY */}
+          <section className="w-full py-24 bg-slate-900/30 border-y border-white/5">
+              <div className="max-w-7xl mx-auto px-6">
+                  <div className="flex flex-col md:flex-row items-center gap-16">
+                      <div className="flex-1 space-y-8">
+                          <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-blue-500/10 text-blue-400 text-xs font-bold uppercase tracking-wider border border-blue-500/20">
+                              <BrainCircuit className="w-4 h-4"/> Módulo Estratégico
                           </div>
-                      )}
+                          <h2 className="text-4xl md:text-5xl font-bold leading-tight">
+                              Decisões baseadas em <span className="text-blue-500">Algoritmos</span>, não em palpites.
+                          </h2>
+                          <p className="text-slate-400 text-lg leading-relaxed">
+                              Pare de gastar recursos em ideias ruins. O Shinkō utiliza modelos matemáticos para classificar oportunidades.
+                          </p>
+                          
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                              <div className="p-4 rounded-xl bg-white/5 border border-white/10 hover:border-blue-500/50 transition-colors">
+                                  <BarChart3 className="w-8 h-8 text-blue-500 mb-3"/>
+                                  <h3 className="font-bold text-white mb-1">Matriz RDE</h3>
+                                  <p className="text-sm text-slate-400">Receita, Dor e Engenharia cruzados para priorização.</p>
+                              </div>
+                              <div className="p-4 rounded-xl bg-white/5 border border-white/10 hover:border-blue-500/50 transition-colors">
+                                  <CheckCircle className="w-8 h-8 text-blue-500 mb-3"/>
+                                  <h3 className="font-bold text-white mb-1">Validação TADS</h3>
+                                  <p className="text-sm text-slate-400">Teste ácido de Tamanho, Acesso, Dor e Solução.</p>
+                              </div>
+                          </div>
+                      </div>
+                      <div className="flex-1 relative">
+                          <div className="absolute inset-0 bg-blue-500/20 blur-[100px] rounded-full"></div>
+                          <div className="relative p-8 bg-slate-900 border border-white/10 rounded-3xl shadow-2xl">
+                              {/* Visual representation of Matrix */}
+                              <div className="aspect-square bg-slate-800/50 rounded-2xl border border-white/5 relative p-4 grid grid-cols-2 grid-rows-2 gap-2">
+                                  <div className="bg-red-500/10 rounded-xl flex items-center justify-center border border-red-500/20 text-red-500 font-bold text-xs uppercase">Descartar</div>
+                                  <div className="bg-yellow-500/10 rounded-xl flex items-center justify-center border border-yellow-500/20 text-yellow-500 font-bold text-xs uppercase">Incubar</div>
+                                  <div className="bg-orange-500/10 rounded-xl flex items-center justify-center border border-orange-500/20 text-orange-500 font-bold text-xs uppercase">MVP Rápido</div>
+                                  <div className="bg-emerald-500/10 rounded-xl flex items-center justify-center border border-emerald-500/20 text-emerald-500 font-bold text-xs uppercase">Escalar</div>
+                                  
+                                  {/* Dots */}
+                                  <div className="absolute top-[30%] left-[70%] w-4 h-4 bg-emerald-500 rounded-full shadow-lg shadow-emerald-500/50 animate-pulse"></div>
+                                  <div className="absolute top-[60%] left-[20%] w-4 h-4 bg-red-500 rounded-full shadow-lg shadow-red-500/50"></div>
+                              </div>
+                          </div>
+                      </div>
                   </div>
-              ))}
-          </div>
-      </section>
+              </div>
+          </section>
 
-      {/* Footer */}
-      <footer className="py-12 border-t border-white/5 bg-black text-center text-slate-600 text-sm">
-         <p>&copy; 2026 Shinkō Innovation Framework. Design System v2.5</p>
-      </footer>
+          {/* FEATURE STRIP 2: ENGINEERING */}
+          <section className="w-full py-24">
+              <div className="max-w-7xl mx-auto px-6">
+                  <div className="flex flex-col md:flex-row-reverse items-center gap-16">
+                      <div className="flex-1 space-y-8">
+                          <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-purple-500/10 text-purple-400 text-xs font-bold uppercase tracking-wider border border-purple-500/20">
+                              <Code2 className="w-4 h-4"/> Engenharia & Execução
+                          </div>
+                          <h2 className="text-4xl md:text-5xl font-bold leading-tight">
+                              Gestão de Projetos com precisão de <span className="text-purple-500">Relógio Suíço</span>.
+                          </h2>
+                          <p className="text-slate-400 text-lg leading-relaxed">
+                              Do Kanban ao Gantt, com métricas avançadas de DORA para times de alta performance.
+                          </p>
+                          
+                          <ul className="space-y-4">
+                              <li className="flex items-center gap-4">
+                                  <div className="p-2 rounded-lg bg-purple-500/10 text-purple-500"><Layout className="w-5 h-5"/></div>
+                                  <div>
+                                      <strong className="block text-white">Kanban & Gantt Integrados</strong>
+                                      <span className="text-sm text-slate-400">Visualização fluida entre tarefas e cronograma.</span>
+                                  </div>
+                              </li>
+                              <li className="flex items-center gap-4">
+                                  <div className="p-2 rounded-lg bg-purple-500/10 text-purple-500"><Workflow className="w-5 h-5"/></div>
+                                  <div>
+                                      <strong className="block text-white">BPMS Designer</strong>
+                                      <span className="text-sm text-slate-400">Desenhe fluxos e gere tarefas automaticamente.</span>
+                                  </div>
+                              </li>
+                              <li className="flex items-center gap-4">
+                                  <div className="p-2 rounded-lg bg-purple-500/10 text-purple-500"><Activity className="w-5 h-5"/></div>
+                                  <div>
+                                      <strong className="block text-white">Métricas DORA</strong>
+                                      <span className="text-sm text-slate-400">Monitore Lead Time, Deployment Frequency e MTTR.</span>
+                                  </div>
+                              </li>
+                          </ul>
+                      </div>
+                      
+                      <div className="flex-1 w-full">
+                          <div className="grid grid-cols-2 gap-4">
+                              <div className="p-6 bg-slate-900 border border-white/10 rounded-2xl flex flex-col items-center justify-center text-center hover:border-purple-500/50 transition-colors h-48">
+                                  <Layout className="w-10 h-10 text-slate-500 mb-4"/>
+                                  <h4 className="font-bold text-white">Kanban Board</h4>
+                              </div>
+                              <div className="p-6 bg-slate-900 border border-white/10 rounded-2xl flex flex-col items-center justify-center text-center hover:border-purple-500/50 transition-colors h-48 mt-8">
+                                  <Calendar className="w-10 h-10 text-slate-500 mb-4"/>
+                                  <h4 className="font-bold text-white">Cronograma Gantt</h4>
+                              </div>
+                              <div className="p-6 bg-slate-900 border border-white/10 rounded-2xl flex flex-col items-center justify-center text-center hover:border-purple-500/50 transition-colors h-48 -mt-8">
+                                  <Activity className="w-10 h-10 text-slate-500 mb-4"/>
+                                  <h4 className="font-bold text-white">Indicadores DORA</h4>
+                              </div>
+                              <div className="p-6 bg-slate-900 border border-white/10 rounded-2xl flex flex-col items-center justify-center text-center hover:border-purple-500/50 transition-colors h-48">
+                                  <Workflow className="w-10 h-10 text-slate-500 mb-4"/>
+                                  <h4 className="font-bold text-white">Modelagem BPMS</h4>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </section>
+
+          {/* FEATURE STRIP 3: BUSINESS SUITE */}
+          <section className="w-full py-24 bg-slate-900/30 border-y border-white/5">
+              <div className="max-w-7xl mx-auto px-6">
+                  <div className="flex flex-col md:flex-row items-center gap-16">
+                      <div className="flex-1 space-y-8">
+                          <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-emerald-500/10 text-emerald-400 text-xs font-bold uppercase tracking-wider border border-emerald-500/20">
+                              <DollarSign className="w-4 h-4"/> Business Suite
+                          </div>
+                          <h2 className="text-4xl md:text-5xl font-bold leading-tight">
+                              Financeiro e Clientes sob <span className="text-emerald-500">Controle Total</span>.
+                          </h2>
+                          <p className="text-slate-400 text-lg leading-relaxed">
+                              Uma visão 360º da saúde do seu negócio. Do contrato ao fluxo de caixa.
+                          </p>
+                          
+                          <div className="grid grid-cols-1 gap-4">
+                              <div className="flex items-start gap-4 p-4 rounded-xl bg-white/5 border border-white/5">
+                                  <DollarSign className="w-6 h-6 text-emerald-500 mt-1"/>
+                                  <div>
+                                      <h3 className="font-bold text-white">Gestão de MRR & Churn</h3>
+                                      <p className="text-sm text-slate-400">Acompanhe receita recorrente e retenção em tempo real.</p>
+                                  </div>
+                              </div>
+                              <div className="flex items-start gap-4 p-4 rounded-xl bg-white/5 border border-white/5">
+                                  <Users className="w-6 h-6 text-emerald-500 mt-1"/>
+                                  <div>
+                                      <h3 className="font-bold text-white">CRM & Portal do Cliente</h3>
+                                      <p className="text-sm text-slate-400">Área exclusiva para seus clientes acompanharem projetos.</p>
+                                  </div>
+                              </div>
+                              <div className="flex items-start gap-4 p-4 rounded-xl bg-white/5 border border-white/5">
+                                  <BarChart3 className="w-6 h-6 text-emerald-500 mt-1"/>
+                                  <div>
+                                      <h3 className="font-bold text-white">Métricas de Produto</h3>
+                                      <p className="text-sm text-slate-400">NPS, Engajamento (DAU/MAU) e Adoção de Features.</p>
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+                      
+                      <div className="flex-1">
+                          <div className="relative p-1 bg-gradient-to-br from-emerald-500/50 to-slate-800 rounded-3xl">
+                              <div className="bg-slate-950 rounded-[22px] p-6 shadow-2xl">
+                                  <div className="flex justify-between items-center mb-8">
+                                      <h3 className="text-lg font-bold">Resumo Financeiro</h3>
+                                      <span className="text-xs bg-emerald-500/20 text-emerald-500 px-2 py-1 rounded">Tempo Real</span>
+                                  </div>
+                                  <div className="space-y-6">
+                                      <div>
+                                          <div className="text-slate-500 text-xs uppercase font-bold">Receita Recorrente (MRR)</div>
+                                          <div className="text-4xl font-black text-white mt-1">R$ 142.500</div>
+                                          <div className="text-emerald-500 text-xs font-bold mt-1 flex items-center gap-1">
+                                              <TrendingUp className="w-3 h-3"/> +12.5% este mês
+                                          </div>
+                                      </div>
+                                      <div className="h-px bg-white/10"></div>
+                                      <div className="grid grid-cols-2 gap-4">
+                                          <div>
+                                              <div className="text-slate-500 text-xs uppercase font-bold">Clientes Ativos</div>
+                                              <div className="text-2xl font-bold text-white">84</div>
+                                          </div>
+                                          <div>
+                                              <div className="text-slate-500 text-xs uppercase font-bold">Ticket Médio</div>
+                                              <div className="text-2xl font-bold text-white">R$ 1.6k</div>
+                                          </div>
+                                      </div>
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </section>
+
+          {/* FEATURE STRIP 4: AI & AUTOMATION */}
+          <section className="w-full py-24 relative overflow-hidden">
+              <div className="absolute inset-0 bg-amber-500/5"></div>
+              <div className="max-w-4xl mx-auto px-6 text-center relative z-10">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold uppercase tracking-wider border border-amber-500/30 mb-6">
+                      <Sparkles className="w-4 h-4"/> Shinkō AI
+                  </div>
+                  <h2 className="text-4xl md:text-6xl font-black mb-6">
+                      Seu copiloto de <span className="text-amber-500">Inteligência</span>.
+                  </h2>
+                  <p className="text-xl text-slate-400 mb-12">
+                      Deixe a IA quebrar tarefas complexas, estimar prazos, otimizar sua agenda e analisar documentos técnicos.
+                  </p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
+                      <div className="p-6 rounded-2xl bg-slate-900 border border-white/10 hover:border-amber-500/50 transition-colors">
+                          <Zap className="w-8 h-8 text-amber-500 mb-4"/>
+                          <h4 className="font-bold text-white text-lg">Otimização de Agenda</h4>
+                          <p className="text-sm text-slate-400 mt-2">A IA realoca tarefas automaticamente baseado na carga de trabalho do time.</p>
+                      </div>
+                      <div className="p-6 rounded-2xl bg-slate-900 border border-white/10 hover:border-amber-500/50 transition-colors">
+                          <Layers className="w-8 h-8 text-amber-500 mb-4"/>
+                          <h4 className="font-bold text-white text-lg">Geração de Checklists</h4>
+                          <p className="text-sm text-slate-400 mt-2">Transforme títulos vagos em planos de ação técnicos detalhados.</p>
+                      </div>
+                      <div className="p-6 rounded-2xl bg-slate-900 border border-white/10 hover:border-amber-500/50 transition-colors">
+                          <Shield className="w-8 h-8 text-amber-500 mb-4"/>
+                          <h4 className="font-bold text-white text-lg">Análise de Risco</h4>
+                          <p className="text-sm text-slate-400 mt-2">IA avalia viabilidade e riscos antes mesmo do projeto começar.</p>
+                      </div>
+                  </div>
+              </div>
+          </section>
+
+          {/* TESTIMONIALS SECTION */}
+          <section className="w-full py-24 px-6 border-t border-white/10 bg-slate-950">
+              <div className="max-w-6xl mx-auto">
+                  <div className="text-center mb-16">
+                      <h2 className="text-3xl font-bold mb-4">O que dizem os Líderes</h2>
+                      <p className="text-slate-400">Empresas que transformaram caos em processo.</p>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {[
+                          { name: "Carlos M.", role: "CTO, TechFlow", text: "A precisão da Matriz RDE mudou como priorizamos features. Finalmente paramos de discutir opiniões e focamos em dados." },
+                          { name: "Fernanda L.", role: "Product Manager", text: "O Shinkō OS trouxe a governança que faltava para escalar nosso time de 5 para 50 pessoas sem perder o controle." },
+                          { name: "Ricardo S.", role: "Fundador, ArqStudio", text: "Adaptamos para nosso escritório de arquitetura e o portal do cliente reduziu em 80% os emails de cobrança." }
+                      ].map((item, i) => (
+                          <div key={i} className="p-6 rounded-2xl bg-white/5 border border-white/10 relative">
+                              <Quote className="w-8 h-8 text-white/20 absolute top-6 right-6"/>
+                              <div className="flex gap-1 text-amber-500 mb-4">
+                                  {[1,2,3,4,5].map(s => <Star key={s} className="w-4 h-4 fill-current"/>)}
+                              </div>
+                              <p className="text-slate-300 text-sm leading-relaxed mb-6">"{item.text}"</p>
+                              <div>
+                                  <div className="font-bold text-white">{item.name}</div>
+                                  <div className="text-xs text-slate-500 uppercase font-bold tracking-wider">{item.role}</div>
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+              </div>
+          </section>
+
+          {/* FINAL CTA */}
+          <section className="w-full py-24 border-t border-white/5 bg-gradient-to-b from-slate-900 to-black text-center px-6">
+              <div className="max-w-2xl mx-auto">
+                  <h2 className="text-4xl font-bold mb-6">Pronto para organizar a casa?</h2>
+                  <p className="text-slate-400 mb-10 text-lg">Junte-se a empresas que tratam inovação com engenharia, não sorte.</p>
+                  <button 
+                    onClick={onEnter}
+                    className="px-12 py-5 bg-white text-black font-bold text-lg rounded-full hover:scale-105 transition-transform shadow-2xl shadow-white/20"
+                  >
+                      Começar Agora
+                  </button>
+              </div>
+          </section>
+
+          <footer className="w-full border-t border-white/10 py-12 text-center text-slate-600 text-sm">
+              <div className="flex justify-center gap-8 mb-8 font-bold text-slate-500">
+                  <a href="#" className="hover:text-white transition-colors">Sobre</a>
+                  <a href="#" className="hover:text-white transition-colors">Preços</a>
+                  <a href="#" className="hover:text-white transition-colors">Docs</a>
+                  <a href="#" className="hover:text-white transition-colors">Contato</a>
+              </div>
+              <p className="text-xs uppercase tracking-widest opacity-50">&copy; 2026 Shinkō Systems. Todos os direitos reservados.</p>
+          </footer>
+      </div>
     </div>
   );
 };
-
-// Helper Icons
-function MagnetIcon(props: any) {
-    return <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 15-4-4 6.75-6.77a7.79 7.79 0 0 1 11 11L13 22l-4-4 6.39-6.35a2.8 2.8 0 0 0-3.92-3.96L6 15Z"/></svg>
-}
-
-function FileTextIcon(props: any) {
-    return <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
-}

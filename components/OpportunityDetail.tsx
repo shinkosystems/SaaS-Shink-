@@ -420,17 +420,32 @@ const OpportunityDetail: React.FC<Props> = ({ opportunity: initialOpp, onClose, 
                                 {(node.checklist || []).map(task => (
                                     <div key={task.id} className="p-3 bg-white dark:bg-black/30 rounded-lg border border-slate-100 dark:border-white/5 hover:border-blue-500/50 transition-all group">
                                         <div className="flex justify-between items-start gap-2">
-                                            <div className="flex gap-2 items-start flex-1 cursor-pointer" onClick={(e) => toggleTaskStatus(e, node.id, task.id)}>
-                                                {task.completed ? <CheckSquare className="w-4 h-4 text-emerald-500 mt-0.5"/> : <Square className="w-4 h-4 text-slate-400 mt-0.5"/>}
-                                                <div>
-                                                    <span className={`text-sm block leading-tight ${task.completed ? 'text-slate-500 line-through' : 'text-slate-800 dark:text-slate-200'}`}>{task.text}</span>
-                                                    <div className="flex items-center gap-2 mt-1">
-                                                        {task.assignee && <span className="text-[10px] bg-slate-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-slate-500">{task.assignee}</span>}
-                                                        {task.estimatedHours && <span className="text-[10px] text-slate-400">{task.estimatedHours}h</span>}
-                                                    </div>
+                                            
+                                            {/* Checkbox (Status Toggle) - Isolated Click */}
+                                            <button 
+                                                onClick={(e) => toggleTaskStatus(e, node.id, task.id)}
+                                                className="shrink-0 pt-0.5 focus:outline-none"
+                                            >
+                                                {task.completed ? <CheckSquare className="w-4 h-4 text-emerald-500"/> : <Square className="w-4 h-4 text-slate-400"/>}
+                                            </button>
+
+                                            {/* Content - Modal Trigger */}
+                                            <div 
+                                                className="flex flex-col flex-1 cursor-pointer min-w-0" 
+                                                onClick={() => setEditingTask({nodeId: node.id, nodeLabel: node.label, task})}
+                                            >
+                                                <span className={`text-sm block leading-tight truncate ${task.completed ? 'text-slate-500 line-through' : 'text-slate-800 dark:text-slate-200'}`}>{task.text}</span>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    {task.assignee && <span className="text-[10px] bg-slate-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-slate-500">{task.assignee}</span>}
+                                                    {task.estimatedHours && <span className="text-[10px] text-slate-400">{task.estimatedHours}h</span>}
                                                 </div>
                                             </div>
-                                            <button onClick={() => setEditingTask({nodeId: node.id, nodeLabel: node.label, task})} className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-white transition-opacity">
+
+                                            {/* Edit Button (Redundant but consistent) */}
+                                            <button 
+                                                onClick={() => setEditingTask({nodeId: node.id, nodeLabel: node.label, task})} 
+                                                className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-white transition-opacity"
+                                            >
                                                 <Edit className="w-3 h-3"/>
                                             </button>
                                         </div>

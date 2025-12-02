@@ -186,7 +186,7 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
                     </div>
                 </div>
 
-                {/* Bottom Row: Search & Actions */}
+                {/* Bottom Row: Search & Actions - Fixed flex-wrap for tablets */}
                 <div className="flex flex-col xl:flex-row gap-4 justify-between items-start xl:items-center">
                     <div className="flex flex-col sm:flex-row gap-2 w-full xl:w-auto flex-1">
                         <div className="relative flex-1 min-w-[200px]">
@@ -206,6 +206,7 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
                         </div>
                     </div>
                     
+                    {/* Actions - Allow wrap on mobile/tablet */}
                     <div className="flex gap-2 w-full xl:w-auto justify-end flex-wrap shrink-0">
                         <button 
                             onClick={onSyncContracts}

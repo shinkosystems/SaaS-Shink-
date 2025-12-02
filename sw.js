@@ -17,23 +17,32 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  // Handle navigation requests (HTML)
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).catch(() => {
+        // If network fails, return index.html from cache regardless of query params
+        return caches.match('/index.html').then(response => {
+            return response || caches.match('/');
+        });
+      })
+    );
+    return;
+  }
+
+  // Handle other requests (Assets, API, etc)
   event.respondWith(
     fetch(event.request)
       .then((response) => {
         // Check if we received a valid response
         if (!response || response.status !== 200 || response.type !== 'basic') {
-          // If it's a cross-origin request (like Supabase or Tailwind), we might still want to use it but maybe not cache strictly
-          // For simplicity in this PWA shell, we cache successful GET requests to origin and Tailwind
-          if (response && response.status === 200 && event.request.method === 'GET') {
-             // Optional: Cache external assets if needed, but be careful with storage
-          }
           return response;
         }
 
         // Clone the response
         const responseToCache = response.clone();
 
-        // Only cache requests from our own origin or specific CDNs to avoid polluting cache with API data that changes often
+        // Only cache requests from our own origin or specific CDNs
         if (event.request.url.startsWith(self.location.origin) || event.request.url.includes('cdn.tailwindcss')) {
             caches.open(CACHE_NAME)
               .then((cache) => {

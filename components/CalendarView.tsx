@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, User, Clock, Zap, 
 import TaskDetailModal from './TaskDetailModal';
 import { optimizeSchedule } from '../services/geminiService';
 import { supabase } from '../services/supabaseClient';
-import { fetchDevelopers, updateTask, fetchAllTasks, deleteTask } from '../services/projectService';
+import { fetchAssignableUsers, updateTask, fetchAllTasks, deleteTask } from '../services/projectService';
 
 interface Props {
   opportunities: Opportunity[];
@@ -142,6 +142,12 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
       return Array.from(set).sort();
   }, [dbTasks, userMap]);
 
+  const taskMap = useMemo(() => {
+      const map = new Map<number, string>();
+      dbTasks.forEach(t => map.set(t.id, t.titulo));
+      return map;
+  }, [dbTasks]);
+
   const visibleTasks = useMemo(() => {
     const tasks: Array<any> = [];
 
@@ -184,6 +190,11 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
              // Tem projeto mas não está na lista carregada (ex: arquivado ou sem acesso)
              meta = { title: dbTask.projetoData?.nome || 'Projeto Arquivado', color: 'bg-slate-400', opp: undefined as any };
         }
+
+        // Header Logic: Standard is Project Name. 
+        // If subtask, user requested Subtask Title to be shown prominently.
+        // We will show Project Name in Header, and Subtask Name in Body.
+        let displayHeader = meta.title;
 
         const safeDateParse = (dateStr?: string) => {
             if (!dateStr) return null;
@@ -239,12 +250,12 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
                     date: dateStr,
                     taskId: dbTask.id,
                     task: taskAdapter, 
-                    taskText: dbTask.titulo,
+                    taskText: dbTask.titulo, // This is the Subtask Title
                     isSubtask: dbTask.sutarefa, 
                     status: effectiveStatus,
                     completed: effectiveStatus === 'done',
                     assignee: dbTask.responsavelData?.nome,
-                    oppTitle: meta.title,
+                    oppTitle: displayHeader, // Project Name
                     oppColor: meta.color,
                     oppId: dbTask.projeto?.toString() || '',
                     nodeId: 'manual', 
@@ -259,7 +270,7 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
     });
 
     return tasks;
-  }, [dbTasks, opportunities, filterProject, filterAssignee]);
+  }, [dbTasks, opportunities, filterProject, filterAssignee, taskMap]);
 
   const handleBalanceClick = async () => {
       setIsBalancing(true);
@@ -270,7 +281,8 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
                const { data: uData } = await supabase.from('users').select('organizacao').eq('id', user.id).single();
                if (uData) orgId = uData.organizacao;
           }
-          const availableDevs = await fetchDevelopers(orgId);
+          // Change from fetchDevelopers to fetchAssignableUsers
+          const availableDevs = await fetchAssignableUsers(orgId);
 
           const globalPendingTasks = dbTasks
             .filter(t => t.status !== 'done' && t.status !== 'Archived' && t.organizacao === orgId)
@@ -640,8 +652,7 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
                           duracaohoras: updatedTask.estimatedHours,
                           datainicio: updatedTask.startDate,
                           datafim: updatedTask.dueDate,
-                          // Sync redundant fields removed for safety
-                          // dataproposta: updatedTask.dueDate, 
+                          // REMOVED deadline and dataproposta to avoid errors on tables without these columns
                           gravidade: updatedTask.gut?.g,
                           urgencia: updatedTask.gut?.u,
                           tendencia: updatedTask.gut?.t

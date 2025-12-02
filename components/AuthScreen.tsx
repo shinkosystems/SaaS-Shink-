@@ -1,492 +1,164 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { supabase } from '../services/supabaseClient';
-import { Lock, Mail, ArrowRight, Loader2, ShieldCheck, UserCircle2, User, Phone, Briefcase, Building2, Sparkles, X, KeyRound } from 'lucide-react';
-import { logEvent } from '../services/analyticsService';
-
-interface GuestPersona {
-  name: string;
-  email: string;
-  role: 'dono' | 'admin' | 'colaborador' | 'cliente';
-  avatar?: string;
-}
+import { Mail, Lock, Loader2, Sparkles, X, ArrowRight, User } from 'lucide-react';
 
 interface Props {
-  onGuestLogin: (persona?: GuestPersona) => void;
+  onGuestLogin: (persona?: any) => void;
   onClose: () => void;
+  customOrgName?: string;
+  customLogoUrl?: string | null;
+  customColor?: string;
 }
 
-const LOGO_URL = "https://zjssfnbcboibqeoubeou.supabase.co/storage/v1/object/public/fotoperfil/fotoperfil/1.png";
-
-const DEMO_PERSONAS: GuestPersona[] = [
-  { name: 'Ana Silva (CTO)', email: 'ana.silva@techcorp.com', role: 'dono' },
-  { name: 'Roberto Mendes', email: 'roberto.m@shinko.os', role: 'colaborador' },
-  { name: 'Carla Dias (Cliente)', email: 'carla.compras@varejo.com.br', role: 'cliente' },
-  { name: 'Fernando Souza', email: 'fernando.ops@shinko.os', role: 'admin' },
-];
-
-interface Organization {
-  id: number;
-  nome: string;
-}
-
-const AuthScreen: React.FC<Props> = ({ onGuestLogin, onClose }) => {
-  const [isRegistering, setIsRegistering] = useState(false);
-  const [isRecovering, setIsRecovering] = useState(false);
-  
-  // Form State
+const AuthScreen: React.FC<Props> = ({ onGuestLogin, onClose, customOrgName, customLogoUrl, customColor }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [role, setRole] = useState('colaborador'); // Default
-  const [selectedOrg, setSelectedOrg] = useState('');
-  const [newOrgName, setNewOrgName] = useState('');
-  
-  // Data State
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
-
   const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [error, setError] = useState<string | null>(null);
-
-  // Fetch Organizations when entering register mode
-  useEffect(() => {
-    if (isRegistering) {
-      const fetchOrgs = async () => {
-        const { data } = await supabase
-          .from('organizacoes')
-          .select('id, nome')
-          .order('nome');
-        
-        if (data) {
-          setOrganizations(data);
-        }
-      };
-      fetchOrgs();
-    }
-  }, [isRegistering]);
-
-  const handleRecovery = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!email) {
-          setError("Digite seu e-mail para recuperar a senha.");
-          return;
-      }
-      setLoading(true);
-      setError(null);
-
-      try {
-          const { error } = await supabase.auth.resetPasswordForEmail(email, {
-              redirectTo: window.location.origin, // Garante que volta para a home do app
-          });
-
-          if (error) throw error;
-
-          alert("E-mail enviado! Verifique sua caixa de entrada. Ao clicar no link, você será redirecionado para definir a nova senha.");
-          setIsRecovering(false);
-      } catch (err: any) {
-          setError(err.message || "Erro ao enviar e-mail de recuperação.");
-      } finally {
-          setLoading(false);
-      }
-  };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-
     try {
-      if (isRegistering) {
-        let orgIdToSave: number | null = null;
-
-        // Lógica de Organização Baseada no Perfil
-        if (role === 'dono') {
-            // CASO DONO: Cria a organização primeiro
-            if (!newOrgName.trim()) {
-                throw new Error("Para cadastrar como Dono, informe o Nome da Empresa.");
-            }
-
-            const { data: newOrg, error: orgError } = await supabase
-                .from('organizacoes')
-                .insert({ nome: newOrgName })
-                .select('id')
-                .single();
-
-            if (orgError) throw new Error("Erro ao criar organização: " + orgError.message);
-            if (!newOrg) throw new Error("Erro inesperado ao criar organização.");
-
-            orgIdToSave = newOrg.id;
-            console.log("Organização criada com sucesso, ID:", orgIdToSave);
-
-        } else if (role === 'colaborador' || role === 'cliente') {
-             // CASO COLABORADOR/CLIENTE: Deve selecionar existente
-             if (!selectedOrg) throw new Error("Por favor, selecione a organização vinculada.");
-             orgIdToSave = parseInt(selectedOrg);
-        }
-        
-        // Criar Usuário no Auth
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: name,
-              phone: phone,
-              role: role,
-              org_id: orgIdToSave,
-              new_org_name: role === 'dono' ? newOrgName : undefined
-            }
-          }
-        });
-
-        if (authError) throw authError;
-        if (!authData.user) throw new Error("Erro ao criar usuário (sem dados retornados).");
-
-        // Upsert na tabela pública 'users' com o ID da organização correto
-        const { error: dbError } = await supabase.from('users').upsert({
-            id: authData.user.id,
-            email: email,
-            nome: name,
-            telefone: phone,
-            perfil: role,
-            organizacao: orgIdToSave, // Vincula ID correto (recém criado ou selecionado)
-            status: role === 'dono' ? 'Aprovado' : 'Pendente' // Donos se auto-aprovam ao criar a org
-        });
-
-        if (dbError) {
-             console.warn("Aviso de Insert User:", dbError.message);
-        }
-
-        logEvent('activation_step', { step: 'register_complete', role });
-
-        alert(role === 'dono' 
-            ? `Empresa "${newOrgName}" criada! Bem-vindo, Dono.` 
-            : 'Cadastro realizado! Aguarde aprovação do administrador.'
-        );
-        
-        // Se for Dono, já faz login direto se o Supabase permitir
-        if (role === 'dono' && authData.session) {
-            logEvent('login', { method: 'email_register' });
-            onClose();
-        } else {
-            setIsRegistering(false);
-        }
-
-      } else {
-        // LOGIN NORMAL
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        
+      if (mode === 'login') {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-
-        // Se login for bem sucedido, tenta validar o status
-        if (data.session) {
-            let userStatus = 'Pendente';
-            let profileError = null;
-
-            try {
-                const { data: profile, error: pError } = await supabase
-                    .from('users')
-                    .select('status, id, nome, email')
-                    .eq('id', data.user.id)
-                    .single();
-                
-                profileError = pError;
-
-                if (profile) {
-                    userStatus = profile.status || 'Pendente';
-                } else if (pError) {
-                    console.warn("Perfil não encontrado, tentando auto-reparo...", pError.message);
-                    
-                    // AUTO-REPAIR: Se o user existe no Auth mas não na tabela users, cria agora
-                    // Default para organização 3 (Shinkō) ou null, e status Pendente
-                    const { error: repairError } = await supabase.from('users').insert({
-                        id: data.user.id,
-                        email: data.user.email,
-                        nome: data.user.user_metadata?.full_name || 'Usuário Recuperado',
-                        status: 'Ativo', // Auto-activate on rescue to prevent lockout loops
-                        perfil: 'colaborador',
-                        organizacao: 3 // Fallback safe organization
-                    });
-                    
-                    if (!repairError) {
-                        userStatus = 'Ativo';
-                        console.log("Perfil auto-recuperado com sucesso.");
-                    }
-                }
-            } catch (e) {
-                console.error("Erro na verificação de perfil:", e);
-                // Em caso de erro catastrófico na leitura, permitimos logar se o Auth passou
-                // Mas marcamos como erro
-            }
-
-            // Normalização de Status (Case insensitive e variantes)
-            const normalizedStatus = userStatus.trim().toLowerCase();
-            const allowedStatuses = ['ativo', 'aprovado', 'active', 'approved'];
-
-            if (!allowedStatuses.includes(normalizedStatus) && normalizedStatus !== 'pendente') {
-                // Se for explicitamente 'bloqueado' ou algo negativo
-                if (normalizedStatus === 'bloqueado' || normalizedStatus === 'blocked') {
-                    await supabase.auth.signOut();
-                    throw new Error("Sua conta está bloqueada. Contate o administrador.");
-                }
-                // Se for Pendente, avisa mas bloqueia?
-                // Decisão: Bloquear Pendente para forçar aprovação, a menos que seja recuperação
-                if (normalizedStatus === 'pendente') {
-                     await supabase.auth.signOut();
-                     throw new Error("Conta aguardando aprovação do administrador.");
-                }
-            }
-
-            logEvent('login', { method: 'email' });
-            onClose(); // Sucesso
-        }
+      } else {
+        const { error } = await supabase.auth.signUp({ email, password });
+        if (error) throw error;
+        alert('Verifique seu email para confirmar o cadastro!');
+        setMode('login');
       }
+      onClose();
     } catch (err: any) {
-      const msg = err instanceof Error ? err.message : (typeof err === 'object' ? JSON.stringify(err) : String(err));
-      setError(msg || 'Erro ao autenticar. Verifique suas credenciais.');
-      logEvent('error', { type: 'auth_fail', message: msg });
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
   const handleRandomGuest = () => {
-      const persona = DEMO_PERSONAS[Math.floor(Math.random() * DEMO_PERSONAS.length)];
-      onGuestLogin(persona);
+    onGuestLogin({
+      name: 'Visitante Demo',
+      email: 'demo@shinko.os',
+      role: 'dono'
+    });
   };
 
-  const showOrgSelect = role === 'colaborador' || role === 'cliente';
-  const showNewOrgInput = role === 'dono';
-
+  const primaryColor = customColor || '#F59E0B';
+  const primaryTextColorStyle = { color: primaryColor };
+  
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">
-      
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={onClose}></div>
-
-      <div className="w-full max-w-md glass-panel p-8 rounded-[32px] shadow-2xl relative z-10 animate-ios-pop duration-300 border border-white/10">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+      <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 relative animate-in zoom-in-95 duration-300">
         
-        {/* Close Button */}
-        <button 
-            onClick={onClose}
-            className="absolute top-4 right-4 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors p-1 rounded-full hover:bg-white/10"
-        >
-            <X className="w-6 h-6" />
+        <button onClick={onClose} className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+            <X className="w-5 h-5"/>
         </button>
 
-        {/* Logo Section */}
-        <div className="text-center mb-8">
-          <div className="w-20 h-20 mx-auto mb-4 relative group">
-             <div className="absolute inset-0 bg-shinko-primary/20 blur-xl rounded-full group-hover:bg-shinko-primary/30 transition-all duration-700"></div>
-             <img 
-                src={LOGO_URL} 
-                alt="Shinko Logo" 
-                className="w-full h-full object-contain relative z-10 drop-shadow-2xl"
-             />
-          </div>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight font-sans">Shink<span className="text-shinko-primary">ŌS</span></h1>
-          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1 tracking-widest uppercase text-[10px]">
-              {isRecovering ? 'Recuperação de Acesso' : (isRegistering ? 'Criar Nova Conta' : 'Login do Sistema')}
-          </p>
+        <div className="p-8 pb-0 flex flex-col items-center">
+            {customLogoUrl ? (
+                <img src={customLogoUrl} alt="Logo" className="h-16 w-auto mb-4" />
+            ) : (
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center mb-4 shadow-lg">
+                    <Sparkles className="w-8 h-8 text-white"/>
+                </div>
+            )}
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white text-center">
+                {customOrgName || 'Bem-vindo ao Shinkō OS'}
+            </h2>
+            <p className="text-sm text-slate-500 text-center mt-2">
+                Sistema Operacional de Inovação
+            </p>
         </div>
 
-        {/* Forms */}
-        {isRecovering ? (
-            /* FORM RECOVERY */
-            <form onSubmit={handleRecovery} className="space-y-6 animate-in slide-in-from-right duration-300">
-                {error && (
-                    <div className="bg-red-500/10 border border-red-500/30 text-red-500 dark:text-red-400 p-3 rounded text-xs text-center font-medium animate-pulse flex items-center justify-center gap-2 break-words">
-                        <ShieldCheck className="w-4 h-4 shrink-0"/> 
-                        <span>{error}</span>
-                    </div>
-                )}
-                <div className="text-sm text-center text-slate-500 dark:text-slate-400 px-4">
-                    Informe seu e-mail para redefinir a senha.
+        <form onSubmit={handleAuth} className="p-8 space-y-4">
+            {error && (
+                <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-xs font-bold text-center">
+                    {error}
                 </div>
-                <div className="relative group">
-                    <Mail className="absolute left-3 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-shinko-primary transition-colors" />
+            )}
+
+            <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 uppercase ml-1">Email</label>
+                <div className="relative">
+                    <Mail className="w-5 h-5 text-slate-400 absolute left-3 top-3.5"/>
                     <input 
                         type="email" 
-                        required
                         value={email}
                         onChange={e => setEmail(e.target.value)}
-                        placeholder="Seu e-mail"
-                        className="glass-input w-full rounded-xl py-3.5 pl-10 pr-4 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-shinko-primary/50 focus:border-shinko-primary outline-none transition-all"
-                    />
-                </div>
-                <button 
-                    type="submit" 
-                    disabled={loading}
-                    className="w-full bg-shinko-primary hover:bg-shinko-secondary text-white font-bold py-3.5 rounded-xl shadow-lg shadow-amber-900/20 transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <KeyRound className="w-5 h-5"/>}
-                    Enviar Link
-                </button>
-                <button 
-                    type="button"
-                    onClick={() => { setIsRecovering(false); setError(null); }}
-                    className="w-full text-xs font-bold text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors py-2"
-                >
-                    Voltar para Login
-                </button>
-            </form>
-        ) : (
-            /* FORM LOGIN/REGISTER */
-            <form onSubmit={handleAuth} className="space-y-4 animate-in slide-in-from-left duration-300">
-            
-            {error && (
-                <div className="bg-red-500/10 border border-red-500/30 text-red-500 dark:text-red-400 p-3 rounded text-xs text-center font-medium animate-pulse flex items-center justify-center gap-2 break-words">
-                <ShieldCheck className="w-4 h-4 shrink-0"/> 
-                <span>{error}</span>
-                </div>
-            )}
-
-            {isRegistering && (
-                <>
-                <div className="relative group animate-ios-slide-right animate-delay-100">
-                    <User className="absolute left-3 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-shinko-primary transition-colors" />
-                    <input 
-                        type="text" 
+                        className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white border-transparent focus:border-amber-500 focus:bg-white dark:focus:bg-slate-900 outline-none transition-all"
+                        placeholder="seu@email.com"
                         required
-                        value={name}
-                        onChange={e => setName(e.target.value)}
-                        placeholder="Nome Completo"
-                        className="glass-input w-full rounded-xl py-3.5 pl-10 pr-4 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-shinko-primary/50 focus:border-shinko-primary outline-none transition-all"
                     />
                 </div>
-
-                <div className="relative group animate-ios-slide-right animate-delay-100">
-                    <Phone className="absolute left-3 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-shinko-primary transition-colors" />
-                    <input 
-                        type="tel" 
-                        required
-                        value={phone}
-                        onChange={e => setPhone(e.target.value)}
-                        placeholder="Telefone / WhatsApp"
-                        className="glass-input w-full rounded-xl py-3.5 pl-10 pr-4 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-shinko-primary/50 focus:border-shinko-primary outline-none transition-all"
-                    />
-                </div>
-
-                <div className="relative group animate-ios-slide-right animate-delay-200">
-                    <Briefcase className="absolute left-3 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-shinko-primary transition-colors" />
-                    <select
-                        required
-                        value={role}
-                        onChange={e => setRole(e.target.value)}
-                        className="glass-input w-full rounded-xl py-3.5 pl-10 pr-4 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-shinko-primary/50 focus:border-shinko-primary outline-none transition-all appearance-none cursor-pointer"
-                    >
-                        <option value="colaborador" className="bg-white dark:bg-slate-900">Colaborador</option>
-                        <option value="cliente" className="bg-white dark:bg-slate-900">Cliente</option>
-                        <option value="dono" className="bg-white dark:bg-slate-900">Dono (Proprietário)</option>
-                    </select>
-                </div>
-
-                {showOrgSelect && (
-                    <div className="relative group animate-ios-slide-right animate-delay-200">
-                        <Building2 className="absolute left-3 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-shinko-primary transition-colors" />
-                        <select
-                            required
-                            value={selectedOrg}
-                            onChange={e => setSelectedOrg(e.target.value)}
-                            className="glass-input w-full rounded-xl py-3.5 pl-10 pr-4 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-shinko-primary/50 focus:border-shinko-primary outline-none transition-all appearance-none cursor-pointer"
-                        >
-                            <option value="" className="bg-white dark:bg-slate-900">Selecione a Organização</option>
-                            {organizations.map(org => (
-                                <option key={org.id} value={org.id} className="bg-white dark:bg-slate-900">{org.nome}</option>
-                            ))}
-                        </select>
-                    </div>
-                )}
-
-                {showNewOrgInput && (
-                    <div className="relative group animate-ios-slide-right animate-delay-200">
-                        <Building2 className="absolute left-3 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-shinko-primary transition-colors" />
-                        <input 
-                        type="text" 
-                        value={newOrgName}
-                        onChange={e => setNewOrgName(e.target.value)}
-                        placeholder="Nome da Sua Empresa"
-                        className="glass-input w-full rounded-xl py-3.5 pl-10 pr-4 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-shinko-primary/50 focus:border-shinko-primary outline-none transition-all"
-                    />
-                    </div>
-                )}
-                </>
-            )}
-
-            <div className="relative group">
-                <Mail className="absolute left-3 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-shinko-primary transition-colors" />
-                <input 
-                    type="email" 
-                    required
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    placeholder="E-mail corporativo"
-                    className="glass-input w-full rounded-xl py-3.5 pl-10 pr-4 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-shinko-primary/50 focus:border-shinko-primary outline-none transition-all"
-                />
             </div>
 
-            <div className="relative group">
-                <Lock className="absolute left-3 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-shinko-primary transition-colors" />
-                <input 
-                    type="password" 
-                    required
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    placeholder="Senha de acesso"
-                    className="glass-input w-full rounded-xl py-3.5 pl-10 pr-4 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-shinko-primary/50 focus:border-shinko-primary outline-none transition-all"
-                />
-            </div>
-
-            {!isRegistering && (
-                <div className="flex justify-end">
-                    <button 
-                        type="button"
-                        onClick={() => { setIsRecovering(true); setError(null); }}
-                        className="text-xs font-medium text-shinko-primary hover:brightness-110 transition-colors"
-                    >
-                        Esqueceu a senha?
-                    </button>
+            <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 uppercase ml-1">Senha</label>
+                <div className="relative">
+                    <Lock className="w-5 h-5 text-slate-400 absolute left-3 top-3.5"/>
+                    <input 
+                        type="password" 
+                        value={password}
+                        onChange={e => setPassword(e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white border-transparent focus:border-amber-500 focus:bg-white dark:focus:bg-slate-900 outline-none transition-all"
+                        placeholder="••••••••"
+                        required
+                    />
                 </div>
-            )}
+            </div>
 
             <button 
                 type="submit" 
                 disabled={loading}
-                className="w-full bg-gradient-to-r from-shinko-primary to-shinko-secondary hover:brightness-110 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-amber-900/20 transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed mt-4 hover:shadow-shinko-primary/30 border border-white/10"
+                className="w-full py-3.5 rounded-xl text-white font-bold text-sm shadow-lg hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2"
+                style={{ backgroundColor: primaryColor }}
             >
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (isRegistering ? <ShieldCheck className="w-5 h-5"/> : <ArrowRight className="w-5 h-5"/>)}
-                {isRegistering ? 'Finalizar Cadastro' : 'Entrar'}
+                {loading && <Loader2 className="w-4 h-4 animate-spin"/>}
+                {mode === 'login' ? 'Entrar' : 'Criar Conta'}
             </button>
-            </form>
-        )}
 
-        {/* Footer Actions */}
-        {!isRecovering && (
-            <div className="mt-6 pt-6 border-t border-slate-200 dark:border-white/10 text-center space-y-4">
+            <div className="flex items-center justify-center gap-2 text-xs text-slate-500 mt-4">
+                <span>{mode === 'login' ? 'Não tem conta?' : 'Já tem conta?'}</span>
                 <button 
-                    onClick={() => {
-                        setError(null);
-                        setIsRegistering(!isRegistering);
-                    }}
-                    className="text-xs text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors"
+                    type="button"
+                    onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
+                    className="font-bold hover:underline"
+                    style={{ color: primaryColor }}
                 >
-                    {isRegistering ? 'Já possui credencial? Fazer Login' : 'Não tem acesso? Criar conta'}
-                </button>
-
-                <button 
-                    onClick={handleRandomGuest}
-                    className="w-full py-2.5 glass-button hover:bg-white/20 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-xl text-sm font-medium transition-colors border border-slate-200 dark:border-white/10 flex items-center justify-center gap-2 group shadow-sm"
-                >
-                    <Sparkles className="w-4 h-4 text-shinko-primary group-hover:brightness-110 transition-colors"/>
-                    Entrar como Convidado (Demo)
+                    {mode === 'login' ? 'Cadastre-se' : 'Faça Login'}
                 </button>
             </div>
-        )}
+        </form>
 
+        <div className="p-8 pt-0">
+            <div className="relative mb-6">
+                <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-slate-200 dark:border-slate-800"></div>
+                </div>
+                <div className="relative flex justify-center text-xs">
+                    <span className="bg-white dark:bg-slate-900 px-2 text-slate-500">Ou continue como</span>
+                </div>
+            </div>
+
+            <button 
+                onClick={handleRandomGuest}
+                className="w-full py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2 group"
+            >
+                <Sparkles className="w-4 h-4 group-hover:brightness-110 transition-colors" style={primaryTextColorStyle} />
+                Entrar como Convidado (Demo)
+            </button>
+        </div>
+
+        <div className="py-4 text-center bg-slate-50 dark:bg-slate-950/50 border-t border-slate-200 dark:border-slate-800">
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 opacity-60">
+                Desenvolvido por Shinkō Systems©
+            </span>
+        </div>
       </div>
     </div>
   );

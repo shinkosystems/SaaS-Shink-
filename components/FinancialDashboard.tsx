@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { TrendingUp, Activity, Calendar, ArrowUpRight, ArrowDownRight, ChevronLeft, ChevronRight, Minus, Filter, Users, UserMinus, DollarSign, Target, Gem, PieChart, Timer, Percent, Info } from 'lucide-react';
 import { FinancialRecord, FinancialTransaction } from '../types';
-import { ResponsiveContainer, AreaChart, Area, Tooltip, XAxis, ReferenceArea, CartesianGrid, YAxis } from 'recharts';
+import { ResponsiveContainer, AreaChart, Area, Tooltip, XAxis, ReferenceArea, CartesianGrid, YAxis, BarChart, Bar } from 'recharts';
 import { supabase } from '../services/supabaseClient';
 
 type TimeRange = 'week' | 'month' | 'year';
@@ -347,14 +346,14 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [], o
         const Arrow = isPositive ? ArrowUpRight : ArrowDownRight;
         
         return (
-            <div className="glass-panel p-5 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-900/60 shadow-sm flex flex-col justify-between group h-32 relative overflow-hidden">
+            <div className="glass-panel p-5 rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/60 shadow-sm flex flex-col justify-between group h-32 relative overflow-hidden">
                 <div className="flex justify-between items-start z-10">
                     <span className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
                         {title}
                         {METRIC_TOOLTIPS[title] && <InfoTooltip text={METRIC_TOOLTIPS[title]} />}
                     </span>
                     {delta !== 0 && (
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${isGood ? 'text-emerald-500 bg-emerald-500/10' : 'text-red-500 bg-red-500/10'}`}>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${isGood ? 'text-emerald-600 bg-emerald-100 dark:text-emerald-500 dark:bg-emerald-500/10' : 'text-red-600 bg-red-100 dark:text-red-500 dark:bg-red-500/10'}`}>
                             <Arrow className="w-3 h-3"/> {Math.abs(delta).toFixed(1)}%
                         </span>
                     )}
@@ -453,7 +452,7 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [], o
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
                         
                         {/* Main Trend Chart */}
-                        <div className="lg:col-span-2 glass-panel p-6 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-900/60 shadow-sm flex flex-col">
+                        <div className="lg:col-span-2 glass-panel p-6 rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/60 shadow-sm flex flex-col">
                             <h3 className="text-sm font-bold text-slate-500 uppercase mb-6 flex items-center gap-2">
                                 <Activity className="w-4 h-4"/> Fluxo de Caixa ({snapshot.label})
                             </h3>
@@ -485,7 +484,7 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [], o
                         </div>
 
                         {/* Breakdown / Profitability */}
-                        <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-900/60 shadow-sm">
+                        <div className="glass-panel p-6 rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/60 shadow-sm">
                             <h3 className="text-sm font-bold text-slate-500 uppercase mb-6 flex items-center gap-2">
                                 <PieChart className="w-4 h-4"/> Composição
                             </h3>

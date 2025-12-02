@@ -4,7 +4,7 @@ import { Opportunity, BpmnTask, DbTask, DbProject } from '../types';
 import { ChevronDown, ChevronRight as ChevronRightIcon, Zap, Loader2, AlertTriangle, Columns, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Grid, LayoutGrid, Square, RefreshCw, Layers, CornerDownRight, Hash, CheckCircle2 } from 'lucide-react';
 import TaskDetailModal from './TaskDetailModal';
 import { optimizeSchedule } from '../services/geminiService';
-import { fetchAllTasks, updateTask, fetchDevelopers, fetchProjects } from '../services/projectService';
+import { fetchAllTasks, updateTask, fetchAssignableUsers, fetchProjects } from '../services/projectService';
 import { supabase } from '../services/supabaseClient';
 
 interface Props {
@@ -488,9 +488,10 @@ export const GanttView: React.FC<Props> = ({ onSelectOpportunity, onTaskUpdate, 
               const { data: userData } = await supabase.from('users').select('organizacao').eq('id', user.id).single();
               if (userData) orgId = userData.organizacao;
           }
-          const availableDevs = await fetchDevelopers(orgId);
+          // Changed from fetchDevelopers to fetchAssignableUsers
+          const availableDevs = await fetchAssignableUsers(orgId);
           if (availableDevs.length === 0) {
-              alert("Não há desenvolvedores disponíveis.");
+              alert("Não há profissionais disponíveis.");
               setIsBalancing(false); return;
           }
 

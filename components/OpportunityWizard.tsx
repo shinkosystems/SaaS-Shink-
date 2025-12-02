@@ -4,7 +4,7 @@ import { Opportunity, RDEStatus, Archetype, IntensityLevel, TadsCriteria, Projec
 import { analyzeOpportunity, suggestEvidence } from '../services/geminiService';
 import { createProject } from '../services/projectService';
 import { supabase } from '../services/supabaseClient';
-import { Target, Zap, Rocket, BrainCircuit, ChevronRight, Check, Loader2, Lightbulb, DollarSign, AlertTriangle, ChevronDown, User, UserPlus, X, Phone, Lock, ArrowLeft, Layers, Calendar, Clock } from 'lucide-react';
+import { Target, Zap, Rocket, BrainCircuit, ChevronRight, Check, Loader2, Lightbulb, DollarSign, AlertTriangle, ChevronDown, User, UserPlus, X, Phone, Lock, ArrowLeft, Layers, Calendar, Clock, Flame, Coffee, Snowflake } from 'lucide-react';
 import { ElasticSwitch } from './ElasticSwitch';
 import { logEvent } from '../services/analyticsService';
 
@@ -469,24 +469,43 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel, org
                 </div>
               )}
 
-              <div className="mt-2">
+              <div className="mt-4">
                 <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-3">1. Radar de Demandas (RDE)</span>
                 <div className="grid grid-cols-3 gap-3">
                   {[
-                    { id: RDEStatus.HOT, color: 'border-red-500 bg-red-500/10 text-red-500' }, 
-                    { id: RDEStatus.WARM, color: 'border-orange-500 bg-orange-500/10 text-orange-500' }, 
-                    { id: RDEStatus.COLD, color: 'border-blue-500 bg-blue-500/10 text-blue-500' }
+                    { 
+                      id: RDEStatus.HOT, 
+                      icon: <Flame className="w-5 h-5 mb-1"/>,
+                      desc: "O cliente pede HOJE. Dor explícita e orçamento.",
+                      color: 'border-red-500 bg-red-500/10 text-red-500' 
+                    }, 
+                    { 
+                      id: RDEStatus.WARM, 
+                      icon: <Coffee className="w-5 h-5 mb-1"/>,
+                      desc: "Existe interesse, mas falta urgência ou budget.",
+                      color: 'border-orange-500 bg-orange-500/10 text-orange-500' 
+                    }, 
+                    { 
+                      id: RDEStatus.COLD, 
+                      icon: <Snowflake className="w-5 h-5 mb-1"/>,
+                      desc: "Ideia interna/prospecção. Sem validação ainda.",
+                      color: 'border-blue-500 bg-blue-500/10 text-blue-500' 
+                    }
                   ].map((status) => (
                     <button
                       key={status.id}
                       onClick={() => setFormData({...formData, rde: status.id})}
-                      className={`p-4 h-20 rounded-xl border transition-all ${
+                      className={`p-4 h-auto min-h-[100px] rounded-xl border transition-all flex flex-col items-center justify-center text-center gap-2 ${
                         formData.rde === status.id 
-                          ? `${status.color} shadow-[0_0_15px_rgba(0,0,0,0.2)] scale-105 ring-1 ring-white/20`
-                          : 'glass-panel border-transparent hover:bg-white/5 opacity-60 hover:opacity-100'
+                          ? `${status.color} shadow-lg scale-105 ring-1 ring-white/20`
+                          : 'glass-panel border-transparent hover:bg-white/5 opacity-50 hover:opacity-100 text-slate-500 dark:text-slate-400'
                       }`}
                     >
-                      <span className="font-bold block text-lg">{status.id}</span>
+                      <div className="flex flex-col items-center">
+                          {status.icon}
+                          <span className="font-bold text-lg leading-none">{status.id}</span>
+                      </div>
+                      <span className="text-[10px] leading-tight opacity-90 font-medium max-w-[120px]">{status.desc}</span>
                     </button>
                   ))}
                 </div>

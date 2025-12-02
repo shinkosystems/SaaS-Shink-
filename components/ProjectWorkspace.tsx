@@ -5,7 +5,7 @@ import { KanbanBoard } from './KanbanBoard';
 import { GanttView } from './GanttView';
 import { CalendarView } from './CalendarView';
 import OpportunityDetail from './OpportunityDetail'; // Reused for Overview/Files/Storytime logic
-import { ArrowLeft, LayoutDashboard, Trello, GanttChartSquare, Calendar as CalendarIcon, Lock, Unlock, Edit, Trash2, PlayCircle, Snowflake } from 'lucide-react';
+import { ArrowLeft, LayoutDashboard, Trello, GanttChartSquare, Calendar as CalendarIcon, Lock, Unlock, Edit, Trash2, PlayCircle, Snowflake, Share2, Check } from 'lucide-react';
 
 interface Props {
   opportunity: Opportunity;
@@ -21,6 +21,7 @@ type Tab = 'overview' | 'kanban' | 'gantt' | 'calendar';
 
 export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdate, onEdit, onDelete, userRole, currentPlan }) => {
   const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const [copiedLink, setCopiedLink] = useState(false);
 
   const getStatusColor = (status: string) => {
       switch(status) {
@@ -46,6 +47,15 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
       }
   };
 
+  const handleShare = () => {
+      // Use origin to ensure no duplicate query params if URL is already dirty
+      const url = `${window.location.origin}/?project=${opportunity.id}`;
+      navigator.clipboard.writeText(url).then(() => {
+          setCopiedLink(true);
+          setTimeout(() => setCopiedLink(false), 2000);
+      });
+  };
+
   return (
     <div className="h-full flex flex-col bg-slate-50/50 dark:bg-[#050505] overflow-hidden">
       
@@ -69,23 +79,34 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
               </div>
           </div>
 
-          {!isClient && (
-              <div className="flex items-center gap-2 shrink-0">
-                  <button onClick={() => onEdit(opportunity)} className="p-2 text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg transition-colors" title="Editar Detalhes">
-                      <Edit className="w-4 h-4"/>
-                  </button>
-                  {userRole === 'dono' && (
-                      <button 
-                        onClick={handleDelete} 
-                        className="flex items-center gap-2 px-3 py-2 text-red-500 hover:text-white hover:bg-red-500 bg-red-500/10 rounded-lg transition-colors text-xs font-bold" 
-                        title="Excluir Projeto e Tarefas"
-                      >
-                          <Trash2 className="w-4 h-4"/>
-                          <span className="hidden sm:inline">Excluir</span>
+          <div className="flex items-center gap-2 shrink-0">
+              <button 
+                  onClick={handleShare}
+                  className="p-2 text-slate-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors flex items-center gap-2"
+                  title="Copiar Link Direto"
+              >
+                  {copiedLink ? <Check className="w-4 h-4 text-emerald-500"/> : <Share2 className="w-4 h-4"/>}
+                  <span className="text-xs font-bold hidden sm:inline">{copiedLink ? 'Copiado!' : 'Compartilhar'}</span>
+              </button>
+
+              {!isClient && (
+                  <>
+                      <button onClick={() => onEdit(opportunity)} className="p-2 text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg transition-colors" title="Editar Detalhes">
+                          <Edit className="w-4 h-4"/>
                       </button>
-                  )}
-              </div>
-          )}
+                      {userRole === 'dono' && (
+                          <button 
+                            onClick={handleDelete} 
+                            className="flex items-center gap-2 px-3 py-2 text-red-500 hover:text-white hover:bg-red-500 bg-red-500/10 rounded-lg transition-colors text-xs font-bold" 
+                            title="Excluir Projeto e Tarefas"
+                          >
+                              <Trash2 className="w-4 h-4"/>
+                              <span className="hidden sm:inline">Excluir</span>
+                          </button>
+                      )}
+                  </>
+              )}
+          </div>
       </header>
 
       {/* Navigation Tabs */}

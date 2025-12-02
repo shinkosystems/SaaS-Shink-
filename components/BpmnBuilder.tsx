@@ -2,9 +2,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Opportunity, BpmnData, BpmnNode, BpmnTask, BpmnSubTask, PLAN_LIMITS } from '../types';
 import { generateBpmn, extractPdfContext, generateSubtasksForTask } from '../services/geminiService';
-import { fetchAreasAtuacao, fetchOrgMembers } from '../services/projectService';
+import { fetchAreasAtuacao, fetchOrgMembers, syncBpmnTasks } from '../services/projectService';
 import TaskDetailModal from './TaskDetailModal';
-import { Loader2, Sparkles, PlayCircle, CheckSquare, Square, Save, RefreshCw, Plus, Trash2, ArrowRight, FileText, X, UploadCloud, FileType, Calendar as CalendarIcon, MoreHorizontal, User, BarChart3, CalendarClock, Layers, Hash, Lock } from 'lucide-react';
+import { Loader2, Sparkles, PlayCircle, CheckSquare, Square, Save, RefreshCw, Plus, Trash2, ArrowRight, FileText, X, UploadCloud, FileType, Calendar as CalendarIcon, MoreHorizontal, User, BarChart3, CalendarClock, Layers, Hash, Lock, Share2, CheckCircle2 } from 'lucide-react';
 
 interface Props {
   opportunity: Opportunity;
@@ -19,6 +19,8 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onSave, currentPlan }) => {
   const [docsContext, setDocsContext] = useState<string>(opportunity.docsContext || '');
   const [isLoading, setIsLoading] = useState(false);
   const [isEnriching, setIsEnriching] = useState(false);
+  const [isSyncingTasks, setIsSyncingTasks] = useState(false);
+  const [hasSynced, setHasSynced] = useState(false); // New state for sync feedback
   const [isReadingPdf, setIsReadingPdf] = useState(false);
   const [selectedNode, setSelectedNode] = useState<BpmnNode | null>(null);
   const [editingTask, setEditingTask] = useState<{nodeId: string, task: BpmnTask} | null>(null);
@@ -85,6 +87,7 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onSave, currentPlan }) => {
 
   const handleGenerateAi = async () => {
       setIsLoading(true);
+      setHasSynced(false); // Reset sync status on regeneration
       try {
           // Determine Org Type based on roles or string
           const orgTypeStr = "Organizacional"; // This could be passed via prop if needed
@@ -145,6 +148,7 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onSave, currentPlan }) => {
 
   const handleEnrichAllTasks = async () => {
     setIsEnriching(true);
+    setHasSynced(false); // Reset sync status on enrichment
     const newNodes = JSON.parse(JSON.stringify(data.nodes)) as BpmnNode[];
     let changed = false;
 
@@ -185,6 +189,32 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onSave, currentPlan }) => {
     }
 
     setIsEnriching(false);
+  };
+
+  const handleSyncToDb = async () => {
+      if (!opportunity.dbProjectId || !opportunity.organizationId) {
+          alert("O projeto precisa estar salvo e vinculado a uma organização para sincronizar.");
+          return;
+      }
+
+      setIsSyncingTasks(true);
+      try {
+          const updatedNodes = await syncBpmnTasks(
+              opportunity.dbProjectId, 
+              opportunity.organizationId, 
+              data.nodes
+          );
+          
+          const newData = { ...data, nodes: updatedNodes };
+          setData(newData);
+          onSave(newData, docsContext); // Update BPMN structure with new DB IDs
+          setHasSynced(true); // Disable button and show success text
+      } catch (err) {
+          console.error(err);
+          alert("Erro ao sincronizar tarefas.");
+      } finally {
+          setIsSyncingTasks(false);
+      }
   };
 
   const handleSave = () => {
@@ -274,7 +304,7 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onSave, currentPlan }) => {
         <div className="flex-1 relative overflow-hidden bg-slate-950/50 flex flex-col h-[500px] lg:h-auto">
             
             {/* Toolbar */}
-            <div className="p-4 z-10 flex gap-2 flex-wrap bg-slate-900/80 backdrop-blur-sm border-b border-slate-800">
+            <div className="p-4 z-10 flex gap-2 flex-wrap bg-slate-900/80 backdrop-blur-sm border-b border-slate-800 items-center">
                 <button 
                     onClick={() => setShowDocs(!showDocs)}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-all ${
@@ -297,21 +327,44 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onSave, currentPlan }) => {
                 </button>
 
                 {data.nodes.length > 0 && (
-                    <button 
-                        onClick={handleEnrichAllTasks}
-                        disabled={isEnriching || isLoading}
-                        className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-purple-300 rounded-lg shadow-lg transition-all active:scale-95 text-sm font-medium whitespace-nowrap"
-                        title="Preencher subtasks vazias automaticamente"
-                    >
-                        {isEnriching ? <Loader2 className="w-4 h-4 animate-spin"/> : <Layers className="w-4 h-4" />}
-                        Detalhar
-                    </button>
+                    <>
+                        <button 
+                            onClick={handleEnrichAllTasks}
+                            disabled={isEnriching || isLoading}
+                            className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-purple-300 rounded-lg shadow-lg transition-all active:scale-95 text-sm font-medium whitespace-nowrap"
+                            title="Preencher subtasks vazias automaticamente"
+                        >
+                            {isEnriching ? <Loader2 className="w-4 h-4 animate-spin"/> : <Layers className="w-4 h-4" />}
+                            Detalhar
+                        </button>
+
+                        <div className="ml-auto flex items-center gap-3">
+                            {hasSynced && (
+                                <span className="text-emerald-500 text-xs font-bold flex items-center gap-1 animate-in fade-in slide-in-from-left-2">
+                                    <CheckCircle2 className="w-4 h-4"/> Tarefas Inseridas
+                                </span>
+                            )}
+                            <button 
+                                onClick={handleSyncToDb}
+                                disabled={isSyncingTasks || hasSynced}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg transition-all text-sm font-medium whitespace-nowrap ${
+                                    hasSynced 
+                                    ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700' 
+                                    : 'bg-emerald-700 hover:bg-emerald-600 text-white active:scale-95'
+                                }`}
+                                title={hasSynced ? "Tarefas já exportadas" : "Criar tarefas reais no Kanban"}
+                            >
+                                {isSyncingTasks ? <Loader2 className="w-4 h-4 animate-spin"/> : <Share2 className="w-4 h-4" />}
+                                Exportar Tasks
+                            </button>
+                        </div>
+                    </>
                 )}
                 
                 {hasUnsavedChanges && (
                     <button 
                         onClick={handleSave}
-                        className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-lg text-sm font-medium animate-pulse ml-auto"
+                        className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-lg text-sm font-medium animate-pulse"
                     >
                         <Save className="w-4 h-4" /> Salvar
                     </button>
@@ -493,8 +546,6 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onSave, currentPlan }) => {
                             const isDone = task.status === 'done' || task.completed;
                             const isDoing = task.status === 'doing';
                             const gutScore = task.gut ? task.gut.g * task.gut.u * task.gut.t : 0;
-                            const subtaskCount = task.subtasks?.length || 0;
-                            const completedSubtasks = task.subtasks?.filter(s => s.completed).length || 0;
                             
                             return (
                                 <div 
@@ -508,12 +559,23 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onSave, currentPlan }) => {
                                     }`}
                                 >
                                     <div className="flex justify-between items-start">
-                                        <div className="flex gap-3 items-start cursor-pointer flex-1" onClick={() => updateTask(selectedNode.id, { ...task, completed: !isDone, status: !isDone ? 'done' : 'todo' })}>
-                                            {isDone
-                                                ? <CheckSquare className="w-5 h-5 text-emerald-500 shrink-0" /> 
-                                                : <Square className={`w-5 h-5 shrink-0 ${isDoing ? 'text-blue-400' : 'text-slate-500'}`} />
-                                            }
-                                            <div className="min-w-0">
+                                        <div className="flex gap-3 items-start flex-1 min-w-0">
+                                            {/* Checkbox Toggle - SEPARATED CLICK */}
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); updateTask(selectedNode.id, { ...task, completed: !isDone, status: !isDone ? 'done' : 'todo' }); }}
+                                                className="mt-0.5 shrink-0 focus:outline-none"
+                                            >
+                                                {isDone
+                                                    ? <CheckSquare className="w-5 h-5 text-emerald-500" /> 
+                                                    : <Square className={`w-5 h-5 ${isDoing ? 'text-blue-400' : 'text-slate-500'}`} />
+                                                }
+                                            </button>
+
+                                            {/* Text Content - OPENS MODAL */}
+                                            <div 
+                                                className="min-w-0 cursor-pointer flex-1"
+                                                onClick={() => setEditingTask({ nodeId: selectedNode.id, task })}
+                                            >
                                                 <span className={`text-sm leading-snug block truncate ${isDone ? 'text-slate-500 line-through' : 'text-slate-300'}`}>
                                                     {task.text}
                                                 </span>
@@ -536,9 +598,11 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onSave, currentPlan }) => {
                                                 </div>
                                             </div>
                                         </div>
+                                        
+                                        {/* Quick Edit Button - OPENS MODAL */}
                                         <button 
                                             onClick={() => setEditingTask({ nodeId: selectedNode.id, task })}
-                                            className="text-slate-600 hover:text-white p-1 rounded hover:bg-slate-700"
+                                            className="text-slate-600 hover:text-white p-1 rounded hover:bg-slate-700 opacity-0 group-hover:opacity-100 transition-opacity"
                                         >
                                             <MoreHorizontal className="w-4 h-4"/>
                                         </button>

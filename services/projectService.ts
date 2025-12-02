@@ -1,6 +1,6 @@
 
 import { supabase } from './supabaseClient';
-import { DbProject, DbTask, AreaAtuacao } from '../types';
+import { DbProject, DbTask, AreaAtuacao, BpmnNode } from '../types';
 
 const TASKS_TABLE = 'tasks';
 const PROJECT_TABLE = 'projetos';
@@ -23,7 +23,7 @@ export const fetchProjects = async (organizationId?: number): Promise<DbProject[
     const { data, error } = await query;
 
     if (error) {
-        console.error('Erro ao buscar projetos:', error);
+        console.error('Erro ao buscar projetos:', error.message);
         return [];
     }
     return data as any[];
@@ -63,7 +63,7 @@ export const createProject = async (nome: string, cliente: string | null, userId
         .single();
 
     if (error) {
-        console.error('Erro ao criar projeto:', error);
+        console.error('Erro ao criar projeto:', error.message);
         return null;
     }
     return data;
@@ -72,36 +72,50 @@ export const createProject = async (nome: string, cliente: string | null, userId
 // --- ÁREAS DE ATUAÇÃO & MEMBROS ---
 
 export const fetchAreasAtuacao = async (): Promise<AreaAtuacao[]> => {
-    const { data, error } = await supabase.from('area_atuacao').select('*').order('nome');
+    // Select * instead of specific columns to avoid error if 'nome' is missing
+    const { data, error } = await supabase.from('area_atuacao').select('*');
+    
     if (error) {
-        console.error('Erro ao buscar áreas de atuação:', error);
-        return [];
-    }
-    return data as AreaAtuacao[];
-};
-
-export const fetchOrgMembers = async (organizationId: number): Promise<{id: string, nome: string, cargo: number, area?: string}[]> => {
-    const { data, error } = await supabase
-        .from('users')
-        .select(`
-            id, 
-            nome, 
-            cargo,
-            areaData:area_atuacao(nome)
-        `)
-        .eq('organizacao', organizationId);
-
-    if (error) {
-        console.error('Erro ao buscar membros:', error);
+        console.error('Erro ao buscar áreas de atuação:', error.message);
         return [];
     }
     
-    // Flatten result
-    return data.map((u: any) => ({
+    // Map with fallbacks for the name property
+    return data.map((d: any) => ({
+        id: d.id,
+        nome: d.nome || d.name || d.titulo || d.descricao || `Cargo ${d.id}`
+    })).sort((a, b) => a.nome.localeCompare(b.nome));
+};
+
+export const fetchOrgMembers = async (organizationId: number): Promise<{id: string, nome: string, cargo: number, area?: string}[]> => {
+    const { data: users, error } = await supabase
+        .from('users')
+        .select('id, nome, cargo')
+        .eq('organizacao', organizationId);
+
+    if (error) {
+        console.error('Erro ao buscar membros:', error.message);
+        return [];
+    }
+
+    // Manual Hydration for Area Name (avoiding join issues)
+    const cargoIds = [...new Set(users.map((u: any) => u.cargo).filter(Boolean))];
+    let areaMap = new Map<number, string>();
+
+    if (cargoIds.length > 0) {
+        // Select * to be safe
+        const { data: areas } = await supabase.from('area_atuacao').select('*').in('id', cargoIds);
+        areas?.forEach((a: any) => {
+            const name = a.nome || a.name || a.titulo || a.descricao || `Cargo ${a.id}`;
+            areaMap.set(a.id, name);
+        });
+    }
+    
+    return users.map((u: any) => ({
         id: u.id,
         nome: u.nome,
         cargo: u.cargo,
-        area: u.areaData?.nome || 'Sem Cargo'
+        area: areaMap.get(u.cargo) || 'Sem Cargo'
     }));
 };
 
@@ -148,8 +162,8 @@ export const fetchAllTasks = async (organizationId?: number): Promise<DbTask[]> 
 
         return hydratedTasks;
 
-    } catch (error) {
-        console.error('Erro ao buscar tarefas (tasks):', error);
+    } catch (error: any) {
+        console.error('Erro ao buscar tarefas (tasks):', error.message);
         return [];
     }
 };
@@ -175,8 +189,8 @@ export const fetchUserTasks = async (userId: string, organizationId?: number): P
 
         if (error) throw error;
         return tasks as DbTask[];
-    } catch (error) {
-        console.error('Erro ao buscar tarefas do usuário:', error);
+    } catch (error: any) {
+        console.error('Erro ao buscar tarefas do usuário:', error.message);
         return [];
     }
 };
@@ -184,7 +198,6 @@ export const fetchUserTasks = async (userId: string, organizationId?: number): P
 export const fetchSubtasks = async (parentId: number): Promise<any[]> => {
     try {
         // Busca subtarefas ligadas ao pai
-        // REMOVED JOIN responsavelData:users(nome) because foreign key points to auth.users, not public.users
         const { data, error } = await supabase
             .from(TASKS_TABLE)
             .select('*')
@@ -219,20 +232,20 @@ export const fetchSubtasks = async (parentId: number): Promise<any[]> => {
             assignee: userMap.get(t.responsavel) || 'Desconhecido'
         }));
     } catch (error: any) {
-        console.error('Erro ao buscar subtarefas:', error.message || error);
+        console.error('Erro ao buscar subtarefas:', error.message);
         return [];
     }
 };
 
-export const fetchDevelopers = async (organizationId: number): Promise<{id: string, nome: string}[]> => {
+export const fetchAssignableUsers = async (organizationId: number): Promise<{id: string, nome: string}[]> => {
     const { data, error } = await supabase
         .from('users')
         .select('id, nome')
-        .eq('organizacao', organizationId)
-        .eq('desenvolvedor', true);
+        .eq('organizacao', organizationId);
+        // Removed filter for 'desenvolvedor' to support all types of assignable users
 
     if (error) {
-        console.error('Erro ao buscar desenvolvedores:', error);
+        console.error('Erro ao buscar usuários atribuíveis:', error.message);
         return [];
     }
     return data || [];
@@ -312,11 +325,7 @@ export const updateTask = async (id: number, updates: Partial<DbTask>): Promise<
         .single();
 
     if (error) {
-        // Improve logging to show full error message instead of [object Object]
-        const errorMsg = typeof error === 'object' && error !== null && 'message' in error 
-            ? (error as any).message 
-            : JSON.stringify(error);
-        console.error(`Erro ao atualizar tarefa (ID: ${id}):`, errorMsg);
+        console.error(`Erro ao atualizar tarefa (ID: ${id}):`, error.message);
         return null;
     }
     return data;
@@ -326,13 +335,13 @@ export const deleteTask = async (id: number): Promise<boolean> => {
     // 1. Delete Subtasks first to avoid constraint errors
     const { error: subError } = await supabase.from(TASKS_TABLE).delete().eq('tarefamae', id);
     if (subError) {
-        console.error('Erro ao deletar subtarefas:', subError);
+        console.error('Erro ao deletar subtarefas:', subError.message);
     }
 
     // 2. Delete Main Task
     const { error } = await supabase.from(TASKS_TABLE).delete().eq('id', id);
     if (error) {
-        console.error('Erro ao deletar tarefa:', error);
+        console.error('Erro ao deletar tarefa:', error.message);
         return false;
     }
     return true;
@@ -361,4 +370,100 @@ export const syncSubtasks = async (parentTaskId: number, subtasks: { nome: strin
     if (inserts.length > 0) {
         await supabase.from(TASKS_TABLE).insert(inserts);
     }
+};
+
+// Function to Sync BPMN Nodes directly to Tasks Table
+export const syncBpmnTasks = async (projectId: number, organizationId: number, nodes: BpmnNode[]): Promise<BpmnNode[]> => {
+    const updatedNodes = JSON.parse(JSON.stringify(nodes)); // Deep copy to avoid mutation issues
+    
+    // Default Assignee fallback (current user if possible, but we don't have user context here easily, so require assigneeId on tasks)
+    // We assume tasks already have assigneeId from the UI or AI assignment step.
+
+    for (const node of updatedNodes) {
+        if (!node.checklist) continue;
+
+        for (let i = 0; i < node.checklist.length; i++) {
+            const task = node.checklist[i];
+            
+            // Validate Assignee
+            if (!task.assigneeId) {
+                console.warn(`Task "${task.text}" skipped sync: No assigneeId.`);
+                continue; 
+            }
+
+            let dbId = task.dbId;
+
+            // 1. CREATE or UPDATE Parent Task
+            if (dbId) {
+                // Update existing
+                await updateTask(dbId, {
+                    titulo: task.text,
+                    descricao: task.description,
+                    status: task.status,
+                    responsavel: task.assigneeId,
+                    duracaohoras: task.estimatedHours,
+                    datainicio: task.startDate,
+                    datafim: task.dueDate
+                });
+            } else {
+                // Insert new
+                const created = await createTask({
+                    projeto: projectId,
+                    titulo: task.text,
+                    descricao: task.description || node.label, // Use node label as description context
+                    status: task.status || 'todo',
+                    responsavel: task.assigneeId,
+                    duracaohoras: task.estimatedHours || 2,
+                    datainicio: task.startDate || new Date().toISOString(),
+                    datafim: task.dueDate || new Date().toISOString(),
+                    organizacao: organizationId,
+                    sutarefa: false
+                });
+                
+                if (created) {
+                    dbId = created.id;
+                    task.dbId = created.id;
+                    task.id = created.id.toString(); // Sync frontend ID to DB ID
+                }
+            }
+
+            // 2. Sync Subtasks
+            if (dbId && task.subtasks && task.subtasks.length > 0) {
+                for (let j = 0; j < task.subtasks.length; j++) {
+                    const sub = task.subtasks[j];
+                    let subDbId = sub.dbId;
+
+                    if (subDbId) {
+                        await updateTask(subDbId, {
+                            titulo: sub.text,
+                            status: sub.completed ? 'done' : 'todo',
+                            responsavel: sub.assigneeId || task.assigneeId,
+                            duracaohoras: sub.estimatedHours
+                        });
+                    } else {
+                        const createdSub = await createTask({
+                            projeto: projectId,
+                            titulo: sub.text,
+                            descricao: 'Subtarefa BPMN',
+                            status: sub.completed ? 'done' : 'todo',
+                            responsavel: sub.assigneeId || task.assigneeId,
+                            duracaohoras: sub.estimatedHours || 1,
+                            datainicio: sub.startDate || task.startDate,
+                            datafim: sub.dueDate || task.dueDate,
+                            organizacao: organizationId,
+                            sutarefa: true,
+                            tarefamae: dbId
+                        });
+
+                        if (createdSub) {
+                            sub.dbId = createdSub.id;
+                            sub.id = createdSub.id.toString();
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return updatedNodes;
 };

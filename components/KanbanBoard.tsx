@@ -1,10 +1,11 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Opportunity, TaskStatus, DbTask } from '../types';
-import { Trello, Filter, User, Hash, Clock, Briefcase, RefreshCw, Calendar as CalendarIcon, GitMerge } from 'lucide-react';
+import { Trello, Filter, User, Hash, Clock, Briefcase, RefreshCw, Calendar as CalendarIcon, GitMerge, GanttChartSquare } from 'lucide-react';
 import TaskDetailModal from './TaskDetailModal';
 import { fetchAllTasks, updateTask, fetchProjects } from '../services/projectService';
 import { logEvent } from '../services/analyticsService';
+import { GanttView } from './GanttView';
 
 interface Props {
   opportunities?: Opportunity[]; // Opcional agora
@@ -23,6 +24,7 @@ interface KanbanColumn {
 }
 
 type TimeFilter = 'all' | 'day' | 'week' | 'month' | 'year';
+type ViewMode = 'board' | 'gantt';
 
 const COLUMNS: KanbanColumn[] = [
     { id: 'todo', label: 'A Fazer', color: 'bg-slate-500' },
@@ -32,7 +34,8 @@ const COLUMNS: KanbanColumn[] = [
     { id: 'done', label: 'Concluído', color: 'bg-emerald-500' }
 ];
 
-export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, projectId, organizationId }) => {
+export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, projectId, organizationId, onTaskUpdate }) => {
+    const [viewMode, setViewMode] = useState<ViewMode>('board');
     const [tasks, setTasks] = useState<DbTask[]>([]);
     const [projectsList, setProjectsList] = useState<{id: number, nome: string}[]>([]);
     const [loading, setLoading] = useState(true);
@@ -53,8 +56,10 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
 
     // Load Real Tasks from DB
     useEffect(() => {
-        loadData();
-    }, [organizationId]);
+        if (viewMode === 'board') {
+            loadData();
+        }
+    }, [organizationId, viewMode]);
 
     const loadData = async () => {
         setLoading(true);
@@ -165,11 +170,38 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
             <div className="mb-6 flex flex-col gap-4">
                 <div className="flex justify-between items-center">
                     {!projectId && (
-                        <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
-                            <Trello className="w-8 h-8 text-shinko-primary"/> Kanban
-                        </h1>
+                        <div className="flex items-center gap-4">
+                            <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
+                                <Briefcase className="w-8 h-8 text-shinko-primary"/> Tarefas
+                            </h1>
+                            
+                            {/* View Switcher */}
+                            <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+                                <button 
+                                    onClick={() => setViewMode('board')}
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                                        viewMode === 'board' 
+                                        ? 'bg-white dark:bg-slate-700 shadow text-shinko-primary' 
+                                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                                    }`}
+                                >
+                                    <Trello className="w-4 h-4"/> Quadro
+                                </button>
+                                <button 
+                                    onClick={() => setViewMode('gantt')}
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                                        viewMode === 'gantt' 
+                                        ? 'bg-white dark:bg-slate-700 shadow text-shinko-primary' 
+                                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                                    }`}
+                                >
+                                    <GanttChartSquare className="w-4 h-4"/> Gantt
+                                </button>
+                            </div>
+                        </div>
                     )}
                     
+                    {viewMode === 'board' && (
                     <div className="flex items-center gap-3 ml-auto">
                         {/* Current Value Display (The "Exibidor") */}
                         <div className="bg-shinko-primary/10 text-shinko-primary px-3 py-1.5 rounded-lg text-xs font-bold border border-shinko-primary/20 flex items-center gap-2">
@@ -184,9 +216,11 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
                             {filteredTasks.length} Tasks
                         </div>
                     </div>
+                    )}
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3 glass-panel p-3 rounded-2xl">
+                {viewMode === 'board' && (
+                <div className="flex flex-wrap items-center gap-3 glass-panel p-3 rounded-2xl bg-white dark:bg-black/20">
                     <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-sm font-bold mr-2"><Filter className="w-4 h-4"/> Filtros:</div>
                     
                     {/* Time Filter Buttons */}
@@ -238,8 +272,25 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
                         <User className="w-4 h-4 absolute left-3 top-3 text-slate-500 pointer-events-none"/>
                     </div>
                 </div>
+                )}
             </div>
 
+            {/* GANTT VIEW MODE */}
+            {viewMode === 'gantt' && (
+                <div className="flex-1 overflow-hidden bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm">
+                    <GanttView 
+                        opportunities={[]} // Data is fetched internally by organizationId
+                        onSelectOpportunity={onSelectOpportunity}
+                        onTaskUpdate={onTaskUpdate || (() => {})}
+                        userRole={userRole}
+                        projectId={projectId}
+                        organizationId={organizationId}
+                    />
+                </div>
+            )}
+
+            {/* BOARD VIEW MODE */}
+            {viewMode === 'board' && (
             <div className="flex-1 overflow-x-auto pb-4 custom-scrollbar">
                 <div className="flex gap-4 h-full min-w-[1400px]">
                     {COLUMNS.map(col => (
@@ -249,17 +300,17 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
                                 handleStatusChange(draggedTask, col.id);
                                 setDraggedTask(null);
                             }
-                        }} className={`flex-1 min-w-[280px] bg-white/40 dark:bg-black/20 backdrop-blur-md border border-white/20 dark:border-white/5 rounded-3xl flex flex-col ${draggedTask ? 'border-dashed border-amber-500/50' : ''}`}>
-                            <div className="p-4 border-b border-slate-100 dark:border-white/5 bg-white/20 dark:bg-white/5 rounded-t-3xl flex items-center justify-between">
+                        }} className={`flex-1 min-w-[280px] bg-slate-100 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-3xl flex flex-col ${draggedTask ? 'border-dashed border-amber-500/50' : ''}`}>
+                            <div className="p-4 border-b border-slate-200 dark:border-white/5 bg-slate-200/50 dark:bg-white/5 rounded-t-3xl flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <div className={`w-3 h-3 rounded-full ${col.color} shadow-glow`}></div>
                                     <span className="font-bold text-slate-800 dark:text-white text-sm tracking-wide">{col.label}</span>
                                 </div>
-                                <span className="text-xs font-bold bg-slate-200 dark:bg-black/30 px-2 py-1 rounded-full text-slate-600 dark:text-slate-400">{columnsData[col.id]?.length || 0}</span>
+                                <span className="text-xs font-bold bg-white dark:bg-black/30 px-2 py-1 rounded-full text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-transparent">{columnsData[col.id]?.length || 0}</span>
                             </div>
                             <div className="flex-1 p-3 overflow-y-auto custom-scrollbar space-y-3">
                                 {columnsData[col.id]?.map(task => (
-                                    <div key={task.id} draggable onDragStart={e => {setDraggedTask(task); e.dataTransfer.setData('text/plain', task.id.toString());}} onClick={() => setEditingTaskCtx(task)} className="glass-card p-4 rounded-2xl cursor-grab active:cursor-grabbing hover:bg-white/60 dark:hover:bg-white/10 border-slate-200 dark:border-white/5 transition-all hover:scale-[1.02] shadow-sm active:scale-95 touch-manipulation">
+                                    <div key={task.id} draggable onDragStart={e => {setDraggedTask(task); e.dataTransfer.setData('text/plain', task.id.toString());}} onClick={() => setEditingTaskCtx(task)} className="bg-white dark:bg-white/5 p-4 rounded-2xl cursor-grab active:cursor-grabbing hover:border-shinko-primary/50 dark:hover:bg-white/10 border border-slate-200 dark:border-white/5 transition-all hover:scale-[1.02] shadow-sm active:scale-95 touch-manipulation">
                                         <div className="flex justify-between items-start mb-2">
                                             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate max-w-[140px]">{task.projetoData?.nome || 'Sem Projeto'}</span>
                                             <span className="text-[9px] font-mono text-slate-500 bg-slate-100 dark:bg-black/30 px-1 rounded">#{task.id}</span>
@@ -267,7 +318,7 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
                                         
                                         {/* Subtask Badge */}
                                         {task.sutarefa && (
-                                            <div className="text-[9px] font-bold text-purple-500 bg-purple-100 dark:bg-purple-900/20 px-1.5 py-0.5 rounded mb-2 w-fit flex items-center gap-1 border border-purple-200 dark:border-purple-500/30">
+                                            <div className="text-[9px] font-bold text-purple-500 bg-purple-50 dark:bg-purple-900/20 px-1.5 py-0.5 rounded mb-2 w-fit flex items-center gap-1 border border-purple-100 dark:border-purple-500/30">
                                                 <GitMerge className="w-3 h-3"/> Subtarefa
                                             </div>
                                         )}
@@ -296,6 +347,7 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
                     ))}
                 </div>
             </div>
+            )}
 
             {editingTaskCtx && (
                 <TaskDetailModal 
