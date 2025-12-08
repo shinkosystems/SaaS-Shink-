@@ -2,6 +2,8 @@
 
 
 
+
+
 import React, { useState, useEffect } from 'react';
 import { Opportunity, RDEStatus, Archetype, IntensityLevel, TadsCriteria, ProjectStatus } from '../types';
 import { analyzeOpportunity, suggestEvidence } from '../services/geminiService';
@@ -341,7 +343,7 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel, org
                 console.error("AI Key retry failed", e);
             }
         } else {
-            alert("⚠️ Configuração Necessária\n\nA chave de API do Gemini não foi encontrada. No Vercel, adicione a variável de ambiente 'API_KEY'.");
+            alert("⚠️ Configuração Necessária\n\nA chave de API do Gemini não foi encontrada.\nCertifique-se de que a variável de ambiente 'VITE_API_KEY' (ou 'API_KEY') está configurada no Vercel.");
         }
     }
 

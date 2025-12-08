@@ -2,8 +2,31 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Opportunity } from "../types";
 
+const getApiKey = (): string | undefined => {
+  // 1. Check Standard Process Env (Node/Webpack/CRA)
+  if (typeof process !== 'undefined' && process.env) {
+    if (process.env.API_KEY) return process.env.API_KEY;
+    if (process.env.VITE_API_KEY) return process.env.VITE_API_KEY;
+    if (process.env.NEXT_PUBLIC_API_KEY) return process.env.NEXT_PUBLIC_API_KEY;
+    if (process.env.REACT_APP_API_KEY) return process.env.REACT_APP_API_KEY;
+  }
+  
+  // 2. Check Vite Import Meta (ESM)
+  try {
+    // @ts-ignore
+    if (import.meta && import.meta.env) {
+        // @ts-ignore
+        if (import.meta.env.VITE_API_KEY) return import.meta.env.VITE_API_KEY;
+        // @ts-ignore
+        if (import.meta.env.API_KEY) return import.meta.env.API_KEY;
+    }
+  } catch(e) {}
+
+  return undefined;
+};
+
 const getAiClient = () => {
-  const apiKey = process.env.API_KEY;
+  const apiKey = getApiKey();
   if (!apiKey) return null;
   return new GoogleGenAI({ apiKey });
 };
