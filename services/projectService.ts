@@ -71,7 +71,8 @@ export const createProject = async (nome: string, cliente: string | null, userId
             tadsrecorrencia: false,
             tadsvelocidade: false,
             organizacao: orgId,
-            projoport: false 
+            projoport: false,
+            cor: '#3b82f6' // Default Blue
         })
         .select()
         .single();
@@ -173,7 +174,7 @@ export const fetchAllTasks = async (organizationId?: number): Promise<DbTask[]> 
             .from(TASKS_TABLE)
             .select(`
                 *,
-                projetoData:projetos(nome)
+                projetoData:projetos(nome, cor)
             `)
             .eq('organizacao', organizationId)
             .order('dataproposta', { ascending: true });
@@ -220,7 +221,7 @@ export const fetchUserTasks = async (userId: string, organizationId?: number): P
             .from(TASKS_TABLE)
             .select(`
                 *,
-                projetoData:projetos(nome)
+                projetoData:projetos(nome, cor)
             `)
             .eq('responsavel', userId)
             .eq('organizacao', organizationId) // Always filter by organization

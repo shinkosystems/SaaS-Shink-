@@ -175,6 +175,7 @@ export interface DbProject {
   organizacao: number;
   projoport: boolean; // True se for apenas oportunidade, False se virou projeto
   created_at: string;
+  cor?: string; // NEW: Project Color for Calendar/Agenda
   
   // AI & Structure
   bpmn_structure?: any;
@@ -215,7 +216,7 @@ export interface DbTask {
   createdat: string;
 
   // Relations (Manually Hydrated)
-  projetoData?: { nome: string }; 
+  projetoData?: { nome: string, cor?: string }; 
   responsavelData?: { nome: string, desenvolvedor: boolean, organizacao: number, avatar_url?: string };
 }
 
@@ -353,6 +354,7 @@ export interface Opportunity {
   status: ProjectStatus;
   createdAt: string;
   priorityLock?: boolean;
+  color?: string; // NEW: Project Color
   
   attachments?: Attachment[];
   comments?: Comment[];

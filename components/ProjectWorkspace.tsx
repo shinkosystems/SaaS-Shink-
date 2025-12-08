@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Opportunity, BpmnTask, ProjectStatus, PLAN_LIMITS } from '../types';
 import { KanbanBoard } from './KanbanBoard';
@@ -123,7 +124,7 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
               { id: 'overview', label: 'Visão Geral', icon: LayoutDashboard },
               { id: 'kanban', label: 'Kanban', icon: Trello },
               { id: 'gantt', label: 'Gantt', icon: GanttChartSquare, locked: !canViewGantt },
-              { id: 'calendar', label: 'Cronograma', icon: CalendarIcon },
+              { id: 'calendar', label: 'Agenda', icon: CalendarIcon },
           ].map(tab => (
               <button
                   key={tab.id}

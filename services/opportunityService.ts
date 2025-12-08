@@ -1,5 +1,4 @@
 
-
 import { supabase } from './supabaseClient';
 import { Opportunity, ProjectStatus, DbProject, RDEStatus, Archetype, IntensityLevel, TadsCriteria, DbTask, BpmnTask, BpmnNode } from '../types';
 
@@ -423,7 +422,8 @@ const mapDbProjectToOpportunity = (row: DbProject, tasks: DbTask[] = []): Opport
         bpmn: baseBpmn as any,
         dbProjectId: row.id,
         docsContext: row.contexto_ia || '',
-        attachments: attachments
+        attachments: attachments,
+        color: row.cor || '#3b82f6'
     };
 };
 
@@ -451,6 +451,7 @@ const mapOpportunityToDbProject = (opp: Opportunity): any => {
         organizacao: opp.organizationId || 3,
         projoport: opp.status === 'Future' || opp.status === 'Negotiation' || opp.status === 'Frozen',
         bpmn_structure: structure,
-        contexto_ia: opp.docsContext || ''
+        contexto_ia: opp.docsContext || '',
+        cor: opp.color // Save color
     };
 };

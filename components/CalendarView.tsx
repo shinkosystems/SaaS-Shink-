@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
 import { Opportunity, TaskStatus, BpmnTask, DbTask } from '../types';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, User, Clock, Zap, Plus, LayoutGrid, Columns, Square, Loader2, CheckCircle2, Hash, RefreshCw, Grid, CornerDownRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, User, Clock, Zap, Plus, LayoutGrid, Columns, Square, Loader2, CheckCircle2, Hash, RefreshCw, Grid, CornerDownRight, AlignLeft } from 'lucide-react';
 import TaskDetailModal from './TaskDetailModal';
 import { optimizeSchedule } from '../services/geminiService';
 import { supabase } from '../services/supabaseClient';
@@ -152,14 +152,17 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
     const tasks: Array<any> = [];
 
     // Mapeamento de Projetos para Cores e Títulos
-    const projectMeta = new Map<number, { title: string, color: string, opp: Opportunity }>();
+    const projectMeta = new Map<number, { title: string, color: string, opp: Opportunity, customColor?: string }>();
     opportunities.forEach(o => {
+        // Use custom color if available, otherwise default logic
+        const customColor = o.color;
+        
         const color = 
             o.status === 'Active' ? 'bg-emerald-500' :
             o.status === 'Negotiation' ? 'bg-blue-500' :
             o.status === 'Future' ? 'bg-yellow-500' :
             'bg-slate-500';
-        projectMeta.set(Number(o.id), { title: o.title, color, opp: o });
+        projectMeta.set(Number(o.id), { title: o.title, color, opp: o, customColor });
     });
 
     dbTasks.forEach(dbTask => {
@@ -179,21 +182,33 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
         }
         
         // Determina cor e título
-        let meta = { title: 'Projeto Desconhecido', color: 'bg-slate-400', opp: undefined as any };
+        let meta: { title: string; color: string; opp?: Opportunity; customColor?: string } = { 
+            title: 'Projeto Desconhecido', 
+            color: 'bg-slate-400', 
+            opp: undefined, 
+            customColor: undefined 
+        };
         
         if (dbTask.projeto && projectMeta.has(dbTask.projeto)) {
             meta = projectMeta.get(dbTask.projeto)!;
         } else if (!dbTask.projeto) {
             // Tarefas Avulsas (Sem projeto vinculado)
-            meta = { title: 'Tarefa Avulsa', color: 'bg-neutral-500 dark:bg-neutral-600', opp: undefined };
+            meta = { title: 'Tarefa Avulsa', color: 'bg-neutral-500', opp: undefined, customColor: '#737373' };
         } else if (dbTask.projeto) {
              // Tem projeto mas não está na lista carregada (ex: arquivado ou sem acesso)
-             meta = { title: dbTask.projetoData?.nome || 'Projeto Arquivado', color: 'bg-slate-400', opp: undefined as any };
+             // Tenta pegar cor do projetoData (join)
+             meta = { 
+                 title: dbTask.projetoData?.nome || 'Projeto Arquivado', 
+                 color: 'bg-slate-400', 
+                 opp: undefined,
+                 customColor: dbTask.projetoData?.cor
+             };
         }
 
-        // Header Logic: Standard is Project Name. 
-        // If subtask, user requested Subtask Title to be shown prominently.
-        // We will show Project Name in Header, and Subtask Name in Body.
+        // Use custom color if available
+        const effectiveBgColor = meta.customColor ? undefined : meta.color;
+        const style = meta.customColor ? { backgroundColor: meta.customColor, borderLeftColor: meta.customColor } : {};
+
         let displayHeader = meta.title;
 
         const safeDateParse = (dateStr?: string) => {
@@ -251,13 +266,14 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
                     date: dateStr,
                     taskId: dbTask.id,
                     task: taskAdapter, 
-                    taskText: dbTask.titulo, // This is the Subtask Title
+                    taskText: dbTask.titulo,
                     isSubtask: dbTask.sutarefa, 
                     status: effectiveStatus,
                     completed: effectiveStatus === 'done',
                     assignee: dbTask.responsavelData?.nome,
-                    oppTitle: displayHeader, // Project Name
-                    oppColor: meta.color,
+                    oppTitle: displayHeader, 
+                    oppColor: effectiveBgColor,
+                    style: style, // Pass custom style
                     oppId: dbTask.projeto?.toString() || '',
                     nodeId: 'manual', 
                     nodeLabel: dbTask.projeto ? 'Tarefa de Projeto' : 'Tarefa Avulsa',
@@ -438,103 +454,63 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
       else { datesToRender = getDayData(); gridColsClass = 'grid-cols-1'; }
 
       return (
-        <div className={`grid ${gridColsClass} gap-px bg-slate-200 dark:bg-[#111] border border-slate-200 dark:border-[#222] rounded-lg overflow-hidden shadow-xl`}>
+        <div className={`grid ${gridColsClass} gap-px bg-slate-200 dark:bg-[#222] border border-slate-200 dark:border-[#222] rounded-lg overflow-hidden shadow-sm`}>
             {viewMode !== 'day' && ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((day, idx) => (
-                <div key={day} className={`p-3 text-center text-xs font-bold uppercase ${
-                    idx === 0 || idx === 6 ? 'bg-slate-50/80 dark:bg-[#0f0f0f] text-red-500 dark:text-red-400' : 'bg-slate-50 dark:bg-[#0a0a0a] text-slate-500 dark:text-neutral-400'
+                <div key={day} className={`p-3 text-center text-xs font-bold uppercase tracking-wider ${
+                    idx === 0 || idx === 6 ? 'bg-slate-50/50 dark:bg-[#111] text-slate-400' : 'bg-white dark:bg-[#111] text-slate-500 dark:text-neutral-400'
                 }`}>{day}</div>
             ))}
 
             {datesToRender.map((date, index) => {
-                if (!date && viewMode === 'month') return <div key={`blank-${index}`} className="bg-slate-50 dark:bg-[#0a0a0a] min-h-[140px]"></div>;
+                if (!date && viewMode === 'month') return <div key={`blank-${index}`} className="bg-white dark:bg-[#111] min-h-[120px]"></div>;
                 
                 const isHoliday = isHolidayDay(date);
                 const isWeekend = date.getDay() === 0 || date.getDay() === 6;
                 const isToday = new Date().toDateString() === date.toDateString();
                 const dayTasks = getTasksForDate(date);
 
-                const dailyLoad = dayTasks.reduce<Record<string, { total: number; remaining: number; name: string }>>((acc, curr) => {
-                    const rawName = curr.assignee || '?';
-                    const normName = rawName.trim().toLowerCase();
-                    const displayName = rawName.trim();
-                    if (!acc[normName]) acc[normName] = { total: 0, remaining: 0, name: displayName };
-                    
-                    const hours = Number(curr.dailyHours) || 0; 
-                    
-                    acc[normName].total += hours;
-                    if (!curr.completed) acc[normName].remaining += hours;
-                    return acc;
-                }, {});
-
                 const isNonBusiness = isHoliday || isWeekend;
 
                 return (
                     <div 
                         key={date.toISOString()} 
-                        className={`p-2 border-t border-l border-slate-100 dark:border-[#222] transition-colors relative group flex flex-col
-                            ${viewMode === 'day' ? 'min-h-[400px]' : 'min-h-[140px]'}
-                            ${isToday ? 'bg-amber-50 dark:bg-[#1a1205]' : ''}
-                            ${isHoliday ? 'bg-red-50 dark:bg-[#2a0f0f]' : ''}
-                            ${!isHoliday && !isToday && isWeekend ? 'bg-slate-100 dark:bg-[#0f0f0f]' : ''}
-                            ${!isHoliday && !isToday && !isWeekend ? 'bg-white dark:bg-[#050505] hover:bg-slate-50 dark:hover:bg-[#0f0f0f]' : ''}
+                        className={`p-1 border-t border-l border-slate-100 dark:border-[#222] transition-colors relative group flex flex-col
+                            ${viewMode === 'day' ? 'min-h-[400px]' : 'min-h-[120px]'}
+                            ${isToday ? 'bg-white dark:bg-[#111]' : ''}
+                            ${isNonBusiness ? 'bg-slate-50 dark:bg-[#0a0a0a]' : 'bg-white dark:bg-[#111]'}
                         `}
                     >
-                        {isNonBusiness && (
-                            <div className="absolute inset-0 opacity-30 pointer-events-none" 
-                                 style={{ 
-                                     backgroundImage: 'linear-gradient(45deg, #000 5%, transparent 5%, transparent 50%, #000 50%, #000 55%, transparent 55%, transparent)', 
-                                     backgroundSize: '8px 8px',
-                                     filter: 'invert(0.1)' 
-                                 }}
-                            ></div>
-                        )}
-
-                        <div className="flex justify-between items-start mb-2 relative z-10">
-                            <div className="flex flex-col">
-                                <span className={`text-lg font-bold leading-none ${isHoliday ? 'text-red-500 dark:text-red-400' : isToday ? 'text-shinko-primary' : isWeekend ? 'text-slate-400 dark:text-neutral-600' : 'text-slate-700 dark:text-neutral-300'}`}>
-                                    {viewMode === 'month' ? date.getDate() : dateFormat.format(date)}
-                                </span>
-                                {isToday && <span className="text-[9px] uppercase font-bold text-shinko-primary tracking-tighter">Hoje</span>}
-                                {isHoliday && <span className="text-[9px] uppercase font-bold text-red-500 dark:text-red-400 tracking-tighter">Feriado</span>}
-                            </div>
-                            <div className="flex flex-col gap-1 items-end w-full pl-2">
-                                {Object.values(dailyLoad).map((data: any) => {
-                                    const isOverloaded = data.remaining > 8.01;
-                                    const isBadScheduling = isNonBusiness; 
-                                    return (
-                                        <div key={data.name} className={`text-[10px] px-1.5 py-0.5 rounded flex items-center gap-2 font-mono shadow-sm ${isOverloaded || (isBadScheduling && data.remaining > 0) ? 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-500/30 animate-pulse' : 'bg-slate-100 dark:bg-[#1a1a1a] text-slate-600 dark:text-neutral-400 border border-slate-200 dark:border-[#333]'}`}>
-                                            <span className="font-bold">{data.name.split(' ')[0]}</span>
-                                            {data.remaining > 0 ? <span className="font-bold">{data.remaining.toFixed(1)}h</span> : <CheckCircle2 className="w-3 h-3 text-emerald-500"/>}
-                                        </div>
-                                    );
-                                })}
+                        {/* Day Header */}
+                        <div className="flex justify-center items-center py-1 relative z-10">
+                            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold leading-none ${isToday ? 'bg-blue-600 text-white' : isHoliday ? 'text-red-500' : 'text-slate-700 dark:text-neutral-300'}`}>
+                                {date.getDate()}
                             </div>
                         </div>
 
-                        <div className="space-y-1.5 mt-2 relative z-10 flex-1">
+                        {isHoliday && (
+                            <div className="text-[10px] text-center font-bold text-red-500 uppercase tracking-tighter mb-1">Feriado</div>
+                        )}
+
+                        <div className="flex flex-col gap-1 mt-1 relative z-10 flex-1 px-1">
                             {dayTasks.map((t, i) => (
                                 <div 
                                     key={`${t.taskId}-${i}`}
                                     onClick={(e) => { e.stopPropagation(); setEditingContext({ task: t.task, oppId: t.oppId, nodeId: t.nodeId, nodeLabel: t.nodeLabel, opportunity: t.opportunity }); }}
-                                    className={`p-2 rounded cursor-pointer hover:opacity-90 border-l-4 transition-all shadow-sm hover:shadow-md active:scale-95 group/card 
-                                        ${t.completed ? 'opacity-60 line-through grayscale border-emerald-200 bg-emerald-50 dark:bg-emerald-900/10' : 
-                                          isHoliday ? 'border-red-300 bg-red-50 dark:bg-red-900/20' : 
-                                          `bg-white dark:bg-[#151515] ${t.oppColor.replace('bg-', 'border-l-')}`}`}
-                                    style={t.isSubtask ? { marginLeft: '12px', transform: 'scale(0.98)', borderLeftStyle: 'dashed' } : {}}
+                                    className={`px-2 py-1 rounded text-[10px] font-bold cursor-pointer hover:brightness-110 transition-all shadow-sm active:scale-95 leading-tight truncate
+                                        ${t.completed ? 'opacity-50 line-through grayscale' : ''}
+                                        ${isHoliday ? 'opacity-70' : ''}
+                                        ${!t.oppColor && !t.style?.backgroundColor ? 'bg-slate-500 text-white' : 'text-white shadow-[0_1px_2px_rgba(0,0,0,0.1)]'}
+                                    `}
+                                    style={{
+                                        marginLeft: t.isSubtask ? '8px' : '0px',
+                                        backgroundColor: t.style?.backgroundColor || (t.oppColor ? t.oppColor.replace('bg-', '') : '#64748b'), // Fallback to slate-500 hex
+                                        // Handle tailwind classes vs hex
+                                        ...(t.oppColor && !t.oppColor.startsWith('bg-') ? { backgroundColor: t.oppColor } : {})
+                                    }}
                                 >
-                                    <div className="flex justify-between items-start mb-1">
-                                        <span className="text-[10px] font-bold truncate text-slate-500 dark:text-neutral-500">{t.oppTitle}</span>
-                                        <div className="text-xs font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ml-1 shrink-0 bg-slate-100 dark:bg-[#222] text-blue-600 dark:text-blue-400">
-                                            <Clock className="w-3 h-3"/> {t.dailyHours}h
-                                        </div>
-                                    </div>
-                                    <div className="text-slate-700 dark:text-neutral-300 text-xs font-medium leading-tight mb-1.5 line-clamp-2 flex items-start gap-1">
-                                        {t.isSubtask && <CornerDownRight className="w-3 h-3 text-slate-400 shrink-0 mt-0.5"/>}
-                                        <span>
-                                            {t.taskText} {t.partLabel}
-                                        </span>
-                                    </div>
-                                    {t.assignee && <div className="flex items-center gap-1 text-[10px] text-slate-500 dark:text-neutral-500"><User className="w-3 h-3"/> {t.assignee}</div>}
+                                    {t.isSubtask && <span className="opacity-70 mr-1">↳</span>}
+                                    <span title={t.taskText}>{t.taskText}</span>
+                                    {t.dailyHours > 0 && <span className="opacity-70 ml-1 font-normal text-[9px]">{t.dailyHours}h</span>}
                                 </div>
                             ))}
                         </div>
@@ -557,7 +533,7 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
                     </h2>
                     <div className="flex bg-white dark:bg-[#0a0a0a] p-1 rounded-lg border border-slate-200 dark:border-white/10">
                         {['month', 'week', 'day', 'year'].map(m => (
-                            <button key={m} onClick={() => setViewMode(m as ViewMode)} className={`h-10 px-3 rounded-md text-xs font-bold flex items-center gap-1 transition-all capitalize ${viewMode === m ? 'bg-shinko-primary text-white shadow' : 'text-slate-500 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white'}`}>
+                            <button key={m} onClick={() => setViewMode(m as ViewMode)} className={`h-8 px-3 rounded-md text-xs font-bold flex items-center gap-1 transition-all capitalize ${viewMode === m ? 'bg-shinko-primary text-white shadow' : 'text-slate-500 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white'}`}>
                                 {m === 'month' ? <LayoutGrid className="w-3 h-3"/> : m === 'week' ? <Columns className="w-3 h-3"/> : m === 'year' ? <Grid className="w-3 h-3"/> : <Square className="w-3 h-3"/>} 
                                 {m === 'month' ? 'Mês' : m === 'week' ? 'Sem' : m === 'year' ? 'Ano' : 'Dia'}
                             </button>
@@ -569,23 +545,23 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
             {userRole !== 'cliente' && !projectId && (
                 <div className="flex flex-wrap gap-2 items-center">
                     <div className="relative group">
-                        <select value={filterProject} onChange={e => setFilterProject(e.target.value)} className="appearance-none pl-9 pr-8 h-12 bg-white dark:bg-[#0a0a0a] border border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 rounded-xl text-sm font-medium text-slate-900 dark:text-white focus:border-amber-500 outline-none cursor-pointer min-w-[160px]">
+                        <select value={filterProject} onChange={e => setFilterProject(e.target.value)} className="appearance-none pl-9 pr-8 h-10 bg-white dark:bg-[#0a0a0a] border border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 rounded-xl text-xs font-bold text-slate-900 dark:text-white focus:border-amber-500 outline-none cursor-pointer min-w-[160px]">
                             <option value="all" className="dark:bg-black">Todos Projetos</option>
                             <option value="adhoc" className="dark:bg-black text-amber-500">Tarefas Avulsas</option>
                             {projects.map(p => <option key={p.id} value={p.id} className="dark:bg-black">{p.title}</option>)}
                         </select>
-                        <Hash className="w-4 h-4 absolute left-3 top-4 text-slate-500 pointer-events-none"/>
+                        <Hash className="w-4 h-4 absolute left-3 top-3 text-slate-500 pointer-events-none"/>
                     </div>
                     <div className="relative group">
-                        <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)} className="appearance-none pl-9 pr-8 h-12 bg-white dark:bg-[#0a0a0a] border border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 rounded-xl text-sm font-medium text-slate-900 dark:text-white focus:border-amber-500 outline-none cursor-pointer min-w-[160px]">
+                        <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)} className="appearance-none pl-9 pr-8 h-10 bg-white dark:bg-[#0a0a0a] border border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 rounded-xl text-xs font-bold text-slate-900 dark:text-white focus:border-amber-500 outline-none cursor-pointer min-w-[160px]">
                             <option value="all" className="dark:bg-black">Todos Resp.</option>
                             {assignees.map(a => <option key={a} value={a} className="dark:bg-black">{a}</option>)}
                         </select>
-                        <User className="w-4 h-4 absolute left-3 top-4 text-slate-500 pointer-events-none"/>
+                        <User className="w-4 h-4 absolute left-3 top-3 text-slate-500 pointer-events-none"/>
                     </div>
 
-                    <button onClick={handleBalanceClick} disabled={isBalancing} className="flex items-center gap-2 px-6 h-12 bg-purple-600 hover:bg-purple-500 text-white text-sm font-bold rounded-xl shadow-lg shadow-purple-900/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-wait ml-2">
-                        {isBalancing ? <Loader2 className="w-4 h-4 animate-spin"/> : <Zap className="w-4 h-4" />}
+                    <button onClick={handleBalanceClick} disabled={isBalancing} className="flex items-center gap-2 px-6 h-10 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-purple-900/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-wait ml-2">
+                        {isBalancing ? <Loader2 className="w-4 h-4 animate-spin"/> : <Zap className="w-4 h-4"/>}
                         {isBalancing ? 'Recalculando...' : 'Otimizar Agenda'}
                     </button>
                 </div>
@@ -594,8 +570,8 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
         
         <div className="flex gap-2 items-center">
             <div className="flex gap-2">
-                <button onClick={handlePrev} className="h-12 w-12 flex items-center justify-center bg-white dark:bg-[#0a0a0a] hover:bg-slate-100 dark:hover:bg-white/5 rounded text-slate-700 dark:text-white border border-slate-200 dark:border-white/10 shadow-sm transition-colors"><ChevronLeft className="w-6 h-6" /></button>
-                <div className="relative h-12 w-12 flex items-center justify-center bg-white dark:bg-[#0a0a0a] border border-slate-200 dark:border-white/10 rounded hover:border-amber-500 transition-colors">
+                <button onClick={handlePrev} className="h-10 w-10 flex items-center justify-center bg-white dark:bg-[#0a0a0a] hover:bg-slate-100 dark:hover:bg-white/5 rounded text-slate-700 dark:text-white border border-slate-200 dark:border-white/10 shadow-sm transition-colors"><ChevronLeft className="w-5 h-5" /></button>
+                <div className="relative h-10 w-10 flex items-center justify-center bg-white dark:bg-[#0a0a0a] border border-slate-200 dark:border-white/10 rounded hover:border-amber-500 transition-colors">
                     <input 
                         type="date" 
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
@@ -604,10 +580,10 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
                     />
                     <CalendarIcon className="w-5 h-5 text-slate-500"/>
                 </div>
-                <button onClick={handleNext} className="h-12 w-12 flex items-center justify-center bg-white dark:bg-[#0a0a0a] hover:bg-slate-100 dark:hover:bg-white/5 rounded text-slate-700 dark:text-white border border-slate-200 dark:border-white/10 shadow-sm transition-colors"><ChevronRight className="w-6 h-6" /></button>
+                <button onClick={handleNext} className="h-10 w-10 flex items-center justify-center bg-white dark:bg-[#0a0a0a] hover:bg-slate-100 dark:hover:bg-white/5 rounded text-slate-700 dark:text-white border border-slate-200 dark:border-white/10 shadow-sm transition-colors"><ChevronRight className="w-5 h-5" /></button>
             </div>
-            <button onClick={loadTasks} className="h-12 w-12 flex items-center justify-center bg-slate-200 dark:bg-[#151515] hover:bg-slate-300 dark:hover:bg-white/10 rounded text-slate-500 dark:text-white transition-colors ml-2">
-                <RefreshCw className={`w-5 h-5 ${isLoadingTasks ? 'animate-spin' : ''}`}/>
+            <button onClick={loadTasks} className="h-10 w-10 flex items-center justify-center bg-slate-200 dark:bg-[#151515] hover:bg-slate-300 dark:hover:bg-white/10 rounded text-slate-500 dark:text-white transition-colors ml-2">
+                <RefreshCw className={`w-4 h-4 ${isLoadingTasks ? 'animate-spin' : ''}`}/>
             </button>
         </div>
       </div>
@@ -619,7 +595,7 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
               visibleTasks.length === 0 ? (
                  <div className="bg-white dark:bg-[#0a0a0a] border border-slate-200 dark:border-white/10 rounded-xl p-12 text-center min-w-[300px]">
                     <CalendarIcon className="w-12 h-12 text-slate-300 dark:text-neutral-600 mx-auto mb-4" />
-                    <h3 className="text-slate-700 dark:text-neutral-300 font-bold text-lg">Calendário Vazio</h3>
+                    <h3 className="text-slate-700 dark:text-neutral-300 font-bold text-lg">Agenda Vazia</h3>
                     <p className="text-slate-500 mt-2">Nenhuma tarefa encontrada para este período ou filtros.</p>
                  </div>
               ) : (
@@ -643,7 +619,6 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
                   }
               }}
               onSave={async (updatedTask) => {
-                  // FIX: Handle DB Update directly to ensure consistency
                   if (!isNaN(Number(updatedTask.id))) {
                       await updateTask(Number(updatedTask.id), {
                           titulo: updatedTask.text,
@@ -653,17 +628,15 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
                           duracaohoras: updatedTask.estimatedHours,
                           datainicio: updatedTask.startDate,
                           datafim: updatedTask.dueDate,
-                          // REMOVED deadline and dataproposta to avoid errors on tables without these columns
                           gravidade: updatedTask.gut?.g,
                           urgencia: updatedTask.gut?.u,
                           tendencia: updatedTask.gut?.t
                       });
                   } else {
-                      // Legacy support
                       await onTaskUpdate(editingContext.oppId, editingContext.nodeId, updatedTask);
                   }
                   
-                  loadTasks(); // Refresh local state
+                  loadTasks(); 
                   if (onRefresh) onRefresh(); 
               }}
           />

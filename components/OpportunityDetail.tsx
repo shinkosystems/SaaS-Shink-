@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useMemo } from 'react';
 import { Opportunity, RDEStatus, BpmnData, ProjectStatus, BpmnTask, Attachment, Comment } from '../types';
 import { updateOpportunity } from '../services/opportunityService';
@@ -6,7 +7,7 @@ import { supabase } from '../services/supabaseClient';
 import BpmnBuilder from './BpmnBuilder';
 import TaskDetailModal from './TaskDetailModal';
 import BurndownChart from './BurndownChart'; 
-import { X, Edit, Trash2, Target, CheckCircle, Clock, AlertTriangle, FileText, DollarSign, Zap, GitMerge, LayoutDashboard, Snowflake, PlayCircle, ChevronDown, ChevronUp, Lock, Unlock, ListTodo, Calendar, User, CheckSquare, Square, Paperclip, History, Send, Download, File, Trash, ArrowLeft, ExternalLink, CloudLightning, Hash, Plus, BarChart3, Save, PieChart } from 'lucide-react';
+import { X, Edit, Trash2, Target, CheckCircle, Clock, AlertTriangle, FileText, DollarSign, Zap, GitMerge, LayoutDashboard, Snowflake, PlayCircle, ChevronDown, ChevronUp, Lock, Unlock, ListTodo, Calendar, User, CheckSquare, Square, Paperclip, History, Send, Download, File, Trash, ArrowLeft, ExternalLink, CloudLightning, Hash, Plus, BarChart3, Save, PieChart, Palette } from 'lucide-react';
 
 interface Props {
   opportunity: Opportunity;
@@ -33,6 +34,9 @@ const OpportunityDetail: React.FC<Props> = ({ opportunity: initialOpp, onClose, 
   
   // Editable Description State
   const [editableDescription, setEditableDescription] = useState(initialOpp.description || '');
+  
+  // Color State
+  const [projectColor, setProjectColor] = useState(initialOpp.color || '#3b82f6');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -352,6 +356,14 @@ const OpportunityDetail: React.FC<Props> = ({ opportunity: initialOpp, onClose, 
       }
   };
 
+  const handleColorChange = async (color: string) => {
+      setProjectColor(color);
+      const updatedOpp = { ...opportunity, color };
+      setOpportunity(updatedOpp);
+      onUpdate(updatedOpp);
+      await updateOpportunity(updatedOpp);
+  }
+
   // --- Timesheet Data Aggregation ---
   const { timesheetData, totalProjectHours } = useMemo(() => {
       const usersMap = new Map<string, { id: string, name: string, totalHours: number, tasks: { title: string, hours: number, status: string, isSubtask: boolean, nodeLabel?: string }[] }>();
@@ -457,6 +469,27 @@ const OpportunityDetail: React.FC<Props> = ({ opportunity: initialOpp, onClose, 
                     </div>
 
                     <div className="space-y-6">
+                        <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/40 dark:bg-black/20">
+                            <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">Configurações</h3>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-xs text-slate-500 block mb-1 flex items-center gap-1">
+                                        <Palette className="w-3 h-3"/> Cor do Projeto
+                                    </label>
+                                    <div className="flex items-center gap-2">
+                                        <input 
+                                            type="color" 
+                                            value={projectColor}
+                                            onChange={(e) => handleColorChange(e.target.value)}
+                                            className="w-8 h-8 rounded-lg cursor-pointer border-0 bg-transparent p-0"
+                                        />
+                                        <span className="text-xs font-mono text-slate-600 dark:text-slate-400 uppercase">{projectColor}</span>
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 mt-1">Essa cor será usada para identificar o projeto na Agenda.</p>
+                                </div>
+                            </div>
+                        </div>
+
                         <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/40 dark:bg-black/20">
                             <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">Métricas Chave</h3>
                             <div className="grid grid-cols-2 gap-4">

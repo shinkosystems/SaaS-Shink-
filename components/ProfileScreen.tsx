@@ -295,12 +295,12 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
   };
 
   const getPlanStyle = (planId: string) => {
-      if (planId === 'plan_free') return { border: 'border-amber-500', titleColor: 'text-amber-500', buttonColor: 'bg-white/10 hover:bg-white/20' };
-      if (planId === 'plan_usuario') return { border: 'border-amber-600', titleColor: 'text-amber-600', buttonColor: 'bg-white/10 hover:bg-white/20' };
-      if (planId === 'plan_studio') return { border: 'border-white/10', titleColor: 'text-white', buttonColor: 'bg-white/10 hover:bg-white/20' }; 
-      if (planId === 'plan_scale') return { border: 'border-white/10', titleColor: 'text-white', buttonColor: 'bg-white/10 hover:bg-white/20' };
-      if (planId === 'plan_agency') return { border: 'border-white/10', titleColor: 'text-white', buttonColor: 'bg-white/10 hover:bg-white/20' };
-      return { border: 'border-white/10', titleColor: 'text-white', buttonColor: 'bg-white/10' };
+      if (planId === 'plan_free') return { border: 'border-amber-500', titleColor: 'text-amber-600 dark:text-amber-500', buttonColor: 'bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20' };
+      if (planId === 'plan_usuario') return { border: 'border-amber-600', titleColor: 'text-amber-700 dark:text-amber-600', buttonColor: 'bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20' };
+      if (planId === 'plan_studio') return { border: 'border-slate-200 dark:border-white/10', titleColor: 'text-slate-900 dark:text-white', buttonColor: 'bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20' }; 
+      if (planId === 'plan_scale') return { border: 'border-slate-200 dark:border-white/10', titleColor: 'text-slate-900 dark:text-white', buttonColor: 'bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20' };
+      if (planId === 'plan_agency') return { border: 'border-slate-200 dark:border-white/10', titleColor: 'text-slate-900 dark:text-white', buttonColor: 'bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20' };
+      return { border: 'border-slate-200 dark:border-white/10', titleColor: 'text-slate-900 dark:text-white', buttonColor: 'bg-slate-100 dark:bg-white/10' };
   };
 
   if (loading) {
@@ -312,20 +312,20 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
   }
 
   return (
-    <div className="h-full flex flex-col animate-in fade-in zoom-in-95 duration-300 overflow-y-auto pb-10 custom-scrollbar bg-black text-white">
+    <div className="h-full flex flex-col animate-in fade-in zoom-in-95 duration-300 overflow-y-auto pb-10 custom-scrollbar bg-slate-50 dark:bg-black text-slate-900 dark:text-white">
 
       {/* Header */}
-      <div className="px-8 py-6 border-b border-white/10 flex justify-between items-center">
+      <div className="px-8 py-6 border-b border-slate-200 dark:border-white/10 flex justify-between items-center bg-white dark:bg-black/20">
           <div>
-              <h1 className="text-3xl font-bold">Meu Perfil</h1>
-              <p className="text-slate-400">Gerencie sua assinatura e métodos de pagamento.</p>
+              <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Meu Perfil</h1>
+              <p className="text-slate-500 dark:text-slate-400">Gerencie sua assinatura e métodos de pagamento.</p>
           </div>
           {orgName && (
-              <div className="bg-slate-900 px-4 py-2 rounded-xl border border-white/10">
+              <div className="bg-slate-100 dark:bg-slate-900 px-4 py-2 rounded-xl border border-slate-200 dark:border-white/10">
                   <span className="text-[10px] text-slate-500 uppercase font-bold block mb-1">Organização</span>
                   <div className="flex items-center gap-2">
                       <Building2 className="w-4 h-4 text-emerald-500"/>
-                      <span className="font-bold text-white text-sm">{orgName}</span>
+                      <span className="font-bold text-slate-900 dark:text-white text-sm">{orgName}</span>
                   </div>
               </div>
           )}
@@ -339,7 +339,7 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
              <button 
                 onClick={() => setActiveTab('personal')}
                 className={`w-full h-12 flex items-center gap-3 px-4 rounded-lg text-sm font-medium transition-all ${
-                    activeTab === 'personal' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    activeTab === 'personal' ? 'bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/5'
                 }`}
              >
                 <User className="w-5 h-5" /> Dados Pessoais
@@ -347,7 +347,7 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
              <button 
                 onClick={() => setActiveTab('workspace')}
                 className={`w-full h-12 flex items-center gap-3 px-4 rounded-lg text-sm font-medium transition-all ${
-                    activeTab === 'workspace' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    activeTab === 'workspace' ? 'bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/5'
                 }`}
              >
                 <Building2 className="w-5 h-5" /> Planos & Cobrança
@@ -361,37 +361,37 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
                 <div className="space-y-8 max-w-2xl">
                     <div className="flex items-center gap-6">
                         <div className="relative group shrink-0">
-                            <div className="w-24 h-24 rounded-full bg-slate-800 overflow-hidden ring-2 ring-white/10">
+                            <div className="w-24 h-24 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden ring-2 ring-white dark:ring-white/10">
                                 {avatarUrl && <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover"/>}
                             </div>
-                            <button onClick={() => fileInputRef.current?.click()} className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
+                            <button onClick={() => fileInputRef.current?.click()} className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full text-white">
                                 {uploading ? <Loader2 className="w-6 h-6 animate-spin"/> : <Camera className="w-6 h-6"/>}
                             </button>
                             <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleAvatarUpload}/>
                         </div>
                         <div>
-                            <h3 className="text-xl font-bold">{name}</h3>
-                            <p className="text-slate-400">{email}</p>
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">{name}</h3>
+                            <p className="text-slate-500 dark:text-slate-400">{email}</p>
                         </div>
                     </div>
 
                     <div className="grid grid-cols-1 gap-6">
                         <div>
                             <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Nome Completo</label>
-                            <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full h-12 bg-slate-900 border border-white/10 rounded-xl px-4 text-white outline-none focus:border-amber-500"/>
+                            <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full h-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 text-slate-900 dark:text-white outline-none focus:border-amber-500"/>
                         </div>
                         <div>
                             <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Telefone</label>
-                            <input type="text" value={phone} onChange={e => setPhone(e.target.value)} className="w-full h-12 bg-slate-900 border border-white/10 rounded-xl px-4 text-white outline-none focus:border-amber-500"/>
+                            <input type="text" value={phone} onChange={e => setPhone(e.target.value)} className="w-full h-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 text-slate-900 dark:text-white outline-none focus:border-amber-500"/>
                         </div>
                         <div>
                             <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Localização</label>
-                            <input type="text" value={location} onChange={e => setLocation(e.target.value)} className="w-full h-12 bg-slate-900 border border-white/10 rounded-xl px-4 text-white outline-none focus:border-amber-500"/>
+                            <input type="text" value={location} onChange={e => setLocation(e.target.value)} className="w-full h-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 text-slate-900 dark:text-white outline-none focus:border-amber-500"/>
                         </div>
                     </div>
 
                     <div className="flex justify-end">
-                        <button onClick={handleSaveProfile} disabled={saving} className="h-12 px-8 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl flex items-center gap-2 disabled:opacity-50">
+                        <button onClick={handleSaveProfile} disabled={saving} className="h-12 px-8 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl flex items-center gap-2 disabled:opacity-50 shadow-lg">
                             {saving ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4"/>} Salvar
                         </button>
                     </div>
@@ -403,7 +403,8 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
                     <div>
                         <h3 className="text-lg font-bold text-slate-500 uppercase mb-6 tracking-wider">Planos Disponíveis</h3>
                         
-                        <div className="flex overflow-x-auto pb-4 gap-4 no-scrollbar snap-x">
+                        {/* Responsive Grid: Vertical on mobile, Horizontal on desktop */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:flex xl:overflow-x-auto xl:pb-4 xl:gap-4 xl:no-scrollbar xl:snap-x gap-6">
                             {availablePlans.map(plan => {
                                 const styles = getPlanStyle(plan.id);
                                 const isCurrent = currentPlan === plan.id;
@@ -411,7 +412,7 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
                                 return (
                                     <div 
                                         key={plan.id} 
-                                        className={`relative p-6 rounded-2xl border bg-black flex flex-col justify-between min-w-[280px] md:min-w-[300px] h-[480px] snap-center ${isCurrent ? 'border-amber-500' : styles.border}`}
+                                        className={`relative p-6 rounded-2xl border bg-white dark:bg-black flex flex-col justify-between xl:min-w-[300px] h-[480px] snap-center shadow-sm ${isCurrent ? 'border-amber-500 ring-1 ring-amber-500' : styles.border}`}
                                     >
                                         {isCurrent && (
                                             <div className="absolute top-4 right-4 bg-amber-500 text-black text-[10px] font-bold px-2 py-1 rounded uppercase">
@@ -427,7 +428,7 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
                                         <div>
                                             <h4 className={`text-xl font-bold mb-4 ${styles.titleColor}`}>{plan.name}</h4>
                                             <div className="flex items-baseline gap-1 mb-6">
-                                                <span className="text-3xl font-black text-white">R$ {plan.price.toFixed(2)}</span>
+                                                <span className="text-3xl font-black text-slate-900 dark:text-white">R$ {plan.price.toFixed(2)}</span>
                                                 <span className="text-xs text-slate-500">/mês</span>
                                             </div>
                                             
@@ -435,8 +436,8 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
                                                 {plan.features.map((feat, i) => {
                                                     const isNegative = feat.startsWith('X') || feat.includes('Sem ');
                                                     return (
-                                                        <li key={i} className={`text-xs flex items-start gap-2 ${isNegative ? 'text-slate-500 line-through decoration-slate-600' : 'text-slate-300'}`}>
-                                                            {isNegative ? <X className="w-3 h-3 text-red-900 mt-0.5 shrink-0"/> : <Check className="w-3 h-3 text-emerald-500 mt-0.5 shrink-0"/>}
+                                                        <li key={i} className={`text-xs flex items-start gap-2 ${isNegative ? 'text-slate-400 dark:text-slate-500 line-through decoration-slate-400' : 'text-slate-600 dark:text-slate-300'}`}>
+                                                            {isNegative ? <X className="w-3 h-3 text-red-500 mt-0.5 shrink-0"/> : <Check className="w-3 h-3 text-emerald-500 mt-0.5 shrink-0"/>}
                                                             <span className="leading-snug">{feat}</span>
                                                         </li>
                                                     );
@@ -449,8 +450,8 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
                                             disabled={isCurrent}
                                             className={`w-full py-3 rounded-lg text-sm font-bold mt-4 transition-colors ${
                                                 isCurrent
-                                                ? 'bg-white/10 text-white/50 cursor-default'
-                                                : styles.buttonColor + ' text-white'
+                                                ? 'bg-slate-100 dark:bg-white/10 text-slate-400 dark:text-white/50 cursor-default'
+                                                : styles.buttonColor + ' text-slate-900 dark:text-white shadow-sm border border-slate-200 dark:border-transparent'
                                         }`}>
                                             {isCurrent ? 'Plano Atual' : 'Selecionar'}
                                         </button>
@@ -467,37 +468,37 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
     {/* Universal Payment Modal */}
     {showPaymentModal && selectedPlanForPayment && (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
-            <div className="bg-[#111] w-full max-w-lg p-8 rounded-3xl shadow-2xl border border-white/10 animate-ios-pop flex flex-col max-h-[90vh]">
+            <div className="bg-white dark:bg-[#111] w-full max-w-lg p-8 rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10 animate-ios-pop flex flex-col max-h-[90vh]">
                 <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
                         <Zap className="w-5 h-5 text-emerald-400"/> Checkout Seguro
                     </h3>
-                    <button onClick={handleCloseModal} className="text-slate-400 hover:text-white"><X className="w-5 h-5"/></button>
+                    <button onClick={handleCloseModal} className="text-slate-400 hover:text-slate-900 dark:hover:text-white"><X className="w-5 h-5"/></button>
                 </div>
 
-                <div className="space-y-6 text-sm text-slate-300 overflow-y-auto custom-scrollbar pr-2">
-                    <div className="flex justify-between items-center bg-white/5 p-4 rounded-xl border border-white/10">
+                <div className="space-y-6 text-sm text-slate-700 dark:text-slate-300 overflow-y-auto custom-scrollbar pr-2">
+                    <div className="flex justify-between items-center bg-slate-50 dark:bg-white/5 p-4 rounded-xl border border-slate-200 dark:border-white/10">
                         <div>
                             <p className="text-xs text-slate-500 uppercase">Plano Selecionado</p>
-                            <p className="text-lg font-bold text-white">{selectedPlanForPayment.name}</p>
+                            <p className="text-lg font-bold text-slate-900 dark:text-white">{selectedPlanForPayment.name}</p>
                         </div>
                         <div className="text-right">
                             <p className="text-xs text-slate-500 uppercase">Valor</p>
-                            <p className="text-xl font-bold text-amber-400">R$ {selectedPlanForPayment.price.toFixed(2)}</p>
+                            <p className="text-xl font-bold text-amber-500 dark:text-amber-400">R$ {selectedPlanForPayment.price.toFixed(2)}</p>
                         </div>
                     </div>
 
                     {/* Method Toggle */}
-                    <div className="grid grid-cols-2 gap-2 bg-slate-900 p-1 rounded-xl border border-slate-800">
+                    <div className="grid grid-cols-2 gap-2 bg-slate-100 dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800">
                         <button 
                             onClick={() => handlePaymentMethodChange('PIX')} 
-                            className={`py-2 rounded-lg text-xs font-bold transition-all ${paymentMethod === 'PIX' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
+                            className={`py-2 rounded-lg text-xs font-bold transition-all ${paymentMethod === 'PIX' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}
                         >
                             PIX (Instantâneo)
                         </button>
                         <button 
                             onClick={() => handlePaymentMethodChange('CREDIT_CARD')} 
-                            className={`py-2 rounded-lg text-xs font-bold transition-all ${paymentMethod === 'CREDIT_CARD' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
+                            className={`py-2 rounded-lg text-xs font-bold transition-all ${paymentMethod === 'CREDIT_CARD' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}
                         >
                             Cartão de Crédito
                         </button>
@@ -506,22 +507,22 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
                     {/* PIX Flow */}
                     {paymentMethod === 'PIX' && (
                         <div className="space-y-4 animate-in fade-in slide-in-from-left-4">
-                            <div className="p-4 bg-white/5 rounded-xl border border-white/10">
+                            <div className="p-4 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10">
                                 <label className="text-xs text-slate-500 uppercase block mb-2">Chave PIX (CNPJ)</label>
                                 <div className="flex gap-2">
-                                    <input type="text" value={PIX_KEY} readOnly className="flex-1 bg-black border border-white/10 p-2 rounded text-xs font-mono text-white"/>
-                                    <button onClick={() => copyToClipboard(PIX_KEY)} className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded text-xs font-bold">
+                                    <input type="text" value={PIX_KEY} readOnly className="flex-1 bg-white dark:bg-black border border-slate-200 dark:border-white/10 p-2 rounded text-xs font-mono text-slate-900 dark:text-white"/>
+                                    <button onClick={() => copyToClipboard(PIX_KEY)} className="px-3 py-1 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-white rounded text-xs font-bold">
                                         {pixKeyCopied ? 'Copiado!' : 'Copiar'}
                                     </button>
                                 </div>
                             </div>
 
                             <div className="mt-4">
-                                <label className={`flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${receiptFile ? 'border-emerald-500 bg-emerald-900/20' : 'border-slate-700 hover:border-slate-500 bg-slate-800/50'}`}>
+                                <label className={`flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${receiptFile ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500 bg-slate-50 dark:bg-slate-800/50'}`}>
                                     <div className="flex flex-col items-center justify-center pt-5 pb-6 text-xs">
                                         <UploadCloud className="w-6 h-6 mb-2 text-slate-400"/>
                                         {receiptFile ? (
-                                            <span className="font-bold text-emerald-400">{receiptFile.name}</span>
+                                            <span className="font-bold text-emerald-500 dark:text-emerald-400">{receiptFile.name}</span>
                                         ) : (
                                             <p className="text-slate-400">Anexar Comprovante</p>
                                         )}

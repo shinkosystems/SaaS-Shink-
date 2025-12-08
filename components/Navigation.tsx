@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { 
     LayoutDashboard, List, Calendar, User, Settings, Search, 
@@ -50,7 +51,8 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, currentPlan: string =
     ];
 
     if (planFeatures.gantt) {
-        groups[1].items.push({ id: 'calendar', label: 'Cronograma', icon: Calendar });
+        // Renamed from Cronograma to Agenda per user request
+        groups[1].items.push({ id: 'calendar', label: 'Agenda', icon: Calendar });
     }
 
     if (!isClient) {
