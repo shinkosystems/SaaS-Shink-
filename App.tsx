@@ -209,11 +209,30 @@ const App: React.FC = () => {
   const loadOrganization = async (orgId: number) => {
       const { data } = await supabase.from('organizacoes').select('*').eq('id', orgId).single();
       if (data) {
-          // UPDATE APP STATE FOR PLAN ID
-          const planId = Number(data.plano) || 4; // Default to Free (4) if null
+          let planId = Number(data.plano);
+          
+          // Fallback: If no plan on org, check active subscription for this org (from cliente_plano)
+          // This handles cases where 'plano' column might be missing or null in 'organizacoes' table
+          if (!planId) {
+               const { data: sub } = await supabase
+                   .from('cliente_plano')
+                   .select('plano')
+                   .eq('organizacao', orgId)
+                   .gte('datafim', new Date().toISOString())
+                   .order('created_at', { ascending: false })
+                   .limit(1)
+                   .single();
+               
+               if (sub && sub.plano) {
+                   planId = Number(sub.plano);
+               }
+          }
+
+          planId = planId || 4; // Default to Free (4) if still null
+
           setOrgPlanId(planId);
           
-          // FORCE UPDATE CURRENT PLAN IMMEDIATELY (Source of Truth is Org Table)
+          // FORCE UPDATE CURRENT PLAN IMMEDIATELY
           const planString = mapDbPlanIdToString(planId);
           setCurrentPlan(planString);
 
@@ -225,7 +244,8 @@ const App: React.FC = () => {
               aiSector: data.setor || '',
               aiTone: data.tomdevoz || '',
               aiContext: data.dna || '',
-              isWhitelabelActive: planId === 10 // Enterprise Plan ID (Strict Number Check)
+              // Explicit check for ID 10 (Enterprise) or 5 (Agency) to unlock features
+              isWhitelabelActive: planId === 10 || planId === 5 
           });
       }
   };
@@ -316,7 +336,7 @@ const App: React.FC = () => {
   };
 
   // --- WHITELABEL LOGIC ---
-  // If plan is Enterprise OR isWhitelabelActive (via link), override branding
+  // If plan is Enterprise OR isWhitelabelActive (via link/db), override branding
   const isEnterprise = currentPlan === 'plan_enterprise';
   const shouldUseWhitelabel = isEnterprise || orgDetails.isWhitelabelActive;
   

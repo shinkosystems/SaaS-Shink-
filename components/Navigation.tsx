@@ -18,7 +18,7 @@ interface Props {
   onToggleTheme: () => void;
   onLogout: () => void;
   onSearch: (q: string) => void;
-  onOpenFeedback: () => void; // New Prop
+  onOpenFeedback: () => void; 
   theme: 'dark' | 'light';
   dbStatus: 'connected' | 'disconnected' | 'error';
   isMobileOpen: boolean;
@@ -52,7 +52,7 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, currentPlan: string =
     ];
 
     if (planFeatures.gantt) {
-        groups[1].items.push({ id: 'calendar', label: 'Agenda', icon: Calendar });
+        groups[1].items.push({ id: 'calendar', label: 'Cronograma', icon: Calendar });
     }
 
     if (!isClient) {
@@ -131,7 +131,7 @@ export const Sidebar: React.FC<Props> = (props) => {
     <div className={`hidden md:flex flex-col w-64 h-full border-r border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 shrink-0 transition-all duration-300`}>
         
         {/* Header Logo */}
-        <div className="h-20 flex items-center justify-between px-4 border-b border-slate-200 dark:border-white/5 bg-white/50 dark:bg-transparent backdrop-blur-sm">
+        <div className="h-20 flex items-center justify-between px-4 border-b border-slate-200 dark:border-white/5 bg-white/50 dark:bg-transparent backdrop-blur-sm relative z-20">
             {props.customLogoUrl ? (
                 <img src={props.customLogoUrl} alt="Logo" className="h-8 object-contain max-w-[140px]" />
             ) : (
@@ -147,8 +147,14 @@ export const Sidebar: React.FC<Props> = (props) => {
             
             {/* Feedback Button (Desktop) */}
             <button 
-                onClick={props.onOpenFeedback}
-                className="p-2 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/20 text-amber-500 dark:text-amber-400 transition-colors"
+                type="button"
+                onClick={(e) => { 
+                    e.preventDefault(); 
+                    e.stopPropagation(); 
+                    console.log("Feedback clicked");
+                    props.onOpenFeedback(); 
+                }}
+                className="p-2 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/20 text-amber-500 dark:text-amber-400 transition-colors relative z-50 cursor-pointer"
                 title="Reportar Problema / Sugerir Melhoria"
             >
                 <Lightbulb className="w-5 h-5"/>
@@ -304,7 +310,10 @@ export const MobileDrawer: React.FC<Props> = (props) => {
                 
                 <div className="flex items-center gap-2">
                     {/* Feedback Button (Mobile) */}
-                    <button onClick={props.onOpenFeedback} className="p-2 bg-amber-100 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 rounded-full">
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); props.onOpenFeedback(); }}
+                        className="p-2 bg-amber-100 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 rounded-full relative z-50"
+                    >
                         <Lightbulb className="w-5 h-5"/>
                     </button>
 

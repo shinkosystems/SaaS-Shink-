@@ -1,3 +1,4 @@
+
 import { supabase } from './supabaseClient';
 import { PLAN_LIMITS } from '../types';
 
@@ -110,21 +111,32 @@ export const updateOrgDetails = async (
 // Fetches public organization details for White Label Login
 export const getPublicOrgDetails = async (orgId: number) => {
     try {
+        // Select 'plano' instead of 'whitelable' because the column 'whitelable' likely doesn't exist
         const { data, error } = await supabase
             .from(ORG_TABLE)
-            .select('nome, logo, cor, whitelable') 
+            .select('nome, logo, cor, plano') 
             .eq('id', orgId)
             .single();
 
         if (error || !data) return null;
         
-        // Return custom branding only if whitelabel is active or if specifically requested for login
-        // Assuming user plan checking happens elsewhere or DB enforces 'whitelabel' column.
-        return {
-            name: data.nome,
-            logoUrl: data.logo,
-            primaryColor: data.cor
-        };
+        // Authorization Logic:
+        // Only return custom branding if Plan ID is 10 (Enterprise) or 5 (Agency)
+        // Or if the query happens to include a 'whitelable' boolean (if schema changes later)
+        const isWhitelabelAllowed = data.plano === 10 || data.plano === 5 || (data as any).whitelable === true;
+
+        if (isWhitelabelAllowed) {
+            return {
+                name: data.nome,
+                logoUrl: data.logo,
+                primaryColor: data.cor,
+                plano: data.plano
+            };
+        }
+        
+        // Return null if whitelabel is not active for this org
+        return null;
+
     } catch (error) {
         console.error("Error fetching public org details:", error);
         return null;

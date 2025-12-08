@@ -129,17 +129,19 @@ export const calculateSubscriptionStatus = (lastPaymentDate: string | Date) => {
 
 export const mapDbPlanIdToString = (dbId: number | string): string => {
     const id = Number(dbId);
-    // Explicitly handle ID 10 as Enterprise
+    
+    // Check for ID 10 specifically first
     if (id === 10) return 'plan_enterprise';
     
+    // Check for ID 5 (Agency - maps to legacy or enterprise features depending on logic)
+    if (id === 5) return 'plan_agency';
+
     switch (id) {
         case 1: return 'plan_usuario';
         case 2: return 'plan_studio';
         case 3: return 'plan_scale';
         case 4: return 'plan_free';
-        case 5: return 'plan_agency'; 
         case 9: return 'plan_scale'; // Mapeamento do plano Governança (ID 9)
-        case 10: return 'plan_enterprise';
         default: return 'plan_free';
     }
 };

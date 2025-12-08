@@ -176,11 +176,11 @@ export const SettingsScreen: React.FC<Props> = ({
   
   const isUserLimitReached = userCount >= effectiveLimit;
   
-  // LOGIC FIX: Whitelabel is unlocked if Plan says so OR if DB flag (ID 10) is true
+  // LOGIC FIX: Whitelabel is unlocked if Plan string is 'plan_enterprise' OR if DB flag 'isWhitelabelActive' is true
   const isEnterprisePlan = currentPlan === 'plan_enterprise';
   const isWhitelabelLocked = !limitConfig.features.whitelabel && !orgDetails.isWhitelabelActive && !isEnterprisePlan;
   
-  // AI is unlocked if Plan says so OR if DB flag (ID 10) is true (Enterprise has AI)
+  // AI is unlocked if Plan says so OR if DB flag (ID 10) is true
   const isAiLocked = !limitConfig.features.aiAdvanced && !orgDetails.isWhitelabelActive && !isEnterprisePlan; 
 
   return (

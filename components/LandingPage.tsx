@@ -18,11 +18,12 @@ interface Props {
 export const LandingPage: React.FC<Props> = ({ onEnter, customName, customLogo, customColor }) => {
   const [showCases, setShowCases] = useState(false);
 
+  // Fallback defaults
   const brandName = customName || "Shinkō OS";
   const primaryColor = customColor || "#F59E0B";
 
   // Dynamic Style Injection for Whitelabel
-  const buttonStyle = { backgroundColor: primaryColor, color: '#000' };
+  const buttonStyle = { backgroundColor: primaryColor, color: '#000', borderColor: primaryColor };
   const textStyle = { color: primaryColor };
 
   const plans = [
@@ -90,13 +91,14 @@ export const LandingPage: React.FC<Props> = ({ onEnter, customName, customLogo, 
           <div className="max-w-7xl mx-auto w-full flex justify-between items-center">
             <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.scrollTo(0, 0)}>
                 {customLogo ? (
-                    <img src={customLogo} alt={brandName} className="h-8 object-contain" />
+                    <img src={customLogo} alt={brandName} className="h-10 object-contain max-w-[180px]" />
                 ) : (
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center text-black font-bold shadow-lg" style={{ backgroundColor: primaryColor }}>
                         {brandName.charAt(0)}
                     </div>
                 )}
-                <span className="font-bold text-xl tracking-tight">{brandName}</span>
+                {/* Only show text name if logo is missing or to complement small icon logos if desired, logic simplified here */}
+                {!customLogo && <span className="font-bold text-xl tracking-tight">{brandName}</span>}
             </div>
             <div className="flex items-center gap-6">
                 <div className="hidden md:flex gap-6 text-sm font-medium text-slate-400">
@@ -476,18 +478,19 @@ export const LandingPage: React.FC<Props> = ({ onEnter, customName, customLogo, 
                             key={i} 
                             className={`relative p-6 rounded-2xl border transition-all duration-300 flex flex-col h-full ${
                                 plan.highlight 
-                                ? 'bg-slate-900 border-amber-500 shadow-[0_0_30px_-5px_rgba(245,158,11,0.3)] transform scale-105 z-10' 
+                                ? 'bg-slate-900 shadow-[0_0_30px_-5px_rgba(245,158,11,0.3)] transform scale-105 z-10' 
                                 : 'bg-slate-900/50 border-white/10 hover:border-white/20'
                             }`}
+                            style={plan.highlight ? { borderColor: primaryColor } : {}}
                           >
                               {plan.badge && (
-                                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-500 text-black text-[10px] font-bold px-3 py-1 rounded-full uppercase shadow-lg whitespace-nowrap">
+                                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-black text-[10px] font-bold px-3 py-1 rounded-full uppercase shadow-lg whitespace-nowrap" style={{ backgroundColor: primaryColor }}>
                                       {plan.badge}
                                   </div>
                               )}
                               
                               <div className="mb-6">
-                                  <h3 className={`font-bold text-lg ${plan.highlight ? 'text-amber-500' : 'text-white'}`}>{plan.name}</h3>
+                                  <h3 className="font-bold text-lg" style={{ color: plan.highlight ? primaryColor : 'white' }}>{plan.name}</h3>
                                   <div className="flex items-baseline gap-1 mt-2">
                                       <span className="text-sm align-top text-slate-400">R$</span>
                                       <span className="text-3xl font-black text-white">{plan.price}</span>
@@ -499,7 +502,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter, customName, customLogo, 
                               <ul className="space-y-3 mb-8 flex-1">
                                   {plan.features.map((feat, idx) => (
                                       <li key={idx} className="text-xs text-slate-300 flex items-start gap-2">
-                                          <Check className={`w-3 h-3 mt-0.5 shrink-0 ${plan.highlight ? 'text-amber-500' : 'text-slate-500'}`}/>
+                                          <Check className="w-3 h-3 mt-0.5 shrink-0" style={{ color: plan.highlight ? primaryColor : '#64748b' }}/>
                                           <span className="leading-snug">{feat}</span>
                                       </li>
                                   ))}
@@ -509,9 +512,10 @@ export const LandingPage: React.FC<Props> = ({ onEnter, customName, customLogo, 
                                 onClick={onEnter}
                                 className={`w-full py-3 rounded-xl text-xs font-bold transition-transform active:scale-95 ${
                                     plan.highlight 
-                                    ? 'bg-amber-500 text-black hover:bg-amber-400 shadow-lg' 
+                                    ? 'shadow-lg text-black' 
                                     : 'bg-white/10 text-white hover:bg-white/20'
                                 }`}
+                                style={plan.highlight ? { backgroundColor: primaryColor } : {}}
                               >
                                   {plan.cta}
                               </button>
