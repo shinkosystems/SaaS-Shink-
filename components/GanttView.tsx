@@ -4,7 +4,7 @@ import { Opportunity, BpmnTask, DbTask, DbProject } from '../types';
 import { ChevronDown, ChevronRight as ChevronRightIcon, Zap, Loader2, AlertTriangle, Columns, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Grid, LayoutGrid, Square, RefreshCw, Layers, CornerDownRight, Hash, CheckCircle2 } from 'lucide-react';
 import TaskDetailModal from './TaskDetailModal';
 import { optimizeSchedule } from '../services/geminiService';
-import { fetchAllTasks, updateTask, fetchAssignableUsers, fetchProjects } from '../services/projectService';
+import { fetchAllTasks, updateTask, fetchAssignableUsers, fetchProjects, deleteTask } from '../services/projectService';
 import { supabase } from '../services/supabaseClient';
 
 interface Props {
@@ -14,6 +14,7 @@ interface Props {
   userRole?: string;
   projectId?: string; // Prop para filtro
   organizationId?: number; // Prop para filtrar por organização
+  customPrimaryColor?: string; // New prop for custom branding
 }
 
 // Estrutura Hierárquica para o Gantt
@@ -29,7 +30,8 @@ interface GanttRow {
   parentId?: string;
   expanded: boolean;
   visible: boolean;
-  color?: string;
+  color?: string; // Tailwind class fallback
+  hexColor?: string; // Custom Hex Color override
   
   // Contexto para edição
   dbTask?: DbTask;
@@ -40,7 +42,7 @@ interface GanttRow {
 
 type ViewMode = 'day' | 'week' | 'month' | 'year';
 
-export const GanttView: React.FC<Props> = ({ onSelectOpportunity, onTaskUpdate, userRole, projectId, organizationId }) => {
+export const GanttView: React.FC<Props> = ({ onSelectOpportunity, onTaskUpdate, userRole, projectId, organizationId, customPrimaryColor }) => {
   const [filterProject, setFilterProject] = useState<string>(projectId || 'all');
   const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [viewDate, setViewDate] = useState(new Date());
@@ -150,6 +152,13 @@ export const GanttView: React.FC<Props> = ({ onSelectOpportunity, onTaskUpdate, 
       }
   };
 
+  // Allow scrolling left pane to drive right pane (for mouse wheel support on left side)
+  const handleLeftWheel = (e: React.WheelEvent) => {
+      if (rightPaneRef.current) {
+          rightPaneRef.current.scrollTop += e.deltaY;
+      }
+  };
+
   const currentRangeLabel = useMemo(() => {
       const d = new Date(viewDate);
       if (viewMode === 'day') return d.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -166,6 +175,7 @@ export const GanttView: React.FC<Props> = ({ onSelectOpportunity, onTaskUpdate, 
   // --- CORE LOGIC: Build the 4-Level Hierarchy ---
   const rows = useMemo(() => {
       const result: GanttRow[] = [];
+      const primaryBrandColor = customPrimaryColor || '#F59E0B'; // Default Amber
       
       // Helper to parse safe date
       const safeDate = (d?: string) => d ? new Date(d) : new Date();
@@ -265,6 +275,7 @@ export const GanttView: React.FC<Props> = ({ onSelectOpportunity, onTaskUpdate, 
                           const { start, end } = getTaskDates(dbTask);
                           const taskId = `TASK-${dbTask.id}`;
                           const taskExpanded = expandedIds.has(taskId);
+                          const isDone = dbTask.status === 'done';
 
                           const taskRow: GanttRow = {
                               id: taskId,
@@ -272,13 +283,14 @@ export const GanttView: React.FC<Props> = ({ onSelectOpportunity, onTaskUpdate, 
                               start,
                               end,
                               status: dbTask.status,
-                              progress: dbTask.status === 'done' ? 100 : 0,
+                              progress: isDone ? 100 : 0,
                               type: 'task',
                               level: 2,
                               parentId: groupId,
                               expanded: taskExpanded,
                               visible: projExpanded && groupExpanded,
-                              color: dbTask.status === 'done' ? 'bg-emerald-500' : 'bg-blue-500',
+                              color: isDone ? 'bg-emerald-500' : undefined,
+                              hexColor: isDone ? undefined : primaryBrandColor,
                               dbTask: dbTask,
                               oppId: proj.id.toString(),
                               nodeTitle: node.label,
@@ -286,10 +298,11 @@ export const GanttView: React.FC<Props> = ({ onSelectOpportunity, onTaskUpdate, 
                                   id: dbTask.id.toString(),
                                   text: dbTask.titulo,
                                   status: dbTask.status as any,
-                                  completed: dbTask.status === 'done',
+                                  completed: isDone,
                                   startDate: dbTask.datainicio,
                                   dueDate: dbTask.datafim,
-                                  estimatedHours: dbTask.duracaohoras
+                                  estimatedHours: dbTask.duracaohoras,
+                                  projectId: dbTask.projeto || undefined // Pass projectId
                               }
                           };
 
@@ -300,19 +313,20 @@ export const GanttView: React.FC<Props> = ({ onSelectOpportunity, onTaskUpdate, 
                           subtasks.forEach(sub => {
                               usedTaskIds.add(sub.id); // Mark subtask as used
                               const { start: sStart, end: sEnd } = getTaskDates(sub);
+                              const subIsDone = sub.status === 'done';
                               subRows.push({
                                   id: `SUB-${sub.id}`,
                                   title: sub.titulo,
                                   start: sStart,
                                   end: sEnd,
                                   status: sub.status,
-                                  progress: sub.status === 'done' ? 100 : 0,
+                                  progress: subIsDone ? 100 : 0,
                                   type: 'subtask',
                                   level: 3,
                                   parentId: taskId,
                                   expanded: false,
                                   visible: projExpanded && groupExpanded && taskExpanded,
-                                  color: 'bg-purple-400',
+                                  color: subIsDone ? 'bg-emerald-500' : 'bg-purple-400',
                                   dbTask: sub,
                                   oppId: proj.id.toString(),
                                   nodeTitle: node.label,
@@ -320,11 +334,12 @@ export const GanttView: React.FC<Props> = ({ onSelectOpportunity, onTaskUpdate, 
                                       id: sub.id.toString(),
                                       text: sub.titulo,
                                       status: sub.status as any,
-                                      completed: sub.status === 'done',
+                                      completed: subIsDone,
                                       startDate: sub.datainicio,
                                       dueDate: sub.datafim,
                                       estimatedHours: sub.duracaohoras,
-                                      isSubtask: true
+                                      isSubtask: true,
+                                      projectId: sub.projeto || undefined // Pass projectId
                                   }
                               });
                               // Update Group Range based on subtasks too
@@ -375,15 +390,18 @@ export const GanttView: React.FC<Props> = ({ onSelectOpportunity, onTaskUpdate, 
                   const { start, end } = getTaskDates(t);
                   const tId = `TASK-${t.id}`;
                   const tExpanded = expandedIds.has(tId);
+                  const isDone = t.status === 'done';
                   
                   const tRow: GanttRow = {
                       id: tId,
                       title: t.titulo,
-                      start, end, status: t.status, progress: t.status === 'done' ? 100 : 0,
+                      start, end, status: t.status, progress: isDone ? 100 : 0,
                       type: 'task', level: 2, parentId: miscGroupId, expanded: tExpanded,
-                      visible: projExpanded && miscExpanded, color: 'bg-blue-500',
+                      visible: projExpanded && miscExpanded, 
+                      color: isDone ? 'bg-emerald-500' : undefined,
+                      hexColor: isDone ? undefined : primaryBrandColor,
                       dbTask: t, oppId: proj.id.toString(), nodeTitle: 'Geral',
-                      bpmnTask: { id: t.id.toString(), text: t.titulo, status: t.status as any, completed: t.status === 'done', startDate: t.datainicio, dueDate: t.datafim, estimatedHours: t.duracaohoras }
+                      bpmnTask: { id: t.id.toString(), text: t.titulo, status: t.status as any, completed: isDone, startDate: t.datainicio, dueDate: t.datafim, estimatedHours: t.duracaohoras, projectId: t.projeto || undefined }
                   };
 
                   // Check for subtasks of orphans
@@ -394,14 +412,16 @@ export const GanttView: React.FC<Props> = ({ onSelectOpportunity, onTaskUpdate, 
                       if (sS < miscGroupRow.start) miscGroupRow.start = sS;
                       if (sE > miscGroupRow.end) miscGroupRow.end = sE;
                       
+                      const subIsDone = s.status === 'done';
                       return {
                           id: `SUB-${s.id}`,
                           title: s.titulo,
-                          start: sS, end: sE, status: s.status, progress: s.status === 'done' ? 100 : 0,
+                          start: sS, end: sE, status: s.status, progress: subIsDone ? 100 : 0,
                           type: 'subtask', level: 3, parentId: tId, expanded: false,
-                          visible: projExpanded && miscExpanded && tExpanded, color: 'bg-purple-400',
+                          visible: projExpanded && miscExpanded && tExpanded, 
+                          color: subIsDone ? 'bg-emerald-500' : 'bg-purple-400',
                           dbTask: s, oppId: proj.id.toString(), nodeTitle: 'Geral',
-                          bpmnTask: { id: s.id.toString(), text: s.titulo, status: s.status as any, completed: s.status === 'done', startDate: s.datainicio, dueDate: s.datafim, estimatedHours: s.duracaohoras, isSubtask: true }
+                          bpmnTask: { id: s.id.toString(), text: s.titulo, status: s.status as any, completed: subIsDone, startDate: s.datainicio, dueDate: s.datafim, estimatedHours: s.duracaohoras, isSubtask: true, projectId: undefined }
                       };
                   });
 
@@ -443,12 +463,15 @@ export const GanttView: React.FC<Props> = ({ onSelectOpportunity, onTaskUpdate, 
                   const { start, end } = getTaskDates(t);
                   const tId = `TASK-${t.id}`;
                   const tExpanded = expandedIds.has(tId);
+                  const isDone = t.status === 'done';
                   
                   const row: GanttRow = {
-                      id: tId, title: t.titulo, start, end, status: t.status, progress: t.status === 'done' ? 100 : 0,
-                      type: 'task', level: 1, parentId: adhocProjId, expanded: tExpanded, visible: adhocExpanded, color: 'bg-amber-500',
+                      id: tId, title: t.titulo, start, end, status: t.status, progress: isDone ? 100 : 0,
+                      type: 'task', level: 1, parentId: adhocProjId, expanded: tExpanded, visible: adhocExpanded, 
+                      color: isDone ? 'bg-emerald-500' : undefined,
+                      hexColor: isDone ? undefined : primaryBrandColor,
                       dbTask: t, oppId: '', nodeTitle: 'Avulso',
-                      bpmnTask: { id: t.id.toString(), text: t.titulo, status: t.status as any, completed: t.status === 'done', startDate: t.datainicio, dueDate: t.datafim, estimatedHours: t.duracaohoras }
+                      bpmnTask: { id: t.id.toString(), text: t.titulo, status: t.status as any, completed: isDone, startDate: t.datainicio, dueDate: t.datafim, estimatedHours: t.duracaohoras, projectId: undefined }
                   };
 
                   // Check subtasks
@@ -456,11 +479,13 @@ export const GanttView: React.FC<Props> = ({ onSelectOpportunity, onTaskUpdate, 
                   const subRows: GanttRow[] = subs.map(s => {
                       const { start: sS, end: sE } = getTaskDates(s);
                       if (sS < minS) minS = sS; if (sE > maxE) maxE = sE;
+                      const subIsDone = s.status === 'done';
                       return {
-                          id: `SUB-${s.id}`, title: s.titulo, start: sS, end: sE, status: s.status, progress: s.status === 'done' ? 100 : 0,
-                          type: 'subtask', level: 2, parentId: tId, expanded: false, visible: adhocExpanded && tExpanded, color: 'bg-purple-400',
+                          id: `SUB-${s.id}`, title: s.titulo, start: sS, end: sE, status: s.status, progress: subIsDone ? 100 : 0,
+                          type: 'subtask', level: 2, parentId: tId, expanded: false, visible: adhocExpanded && tExpanded, 
+                          color: subIsDone ? 'bg-emerald-500' : 'bg-purple-400',
                           dbTask: s, oppId: '', nodeTitle: 'Avulso',
-                          bpmnTask: { id: s.id.toString(), text: s.titulo, status: s.status as any, completed: s.status === 'done', startDate: s.datainicio, dueDate: s.datafim, estimatedHours: s.duracaohoras, isSubtask: true }
+                          bpmnTask: { id: s.id.toString(), text: s.titulo, status: s.status as any, completed: subIsDone, startDate: s.datainicio, dueDate: s.datafim, estimatedHours: s.duracaohoras, isSubtask: true, projectId: undefined }
                       };
                   });
 
@@ -477,7 +502,7 @@ export const GanttView: React.FC<Props> = ({ onSelectOpportunity, onTaskUpdate, 
       }
 
       return result;
-  }, [dbProjects, allDbTasks, expandedIds, filterProject]);
+  }, [dbProjects, allDbTasks, expandedIds, filterProject, customPrimaryColor]);
 
   const handleAutoBalance = async () => {
       setIsBalancing(true);
@@ -669,37 +694,46 @@ export const GanttView: React.FC<Props> = ({ onSelectOpportunity, onTaskUpdate, 
             
             {/* Left Sidebar: Tree Structure */}
             <div 
-                ref={leftPaneRef}
                 className="w-[300px] flex flex-col border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-black/20 shrink-0 overflow-hidden relative"
             >
-                <div className="h-12 flex items-center px-4 border-b border-slate-200 dark:border-slate-700 font-bold text-xs text-slate-500 uppercase bg-white dark:bg-slate-900 sticky top-0 z-20">
+                {/* Header MOVED OUT of scroll container to fix sync issue */}
+                <div className="h-12 flex items-center px-4 border-b border-slate-200 dark:border-slate-700 font-bold text-xs text-slate-500 uppercase bg-white dark:bg-slate-900 shrink-0 z-20">
                     Estrutura do Projeto
                 </div>
-                <div className="flex-1">
-                    {rows.map(row => {
-                        if (!row.visible) return null;
-                        return (
-                            <div 
-                                key={row.id} 
-                                className={`h-10 flex items-center px-4 border-b border-slate-100 dark:border-slate-800/50 text-sm hover:bg-blue-50 dark:hover:bg-white/5 cursor-pointer truncate transition-colors
-                                    ${row.type === 'project' ? 'font-bold bg-slate-200/50 dark:bg-slate-800/50' : ''}
-                                    ${row.type === 'group' ? 'font-semibold text-slate-700 dark:text-slate-300 bg-slate-100/30 dark:bg-slate-800/20' : ''}
-                                    ${row.type === 'subtask' ? 'text-slate-500 text-xs' : ''}
-                                `}
-                                onClick={() => handleRowClick(row)}
-                                style={{ paddingLeft: (row.level * 16) + 12 }}
-                            >
-                                <div className="mr-2 shrink-0 text-slate-400">
-                                    {(row.type === 'project' || row.type === 'group' || (row.type === 'task' && rows.some(r => r.parentId === row.id))) ? (
-                                        row.expanded ? <ChevronDown className="w-3 h-3"/> : <ChevronRightIcon className="w-3 h-3"/>
-                                    ) : (
-                                        row.type === 'subtask' ? <CornerDownRight className="w-3 h-3"/> : <Square className="w-2 h-2 rounded-full bg-slate-300"/>
-                                    )}
+                
+                {/* Scroll Container */}
+                <div 
+                    ref={leftPaneRef}
+                    className="flex-1 overflow-hidden"
+                    onWheel={handleLeftWheel}
+                >
+                    {/* Padding bottom matches right pane to ensure height parity */}
+                    <div className="pb-10">
+                        {rows.map(row => {
+                            if (!row.visible) return null;
+                            return (
+                                <div 
+                                    key={row.id} 
+                                    className={`h-10 flex items-center px-4 border-b border-slate-100 dark:border-slate-800/50 text-sm hover:bg-blue-50 dark:hover:bg-white/5 cursor-pointer truncate transition-colors
+                                        ${row.type === 'project' ? 'font-bold bg-slate-200/50 dark:bg-slate-800/50' : ''}
+                                        ${row.type === 'group' ? 'font-semibold text-slate-700 dark:text-slate-300 bg-slate-100/30 dark:bg-slate-800/20' : ''}
+                                        ${row.type === 'subtask' ? 'text-slate-500 text-xs' : ''}
+                                    `}
+                                    onClick={() => handleRowClick(row)}
+                                    style={{ paddingLeft: (row.level * 16) + 12 }}
+                                >
+                                    <div className="mr-2 shrink-0 text-slate-400">
+                                        {(row.type === 'project' || row.type === 'group' || (row.type === 'task' && rows.some(r => r.parentId === row.id))) ? (
+                                            row.expanded ? <ChevronDown className="w-3 h-3"/> : <ChevronRightIcon className="w-3 h-3"/>
+                                        ) : (
+                                            row.type === 'subtask' ? <CornerDownRight className="w-3 h-3"/> : <Square className="w-2 h-2 rounded-full bg-slate-300"/>
+                                        )}
+                                    </div>
+                                    <span className="truncate">{row.title}</span>
                                 </div>
-                                <span className="truncate">{row.title}</span>
-                            </div>
-                        )
-                    })}
+                            )
+                        })}
+                    </div>
                 </div>
             </div>
 
@@ -710,7 +744,7 @@ export const GanttView: React.FC<Props> = ({ onSelectOpportunity, onTaskUpdate, 
                 {/* Header Dates */}
                 <div 
                     ref={headerRef}
-                    className="h-12 flex border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden w-full"
+                    className="h-12 flex border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden w-full shrink-0"
                 >
                     {timelineCols.map((date, i) => (
                         <div 
@@ -746,11 +780,13 @@ export const GanttView: React.FC<Props> = ({ onSelectOpportunity, onTaskUpdate, 
                             return (
                                 <div key={row.id} className="h-10 border-b border-transparent flex items-center relative group hover:bg-white/5">
                                     <div 
-                                        className={`absolute h-6 rounded-md shadow-sm flex items-center px-2 text-[10px] text-white font-bold whitespace-nowrap overflow-hidden transition-all ${row.color || 'bg-slate-400'}`}
+                                        onClick={() => handleRowClick(row)}
+                                        className={`absolute h-6 rounded-md shadow-sm flex items-center px-2 text-[10px] text-white font-bold whitespace-nowrap overflow-hidden transition-all cursor-pointer ${row.color || 'bg-slate-400'}`}
                                         style={{ 
                                             left: Math.max(0, pos.left), 
                                             width: Math.max(viewConfig.colWidth / 2, pos.width),
-                                            opacity: row.type === 'project' ? 0.8 : row.type === 'group' ? 0.6 : 1 
+                                            opacity: row.type === 'project' ? 0.8 : row.type === 'group' ? 0.6 : 1,
+                                            backgroundColor: row.hexColor // Override with custom whitelabel color if provided
                                         }}
                                         title={`${row.title} (${row.start.toLocaleDateString()} - ${row.end.toLocaleDateString()})`}
                                     >
@@ -787,6 +823,14 @@ export const GanttView: React.FC<Props> = ({ onSelectOpportunity, onTaskUpdate, 
                 task={editingTaskCtx.task}
                 nodeTitle={editingTaskCtx.nodeLabel}
                 onClose={() => setEditingTaskCtx(null)}
+                onDelete={async (id) => {
+                    // Confirm removed (handled inside modal)
+                    if (!isNaN(Number(id))) {
+                        await deleteTask(Number(id));
+                        loadData();
+                        setEditingTaskCtx(null);
+                    }
+                }}
                 onSave={async (updated) => {
                     if (updated.id) {
                         const dbId = Number(updated.id);

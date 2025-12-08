@@ -1,4 +1,5 @@
 
+
 import { supabase } from './supabaseClient';
 import { Opportunity, ProjectStatus, DbProject, RDEStatus, Archetype, IntensityLevel, TadsCriteria, DbTask, BpmnTask, BpmnNode } from '../types';
 
@@ -68,6 +69,44 @@ export const fetchOpportunities = async (organizationId?: number): Promise<Oppor
     console.warn('Supabase Connection Unavailable.');
     return null;
   }
+};
+
+export const fetchOpportunityById = async (id: string): Promise<Opportunity | null> => {
+    if (!supabase) return null;
+    try {
+        const { data: project, error } = await supabase
+            .from(TABLE_NAME)
+            .select(`*, clienteData:clientes(nome, logo_url)`)
+            .eq('id', id)
+            .single();
+        
+        if (error || !project) return null;
+
+        const { data: tasks, error: tasksError } = await supabase
+            .from('tasks')
+            .select('*')
+            .eq('projeto', id);
+            
+        // Map tasks users
+        let userMap = new Map<string, any>();
+        if (tasks && tasks.length > 0) {
+             const userIds = [...new Set(tasks.map((t: any) => t.responsavel).filter(Boolean))];
+             if (userIds.length > 0) {
+                 const { data: users } = await supabase.from('users').select('id, nome, desenvolvedor').in('id', userIds);
+                 users?.forEach(u => userMap.set(u.id, u));
+             }
+        }
+        
+        const hydratedTasks = (tasks || []).map((t: any) => ({
+            ...t,
+            responsavelData: userMap.get(t.responsavel)
+        }));
+
+        return mapDbProjectToOpportunity(project, hydratedTasks);
+    } catch (e) {
+        console.error(e);
+        return null;
+    }
 };
 
 export const createOpportunity = async (opp: Opportunity): Promise<Opportunity | null> => {
@@ -211,72 +250,157 @@ const mapDbProjectToOpportunity = (row: DbProject, tasks: DbTask[] = []): Opport
 
     const tadsScore = Object.values(tads).filter(Boolean).length * 2;
 
-    // Map 'tasks' rows to BPMN Nodes/Tasks
-    const bpmnNodes: BpmnNode[] = [];
-    
+    // Create a Lookup Map for Fresh DB Tasks
+    const freshTaskMap = new Map<string, BpmnTask>();
+    const usedTaskIds = new Set<string>(); // To track which tasks were used in structure
+
     const mappedTasks: BpmnTask[] = tasks
         .filter(t => !t.sutarefa) // Main tasks only
-        .map(t => ({
-            id: t.id.toString(),
-            dbId: t.id,
-            text: t.titulo,
-            description: t.descricao,
-            status: t.status as any,
-            completed: t.status === 'done',
-            assignee: t.responsavelData?.nome || undefined,
-            assigneeId: t.responsavel || undefined, // Map UUID for logic
-            assigneeIsDev: t.responsavelData?.desenvolvedor,
-            startDate: t.datainicio || t.dataproposta,
-            dueDate: t.datafim || t.deadline,
-            estimatedHours: t.duracaohoras,
-            gut: { g: t.gravidade, u: t.urgencia, t: t.tendencia },
-            subtasks: []
-        }));
+        .map(t => {
+            // Determine Completed At: If status is 'done', we need a date.
+            let completedDateStr = undefined;
+            if (t.status === 'done') {
+                const now = new Date();
+                // If datafim is provided, check if it's in future. If so, cap at now for metrics.
+                // Or better, use `createdat` + duration if available? No, simpler:
+                const fim = t.datafim ? new Date(t.datafim) : now;
+                completedDateStr = fim > now ? now.toISOString() : fim.toISOString();
+            }
 
-    // Re-attach subtasks if loaded
+            return {
+                id: t.id.toString(),
+                dbId: t.id,
+                text: t.titulo,
+                description: t.descricao,
+                status: t.status as any,
+                completed: t.status === 'done',
+                completedAt: completedDateStr,
+                createdAt: t.createdat, // IMPORTANT: Map createdAt for Lead Time calc
+                assignee: t.responsavelData?.nome || undefined,
+                assigneeId: t.responsavel || undefined, // Map UUID for logic
+                assigneeIsDev: t.responsavelData?.desenvolvedor,
+                startDate: t.datainicio || t.dataproposta,
+                dueDate: t.datafim || t.deadline,
+                estimatedHours: t.duracaohoras,
+                gut: { g: t.gravidade, u: t.urgencia, t: t.tendencia },
+                subtasks: [],
+                projectId: row.id // Bind project ID
+            };
+        });
+
+    // Populate Subtasks
     if (tasks.length > 0) {
         const subtasks = tasks.filter(t => t.sutarefa);
-        
         subtasks.forEach(sub => {
-            // Check both 'tarefa' (legacy) and 'tarefamae' (new) columns
             const parentId = sub.tarefamae || sub.tarefa;
-            
             if (parentId) {
                 const parent = mappedTasks.find(p => p.dbId === parentId);
                 if (parent) {
                     parent.subtasks = parent.subtasks || [];
+                    
+                    let subCompletedStr = undefined;
+                    if (sub.status === 'done') {
+                        const now = new Date();
+                        const fim = sub.datafim ? new Date(sub.datafim) : now;
+                        subCompletedStr = fim > now ? now.toISOString() : fim.toISOString();
+                    }
+
                     parent.subtasks.push({
                         id: sub.id.toString(),
                         text: sub.titulo,
                         completed: sub.status === 'done',
+                        completedAt: subCompletedStr,
                         dbId: sub.id,
                         dueDate: sub.datafim || sub.deadline,
                         assignee: sub.responsavelData?.nome,
-                        assigneeId: sub.responsavel
+                        assigneeId: sub.responsavel,
+                        startDate: sub.datainicio
                     });
                 }
             }
         });
     }
 
-    if (mappedTasks.length > 0) {
-        bpmnNodes.push({
-            id: 'node_main_execution',
-            label: 'Lista de Execução',
-            laneId: 'lane_main',
-            type: 'task',
-            checklist: mappedTasks,
-            x: 100, 
-            y: 80
-        });
+    // Fill Map
+    mappedTasks.forEach(t => {
+        freshTaskMap.set(t.id, t);
+        if (t.dbId) freshTaskMap.set(t.dbId.toString(), t);
+    });
+
+    // HYDRATION: Check if we have a saved structure or need to build one
+    let finalNodes: BpmnNode[] = [];
+    
+    if (row.bpmn_structure && (row.bpmn_structure as any).nodes && (row.bpmn_structure as any).nodes.length > 0) {
+        // Use Saved Structure but Hydrate with DB Data
+        finalNodes = (row.bpmn_structure as any).nodes.map((node: any) => ({
+            ...node,
+            checklist: (node.checklist || []).map((task: any) => {
+                // Try to find fresh version in DB
+                // Matching primarily by ID (if synced)
+                let fresh = freshTaskMap.get(task.id);
+                if (!fresh && task.dbId) fresh = freshTaskMap.get(task.dbId.toString());
+                
+                // Secondary match by Title if ID is temporary (risky but helpful for unsynced structures)
+                // if (!fresh) fresh = mappedTasks.find(t => t.text === task.text);
+
+                if (fresh) {
+                    usedTaskIds.add(fresh.id); // Mark as used
+                    return {
+                        ...task,
+                        ...fresh, // Overwrite with fresh DB data (status, dates, assignee)
+                        subtasks: fresh.subtasks // Use fresh subtasks from DB
+                    };
+                }
+                return task; // Return original if not found in DB (might be unsynced draft)
+            })
+        }));
+
+        // Find Orphaned Tasks (In DB but not in Structure)
+        // These are tasks added via Kanban/QuickTask that haven't been put into a specific BPMN node yet.
+        const orphans = mappedTasks.filter(t => !usedTaskIds.has(t.id));
+        
+        if (orphans.length > 0) {
+            // Append them to the last node or a new "Backlog" node
+            // Let's create a "Backlog / Ad-hoc" node if it doesn't exist
+            let backlogNode = finalNodes.find(n => n.id === 'node_backlog_adhoc');
+            if (!backlogNode) {
+                backlogNode = {
+                    id: 'node_backlog_adhoc',
+                    label: 'Backlog / Ad-hoc',
+                    laneId: 'lane_main',
+                    type: 'task',
+                    checklist: [],
+                    x: 50, y: 300 // Arbitrary position
+                };
+                finalNodes.push(backlogNode);
+            }
+            backlogNode.checklist = [...(backlogNode.checklist || []), ...orphans];
+        }
+
+    } else {
+        // No structure saved, build default from DB tasks
+        if (mappedTasks.length > 0) {
+            finalNodes.push({
+                id: 'node_main_execution',
+                label: 'Lista de Execução',
+                laneId: 'lane_main',
+                type: 'task',
+                checklist: mappedTasks,
+                x: 100, 
+                y: 80
+            });
+        }
     }
 
-    // Use saved structure if available, otherwise use generated default
-    const baseBpmn = row.bpmn_structure && (row.bpmn_structure as any).nodes ? row.bpmn_structure : {
-        lanes: [{ id: 'lane_main', label: 'Fluxo' }],
-        nodes: bpmnNodes,
-        edges: []
+    const baseBpmn = {
+        lanes: (row.bpmn_structure as any)?.lanes || [{ id: 'lane_main', label: 'Fluxo' }],
+        nodes: finalNodes,
+        edges: (row.bpmn_structure as any)?.edges || []
     };
+
+    // Extract attachments from structure if available
+    const structure = row.bpmn_structure as any || {};
+    const attachments = structure.attachments || [];
 
     return {
         id: row.id.toString(),
@@ -298,11 +422,16 @@ const mapDbProjectToOpportunity = (row: DbProject, tasks: DbTask[] = []): Opport
         createdAt: row.created_at,
         bpmn: baseBpmn as any,
         dbProjectId: row.id,
-        docsContext: row.contexto_ia || ''
+        docsContext: row.contexto_ia || '',
+        attachments: attachments
     };
 };
 
 const mapOpportunityToDbProject = (opp: Opportunity): any => {
+    const structure = opp.bpmn || { nodes: [], lanes: [] };
+    // Ensure attachments are saved into structure
+    (structure as any).attachments = opp.attachments || [];
+
     return {
         nome: opp.title,
         descricao: opp.description || '',
@@ -321,7 +450,7 @@ const mapOpportunityToDbProject = (opp: Opportunity): any => {
         tadsvelocidade: opp.tads.mvpSpeed,
         organizacao: opp.organizationId || 3,
         projoport: opp.status === 'Future' || opp.status === 'Negotiation' || opp.status === 'Frozen',
-        bpmn_structure: opp.bpmn || {},
+        bpmn_structure: structure,
         contexto_ia: opp.docsContext || ''
     };
 };

@@ -1,4 +1,5 @@
 
+
 export enum RDEStatus {
   HOT = 'Quente',
   WARM = 'Morno',
@@ -20,36 +21,87 @@ export enum IntensityLevel {
   L4 = 4
 }
 
-// --- PLAN CONFIGURATION ---
+// --- PLAN CONFIGURATION (Mapped to DB IDs) ---
+// ID 4: Free
+// ID 1: Básico (was Usuário)
+// ID 2: Studio
+// ID 3: Governança (was Scale)
+// ID 5: Agency (Legacy - Now mostly mapped to Governance features but kept for compat)
+// ID 10: Enterprise (Whitelabel & Full AI)
+
 export const PLAN_LIMITS: Record<string, { 
     maxProjects: number; 
+    maxUsers: number;
+    aiLimit: number; // Monthly requests or Total requests
     features: { 
         financial: boolean; 
         clients: boolean; 
-        metrics: boolean; 
+        metrics: boolean; // DORA & Product
         pdfUpload: boolean; 
         gantt: boolean;
+        whitelabel: boolean;
+        aiAdvanced: boolean;
     } 
 }> = {
-    'plan_free': {
-        maxProjects: 3,
-        features: { financial: false, clients: false, metrics: false, pdfUpload: false, gantt: true }
+    'plan_free': { // ID 4
+        maxProjects: 1, // Strict Limit: 1 Project to trigger need
+        maxUsers: 1,
+        aiLimit: 0, // Zero AI to trigger upgrade
+        features: { financial: false, clients: false, metrics: false, pdfUpload: false, gantt: false, whitelabel: false, aiAdvanced: false }
     },
-    'plan_consultant': {
+    'plan_usuario': { // ID 1 - Básico
         maxProjects: 9999,
-        features: { financial: false, clients: false, metrics: false, pdfUpload: false, gantt: true }
+        maxUsers: 1,
+        aiLimit: 50,
+        features: { financial: false, clients: false, metrics: false, pdfUpload: false, gantt: true, whitelabel: false, aiAdvanced: false }
     },
-    'plan_studio': {
+    'plan_studio': { // ID 2
         maxProjects: 9999,
-        features: { financial: true, clients: true, metrics: false, pdfUpload: true, gantt: true }
+        maxUsers: 5,
+        aiLimit: 500,
+        features: { 
+            financial: true, 
+            clients: true, 
+            metrics: false, 
+            pdfUpload: true, 
+            gantt: true, 
+            whitelabel: false, 
+            aiAdvanced: false // IA Generativa apenas (sem personalização de Cérebro/Contexto profunda)
+        }
     },
-    'plan_scale': {
+    'plan_scale': { // ID 3 - Governança
         maxProjects: 9999,
-        features: { financial: true, clients: true, metrics: true, pdfUpload: true, gantt: true }
+        maxUsers: 25, // Aumentado para 25 usuários
+        aiLimit: 9999,
+        features: { 
+            financial: true, 
+            clients: true, 
+            metrics: false, // Bloqueado: Sem métricas de Produto/Engenharia
+            pdfUpload: true, 
+            gantt: true, 
+            whitelabel: false, 
+            aiAdvanced: true // Mantém IA Avançada para Nivelamento de Recursos
+        }
     },
-    'plan_agency': {
+    'plan_agency': { // ID 5 - Legacy (Maps similar to Governance but more users, NO Whitelabel)
         maxProjects: 9999,
-        features: { financial: true, clients: true, metrics: true, pdfUpload: true, gantt: true }
+        maxUsers: 50,
+        aiLimit: 9999,
+        features: { financial: true, clients: true, metrics: true, pdfUpload: true, gantt: true, whitelabel: false, aiAdvanced: true }
+    },
+    'plan_enterprise': { // ID 10 - Enterprise - USO ILIMITADO
+        maxProjects: 999999,
+        maxUsers: 999999,
+        aiLimit: 999999,
+        features: { 
+            financial: true, 
+            clients: true, 
+            metrics: true, 
+            pdfUpload: true, 
+            gantt: true, 
+            whitelabel: true, 
+            aiAdvanced: true 
+        }
     }
 };
 
@@ -66,6 +118,7 @@ export interface DbPlan {
   valor: number;
   meses: number;
   descricao: string;
+  colabtotal?: number;
 }
 
 export interface DbClientPlan {
@@ -170,6 +223,16 @@ export interface DbTask {
 
 export type TaskStatus = 'todo' | 'doing' | 'review' | 'approval' | 'done' | 'backlog';
 
+export interface Attachment {
+    id: string;
+    name: string;
+    size: string;
+    type: string;
+    uploadedAt: string;
+    url: string;
+    taskId?: string;
+}
+
 export interface BpmnTask {
   id: string; 
   displayId?: number;
@@ -177,6 +240,7 @@ export interface BpmnTask {
   description?: string;
   completed: boolean;
   completedAt?: string;
+  createdAt?: string; // New field for Metrics
   status: TaskStatus;
   startDate?: string;
   dueDate?: string;
@@ -195,12 +259,15 @@ export interface BpmnTask {
   
   // AI Role Suggestion
   suggestedRoleId?: number;
+  
+  attachments?: Attachment[];
 }
 
 export interface BpmnSubTask {
   id: string;
   text: string;
   completed: boolean;
+  completedAt?: string;
   dbId?: number;
   dueDate?: string;
   startDate?: string;
@@ -229,15 +296,6 @@ export interface BpmnLane {
 export interface BpmnEdge {
     from: string; 
     to: string;
-}
-
-export interface Attachment {
-    id: string;
-    name: string;
-    size: string;
-    type: string;
-    uploadedAt: string;
-    url: string;
 }
 
 export interface Comment {
@@ -397,7 +455,8 @@ export interface AsaasSubscription {
 }
 
 export interface SubscriptionPlan {
-    id: string;
+    id: string; // 'plan_free', 'plan_usuario', etc.
+    dbId?: number; // 4, 1, 2, 3, 5, 10
     name: string;
     price: number;
     features: string[];

@@ -1,22 +1,38 @@
 
-import React, { useState } from 'react';
-import { Opportunity, ProjectStatus } from '../types';
-import { Search, Filter, LayoutGrid, Zap, Target, Calendar, ArrowRight, Lock, Briefcase, Trello, GanttChartSquare, Layers, MoreHorizontal } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Opportunity, ProjectStatus, PLAN_LIMITS } from '../types';
+import { Search, Filter, LayoutGrid, Zap, Target, ArrowRight, Lock, Briefcase, Trello, GanttChartSquare, Plus, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { GanttView } from './GanttView';
+import { getCurrentUserPlan } from '../services/asaasService';
+import { supabase } from '../services/supabaseClient';
 
 interface Props {
   opportunities: Opportunity[];
   onOpenProject: (opp: Opportunity) => void;
   userRole?: string;
   organizationId?: number;
+  onOpenCreate?: () => void;
+  initialFilterStatus?: string;
 }
 
 type ViewMode = 'grid' | 'kanban' | 'gantt';
 
-export const ProjectList: React.FC<Props> = ({ opportunities, onOpenProject, userRole, organizationId }) => {
+export const ProjectList: React.FC<Props> = ({ opportunities, onOpenProject, userRole, organizationId, onOpenCreate, initialFilterStatus }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<string>('All');
+  const [filterStatus, setFilterStatus] = useState<string>(initialFilterStatus || 'All');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [currentPlan, setCurrentPlan] = useState('plan_free');
+
+  useEffect(() => {
+      const checkPlan = async () => {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+              const plan = await getCurrentUserPlan(user.id);
+              setCurrentPlan(plan);
+          }
+      };
+      checkPlan();
+  }, []);
 
   const filteredOpps = opportunities.filter(opp => {
       const matchesSearch = opp.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -24,6 +40,24 @@ export const ProjectList: React.FC<Props> = ({ opportunities, onOpenProject, use
       const matchesStatus = filterStatus === 'All' || opp.status === filterStatus;
       return matchesSearch && matchesStatus;
   });
+
+  const planConfig = PLAN_LIMITS[currentPlan] || PLAN_LIMITS['plan_free'];
+  const maxProjects = planConfig.maxProjects;
+  const currentCount = opportunities.length;
+  const isUnlimited = maxProjects >= 9999;
+  const canCreateProject = currentCount < maxProjects;
+  const canViewGantt = planConfig.features.gantt;
+
+  // Calculate usage percentage for bar
+  const usagePercentage = isUnlimited ? 0 : Math.min(100, (currentCount / maxProjects) * 100);
+
+  const handleCreateClick = () => {
+      if (canCreateProject) {
+          if (onOpenCreate) onOpenCreate();
+      } else {
+          alert(`Limite de projetos (${maxProjects}) atingido para o plano ${currentPlan === 'plan_free' ? 'Free' : 'Atual'}. Faça upgrade para criar mais.`);
+      }
+  };
 
   const getStatusColor = (status: string) => {
       switch(status) {
@@ -97,6 +131,22 @@ export const ProjectList: React.FC<Props> = ({ opportunities, onOpenProject, use
             </div>
 
             <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+                
+                {onOpenCreate && userRole !== 'cliente' && (
+                    <button 
+                        onClick={handleCreateClick}
+                        className={`px-4 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg transition-all active:scale-95 whitespace-nowrap ${
+                            canCreateProject 
+                            ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-900/20' 
+                            : 'bg-slate-200 dark:bg-white/10 text-slate-500 cursor-not-allowed opacity-70'
+                        }`}
+                        title={!canCreateProject ? "Limite de projetos atingido. Faça upgrade." : ""}
+                    >
+                        {!canCreateProject ? <Lock className="w-4 h-4"/> : <Plus className="w-4 h-4"/>} 
+                        Novo Projeto ({currentCount}/{isUnlimited ? '∞' : maxProjects})
+                    </button>
+                )}
+
                 <div className="relative flex-1 md:min-w-[240px] w-full">
                     <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400"/>
                     <input 
@@ -124,12 +174,23 @@ export const ProjectList: React.FC<Props> = ({ opportunities, onOpenProject, use
                     >
                         <Trello className="w-4 h-4"/>
                     </button>
+                    
+                    {/* Gantt Button Lock */}
                     <button 
-                        onClick={() => setViewMode('gantt')}
-                        className={`p-2 rounded-lg transition-all ${viewMode === 'gantt' ? 'bg-white dark:bg-slate-700 shadow text-shinko-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}
-                        title="Cronograma Global"
+                        onClick={() => canViewGantt ? setViewMode('gantt') : alert("Gantt disponível apenas nos planos superiores. Faça upgrade para visualizar.")}
+                        className={`p-2 rounded-lg transition-all relative group ${
+                            viewMode === 'gantt' 
+                            ? 'bg-white dark:bg-slate-700 shadow text-shinko-primary' 
+                            : canViewGantt ? 'text-slate-500 hover:text-slate-900 dark:hover:text-white' : 'text-slate-300 dark:text-slate-700 cursor-not-allowed'
+                        }`}
+                        title={canViewGantt ? "Cronograma Global" : "Bloqueado no Plano Free"}
                     >
                         <GanttChartSquare className="w-4 h-4"/>
+                        {!canViewGantt && (
+                            <div className="absolute top-0 right-0 -mt-1 -mr-1">
+                                <Lock className="w-3 h-3 text-red-500 fill-white dark:fill-slate-900"/>
+                            </div>
+                        )}
                     </button>
                 </div>
 
@@ -144,6 +205,7 @@ export const ProjectList: React.FC<Props> = ({ opportunities, onOpenProject, use
                             <option value="Active">Ativos</option>
                             <option value="Negotiation">Negociação</option>
                             <option value="Future">Futuros</option>
+                            <option value="Frozen">Congelados</option>
                             <option value="Archived">Arquivados</option>
                         </select>
                         <Filter className="w-4 h-4 absolute left-3 top-3 text-slate-400 pointer-events-none"/>
@@ -151,6 +213,34 @@ export const ProjectList: React.FC<Props> = ({ opportunities, onOpenProject, use
                 )}
             </div>
         </div>
+
+        {/* Limit Banner (Only for Limited Plans) */}
+        {!isUnlimited && (
+            <div className="mb-6 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex flex-col sm:flex-row items-center gap-4">
+                <div className={`p-2 rounded-lg ${canCreateProject ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'}`}>
+                    {canCreateProject ? <CheckCircle2 className="w-5 h-5"/> : <AlertTriangle className="w-5 h-5"/>}
+                </div>
+                <div className="flex-1 w-full">
+                    <div className="flex justify-between items-center mb-1.5">
+                        <span className="text-sm font-bold text-slate-700 dark:text-slate-300">Uso do Plano Free (Projetos)</span>
+                        <span className={`text-xs font-bold ${!canCreateProject ? 'text-red-500' : 'text-slate-500'}`}>
+                            {currentCount} de {maxProjects} utilizados
+                        </span>
+                    </div>
+                    <div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                        <div 
+                            className={`h-full transition-all duration-500 ${!canCreateProject ? 'bg-red-500' : 'bg-blue-500'}`} 
+                            style={{ width: `${usagePercentage}%` }}
+                        ></div>
+                    </div>
+                </div>
+                {!canCreateProject && (
+                    <button className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-xs rounded-lg shadow hover:opacity-90 transition-opacity whitespace-nowrap">
+                        Fazer Upgrade
+                    </button>
+                )}
+            </div>
+        )}
 
         {/* Content Area */}
         <div className="flex-1 overflow-hidden relative">
@@ -178,7 +268,9 @@ export const ProjectList: React.FC<Props> = ({ opportunities, onOpenProject, use
                                             {getStatusLabel(opp.status)}
                                         </span>
                                         {opp.priorityLock ? (
-                                            <Lock className="w-4 h-4 text-red-500" title="Prioridade Travada"/>
+                                            <span title="Prioridade Travada">
+                                                <Lock className="w-4 h-4 text-red-500" />
+                                            </span>
                                         ) : (
                                             <div className="flex items-center gap-1 text-slate-400">
                                                 <span className="text-xs font-bold">Prio-6</span>
@@ -230,15 +322,23 @@ export const ProjectList: React.FC<Props> = ({ opportunities, onOpenProject, use
             )}
 
             {/* GANTT VIEW */}
-            {viewMode === 'gantt' && (
+            {viewMode === 'gantt' && canViewGantt && (
                 <div className="h-full w-full bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm overflow-hidden">
                     <GanttView 
                         opportunities={filteredOpps} 
                         onSelectOpportunity={onOpenProject} 
                         onTaskUpdate={() => {}} 
                         userRole={userRole}
-                        organizationId={organizationId} // Pass org ID to fetch tasks internally
+                        organizationId={organizationId} 
                     />
+                </div>
+            )}
+            
+            {viewMode === 'gantt' && !canViewGantt && (
+                <div className="h-full w-full flex flex-col items-center justify-center text-center p-8 bg-slate-50 dark:bg-black/20 rounded-2xl border border-dashed border-slate-200 dark:border-white/10">
+                    <Lock className="w-16 h-16 text-slate-300 dark:text-slate-700 mb-4"/>
+                    <h3 className="text-xl font-bold text-slate-500">Visualização Bloqueada</h3>
+                    <p className="text-slate-400 mt-2 max-w-md">O gráfico de Gantt Global é exclusivo para planos Studio ou superiores. Faça um upgrade para organizar seu cronograma mestre.</p>
                 </div>
             )}
 

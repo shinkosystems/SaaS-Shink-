@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { fetchAllOwners, updateGlobalClientData, fetchPlans, fetchGlobalMetrics, AdminUser, GlobalMetrics, updateUserStatus } from '../services/adminService';
 import { DbPlan } from '../types';
@@ -640,13 +641,21 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                                     <label className="block text-xs font-bold text-slate-500 mb-1">Plano Selecionado</label>
                                     <select 
                                         value={selectedPlanId}
-                                        onChange={e => setSelectedPlanId(Number(e.target.value))}
+                                        onChange={e => {
+                                            const pid = Number(e.target.value);
+                                            setSelectedPlanId(pid);
+                                            // Automatically update org limit based on the selected plan
+                                            const p = plans.find(pl => pl.id === pid);
+                                            if (p && p.colabtotal) {
+                                                setOrgLimit(p.colabtotal);
+                                            }
+                                        }}
                                         className="w-full glass-input rounded-lg p-3 outline-none focus:border-purple-500 appearance-none bg-white dark:bg-slate-950 font-bold"
                                     >
                                         <option value="" className="dark:bg-slate-900">Selecione...</option>
                                         {plans.map(p => (
                                             <option key={p.id} value={p.id} className="dark:bg-slate-900">
-                                                {p.nome} - R$ {p.valor} ({p.meses} meses)
+                                                {p.nome} - R$ {p.valor} ({p.meses} meses) - {p.colabtotal || 1} Users
                                             </option>
                                         ))}
                                     </select>

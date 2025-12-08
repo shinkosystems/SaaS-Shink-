@@ -53,7 +53,7 @@ const AuthScreen: React.FC<Props> = ({ onGuestLogin, onClose, customOrgName, cus
   
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-      <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 relative animate-in zoom-in-95 duration-300">
+      <div className="w-full max-w-md bg-white dark:bg-black/40 rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-white/10 relative animate-in zoom-in-95 duration-300 backdrop-blur-xl ring-1 ring-white/10">
         
         <button onClick={onClose} className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
             <X className="w-5 h-5"/>
@@ -90,7 +90,7 @@ const AuthScreen: React.FC<Props> = ({ onGuestLogin, onClose, customOrgName, cus
                         type="email" 
                         value={email}
                         onChange={e => setEmail(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white border-transparent focus:border-amber-500 focus:bg-white dark:focus:bg-slate-900 outline-none transition-all"
+                        className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-100 dark:bg-black/30 text-slate-900 dark:text-white border border-transparent dark:border-white/10 focus:border-amber-500 focus:bg-white dark:focus:bg-black/50 outline-none transition-all backdrop-blur-md"
                         placeholder="seu@email.com"
                         required
                     />
@@ -105,7 +105,7 @@ const AuthScreen: React.FC<Props> = ({ onGuestLogin, onClose, customOrgName, cus
                         type="password" 
                         value={password}
                         onChange={e => setPassword(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white border-transparent focus:border-amber-500 focus:bg-white dark:focus:bg-slate-900 outline-none transition-all"
+                        className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-100 dark:bg-black/30 text-slate-900 dark:text-white border border-transparent dark:border-white/10 focus:border-amber-500 focus:bg-white dark:focus:bg-black/50 outline-none transition-all backdrop-blur-md"
                         placeholder="••••••••"
                         required
                     />
@@ -138,23 +138,23 @@ const AuthScreen: React.FC<Props> = ({ onGuestLogin, onClose, customOrgName, cus
         <div className="p-8 pt-0">
             <div className="relative mb-6">
                 <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-slate-200 dark:border-slate-800"></div>
+                    <div className="w-full border-t border-slate-200 dark:border-white/10"></div>
                 </div>
                 <div className="relative flex justify-center text-xs">
-                    <span className="bg-white dark:bg-slate-900 px-2 text-slate-500">Ou continue como</span>
+                    <span className="bg-white dark:bg-black/20 px-2 text-slate-500 backdrop-blur-xl rounded">Ou continue como</span>
                 </div>
             </div>
 
             <button 
                 onClick={handleRandomGuest}
-                className="w-full py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2 group"
+                className="w-full py-2.5 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2 group border border-transparent dark:border-white/5"
             >
                 <Sparkles className="w-4 h-4 group-hover:brightness-110 transition-colors" style={primaryTextColorStyle} />
                 Entrar como Convidado (Demo)
             </button>
         </div>
 
-        <div className="py-4 text-center bg-slate-50 dark:bg-slate-950/50 border-t border-slate-200 dark:border-slate-800">
+        <div className="py-4 text-center bg-slate-50 dark:bg-black/20 border-t border-slate-200 dark:border-white/10">
             <span className="text-[10px] text-slate-400 dark:text-slate-500 opacity-60">
                 Desenvolvido por Shinkō Systems©
             </span>

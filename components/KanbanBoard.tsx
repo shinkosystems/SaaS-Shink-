@@ -1,9 +1,9 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Opportunity, TaskStatus, DbTask } from '../types';
-import { Trello, Filter, User, Hash, Clock, Briefcase, RefreshCw, Calendar as CalendarIcon, GitMerge, GanttChartSquare } from 'lucide-react';
+import { Opportunity, TaskStatus, DbTask, PLAN_LIMITS } from '../types';
+import { Trello, Filter, User, Hash, Clock, Briefcase, RefreshCw, Calendar as CalendarIcon, GitMerge, GanttChartSquare, Lock } from 'lucide-react';
 import TaskDetailModal from './TaskDetailModal';
-import { fetchAllTasks, updateTask, fetchProjects } from '../services/projectService';
+import { fetchAllTasks, updateTask, fetchProjects, deleteTask } from '../services/projectService';
 import { logEvent } from '../services/analyticsService';
 import { GanttView } from './GanttView';
 
@@ -15,6 +15,7 @@ interface Props {
   userId?: string;
   projectId?: string; // Prop para filtrar por projeto específico
   organizationId?: number; // Prop para filtrar por organização
+  currentPlan?: string;
 }
 
 interface KanbanColumn {
@@ -34,7 +35,7 @@ const COLUMNS: KanbanColumn[] = [
     { id: 'done', label: 'Concluído', color: 'bg-emerald-500' }
 ];
 
-export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, projectId, organizationId, onTaskUpdate }) => {
+export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, projectId, organizationId, onTaskUpdate, currentPlan }) => {
     const [viewMode, setViewMode] = useState<ViewMode>('board');
     const [tasks, setTasks] = useState<DbTask[]>([]);
     const [projectsList, setProjectsList] = useState<{id: number, nome: string}[]>([]);
@@ -48,6 +49,9 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
     
     const [draggedTask, setDraggedTask] = useState<DbTask | null>(null);
     const [editingTaskCtx, setEditingTaskCtx] = useState<DbTask | null>(null);
+
+    const planConfig = PLAN_LIMITS[currentPlan || 'plan_free'];
+    const canViewGantt = planConfig?.features.gantt !== false;
     
     // Update filter if prop changes
     useEffect(() => {
@@ -188,14 +192,20 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
                                     <Trello className="w-4 h-4"/> Quadro
                                 </button>
                                 <button 
-                                    onClick={() => setViewMode('gantt')}
-                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                                    onClick={() => canViewGantt ? setViewMode('gantt') : alert("Visualização Gantt disponível apenas nos planos Studio e superiores.")}
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all relative group ${
                                         viewMode === 'gantt' 
                                         ? 'bg-white dark:bg-slate-700 shadow text-shinko-primary' 
-                                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                                        : canViewGantt ? 'text-slate-500 hover:text-slate-900 dark:hover:text-white' : 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
                                     }`}
+                                    title={!canViewGantt ? "Disponível no plano Studio" : ""}
                                 >
                                     <GanttChartSquare className="w-4 h-4"/> Gantt
+                                    {!canViewGantt && (
+                                        <div className="absolute top-0 right-0 -mt-1 -mr-1">
+                                            <Lock className="w-3 h-3 text-red-500 fill-white dark:fill-slate-900"/>
+                                        </div>
+                                    )}
                                 </button>
                             </div>
                         </div>
@@ -258,6 +268,7 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
                         <div className="relative group">
                             <select value={filterProject} onChange={e => setFilterProject(e.target.value)} className="appearance-none pl-9 pr-8 py-2 h-10 bg-white dark:bg-black/30 border border-slate-200 dark:border-white/10 rounded-xl text-sm font-medium text-slate-900 dark:text-white focus:border-shinko-primary outline-none cursor-pointer max-w-[200px] backdrop-blur-sm">
                                 <option value="all" className="dark:bg-slate-900">Todos Projetos</option>
+                                <option value="adhoc" className="dark:bg-black text-amber-500">Tarefas Avulsas</option>
                                 {projectsList.map(p => <option key={p.id} value={p.id} className="dark:bg-slate-900">{p.nome}</option>)}
                             </select>
                             <Briefcase className="w-4 h-4 absolute left-3 top-3 text-slate-500 pointer-events-none"/>
@@ -276,7 +287,7 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
             </div>
 
             {/* GANTT VIEW MODE */}
-            {viewMode === 'gantt' && (
+            {viewMode === 'gantt' && canViewGantt && (
                 <div className="flex-1 overflow-hidden bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm">
                     <GanttView 
                         opportunities={[]} // Data is fetched internally by organizationId
@@ -286,6 +297,14 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
                         projectId={projectId}
                         organizationId={organizationId}
                     />
+                </div>
+            )}
+
+            {viewMode === 'gantt' && !canViewGantt && (
+                <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-slate-50 dark:bg-black/20 rounded-2xl border border-dashed border-slate-200 dark:border-white/10">
+                    <Lock className="w-16 h-16 text-slate-300 dark:text-slate-700 mb-4"/>
+                    <h3 className="text-xl font-bold text-slate-500">Visualização Bloqueada</h3>
+                    <p className="text-slate-400 mt-2 max-w-md">O gráfico de Gantt Global é exclusivo para planos Studio ou superiores. Faça um upgrade para organizar seu cronograma mestre.</p>
                 </div>
             )}
 
@@ -364,11 +383,20 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
                         assigneeId: editingTaskCtx.responsavel, // UUID for saving
                         assigneeIsDev: editingTaskCtx.responsavelData?.desenvolvedor,
                         gut: { g: editingTaskCtx.gravidade, u: editingTaskCtx.urgencia, t: editingTaskCtx.tendencia },
-                        subtasks: [] 
+                        subtasks: [],
+                        projectId: editingTaskCtx.projeto || undefined 
                     }}
                     nodeTitle={editingTaskCtx.projetoData?.nome || 'Projeto'}
                     opportunityTitle={editingTaskCtx.projetoData?.nome}
                     onClose={() => setEditingTaskCtx(null)}
+                    onDelete={async (id) => {
+                        // Confirm removed (handled inside modal)
+                        if (!isNaN(Number(id))) {
+                            await deleteTask(Number(id));
+                            loadData();
+                            setEditingTaskCtx(null);
+                        }
+                    }}
                     onSave={async (updatedTask) => {
                         // Salvar alterações na tarefa principal
                         await updateTask(Number(updatedTask.id), {

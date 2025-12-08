@@ -1,41 +1,13 @@
 
+
 import { supabase } from './supabaseClient';
-import { ProductMetricsData, ProductEvent, DevMetricsData, Opportunity, BpmnTask } from '../types';
+import { ProductMetricsData, ProductEvent, DevMetricsData, Opportunity } from '../types';
 
 const EVENTS_TABLE = 'eventos';
 const NPS_TABLE = 'nps';
 
-// Mock Data generator for demo/fallback
-const getMockMetrics = (range: 'week' | 'month' | 'year' = 'month'): ProductMetricsData => {
-    const multiplier = range === 'week' ? 0.25 : range === 'year' ? 12 : 1;
-    
-    return {
-        dau: Math.floor(142 * (range === 'week' ? 0.9 : 1)),
-        mau: 450,
-        engagementRatio: 31.5, 
-        nps: range === 'week' ? 65 : 62, 
-        featureEngagement: [
-            { feature: 'Kanban', count: Math.floor(320 * multiplier), percentage: 71 },
-            { feature: 'Matriz RDE', count: Math.floor(180 * multiplier), percentage: 40 },
-            { feature: 'Gantt', count: Math.floor(90 * multiplier), percentage: 20 },
-            { feature: 'Financeiro', count: Math.floor(45 * multiplier), percentage: 10 }
-        ],
-        featureAdoption: [
-            { feature: 'Kanban', percentage: 85 },
-            { feature: 'Matriz RDE', percentage: 60 }
-        ],
-        timeToValue: 2.5, 
-        activationRate: 45, 
-        retentionRate: 78, 
-        reactivationRate: 12, 
-        crashRate: 0.8, 
-        avgSessionDuration: 14.5 
-    };
-};
-
 export const trackUserAccess = async (userId: string) => {
     try {
-        // 1. Busca o contador atual para incrementar
         const { data, error } = await supabase
             .from('users')
             .select('acessos')
@@ -43,14 +15,12 @@ export const trackUserAccess = async (userId: string) => {
             .single();
 
         if (error) {
-            // Se der erro (ex: usuário não existe na tabela users ainda), falha silenciosamente ou tenta criar
             console.warn("Erro ao buscar contador de acessos:", error.message);
             return;
         }
 
         const currentAccess = (data?.acessos || 0);
 
-        // 2. Atualiza contador e data
         await supabase
             .from('users')
             .update({
@@ -72,17 +42,12 @@ export const logEvent = async (
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        // Tenta gravar no Supabase
-        const { error } = await supabase.from(EVENTS_TABLE).insert({
+        await supabase.from(EVENTS_TABLE).insert({
             user_id: user.id,
             event_type: eventType,
             event_data: eventData,
             created_at: new Date().toISOString()
         });
-
-        if (error) {
-            // Silently fail
-        }
     } catch (err) {
         // Ignore network errors
     }
@@ -90,7 +55,6 @@ export const logEvent = async (
 
 export const checkUserNpsEligibility = async (userId: string): Promise<boolean> => {
     try {
-        // Busca a última resposta deste usuário
         const { data, error } = await supabase
             .from(NPS_TABLE)
             .select('created_at')
@@ -98,17 +62,10 @@ export const checkUserNpsEligibility = async (userId: string): Promise<boolean> 
             .order('created_at', { ascending: false })
             .limit(1);
 
-        if (error) {
-            console.error("Erro ao verificar NPS:", error);
-            return false;
-        }
+        if (error) return false;
 
-        // Se não tem dados, nunca respondeu -> Elegível
-        if (!data || data.length === 0) {
-            return true;
-        }
+        if (!data || data.length === 0) return true;
 
-        // Se tem dados, verifica se faz mais de 30 dias
         const lastResponseDate = new Date(data[0].created_at);
         const now = new Date();
         const diffTime = Math.abs(now.getTime() - lastResponseDate.getTime());
@@ -129,7 +86,6 @@ export const submitNpsResponse = async (score: number, feedback: string, userId:
             comentario: feedback
         });
         
-        // Opcional: Logar também na tabela de eventos para analytics agregado rápido
         const category = score >= 9 ? 'promoter' : score >= 7 ? 'passive' : 'detractor';
         await logEvent('nps_response', { score, category });
 
@@ -138,27 +94,100 @@ export const submitNpsResponse = async (score: number, feedback: string, userId:
     }
 };
 
-export const fetchProductMetrics = async (range: 'week' | 'month' | 'year' = 'month'): Promise<ProductMetricsData> => {
-    try {
-        const { data: events, error } = await supabase
-            .from(EVENTS_TABLE)
-            .select('*')
-            .limit(1000); 
+// --- REAL DATA CALCULATIONS ---
 
-        if (error || !events || events.length < 10) {
-            return getMockMetrics(range);
+export const fetchProductMetrics = async (range: 'week' | 'month' | 'year' = 'month', organizationId?: number): Promise<ProductMetricsData> => {
+    try {
+        const now = new Date();
+        const startDate = new Date();
+        
+        if (range === 'week') startDate.setDate(now.getDate() - 7);
+        else if (range === 'month') startDate.setMonth(now.getMonth() - 1);
+        else startDate.setFullYear(now.getFullYear() - 1);
+
+        const isoStart = startDate.toISOString();
+
+        // 1. NPS Calculation (REAL)
+        const { data: npsData } = await supabase
+            .from(NPS_TABLE)
+            .select('nota')
+            .gte('created_at', isoStart);
+        
+        let nps = 0;
+        if (npsData && npsData.length > 0) {
+            const promoters = npsData.filter(n => n.nota >= 9).length;
+            const detractors = npsData.filter(n => n.nota <= 6).length;
+            nps = ((promoters - detractors) / npsData.length) * 100;
         }
 
-        return getMockMetrics(range);
+        // 2. Active Users (REAL)
+        // Fetch users who accessed the system in the timeframe
+        let userQuery = supabase
+            .from('users')
+            .select('id, ultimo_acesso')
+            .gte('ultimo_acesso', isoStart);
+            
+        if (organizationId) {
+            userQuery = userQuery.eq('organizacao', organizationId);
+        }
+        
+        const { data: activeUsers } = await userQuery;
+        const mau = activeUsers ? activeUsers.length : 0;
+        
+        // DAU (Last 24h)
+        const oneDayAgo = new Date();
+        oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+        const dau = activeUsers ? activeUsers.filter(u => new Date(u.ultimo_acesso) >= oneDayAgo).length : 0;
+        
+        const engagementRatio = mau > 0 ? (dau / mau) * 100 : 0;
+
+        // 3. Feature Usage (Proxied by Table Counts)
+        // We use table counts as a proxy for "Features Used"
+        // E.g. Created Tasks = Kanban Usage, Created Projects = Portfolio Usage
+        let tasksQuery = supabase.from('tasks').select('id', { count: 'exact', head: true }).gte('createdat', isoStart);
+        let projectsQuery = supabase.from('projetos').select('id', { count: 'exact', head: true }).gte('created_at', isoStart);
+        
+        if (organizationId) {
+            tasksQuery = tasksQuery.eq('organizacao', organizationId);
+            projectsQuery = projectsQuery.eq('organizacao', organizationId);
+        }
+
+        const [tasksResult, projectsResult] = await Promise.all([tasksQuery, projectsQuery]);
+        
+        const featureEngagement = [
+            { feature: 'Kanban (Tasks)', count: tasksResult.count || 0, percentage: 0 },
+            { feature: 'Projetos', count: projectsResult.count || 0, percentage: 0 }
+        ];
+
+        // 4. Return Real Data Structure
+        return {
+            dau,
+            mau,
+            engagementRatio,
+            nps,
+            featureEngagement,
+            featureAdoption: [], // Hard to calc without granular events
+            timeToValue: 0, // Requires complex event tracking
+            activationRate: 0,
+            retentionRate: 0, 
+            reactivationRate: 0,
+            crashRate: 0,
+            avgSessionDuration: 0
+        };
 
     } catch (err) {
         console.error("Analytics Service Error:", err);
-        return getMockMetrics(range);
+        // Fallback to zeros instead of mock data
+        return {
+            dau: 0, mau: 0, engagementRatio: 0, nps: 0,
+            featureEngagement: [], featureAdoption: [],
+            timeToValue: 0, activationRate: 0, retentionRate: 0, 
+            reactivationRate: 0, crashRate: 0, avgSessionDuration: 0
+        };
     }
 };
 
 export const calculateDevMetrics = (opportunities: Opportunity[], range: 'week' | 'month' | 'year' = 'month'): DevMetricsData => {
-    // Metric Calculation Logic remains the same
     const now = new Date();
     const currentStart = new Date();
     const prevStart = new Date();
@@ -197,8 +226,12 @@ export const calculateDevMetrics = (opportunities: Opportunity[], range: 'week' 
         if (!opp.bpmn) return;
         const projectCreated = new Date(opp.createdAt).getTime();
 
-        opp.bpmn.nodes.forEach(node => {
-            node.checklist.forEach(task => {
+        // Safe array check
+        const nodes = opp.bpmn.nodes || [];
+
+        nodes.forEach(node => {
+            const checklist = node.checklist || [];
+            checklist.forEach(task => {
                 if (task.status === 'doing' || task.status === 'review' || task.status === 'approval') {
                     currentWip++;
                 }
@@ -206,17 +239,22 @@ export const calculateDevMetrics = (opportunities: Opportunity[], range: 'week' 
                 if (task.completedAt) {
                     const completedDate = new Date(task.completedAt);
                     const completedTime = completedDate.getTime();
+                    
                     const isCurrentPeriod = completedDate >= currentStart && completedDate <= now;
                     const isPrevPeriod = completedDate >= prevStart && completedDate < prevEnd;
 
-                    const createdTime = projectCreated;
-                    const leadDays = Math.max(0, (completedTime - createdTime) / (1000 * 3600 * 24));
+                    // Lead Time Calculation: Use Task CreatedAt if available, else Project CreatedAt
+                    const startBasis = task.createdAt ? new Date(task.createdAt).getTime() : projectCreated;
+                    
+                    // Prevent negative numbers (if clocks out of sync or bad data)
+                    const leadDays = Math.max(0, (completedTime - startBasis) / (1000 * 3600 * 24));
                     
                     let cycleDays = 0;
                     if (task.startDate) {
                         const startTime = new Date(task.startDate).getTime();
                         cycleDays = Math.max(0, (completedTime - startTime) / (1000 * 3600 * 24));
                     } else {
+                        // Estimate cycle if start date missing
                         cycleDays = (task.estimatedHours || 8) / 8;
                     }
 
@@ -255,9 +293,9 @@ export const calculateDevMetrics = (opportunities: Opportunity[], range: 'week' 
         return ((curr - prev) / prev) * 100;
     };
 
-    const deploymentFrequency = Math.max(0.1, currentCompleted / (range === 'week' ? 1 : range === 'month' ? 4 : 52));
+    const deploymentFrequency = Math.max(0, currentCompleted / (range === 'week' ? 1 : range === 'month' ? 4 : 52));
     const changeFailureRate = Math.min(100, (currentBugs / Math.max(1, currentCompleted)) * 100);
-    const mttr = currentBugs > 0 ? 4 + (currentBugs * 2) : 2;
+    const mttr = currentBugs > 0 ? 4 + (currentBugs * 2) : 0;
 
     const chartDataThroughput = Object.keys(throughputHistory).sort().map(k => ({
         date: k,
@@ -287,7 +325,7 @@ export const calculateDevMetrics = (opportunities: Opportunity[], range: 'week' 
         mttr: { value: Number(mttr.toFixed(1)), unit: 'h', rating: 'Elite' },
         leadTimeForChanges: { value: Number((avgCycleTime * 24).toFixed(0)), unit: 'h', rating: 'Elite' },
         bugRate: { value: Number(bugRate.toFixed(1)), unit: '%', delta: 0 },
-        codeChurn: { value: 12, unit: '%', delta: 0 },
+        codeChurn: { value: 0, unit: '%', delta: 0 }, // Requires Git Integration
         charts: {
             throughputHistory: chartDataThroughput,
             leadTimeHistory: chartDataLeadTime

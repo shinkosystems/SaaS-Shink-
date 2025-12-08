@@ -234,7 +234,8 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
                 estimatedHours: dbTask.duracaohoras,
                 gut: { g: dbTask.gravidade, u: dbTask.urgencia, t: dbTask.tendencia },
                 assigneeIsDev: dbTask.responsavelData?.desenvolvedor,
-                isSubtask: dbTask.sutarefa
+                isSubtask: dbTask.sutarefa,
+                projectId: dbTask.projeto || undefined // Pass projectId to support attachments
             };
 
             effectiveDays.forEach((dateObj, index) => {
@@ -545,8 +546,8 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
   };
 
   return (
-    <div className="animate-in fade-in duration-500 relative">
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
+    <div className="h-full flex flex-col animate-in fade-in duration-500 relative">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4 shrink-0">
         <div className="flex flex-col items-start gap-4 w-full lg:w-auto">
             {!projectId && (
                 <div className="flex items-center gap-3">
@@ -611,7 +612,7 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
         </div>
       </div>
       
-      <div className="overflow-x-auto pb-4">
+      <div className="flex-1 overflow-y-auto custom-scrollbar pb-4">
           {viewMode === 'year' ? (
               renderYearView()
           ) : (

@@ -20,6 +20,8 @@ export const fetchClients = async (organizationId: number): Promise<DbClient[]> 
 };
 
 export const createClient = async (client: Partial<DbClient>, password?: string): Promise<DbClient | null> => {
+    console.log("Iniciando criação de cliente...", { client, hasPassword: !!password });
+    
     const { data: user } = await supabase.auth.getUser();
     
     // Ensure we use the Organization ID passed in the object or fetch from current user if missing
@@ -39,26 +41,36 @@ export const createClient = async (client: Partial<DbClient>, password?: string)
 
     // 1. If password is provided, create Auth User first
     if (password && client.email) {
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-            email: client.email,
-            password: password,
-            options: {
-                data: {
-                    full_name: client.nome,
-                    role: 'cliente',
-                    perfil: 'cliente',
-                    org_id: orgId
+        try {
+            // Note: This might sign out the current admin if not handled carefully in certain environments.
+            // However, with Supabase JS v2, this is the standard way to sign up a user client-side.
+            // If email confirmation is enabled, the user won't be signed in automatically.
+            const { data: authData, error: authError } = await supabase.auth.signUp({
+                email: client.email,
+                password: password,
+                options: {
+                    data: {
+                        full_name: client.nome,
+                        role: 'cliente',
+                        perfil: 'cliente',
+                        org_id: orgId
+                    }
                 }
+            });
+
+            if (authError) {
+                console.error('Erro ao criar usuário de autenticação:', authError);
+                throw new Error(`Erro ao criar login: ${authError.message}`);
             }
-        });
 
-        if (authError) {
-            console.error('Erro ao criar usuário de autenticação:', authError);
-            throw new Error(`Erro ao criar login: ${authError.message}`);
-        }
-
-        if (authData.user) {
-            newClientId = authData.user.id;
+            if (authData.user) {
+                newClientId = authData.user.id;
+            } else {
+                console.warn("Usuário criado, mas ID não retornado imediatamente (possível confirmação de email pendente).");
+            }
+        } catch (e: any) {
+            console.error("Exceção no cadastro de Auth:", e);
+            throw new Error(`Falha no registro de usuário: ${e.message}`);
         }
     }
 
@@ -83,6 +95,8 @@ export const createClient = async (client: Partial<DbClient>, password?: string)
         payload.id = newClientId;
     }
 
+    console.log("Tentando inserir cliente na tabela DB...", payload);
+
     const { data, error } = await supabase
         .from('clientes')
         .insert(payload)
@@ -91,8 +105,10 @@ export const createClient = async (client: Partial<DbClient>, password?: string)
 
     if (error) {
         console.error('Erro ao criar cliente na tabela:', error);
-        throw new Error(error.message);
+        throw new Error(`Erro no banco de dados: ${error.message}`);
     }
+    
+    console.log("Cliente criado com sucesso:", data);
     return data as DbClient;
 };
 

@@ -1,58 +1,62 @@
 
+
+
+
 import React, { useState } from 'react';
 import { 
-    ArrowRight, Sparkles, Shield, Rocket, CheckCircle, Star, Quote, 
-    ChevronRight, Play, BarChart3, Users, DollarSign, Code2, 
+    ArrowRight, Sparkles, Rocket, CheckCircle, Star, Quote, 
+    Play, BarChart3, Users, DollarSign, Code2, 
     Workflow, Calendar, Zap, Layout, Layers, BrainCircuit, 
-    Activity, TrendingUp, Lock, Check
+    Activity, TrendingUp, Check, Shield
 } from 'lucide-react';
+import { CasesGallery } from './CasesGallery';
 
 interface Props {
   onEnter: () => void;
 }
 
 export const LandingPage: React.FC<Props> = ({ onEnter }) => {
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+  const [showCases, setShowCases] = useState(false);
 
   const plans = [
       {
           name: "Free",
           price: "0",
           desc: "Para entusiastas e validação inicial.",
-          features: ["1 Usuário (Dono)", "Até 3 Projetos Ativos", "Kanban & Cronograma", "Metodologia Shinkō"],
+          features: ["1 Usuário (Dono)", "1 Projeto Ativo", "Kanban & Cronograma", "IA Bloqueada (Upgrade necessário)"],
           cta: "Começar Grátis",
           highlight: false
       },
       {
-          name: "Consultant",
-          price: "89,90",
-          desc: "Para consultores autônomos.",
-          features: ["2 Usuários", "Projetos Ilimitados", "Matriz RDE & Prio-6", "IA Generativa Básica"],
-          cta: "Assinar Consultant",
+          name: "Básico",
+          price: "99,90",
+          desc: "Para indivíduos e testes de conceito.",
+          features: ["1 Usuário", "Projetos Ilimitados", "Framework Básico (6 etapas)", "Kanban e Cronograma"],
+          cta: "Assinar Básico",
           highlight: false
       },
       {
           name: "Studio",
-          price: "297,00",
-          desc: "Para pequenas equipes ágeis.",
-          features: ["5 Usuários", "Módulo Financeiro & Contratos", "Portal do Cliente", "IA Leitura de Docs (OCR)", "Upload de Arquivos"],
+          price: "349,00",
+          desc: "Para pequenas agências e times ágeis.",
+          features: ["5 Usuários", "Módulo Financeiro (MRR)", "Portal do Cliente (Leitura)", "IA Generativa Básica"],
           cta: "Assinar Studio",
           highlight: true,
-          badge: "Mais Popular"
+          badge: "Melhor Custo-Benefício"
       },
       {
-          name: "Scale",
-          price: "799,00",
-          desc: "Para empresas em crescimento.",
-          features: ["15 Usuários", "Métricas de Engenharia (DORA)", "Métricas de Produto (NPS)", "IA Avançada", "Suporte Dedicado"],
-          cta: "Assinar Scale",
+          name: "Governança",
+          price: "1.990",
+          desc: "Para empresas em escala.",
+          features: ["15 Usuários", "Métricas de Engenharia (DORA)", "Score PRIO-6 Ilimitado", "Otimização AI de Recursos", "Suporte Prioritário"],
+          cta: "Assinar Governança",
           highlight: false
       },
       {
-          name: "Agency",
-          price: "1.500",
-          desc: "Para grandes operações.",
-          features: ["Whitelabel (Sua Marca)", "Usuários Ilimitados*", "Gestão Multi-Workspace", "API Access", "Onboarding Personalizado"],
+          name: "Enterprise",
+          price: "6.500",
+          desc: "Para corporações e grandes agências.",
+          features: ["Usuários Ilimitados", "Whitelabel (Sua Marca)", "IA Completa (Gemini 2.5 BPMS)", "Portal Interativo", "Onboarding VIP"],
           cta: "Falar com Vendas",
           highlight: false
       }
@@ -61,6 +65,8 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
   return (
     <div className="fixed inset-0 z-[200] bg-slate-950 text-white overflow-y-auto scroll-smooth custom-scrollbar selection:bg-amber-500 selection:text-black">
       
+      {showCases && <CasesGallery onClose={() => setShowCases(false)} />}
+
       {/* --- BACKGROUND EFFECTS --- */}
       <div className="fixed inset-0 w-full h-full overflow-hidden pointer-events-none">
           <div className="absolute top-[-10%] left-[-10%] w-[800px] h-[800px] bg-purple-600/10 rounded-full blur-[120px] animate-pulse"></div>
@@ -83,7 +89,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
                 <div className="hidden md:flex gap-6 text-sm font-medium text-slate-400">
                     <a href="#features" className="hover:text-white transition-colors">Funcionalidades</a>
                     <a href="#pricing" className="hover:text-white transition-colors">Preços</a>
-                    <a href="#testimonials" className="hover:text-white transition-colors">Cases</a>
+                    <button onClick={() => setShowCases(true)} className="hover:text-white transition-colors">Cases</button>
                 </div>
                 <button onClick={onEnter} className="px-5 py-2 bg-white text-black font-bold text-sm rounded-full hover:bg-slate-200 transition-colors shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
                     Entrar
@@ -448,23 +454,6 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
                   <div className="text-center mb-16">
                       <h2 className="text-4xl md:text-5xl font-black mb-6">Planos Transparentes</h2>
                       <p className="text-lg text-slate-400 mb-8">Comece pequeno, escale rápido. Cancele quando quiser.</p>
-                      
-                      {/* Toggle */}
-                      <div className="inline-flex bg-white/5 p-1 rounded-xl border border-white/10 relative">
-                          <button 
-                            onClick={() => setBillingCycle('monthly')}
-                            className={`px-6 py-2 rounded-lg text-sm font-bold transition-all relative z-10 ${billingCycle === 'monthly' ? 'text-black' : 'text-slate-400 hover:text-white'}`}
-                          >
-                              Mensal
-                          </button>
-                          <button 
-                            onClick={() => setBillingCycle('yearly')}
-                            className={`px-6 py-2 rounded-lg text-sm font-bold transition-all relative z-10 ${billingCycle === 'yearly' ? 'text-black' : 'text-slate-400 hover:text-white'}`}
-                          >
-                              Anual <span className="text-[10px] text-emerald-600 bg-emerald-100 px-1 rounded ml-1">-20%</span>
-                          </button>
-                          <div className={`absolute top-1 bottom-1 w-[50%] bg-white rounded-lg transition-transform duration-300 ${billingCycle === 'monthly' ? 'left-1' : 'translate-x-[96%]'}`}></div>
-                      </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-start">
@@ -512,41 +501,6 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
                               >
                                   {plan.cta}
                               </button>
-                          </div>
-                      ))}
-                  </div>
-              </div>
-          </section>
-
-          {/* --- TESTIMONIALS --- */}
-          <section id="testimonials" className="w-full py-24 bg-slate-900/30 border-t border-white/5">
-              <div className="max-w-6xl mx-auto px-6">
-                  <div className="text-center mb-16">
-                      <h2 className="text-3xl font-bold mb-4">O que dizem os Líderes</h2>
-                      <p className="text-slate-400">Empresas que transformaram caos em processo.</p>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {[
-                          { name: "Carlos M.", role: "CTO, TechFlow", text: "A precisão da Matriz RDE mudou como priorizamos features. Finalmente paramos de discutir opiniões e focamos em dados." },
-                          { name: "Fernanda L.", role: "Product Manager", text: "O Shinkō OS trouxe a governança que faltava para escalar nosso time de 5 para 50 pessoas sem perder o controle." },
-                          { name: "Ricardo S.", role: "Fundador, ArqStudio", text: "Adaptamos para nosso escritório de arquitetura e o portal do cliente reduziu em 80% os emails de cobrança." }
-                      ].map((item, i) => (
-                          <div key={i} className="p-8 rounded-3xl bg-slate-800/50 border border-white/5 relative hover:bg-slate-800 transition-colors">
-                              <Quote className="w-8 h-8 text-white/10 absolute top-6 right-6"/>
-                              <div className="flex gap-1 text-amber-500 mb-4">
-                                  {[1,2,3,4,5].map(s => <Star key={s} className="w-4 h-4 fill-current"/>)}
-                              </div>
-                              <p className="text-slate-300 text-sm leading-relaxed mb-6 italic">"{item.text}"</p>
-                              <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-700 to-slate-600 flex items-center justify-center font-bold text-white text-xs">
-                                      {item.name.charAt(0)}
-                                  </div>
-                                  <div>
-                                      <div className="font-bold text-white text-sm">{item.name}</div>
-                                      <div className="text-xs text-slate-500 uppercase font-bold tracking-wider">{item.role}</div>
-                                  </div>
-                              </div>
                           </div>
                       ))}
                   </div>

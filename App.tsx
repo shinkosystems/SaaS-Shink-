@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect, Suspense } from 'react';
 import { supabase } from './services/supabaseClient';
 import { Opportunity, BpmnTask } from './types';
-import { fetchOpportunities, createOpportunity, updateOpportunity, deleteOpportunity } from './services/opportunityService';
+import { fetchOpportunities, createOpportunity, updateOpportunity, deleteOpportunity, fetchOpportunityById } from './services/opportunityService';
 import { createTask } from './services/projectService';
 import { getPublicOrgDetails, updateOrgDetails, uploadLogo } from './services/organizationService';
 import { subscribeToPresence } from './services/presenceService';
@@ -30,6 +31,7 @@ import { ProductIndicators } from './components/ProductIndicators';
 import { DevIndicators } from './components/DevIndicators';
 import { AdminManagerScreen } from './components/AdminManagerScreen';
 import { NpsSurvey } from './components/NpsSurvey';
+import { GuruFab } from './components/GuruFab';
 
 const App: React.FC = () => {
   // State
@@ -52,10 +54,27 @@ const App: React.FC = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   const [selectedProject, setSelectedProject] = useState<Opportunity | null>(null);
+  const [isSharedMode, setIsSharedMode] = useState(false); // Controls focused view
   const [theme, setTheme] = useState<'light'|'dark'>('dark');
 
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
-  const [orgDetails, setOrgDetails] = useState<{ name: string, limit: number, logoUrl: string | null, primaryColor: string }>({ name: '', limit: 1, logoUrl: null, primaryColor: '#F59E0B' });
+  const [orgDetails, setOrgDetails] = useState<{ 
+      name: string, 
+      limit: number, 
+      logoUrl: string | null, 
+      primaryColor: string,
+      aiSector: string,
+      aiTone: string,
+      aiContext: string
+  }>({ 
+      name: '', 
+      limit: 1, 
+      logoUrl: null, 
+      primaryColor: '#F59E0B',
+      aiSector: '',
+      aiTone: '',
+      aiContext: ''
+  });
   const [dbStatus, setDbStatus] = useState<'connected'|'disconnected'>('connected');
 
   // Check URL for White Label or Password Reset
@@ -100,6 +119,30 @@ const App: React.FC = () => {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // DEEP LINKING HANDLER (Run when user is authenticated)
+  useEffect(() => {
+      const handleDeepLink = async () => {
+          if (!user) return;
+          const params = new URLSearchParams(window.location.search);
+          const projectId = params.get('project');
+          
+          if (projectId) {
+              console.log("Deep Link detectado para o projeto:", projectId);
+              // Activate Shared Mode (Hides Navigation)
+              setIsSharedMode(true);
+              
+              const opp = await fetchOpportunityById(projectId);
+              if (opp) {
+                  setSelectedProject(opp);
+              } else {
+                  console.warn("Projeto não encontrado ou usuário sem permissão.");
+                  setIsSharedMode(false); // Revert if failed
+              }
+          }
+      };
+      handleDeepLink();
+  }, [user]);
 
   // Determine Plan & Org
   const loadUserData = async (userId: string) => {
@@ -146,7 +189,10 @@ const App: React.FC = () => {
               name: data.nome,
               limit: data.colaboradores,
               logoUrl: data.logo,
-              primaryColor: data.cor || '#F59E0B'
+              primaryColor: data.cor || '#F59E0B',
+              aiSector: data.setor || '',
+              aiTone: data.tomdevoz || '',
+              aiContext: data.dna || ''
           });
       }
   };
@@ -198,7 +244,7 @@ const App: React.FC = () => {
       loadOpportunities(userOrgId);
   };
 
-  const handleUpdateOrgDetails = async (updates: { logoFile?: File, color?: string, name?: string, limit?: number }) => {
+  const handleUpdateOrgDetails = async (updates: { logoFile?: File, color?: string, name?: string, limit?: number, aiSector?: string, aiTone?: string, aiContext?: string }) => {
       if (!userOrgId) return;
       try {
           let logoUrl = undefined;
@@ -210,7 +256,10 @@ const App: React.FC = () => {
               logoUrl,
               primaryColor: updates.color,
               name: updates.name,
-              limit: updates.limit
+              limit: updates.limit,
+              aiSector: updates.aiSector,
+              aiTone: updates.aiTone,
+              aiContext: updates.aiContext
           });
           
           // Refresh local state
@@ -218,6 +267,18 @@ const App: React.FC = () => {
           alert('Configurações atualizadas!');
       } catch (e: any) {
           alert('Erro ao atualizar: ' + e.message);
+      }
+  };
+
+  const handleGuruAction = (actionId: string) => {
+      if (actionId === 'nav_kanban') setView('kanban');
+      else if (actionId === 'nav_calendar') setView('calendar');
+      else if (actionId === 'nav_financial') setView('financial');
+      else if (actionId === 'nav_matrix') setView('dashboard');
+      else if (actionId === 'create_project') setShowCreate(true);
+      else if (actionId === 'create_task') setShowCreateTask(true);
+      else {
+          console.warn("Action ID not handled:", actionId);
       }
   };
 
@@ -247,55 +308,71 @@ const App: React.FC = () => {
   // App Layout
   return (
     <div className={`flex h-screen w-full bg-slate-100 dark:bg-black text-slate-900 dark:text-slate-100 transition-colors duration-300 ${theme}`}>
-        <Sidebar 
-            currentView={view} 
-            onChangeView={setView} 
-            onOpenCreate={() => setShowCreate(true)}
-            onOpenCreateTask={() => setShowCreateTask(true)}
-            onToggleTheme={toggleTheme}
-            onLogout={handleLogout}
-            onSearch={(q) => console.log(q)}
-            theme={theme}
-            dbStatus={dbStatus}
-            isMobileOpen={isMobileOpen}
-            setIsMobileOpen={setIsMobileOpen}
-            userRole={userRole}
-            userData={userData || { name: 'Carregando...', avatar: null }}
-            currentPlan={currentPlan}
-            customLogoUrl={orgDetails.logoUrl}
-            orgName={orgDetails.name}
-        />
         
-        <MobileDrawer 
-            currentView={view} 
-            onChangeView={setView} 
-            onOpenCreate={() => setShowCreate(true)}
-            onOpenCreateTask={() => setShowCreateTask(true)}
-            onToggleTheme={toggleTheme}
-            onLogout={handleLogout}
-            onSearch={(q) => console.log(q)}
-            theme={theme}
-            dbStatus={dbStatus}
-            isMobileOpen={isMobileOpen}
-            setIsMobileOpen={setIsMobileOpen}
-            userRole={userRole}
-            userData={userData || { name: 'Carregando...', avatar: null }}
-            currentPlan={currentPlan}
-            customLogoUrl={orgDetails.logoUrl}
-            orgName={orgDetails.name}
-        />
+        {/* HIDE SIDEBAR IN SHARED MODE */}
+        {!isSharedMode && (
+            <Sidebar 
+                currentView={view} 
+                onChangeView={setView} 
+                onOpenCreate={() => setShowCreate(true)}
+                onOpenCreateTask={() => setShowCreateTask(true)}
+                onToggleTheme={toggleTheme}
+                onLogout={handleLogout}
+                onSearch={(q) => console.log(q)}
+                theme={theme}
+                dbStatus={dbStatus}
+                isMobileOpen={isMobileOpen}
+                setIsMobileOpen={setIsMobileOpen}
+                userRole={userRole}
+                userData={userData || { name: 'Carregando...', avatar: null }}
+                currentPlan={currentPlan}
+                customLogoUrl={orgDetails.logoUrl}
+                orgName={orgDetails.name}
+            />
+        )}
+        
+        {/* HIDE MOBILE DRAWER IN SHARED MODE */}
+        {!isSharedMode && (
+            <MobileDrawer 
+                currentView={view} 
+                onChangeView={setView} 
+                onOpenCreate={() => setShowCreate(true)}
+                onOpenCreateTask={() => setShowCreateTask(true)}
+                onToggleTheme={toggleTheme}
+                onLogout={handleLogout}
+                onSearch={(q) => console.log(q)}
+                theme={theme}
+                dbStatus={dbStatus}
+                isMobileOpen={isMobileOpen}
+                setIsMobileOpen={setIsMobileOpen}
+                userRole={userRole}
+                userData={userData || { name: 'Carregando...', avatar: null }}
+                currentPlan={currentPlan}
+                customLogoUrl={orgDetails.logoUrl}
+                orgName={orgDetails.name}
+            />
+        )}
 
-        <main className="flex-1 overflow-hidden relative pt-16 xl:pt-0">
+        {/* Adjust Main Padding if Shared Mode (Remove mobile header spacing) */}
+        <main className={`flex-1 overflow-hidden relative ${!isSharedMode ? 'pt-16 xl:pt-0' : ''}`}>
             <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500"></div></div>}>
                 {selectedProject ? (
                     <ProjectWorkspace 
                         opportunity={selectedProject} 
-                        onBack={() => setSelectedProject(null)}
+                        onBack={() => {
+                            // If in shared mode, clicking back should exit shared mode and clear URL
+                            if (isSharedMode) {
+                                window.history.replaceState(null, '', '/');
+                                setIsSharedMode(false);
+                            }
+                            setSelectedProject(null);
+                        }}
                         onUpdate={(opp) => updateOpportunity(opp).then(() => loadOpportunities(userOrgId!))}
                         onEdit={(opp) => { setShowCreate(true); /* Logic to populate wizard could be added here */ }}
                         onDelete={(id) => deleteOpportunity(id).then(() => { setSelectedProject(null); loadOpportunities(userOrgId!); })}
                         userRole={userRole}
                         currentPlan={currentPlan}
+                        isSharedMode={isSharedMode}
                     />
                 ) : (
                     <>
@@ -332,7 +409,8 @@ const App: React.FC = () => {
                                 <KanbanBoard 
                                     onSelectOpportunity={setSelectedProject} 
                                     userRole={userRole}
-                                    organizationId={userOrgId || undefined} 
+                                    organizationId={userOrgId || undefined}
+                                    currentPlan={currentPlan}
                                 />
                             </div>
                         )}
@@ -424,6 +502,16 @@ const App: React.FC = () => {
                 onClose={() => setShowCreateTask(false)}
                 onSave={handleCreateTask}
                 userRole={userRole}
+            />
+        )}
+
+        {/* Global AI Assistant Button - Only Show if not in Shared Mode */}
+        {user && userRole !== 'cliente' && !isSharedMode && (
+            <GuruFab 
+                opportunities={opportunities} 
+                user={user} 
+                organizationId={userOrgId || undefined} 
+                onAction={handleGuruAction}
             />
         )}
 

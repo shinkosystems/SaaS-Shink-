@@ -1,6 +1,6 @@
 
 import { supabase } from './supabaseClient';
-import { DbProject, DbTask, AreaAtuacao, BpmnNode } from '../types';
+import { DbProject, DbTask, AreaAtuacao, BpmnNode, Attachment } from '../types';
 
 const TASKS_TABLE = 'tasks';
 const PROJECT_TABLE = 'projetos';
@@ -27,6 +27,20 @@ export const fetchProjects = async (organizationId?: number): Promise<DbProject[
         return [];
     }
     return data as any[];
+};
+
+export const fetchProjectsByClient = async (clientId: string): Promise<DbProject[]> => {
+    const { data, error } = await supabase
+        .from(PROJECT_TABLE)
+        .select('*')
+        .eq('cliente', clientId)
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        console.error('Erro ao buscar projetos do cliente:', error.message);
+        return [];
+    }
+    return data as DbProject[];
 };
 
 export const createProject = async (nome: string, cliente: string | null, userId: string): Promise<DbProject | null> => {
@@ -67,6 +81,35 @@ export const createProject = async (nome: string, cliente: string | null, userId
         return null;
     }
     return data;
+};
+
+export const addAttachmentToProject = async (projectId: number, attachment: Attachment) => {
+    try {
+        // Fetch current project structure
+        const { data: proj, error } = await supabase.from(PROJECT_TABLE).select('bpmn_structure').eq('id', projectId).single();
+        if (error || !proj) throw new Error("Project not found or load failed");
+
+        const structure = proj.bpmn_structure || { nodes: [], lanes: [], edges: [] };
+        const currentAttachments = (structure as any).attachments || [];
+        
+        // Add new attachment
+        (structure as any).attachments = [attachment, ...currentAttachments];
+
+        // Update project
+        await supabase.from(PROJECT_TABLE).update({ bpmn_structure: structure }).eq('id', projectId);
+        return true;
+    } catch (e: any) {
+        console.error("Failed to add attachment to project:", e.message);
+        return false;
+    }
+};
+
+export const fetchProjectAttachments = async (projectId: number): Promise<Attachment[]> => {
+    const { data: proj } = await supabase.from(PROJECT_TABLE).select('bpmn_structure').eq('id', projectId).single();
+    if (proj && proj.bpmn_structure) {
+        return (proj.bpmn_structure as any).attachments || [];
+    }
+    return [];
 };
 
 // --- ÁREAS DE ATUAÇÃO & MEMBROS ---
@@ -281,7 +324,7 @@ export const createTask = async (task: Partial<DbTask>): Promise<DbTask | null> 
             deadline: prazo,
             datainicio: cleanTask.datainicio || new Date().toISOString(),
             datafim: prazo,
-            duracaohoras: cleanTask.duracaohoras || 2,
+            duracaohoras: cleanTask.duracaohoras ? Math.round(Number(cleanTask.duracaohoras)) : 2, // Force Integer
             sutarefa: cleanTask.sutarefa || false,
             tarefamae: cleanTask.tarefamae || null,
             organizacao: cleanTask.organizacao
@@ -308,7 +351,11 @@ export const updateTask = async (id: number, updates: Partial<DbTask>): Promise<
     Object.entries(updates).forEach(([key, value]) => {
         // Exclude internal/hydration keys and undefined values
         if (value !== undefined && key !== 'projetoData' && key !== 'responsavelData' && key !== 'createdat' && key !== 'id') {
-            payload[key] = value;
+            if (key === 'duracaohoras') {
+                payload[key] = Math.round(Number(value)); // Force Integer
+            } else {
+                payload[key] = value;
+            }
         }
     });
 
@@ -359,7 +406,7 @@ export const syncSubtasks = async (parentTaskId: number, subtasks: { nome: strin
         organizacao: parent.organizacao,
         sutarefa: true,
         tarefamae: parentTaskId,
-        duracaohoras: sub.estimatedHours || 2,
+        duracaohoras: sub.estimatedHours ? Math.round(Number(sub.estimatedHours)) : 2, // Force Integer
         gravidade: 1, urgencia: 1, tendencia: 1,
         dataproposta: new Date().toISOString(),
         datainicio: sub.startDate || new Date().toISOString(),
@@ -466,4 +513,19 @@ export const syncBpmnTasks = async (projectId: number, organizationId: number, n
     }
 
     return updatedNodes;
+};
+
+// --- PROMOTION ---
+export const promoteSubtask = async (subtaskId: number): Promise<boolean> => {
+    // Desvincula a tarefa do pai (tarefamae = null) e remove a flag sutarefa
+    const { error } = await supabase
+        .from(TASKS_TABLE)
+        .update({ sutarefa: false, tarefamae: null })
+        .eq('id', subtaskId);
+
+    if (error) {
+        console.error('Erro ao promover subtarefa:', error.message);
+        return false;
+    }
+    return true;
 };

@@ -37,12 +37,14 @@ export interface GlobalMetrics {
 }
 
 export const fetchPlans = async (): Promise<DbPlan[]> => {
-    const { data, error } = await supabase.from('planos').select('*').order('valor');
-    if (error) {
+    try {
+        const { data, error } = await supabase.from('planos').select('*').order('valor');
+        if (error) throw error;
+        return data as DbPlan[];
+    } catch (error) {
         console.error('Error fetching plans:', error);
         return [];
     }
-    return data as DbPlan[];
 }
 
 export const fetchGlobalMetrics = async (startDate?: string, endDate?: string): Promise<GlobalMetrics> => {
@@ -63,7 +65,8 @@ export const fetchGlobalMetrics = async (startDate?: string, endDate?: string): 
         // Optimizing: Only fetch records that started before the end of the period
         query = query.lte('datainicio', end.toISOString());
         
-        const { data: historyData } = await query;
+        const { data: historyData, error: historyError } = await query;
+        if (historyError) throw historyError;
 
         // Filter overlap in memory to be safe with null dates
         const activeInPeriod = historyData?.filter(h => {
@@ -151,6 +154,7 @@ export const fetchGlobalMetrics = async (startDate?: string, endDate?: string): 
         };
     } catch (e) {
         console.error("Erro ao calcular métricas globais:", e);
+        // Return zeroed data to prevent UI crash
         return { 
             totalMrr: 0, activeClients: 0, totalUsers: 0, avgTicket: 0,
             npsScore: 0, churnRate: 0, ltv: 0, dau: 0, mau: 0
@@ -167,16 +171,19 @@ export const fetchAllOwners = async (): Promise<AdminUser[]> => {
                 organizacoes (
                     id,
                     nome,
-                    colaboradores
+                    colaboradores,
+                    plano
                 )
             `)
             .eq('perfil', 'dono')
             .order('nome');
 
-        if (error) {
-            console.error('Erro ao buscar donos:', error);
-            return [];
-        }
+        if (error) throw error;
+
+        // Fetch Plans to map ID to Name efficiently
+        const { data: plans } = await supabase.from('planos').select('id, nome');
+        const planMap = new Map();
+        plans?.forEach(p => planMap.set(p.id, p.nome));
 
         const userIds = users.map((u: any) => u.id);
         let subs: any[] = [];
@@ -201,6 +208,10 @@ export const fetchAllOwners = async (): Promise<AdminUser[]> => {
         const mappedUsers = users.map((u: any) => {
             const latestSub: any = subs.find((s: any) => s.dono === u.id);
             const orgData = Array.isArray(u.organizacoes) ? u.organizacoes[0] : u.organizacoes;
+            
+            // Priority: Org Plan -> Latest History Plan
+            const currentPlanId = orgData?.plano || latestSub?.plano?.id;
+            const currentPlanName = planMap.get(currentPlanId) || latestSub?.plano?.nome || 'Free';
 
             return {
                 id: u.id,
@@ -209,8 +220,8 @@ export const fetchAllOwners = async (): Promise<AdminUser[]> => {
                 organizacao: u.organizacao,
                 perfil: u.perfil,
                 status: u.status,
-                planName: latestSub?.plano?.nome || null,
-                currentPlanId: latestSub?.plano?.id || null,
+                planName: currentPlanName,
+                currentPlanId: currentPlanId,
                 subscription_start: latestSub?.datainicio || null,
                 subscription_end: latestSub?.datafim || null,
                 orgName: orgData?.nome || 'N/A',
@@ -233,7 +244,7 @@ interface UpdatePayload {
     userName: string;
     orgName: string;
     orgLimit: number;
-    userStatus: string; // ADDED THIS FIELD
+    userStatus: string; 
     planId: number;
     start: string;
     end: string;
@@ -244,24 +255,35 @@ export const updateGlobalClientData = async (data: UpdatePayload): Promise<{ suc
     try {
         const promises = [];
 
+        // 1. Update User Basic Info
         if (data.userId) {
             promises.push(
                 supabase.from('users').update({ 
                     nome: data.userName,
-                    status: data.userStatus // Update Status Here
+                    status: data.userStatus
                 }).eq('id', data.userId)
             );
         }
 
+        // 2. Update Organization Info (Limit & Name)
+        // CRITICAL: We also update the plan directly on the Organization table here.
         if (data.orgId) {
+            const orgUpdatePayload: any = {
+                nome: data.orgName,
+                colaboradores: data.orgLimit
+            };
+            
+            // CONNECTING PLAN TO ORGANIZATION
+            if (data.planId) {
+                orgUpdatePayload.plano = data.planId;
+            }
+
             promises.push(
-                supabase.from('organizacoes').update({ 
-                    nome: data.orgName,
-                    colaboradores: data.orgLimit
-                }).eq('id', data.orgId)
+                supabase.from('organizacoes').update(orgUpdatePayload).eq('id', data.orgId)
             );
         }
 
+        // 3. Register Subscription History (Ledger)
         if (data.planId) {
             const subPayload = {
                 dono: data.userId,
@@ -303,14 +325,19 @@ export const updateUserSubscription = async (userId: string, data: { planId: num
 };
 
 export const updateUserStatus = async (userId: string, newStatus: string): Promise<{ success: boolean }> => {
-    const { error } = await supabase
-        .from('users')
-        .update({ status: newStatus })
-        .eq('id', userId);
-    
-    if (error) {
-        console.error('Error updating user status:', error.message);
+    try {
+        const { error } = await supabase
+            .from('users')
+            .update({ status: newStatus })
+            .eq('id', userId);
+        
+        if (error) {
+            console.error('Error updating user status:', error.message);
+            return { success: false };
+        }
+        return { success: true };
+    } catch (e) {
+        console.error('Exception updating user status:', e);
         return { success: false };
     }
-    return { success: true };
 };

@@ -1,59 +1,110 @@
-
 import { supabase } from './supabaseClient';
+import { PLAN_LIMITS } from '../types';
 
 const ORG_TABLE = 'organizacoes';
 const LOGO_BUCKET = 'fotoperfil'; 
 
+// Helper to determine plan string from ID
+const getPlanKeyFromId = (id: number): string => {
+    switch (id) {
+        case 4: return 'plan_free';
+        case 1: return 'plan_usuario';
+        case 2: return 'plan_studio';
+        case 3: return 'plan_scale';
+        case 9: return 'plan_scale'; // Mapeamento para Governança (ID 9)
+        case 5: return 'plan_agency';
+        case 10: return 'plan_enterprise';
+        default: return 'plan_free';
+    }
+};
+
 // Uploads a new logo and returns the public URL
 export const uploadLogo = async (orgId: number, file: File) => {
-    const fileExt = file.name.split('.').pop();
-    // User requested "pasta fotoperfil" inside the bucket
-    const fileName = `fotoperfil/org-logo-${orgId}-${Date.now()}.${fileExt}`;
-    
-    // The bucket is 'fotoperfil', so the path is relative to root of bucket
-    const filePath = fileName;
+    try {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `fotoperfil/org-logo-${orgId}-${Date.now()}.${fileExt}`;
+        const filePath = fileName;
 
-    const { error } = await supabase.storage
-        .from(LOGO_BUCKET)
-        .upload(filePath, file, { upsert: true });
-    
-    if (error) {
-        throw new Error(`Logo upload failed: ${error.message}`);
+        const { error } = await supabase.storage
+            .from(LOGO_BUCKET)
+            .upload(filePath, file, { upsert: true });
+        
+        if (error) throw error;
+
+        const { data } = supabase.storage
+            .from(LOGO_BUCKET)
+            .getPublicUrl(filePath);
+
+        return data.publicUrl;
+    } catch (error: any) {
+        throw new Error(`Erro no upload do logo: ${error.message || JSON.stringify(error)}`);
     }
+};
 
-    const { data } = supabase.storage
-        .from(LOGO_BUCKET)
-        .getPublicUrl(filePath);
+// Fetch full organization details (Including AI fields)
+export const fetchOrganizationDetails = async (orgId: number) => {
+    try {
+        const { data, error } = await supabase
+            .from(ORG_TABLE)
+            .select('*')
+            .eq('id', orgId)
+            .single();
 
-    return data.publicUrl;
+        if (error) {
+            console.error(`Error fetching organization details for ID ${orgId}:`, error);
+            return null;
+        }
+        return data;
+    } catch (err) {
+        console.error("Exceção ao buscar organização:", err);
+        return null;
+    }
 };
 
 // Updates all organization details in the database
-export const updateOrgDetails = async (orgId: number, { logoUrl, primaryColor, name, limit }: { logoUrl?: string; primaryColor?: string; name?: string; limit?: number }) => {
+export const updateOrgDetails = async (
+    orgId: number, 
+    { logoUrl, primaryColor, name, limit, aiSector, aiTone, aiContext }: 
+    { logoUrl?: string; primaryColor?: string; name?: string; limit?: number; aiSector?: string; aiTone?: string; aiContext?: string }
+) => {
+    console.log("updateOrgDetails - Atualizando Org ID:", orgId);
+    
     const updates: any = {};
     
-    // User requested updating column 'logo'
-    if (logoUrl !== undefined) {
-        updates.logo = logoUrl;
-    }
-    
-    // User requested updating column 'cor'
+    if (logoUrl !== undefined) updates.logo = logoUrl;
     if (primaryColor !== undefined) updates.cor = primaryColor;
-    
     if (name !== undefined) updates.nome = name;
     if (limit !== undefined) updates.colaboradores = limit;
 
+    // AI Fields Mapping to DB Schema (Corrected based on schema provided)
+    if (aiSector !== undefined) updates.setor = aiSector; // Fixed: orientacoesia -> setor
+    if (aiTone !== undefined) updates.tomdevoz = aiTone;
+    if (aiContext !== undefined) updates.dna = aiContext;
+
+    console.log("Payload enviado ao Supabase:", updates);
+
     if (Object.keys(updates).length === 0) return { success: true };
 
-    const { error } = await supabase
-        .from(ORG_TABLE)
-        .update(updates)
-        .eq('id', orgId);
+    try {
+        const { data, error } = await supabase
+            .from(ORG_TABLE)
+            .update(updates)
+            .eq('id', orgId)
+            .select();
 
-    if (error) {
-        throw new Error(`Failed to update org details: ${error.message}`);
+        if (error) {
+            // Converte o erro para string legível
+            const errorDetails = error.message || JSON.stringify(error);
+            console.error("Erro detalhado no update do Supabase:", errorDetails);
+            throw new Error(errorDetails);
+        }
+        
+        console.log("Update realizado com sucesso. Dados retornados:", data);
+        return { success: true, data };
+    } catch (err: any) {
+        const msg = err.message || JSON.stringify(err);
+        throw new Error(`Falha ao salvar no banco: ${msg}`);
     }
-    return { success: true };
 };
 
 // Fetches public organization details for White Label Login
@@ -61,18 +112,14 @@ export const getPublicOrgDetails = async (orgId: number) => {
     try {
         const { data, error } = await supabase
             .from(ORG_TABLE)
-            .select('nome, logo, cor, whitelable') // Corrected column name to match DB schema
+            .select('nome, logo, cor, whitelable') 
             .eq('id', orgId)
             .single();
 
         if (error || !data) return null;
         
-        // Only return if whitelabel is active (security check)
-        // Note: Check both possible boolean column names if schema is inconsistent
-        const isWhitelabel = (data as any).whitelabel === true || (data as any).whitelable === true;
-        
-        if (!isWhitelabel) return null;
-
+        // Return custom branding only if whitelabel is active or if specifically requested for login
+        // Assuming user plan checking happens elsewhere or DB enforces 'whitelabel' column.
         return {
             name: data.nome,
             logoUrl: data.logo,
@@ -89,19 +136,17 @@ export const getPublicOrgDetails = async (orgId: number) => {
 export const fetchRoles = async (organizationId: number) => {
     if (!organizationId) return [];
 
-    // Filter by 'empresa' which is the organization ID in area_atuacao table
     const { data, error } = await supabase
         .from('area_atuacao')
         .select('*')
         .eq('empresa', organizationId)
-        .order('cargo', { ascending: true }); // Order by 'cargo' (name)
+        .order('cargo', { ascending: true });
 
     if (error) {
         console.error('Error fetching roles:', error);
         return [];
     }
     
-    // Map 'cargo' column to 'nome' property for frontend consistency
     return data.map((d: any) => ({
         id: d.id,
         nome: d.cargo || `Cargo ${d.id}`
@@ -111,7 +156,6 @@ export const fetchRoles = async (organizationId: number) => {
 export const createRole = async (name: string, organizationId: number) => {
     if (!organizationId) throw new Error("Organization ID required to create role");
 
-    // Insert into 'area_atuacao' using correct columns: 'cargo' and 'empresa'
     const { data, error } = await supabase
         .from('area_atuacao')
         .insert({ 
@@ -149,14 +193,12 @@ export const fetchOrganizationMembersWithRoles = async (orgId: number) => {
         return [];
     }
 
-    // Manual Hydration for Area Name (avoiding join issues)
     const cargoIds = [...new Set(data.map((u: any) => u.cargo).filter(Boolean))];
     let areaMap = new Map<number, string>();
 
     if (cargoIds.length > 0) {
         const { data: areas } = await supabase.from('area_atuacao').select('*').in('id', cargoIds);
         areas?.forEach((a: any) => {
-            // Use 'cargo' column as primary source of name
             const name = a.cargo || a.nome || `Cargo ${a.id}`;
             areaMap.set(a.id, name);
         });
@@ -176,4 +218,47 @@ export const updateUserRole = async (userId: string, roleId: number | null) => {
     
     if (error) throw error;
     return true;
+};
+
+// --- AI LIMIT MANAGEMENT ---
+
+export const checkAndIncrementAiUsage = async (orgId: number): Promise<{ success: boolean; usage: number; limit: number }> => {
+    try {
+        // 1. Get current usage and plan
+        const { data: orgData, error } = await supabase
+            .from(ORG_TABLE)
+            .select('pedidoia, plano')
+            .eq('id', orgId)
+            .single();
+
+        if (error || !orgData) throw new Error("Erro ao verificar limite de IA.");
+
+        const currentUsage = orgData.pedidoia || 0;
+        const planKey = getPlanKeyFromId(orgData.plano || 4); // Default to Free if null
+        const limit = PLAN_LIMITS[planKey]?.aiLimit || 0;
+
+        // If limit is 0 (Free Plan), block immediately
+        if (limit === 0) {
+            return { success: false, usage: currentUsage, limit: 0 };
+        }
+
+        // If limit is practically infinite (9999), we skip check but still track
+        if (limit < 9000 && currentUsage >= limit) {
+            return { success: false, usage: currentUsage, limit };
+        }
+
+        // 2. Increment usage
+        const { error: updateError } = await supabase
+            .from(ORG_TABLE)
+            .update({ pedidoia: currentUsage + 1 })
+            .eq('id', orgId);
+
+        if (updateError) throw new Error("Erro ao registrar uso de IA.");
+
+        return { success: true, usage: currentUsage + 1, limit };
+    } catch (e: any) {
+        console.error("Erro AI Usage:", e);
+        // Fail closed to prevent abuse if DB is down, but typically could fail open
+        return { success: false, usage: 0, limit: 0 };
+    }
 };

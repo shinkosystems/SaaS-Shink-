@@ -1,11 +1,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { BpmnTask, BpmnSubTask, TaskStatus } from '../types';
-import { X, User, Calendar as CalendarIcon, CheckSquare, Square, Plus, Trash2, AlignLeft, Clock, PlayCircle, CheckCircle, BarChart3, Timer, Sparkles, Loader2, ArrowLeft, Layers, Hash, Eye, ShieldCheck, CornerDownRight, ChevronDown, Check } from 'lucide-react';
+import { BpmnTask, BpmnSubTask, TaskStatus, Attachment } from '../types';
+import { X, User, Calendar as CalendarIcon, CheckSquare, Square, Plus, Trash2, AlignLeft, Clock, PlayCircle, CheckCircle, BarChart3, Timer, Sparkles, Loader2, ArrowLeft, Layers, Hash, Eye, ShieldCheck, CornerDownRight, ChevronDown, Check, Paperclip, UploadCloud, File as FileIcon, ExternalLink, ArrowUpRight } from 'lucide-react';
 import { generateSubtasksForTask } from '../services/geminiService';
 import { supabase } from '../services/supabaseClient';
 import { logEvent } from '../services/analyticsService';
-import { syncSubtasks, updateTask, fetchSubtasks } from '../services/projectService';
+import { syncSubtasks, updateTask, fetchSubtasks, addAttachmentToProject, fetchProjectAttachments, promoteSubtask, createTask } from '../services/projectService';
 
 interface Props {
   task: BpmnTask;
@@ -15,6 +15,7 @@ interface Props {
   onClose: () => void;
   onOpenProject?: () => void;
   onDelete?: (id: string) => void;
+  onAttach?: (attachment: Attachment) => void; // Callback for parent sync
   orgType?: string; // New prop for context
 }
 
@@ -118,7 +119,7 @@ const MultiUserSelect = ({
     );
 };
 
-const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, onSave, onClose, onOpenProject, onDelete, orgType }) => {
+const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, onSave, onClose, onOpenProject, onDelete, onAttach, orgType }) => {
   const [formData, setFormData] = useState<BpmnTask>({
     ...task,
     subtasks: task.subtasks || [],
@@ -126,11 +127,18 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
     gut: task.gut || { g: 1, u: 1, t: 1 },
     estimatedHours: task.estimatedHours || 2,
     startDate: task.startDate || new Date().toISOString(),
-    dueDate: task.dueDate || new Date().toISOString()
+    dueDate: task.dueDate || new Date().toISOString(),
+    attachments: task.attachments || [] // Use local attachments if provided
   });
 
   const [newSubtask, setNewSubtask] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [organizacaoId, setOrganizacaoId] = useState<number | undefined>(undefined);
+  
+  // Attachments State (Dynamic fetch)
+  const [projectAttachments, setProjectAttachments] = useState<Attachment[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Modified state to include assigneeId per suggestion
   const [aiSuggestions, setAiSuggestions] = useState<{title: string, hours: number, assigneeIds: string[]}[]>([]);
@@ -153,8 +161,20 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
       }
   };
 
+  // Load attachments from project if linked
+  const loadAttachments = async () => {
+      if (formData.projectId) {
+          const allAttachments = await fetchProjectAttachments(formData.projectId);
+          const taskAttachments = allAttachments.filter(a => a.taskId === formData.id);
+          setProjectAttachments(taskAttachments);
+      }
+  };
+
   useEffect(() => {
       loadSubtasks();
+      if (formData.projectId) {
+          loadAttachments();
+      }
   }, [task.id]);
 
   // Fetch Users from Organization
@@ -171,6 +191,7 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
               if (userData) {
                   setCurrentUser({ id: userData.id, nome: userData.nome });
                   setBulkAssigneeIds([userData.id]); // Default to current user
+                  setOrganizacaoId(userData.organizacao);
 
                   if (userData.organizacao) {
                       const { data: members } = await supabase
@@ -227,11 +248,41 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
       }));
   };
 
-  const toggleSubtask = (subId: string) => {
+  const toggleSubtask = async (subId: string) => {
+    const sub = formData.subtasks?.find(s => s.id === subId);
+    if (!sub) return;
+
+    const newCompleted = !sub.completed;
+    const newStatus = newCompleted ? 'done' : 'todo';
+
+    // 1. Optimistic UI Update (Update both completed boolean AND status string for consistency)
     setFormData(prev => ({
       ...prev,
-      subtasks: prev.subtasks?.map(s => s.id === subId ? { ...s, completed: !s.completed } : s)
+      subtasks: prev.subtasks?.map(s => s.id === subId ? { 
+          ...s, 
+          completed: newCompleted,
+          status: newStatus as any 
+      } : s)
     }));
+
+    // 2. DB Update (Se já existe no banco)
+    if (!isNaN(Number(subId))) {
+        try {
+            await updateTask(Number(subId), { status: newStatus });
+        } catch (e: any) {
+            console.error("Erro ao atualizar status da subtarefa:", e);
+            alert("Erro ao salvar status no banco de dados. Tente novamente.");
+            // Revert UI on error
+            setFormData(prev => ({
+                ...prev,
+                subtasks: prev.subtasks?.map(s => s.id === subId ? { 
+                    ...s, 
+                    completed: !newCompleted,
+                    status: (!newCompleted ? 'done' : 'todo') as any 
+                } : s)
+            }));
+        }
+    }
   };
 
   const deleteSubtask = (subId: string) => {
@@ -239,6 +290,46 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
       ...prev,
       subtasks: prev.subtasks?.filter(s => s.id !== subId)
     }));
+  };
+
+  const handlePromoteSubtask = async (sub: BpmnSubTask) => {
+      if (!confirm(`Deseja promover "${sub.text}" para uma tarefa principal?`)) return;
+
+      try {
+          if (!isNaN(Number(sub.id))) {
+              // Scenario A: DB Subtask
+              await promoteSubtask(Number(sub.id));
+          } else {
+              // Scenario B: Unsaved Subtask
+              if (!organizacaoId || !currentUser?.id) {
+                  alert("Erro: Organização ou usuário não identificados.");
+                  return;
+              }
+              await createTask({
+                  titulo: sub.text,
+                  descricao: 'Promovida de checklist',
+                  status: sub.completed ? 'done' : 'todo',
+                  responsavel: sub.assigneeId || currentUser.id,
+                  duracaohoras: sub.estimatedHours || 2,
+                  organizacao: organizacaoId,
+                  projeto: formData.projectId || null,
+                  datainicio: sub.startDate || new Date().toISOString(),
+                  datafim: sub.dueDate || new Date().toISOString()
+              });
+          }
+
+          // Remove from local list
+          setFormData(prev => ({
+              ...prev,
+              subtasks: prev.subtasks?.filter(s => s.id !== sub.id)
+          }));
+
+          alert("Tarefa promovida com sucesso! Ela aparecerá no quadro principal.");
+
+      } catch (e: any) {
+          console.error("Erro ao promover tarefa:", e);
+          alert("Erro ao promover tarefa.");
+      }
   };
 
   const handleAiGenerate = async () => {
@@ -406,11 +497,14 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
           deadlineExtended = true;
       }
 
+      // Ensure integer hours
+      const finalTotalHours = Math.ceil(totalCalculatedHours);
+
       // 1. Update Local State (Provisório para UI responder rápido)
       const updatedFormData = {
           ...formData,
           subtasks: [...(formData.subtasks || []), ...newSubs],
-          estimatedHours: totalCalculatedHours, // Update total hours to sum of subtasks
+          estimatedHours: finalTotalHours, // Update total hours to sum of subtasks
           dueDate: updatedDueDate
       };
       setFormData(updatedFormData);
@@ -420,7 +514,7 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
           try {
               // Update Parent Task (New Deadline + New Hours)
               await updateTask(Number(formData.id), {
-                  duracaohoras: totalCalculatedHours,
+                  duracaohoras: finalTotalHours,
                   datafim: updatedDueDate,
                   // deadline: updatedDueDate // REMOVED to avoid error
               });
@@ -458,12 +552,66 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
       setAiSuggestions([]);
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      setIsUploading(true);
+      let fileUrl = '';
+      try {
+          const sanitizedName = file.name.replace(/[^\x00-\x7F]/g, "").replace(/\s+/g, "_");
+          const fileName = `${Date.now()}-${sanitizedName}`;
+          const filePath = `documentos/${fileName}`;
+          
+          const { error } = await supabase.storage.from('documentos').upload(filePath, file);
+          if (error) throw error;
+          
+          const { data } = supabase.storage.from('documentos').getPublicUrl(filePath);
+          fileUrl = data.publicUrl;
+
+          const newAttachment: Attachment = {
+              id: crypto.randomUUID(),
+              name: file.name,
+              size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+              type: file.type.split('/')[1]?.toUpperCase() || 'FILE',
+              uploadedAt: new Date().toISOString(),
+              url: fileUrl,
+              taskId: formData.id // Link to Task
+          };
+
+          // 1. Add to Local State
+          setProjectAttachments(prev => [...prev, newAttachment]);
+          
+          // 2. Add to Project in DB (if Project ID exists)
+          if (formData.projectId) {
+              await addAttachmentToProject(formData.projectId, newAttachment);
+              // Notify parent about the new attachment so it shows up in "Arquivos" tab instantly
+              if (onAttach) {
+                  onAttach(newAttachment);
+              }
+          } else {
+              // If not yet saved to a project (unlikely for task modal), just update local task state
+              // But BpmnTask interface now has `attachments` property
+              setFormData(prev => ({
+                  ...prev,
+                  attachments: [...(prev.attachments || []), newAttachment]
+              }));
+          }
+
+      } catch (err: any) {
+          alert('Erro no upload: ' + err.message);
+      } finally {
+          setIsUploading(false);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+  };
+
   const handleSave = async () => {
     logEvent('feature_use', { feature: 'Save Task' });
     
     // Save main task updates directly to DB
-    if (!isNaN(Number(formData.id))) {
-        await updateTask(Number(formData.id), {
+    const taskId = Number(formData.id);
+    if (!isNaN(taskId)) {
+        await updateTask(taskId, {
             titulo: formData.text,
             descricao: formData.description,
             status: formData.status,
@@ -471,11 +619,23 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
             duracaohoras: formData.estimatedHours,
             datainicio: formData.startDate,
             datafim: formData.dueDate,
-            // REMOVED deadline and dataproposta to avoid errors on tables without these columns
             gravidade: formData.gut?.g,
             urgencia: formData.gut?.u,
             tendencia: formData.gut?.t
         });
+
+        // Save status of existing subtasks (in case user clicked checkbox without waiting for async)
+        const existingSubtasks = (formData.subtasks || []).filter(s => !isNaN(Number(s.id)));
+        await Promise.all(existingSubtasks.map(sub => 
+            updateTask(Number(sub.id), { 
+                status: sub.completed ? 'done' : 'todo',
+                titulo: sub.text,
+                responsavel: sub.assigneeId,
+                duracaohoras: sub.estimatedHours,
+                datainicio: sub.startDate,
+                datafim: sub.dueDate
+            })
+        ));
     }
 
     // Propagate up
@@ -485,7 +645,7 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
     if (!isNaN(Number(formData.id))) {
         const newSubs = (formData.subtasks || []).filter(s => isNaN(Number(s.id))).map(s => ({
             nome: s.text,
-            status: s.completed ? 'done' : 'pending',
+            status: s.completed ? 'done' : 'todo', // Explicitly set status based on completed state
             dueDate: s.dueDate,
             assigneeId: s.assigneeId || currentUser?.id
         }));
@@ -517,6 +677,9 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
   ];
 
   const isSubtask = formData.isSubtask;
+
+  // Use local attachments or fetched project attachments filtered by task
+  const displayAttachments = formData.projectId ? projectAttachments : (formData.attachments || []);
 
   return (
     <div className="fixed inset-0 z-[70] flex justify-end">
@@ -610,6 +773,47 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
                             placeholder="Descreva o contexto técnico..."
                         />
                      </div>
+                </div>
+
+                {/* Attachments Section */}
+                <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/40 dark:bg-black/20">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                            <Paperclip className="w-5 h-5 text-blue-500"/> Anexos
+                        </h3>
+                        <label className="cursor-pointer bg-slate-200 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/20 text-slate-600 dark:text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-all">
+                            {isUploading ? <Loader2 className="w-3 h-3 animate-spin"/> : <UploadCloud className="w-3 h-3"/>}
+                            Anexar
+                            <input 
+                                type="file" 
+                                className="hidden" 
+                                onChange={handleFileUpload} 
+                                disabled={isUploading}
+                            />
+                        </label>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                        {displayAttachments.map((file, idx) => (
+                            <div key={idx} className="flex items-center gap-3 p-3 bg-white/50 dark:bg-black/30 border border-slate-200 dark:border-white/5 rounded-xl group hover:border-blue-500/30 transition-colors">
+                                <div className="w-8 h-8 bg-slate-100 dark:bg-white/5 rounded flex items-center justify-center shrink-0 text-blue-500">
+                                    <FileIcon className="w-4 h-4"/>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="text-xs font-bold text-slate-900 dark:text-white truncate" title={file.name}>{file.name}</div>
+                                    <div className="text-[10px] text-slate-500">{file.size}</div>
+                                </div>
+                                <a href={file.url} target="_blank" className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded text-slate-400 hover:text-blue-500 transition-colors">
+                                    <ExternalLink className="w-3 h-3"/>
+                                </a>
+                            </div>
+                        ))}
+                        {displayAttachments.length === 0 && (
+                            <div className="col-span-2 text-center py-6 text-slate-400 text-xs italic border-2 border-dashed border-slate-200 dark:border-white/5 rounded-xl">
+                                Nenhum anexo.
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Checklist Section - ONLY FOR PARENT TASKS */}
@@ -736,9 +940,14 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
                                             </div>
                                         </div>
                                         
-                                        <button onClick={() => deleteSubtask(sub.id)} className="p-3 rounded hover:bg-red-100 dark:hover:bg-red-900/20 text-slate-400 hover:text-red-500 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
-                                            <Trash2 className="w-5 h-5"/>
-                                        </button>
+                                        <div className="flex items-center gap-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+                                            <button onClick={() => handlePromoteSubtask(sub)} className="p-2 rounded hover:bg-slate-200 dark:hover:bg-white/10 text-slate-400 hover:text-blue-500" title="Promover para Tarefa Principal">
+                                                <ArrowUpRight className="w-4 h-4"/>
+                                            </button>
+                                            <button onClick={() => deleteSubtask(sub.id)} className="p-2 rounded hover:bg-red-100 dark:hover:bg-red-900/20 text-slate-400 hover:text-red-500">
+                                                <Trash2 className="w-4 h-4"/>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             ))}

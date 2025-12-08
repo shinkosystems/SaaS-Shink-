@@ -1,9 +1,14 @@
 
+
+
+
 import React, { useState, useEffect } from 'react';
 import { Opportunity, RDEStatus, Archetype, IntensityLevel, TadsCriteria, ProjectStatus } from '../types';
 import { analyzeOpportunity, suggestEvidence } from '../services/geminiService';
 import { createProject } from '../services/projectService';
+import { createClient } from '../services/clientService';
 import { supabase } from '../services/supabaseClient';
+import { checkAndIncrementAiUsage } from '../services/organizationService';
 import { Target, Zap, Rocket, BrainCircuit, ChevronRight, Check, Loader2, Lightbulb, DollarSign, AlertTriangle, ChevronDown, User, UserPlus, X, Phone, Lock, ArrowLeft, Layers, Calendar, Clock, Flame, Coffee, Snowflake } from 'lucide-react';
 import { ElasticSwitch } from './ElasticSwitch';
 import { logEvent } from '../services/analyticsService';
@@ -30,7 +35,8 @@ const STEPS = [
   'Aprovação'
 ];
 
-// --- DOMAIN ADAPTATION MAP ---
+// ... DOMAIN_LABELS ... (Assuming existing map is here or imported if needed, reusing previous component logic for brevity if unchanged, but full content requested)
+// Re-inserting DOMAIN_LABELS for completeness as per instructions
 const DOMAIN_LABELS: any = {
     'Engenharia': {
         mvp: 'Estudo Preliminar',
@@ -92,7 +98,6 @@ const DOMAIN_LABELS: any = {
             '4': { label: 'Gestão Continuada', desc: 'Acompanhamento de longo prazo.' }
         }
     }
-    // Default fallback to SaaS terms defined in code
 };
 
 const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel, orgType = 'Startup' }) => {
@@ -109,12 +114,8 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel, org
   const [newClientEmail, setNewClientEmail] = useState('');
   const [newClientPhone, setNewClientPhone] = useState('');
   const [newClientPassword, setNewClientPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   
-  // New Client Contract Form
-  const [newClientValue, setNewClientValue] = useState<number>(0);
-  const [newClientStart, setNewClientStart] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [newClientMonths, setNewClientMonths] = useState<number>(12);
-
   const [isCreatingClient, setIsCreatingClient] = useState(false);
 
   const [selectedStatus, setSelectedStatus] = useState<ProjectStatus | null>(null);
@@ -198,10 +199,17 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel, org
   }, []);
 
   const handleCreateClient = async () => {
-      if (!newClientName || !newClientEmail) {
-          alert("Preencha nome e email.");
+      console.log("Ação: Criar Cliente iniciado");
+      
+      if (!newClientName || !newClientEmail || !newClientPassword) {
+          alert("Preencha nome, email e senha.");
           return;
       }
+      if (newClientPassword !== confirmPassword) {
+          alert("As senhas não coincidem.");
+          return;
+      }
+      
       setIsCreatingClient(true);
 
       try {
@@ -217,36 +225,41 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel, org
           
           const orgId = userProfile.organizacao;
 
-          // Match schema exactly: valormensal, numcolaboradores, cnpj, organizacao, contrato, logo_url
-          const { data, error } = await supabase.from('clientes').insert({
+          // Payload for creation
+          const payload = {
               nome: newClientName,
               email: newClientEmail,
               telefone: newClientPhone || '',
-              cnpj: '00.000.000/0000-00', // Placeholder or Input
-              endereco: 'Endereço Padrão',
-              numcolaboradores: 1, // Correct column name
-              valormensal: newClientValue, // Correct column name
-              meses: newClientMonths,
-              data_inicio: newClientStart,
+              cnpj: '00.000.000/0000-00', // Default placeholder
+              endereco: '',
+              numcolaboradores: 1,
+              valormensal: 0, // Default 0 as requested to edit later
+              meses: 12,
+              data_inicio: new Date().toISOString().split('T')[0],
               status: 'Ativo',
-              contrato: '', // Required NOT NULL
-              logo_url: '', // Required NOT NULL
-              organizacao: orgId // Required NOT NULL FK
-          }).select().single();
+              contrato: '',
+              logo_url: '',
+              organizacao: orgId
+          };
 
-          if (error) throw error;
+          // Use centralized service that creates Auth User + Client Record
+          const createdClient = await createClient(payload, newClientPassword);
 
-          const newClient = { id: data.id, nome: newClientName, email: newClientEmail };
-          setClients(prev => [...prev, newClient].sort((a,b) => a.nome.localeCompare(b.nome)));
-          setFormData({ ...formData, clientId: data.id });
+          if (!createdClient) throw new Error("Falha ao criar cliente (retorno nulo).");
+
+          const newClientSimple = { id: createdClient.id, nome: newClientName, email: newClientEmail };
+          setClients(prev => [...prev, newClientSimple].sort((a,b) => a.nome.localeCompare(b.nome)));
+          setFormData({ ...formData, clientId: createdClient.id });
           setShowCreateClient(false);
-          setNewClientName(''); setNewClientEmail(''); setNewClientPhone(''); setNewClientPassword('');
-          setNewClientValue(0); setNewClientMonths(12);
+          
+          // Reset fields
+          setNewClientName(''); setNewClientEmail(''); setNewClientPhone(''); 
+          setNewClientPassword(''); setConfirmPassword('');
           
           logEvent('feature_use', { feature: 'Create Client Inline' });
 
       } catch (err: any) {
-          console.error("Erro detalhado:", err);
+          console.error("Erro detalhado ao criar cliente:", err);
           alert('Erro ao criar cliente: ' + (err.message || JSON.stringify(err)));
       } finally {
           setIsCreatingClient(false);
@@ -282,8 +295,35 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel, org
       }
   }, [step]);
 
+  // AI Function to check limit
+  const checkAiLimit = async (): Promise<boolean> => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return false;
+
+      // SUPER ADMIN BYPASS
+      if (user.email === 'peboorba@gmail.com') return true;
+
+      const { data } = await supabase.from('users').select('organizacao').eq('id', user.id).single();
+      if (!data?.organizacao) return false;
+
+      const check = await checkAndIncrementAiUsage(data.organizacao);
+      if (!check.success) {
+          if (check.limit === 0) {
+              alert("Funcionalidade exclusiva de planos pagos. Faça upgrade para desbloquear a Inteligência Artificial.");
+          } else {
+              alert(`Limite de IA atingido (${check.usage}/${check.limit}). Faça upgrade para continuar usando inteligência artificial.`);
+          }
+          return false;
+      }
+      return true;
+  };
+
   const handleAiAnalysis = async () => {
     if (!formData.title || !formData.description) return;
+    
+    // Check Limit First
+    if (!(await checkAiLimit())) return;
+
     setIsLoadingAi(true);
     setAiSuggestion(null);
     
@@ -312,6 +352,10 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel, org
 
   const handleAiEvidence = async () => {
     if (!formData.title) return;
+    
+    // Check Limit First
+    if (!(await checkAiLimit())) return;
+
     setIsLoadingAi(true);
     
     // Pass orgType to prompt
@@ -330,10 +374,6 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel, org
             } catch (e) {
                 console.error("AI Key retry failed", e);
             }
-        } else {
-            // Only alert if we suspect it's a key issue (null return usually means error)
-            // But suggestEvidence returns null on error, so we can check if it's production env without key
-            // This logic is a bit loose but works for now
         }
     }
 
@@ -903,11 +943,11 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel, org
 
       {/* Create Client Modal (Inner) */}
       {showCreateClient && (
-          <div className="absolute inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
-              <div className="glass-panel w-full max-w-md p-8 rounded-3xl shadow-2xl border border-white/10 animate-ios-pop overflow-y-auto max-h-[90vh]">
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
+              <div className="glass-panel w-full max-w-md p-8 rounded-3xl shadow-2xl border border-white/10 animate-ios-pop overflow-y-auto max-h-[90vh] relative bg-white dark:bg-[#111]">
                   <div className="flex justify-between items-center mb-6">
-                      <h3 className="text-lg font-bold text-white">Novo Cliente</h3>
-                      <button onClick={() => setShowCreateClient(false)} className="text-slate-400 hover:text-white"><X className="w-5 h-5"/></button>
+                      <h3 className="text-lg font-bold text-slate-900 dark:text-white">Novo Cliente</h3>
+                      <button onClick={() => setShowCreateClient(false)} className="text-slate-400 hover:text-slate-900 dark:hover:text-white"><X className="w-5 h-5"/></button>
                   </div>
                   
                   <div className="space-y-4">
@@ -917,7 +957,7 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel, org
                               type="text" 
                               value={newClientName}
                               onChange={e => setNewClientName(e.target.value)}
-                              className="glass-input w-full p-3 rounded-xl text-white"
+                              className="w-full p-3 rounded-xl text-slate-900 dark:text-white bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:border-amber-500 outline-none"
                               placeholder="Acme Corp"
                           />
                       </div>
@@ -927,9 +967,31 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel, org
                               type="email" 
                               value={newClientEmail}
                               onChange={e => setNewClientEmail(e.target.value)}
-                              className="glass-input w-full p-3 rounded-xl text-white"
+                              className="w-full p-3 rounded-xl text-slate-900 dark:text-white bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:border-amber-500 outline-none"
                               placeholder="login@acme.com"
                           />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                          <div>
+                              <label className="text-xs font-bold text-slate-500 uppercase mb-1 flex items-center gap-1"><Lock className="w-3 h-3"/> Senha</label>
+                              <input 
+                                  type="password" 
+                                  value={newClientPassword}
+                                  onChange={e => setNewClientPassword(e.target.value)}
+                                  className="w-full p-3 rounded-xl text-slate-900 dark:text-white bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:border-amber-500 outline-none"
+                                  placeholder="Mín 6 chars"
+                              />
+                          </div>
+                          <div>
+                              <label className="text-xs font-bold text-slate-500 uppercase mb-1 flex items-center gap-1"><Lock className="w-3 h-3"/> Confirmar</label>
+                              <input 
+                                  type="password" 
+                                  value={confirmPassword}
+                                  onChange={e => setConfirmPassword(e.target.value)}
+                                  className="w-full p-3 rounded-xl text-slate-900 dark:text-white bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:border-amber-500 outline-none"
+                                  placeholder="Repita senha"
+                              />
+                          </div>
                       </div>
                       <div>
                           <label className="text-xs font-bold text-slate-500 uppercase mb-1 flex items-center gap-1"><Phone className="w-3 h-3"/> Telefone</label>
@@ -937,62 +999,27 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel, org
                               type="tel" 
                               value={newClientPhone}
                               onChange={e => setNewClientPhone(e.target.value)}
-                              className="glass-input w-full p-3 rounded-xl text-white"
+                              className="w-full p-3 rounded-xl text-slate-900 dark:text-white bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:border-amber-500 outline-none"
                           />
-                      </div>
-                      
-                      <div className="pt-4 border-t border-white/10 mt-4">
-                          <h4 className="text-xs font-bold text-emerald-500 uppercase mb-3 flex items-center gap-2">
-                              <DollarSign className="w-4 h-4"/> Dados do Contrato
-                          </h4>
-                          <div className="space-y-3">
-                              <div>
-                                  <label className="text-xs font-bold text-slate-500 mb-1 block">Valor Mensal (MRR)</label>
-                                  <input 
-                                      type="number" 
-                                      value={newClientValue}
-                                      onChange={e => setNewClientValue(parseFloat(e.target.value))}
-                                      className="glass-input w-full p-3 rounded-xl text-white"
-                                      placeholder="0.00"
-                                  />
-                              </div>
-                              <div className="grid grid-cols-2 gap-3">
-                                  <div>
-                                      <label className="text-xs font-bold text-slate-500 mb-1 flex items-center gap-1"><Calendar className="w-3 h-3"/> Início</label>
-                                      <input 
-                                          type="date" 
-                                          value={newClientStart}
-                                          onChange={e => setNewClientStart(e.target.value)}
-                                          className="glass-input w-full p-3 rounded-xl text-white text-xs"
-                                      />
-                                  </div>
-                                  <div>
-                                      <label className="text-xs font-bold text-slate-500 mb-1 flex items-center gap-1"><Clock className="w-3 h-3"/> Meses</label>
-                                      <input 
-                                          type="number" 
-                                          value={newClientMonths}
-                                          onChange={e => setNewClientMonths(parseInt(e.target.value))}
-                                          className="glass-input w-full p-3 rounded-xl text-white"
-                                      />
-                                  </div>
-                              </div>
-                          </div>
                       </div>
                   </div>
 
                   <div className="mt-8 flex justify-end gap-3">
                       <button 
                           onClick={() => setShowCreateClient(false)}
-                          className="px-4 py-2 rounded-xl text-sm font-bold text-slate-400 hover:text-white hover:bg-white/5"
+                          type="button"
+                          className="px-4 py-2 rounded-xl text-sm font-bold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5"
                       >
                           Cancelar
                       </button>
                       <button 
                           onClick={handleCreateClient}
                           disabled={isCreatingClient}
-                          className="px-6 py-2 rounded-xl text-sm font-bold bg-amber-500 text-white hover:bg-amber-400 shadow-lg"
+                          type="button"
+                          className="px-6 py-2 rounded-xl text-sm font-bold bg-amber-500 text-white hover:bg-amber-400 shadow-lg flex items-center gap-2"
                       >
-                          {isCreatingClient ? <Loader2 className="w-4 h-4 animate-spin"/> : 'Criar Cliente'}
+                          {isCreatingClient && <Loader2 className="w-4 h-4 animate-spin"/>}
+                          Criar Cliente
                       </button>
                   </div>
               </div>

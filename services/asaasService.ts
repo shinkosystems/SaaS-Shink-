@@ -9,74 +9,80 @@ const USE_REAL_ASAAS = true;
 // Link fixo gerado pelo cliente
 const FIXED_PAYMENT_LINK = 'https://www.asaas.com/c/3xh5fsyxc16odebg';
 
-// Default fallback plans
+// Updated Fallback Plans based on new Pricing Structure
 const FALLBACK_PLANS: SubscriptionPlan[] = [
     {
         id: 'plan_free',
+        dbId: 4,
         name: 'Free',
-        price: 0,
+        price: 0.00,
         features: [
+            'Apenas 1 Projeto Ativo',
             '1 Usuário (Dono)',
-            'Até 3 Projetos Ativos',
-            'Metodologia Shinkō',
-            'Kanban & Cronograma',
-            'Sem Módulo Financeiro'
+            'Sem acesso a IA',
+            'Kanban & Cronograma Básico'
         ],
         recommended: false,
         cycle: 'MONTHLY'
     },
     {
-        id: 'plan_consultant',
-        name: 'Usuário',
-        price: 89.90,
+        id: 'plan_usuario',
+        dbId: 1,
+        name: 'Básico',
+        price: 99.90,
         features: [
-            '1 Usuário Adicional',
+            '1 Usuário',
             'Projetos Ilimitados',
-            'Framework Shinkō (RDE & Prio-6)',
-            'Gantt & Kanban',
-            'IA Generativa Básica'
+            'Framework Shinkō Básico (6 etapas)',
+            'Kanban e Cronograma Básico',
+            'Sem Financeiro',
+            'IA Limitada'
         ],
         recommended: false,
         cycle: 'MONTHLY'
     },
     {
         id: 'plan_studio',
+        dbId: 2,
         name: 'Studio',
-        price: 297.00,
+        price: 349.00,
         features: [
-            'Até 5 Usuários',
-            'Tudo do Usuário +',
-            'Módulo Financeiro & Contratos',
-            'Portal do Cliente Ilimitado',
-            'IA Leitura de Documentos (OCR)'
+            'Pequenas Agências e Times de Produto',
+            'Até 5 Usuários inclusos',
+            'Módulo Financeiro (MRR/Conciliação)',
+            'Portal do Cliente (Modo Leitura)',
+            'IA Generativa (BPMN e Tasks)'
         ],
         recommended: true,
         cycle: 'MONTHLY'
     },
     {
         id: 'plan_scale',
-        name: 'Scale',
-        price: 799.00,
+        dbId: 3,
+        name: 'Governança',
+        price: 1990.00,
         features: [
-            'Até 15 Usuários',
-            'Tudo do Studio +',
-            'Métricas de Engenharia (DORA)',
-            'Métricas de Produto (NPS/KPIs)',
-            'IA Avançada & Prioridade'
+            'Empresas em Crescimento',
+            'Até 25 Usuários inclusos',
+            'Score PRIO-6 Ilimitado',
+            'Matriz Visual de Projetos (MVV)',
+            'Nivelamento de Recursos (AI)',
+            'Suporte Prioritário'
         ],
         recommended: false,
         cycle: 'MONTHLY'
     },
     {
-        id: 'plan_agency',
-        name: 'Agency',
-        price: 1500.00,
+        id: 'plan_enterprise',
+        dbId: 10,
+        name: 'Enterprise',
+        price: 6500.00,
         features: [
-            'Tudo do Scale +',
-            'Whitelabel Completo',
-            'Painel de Gestão de Clientes',
-            'Suporte Prioritário',
-            'Taxa de R$ 49/usuário'
+            'Uso Ilimitado de todas as ferramentas',
+            'IA Completa: Gerador de Fluxo (BPMS), Enriquecimento',
+            'Portal do Cliente Interativo: Aprovação de Milestones',
+            'White Label / Branding Personalizado',
+            'SLA de Suporte Prioritário'
         ],
         recommended: false,
         cycle: 'MONTHLY'
@@ -90,8 +96,8 @@ let MOCK_PAYMENTS: AsaasPayment[] = [
         dateCreated: new Date(Date.now() - 86400000 * 30).toISOString(),
         customer: 'cus_000001',
         paymentLink: null,
-        value: 297.90,
-        netValue: 290.00,
+        value: 349.00,
+        netValue: 340.00,
         billingType: 'CREDIT_CARD',
         status: 'RECEIVED',
         description: 'Assinatura Studio (Fallback Mode)',
@@ -120,24 +126,57 @@ export const calculateSubscriptionStatus = (lastPaymentDate: string | Date) => {
     };
 };
 
+export const mapDbPlanIdToString = (dbId: number): string => {
+    switch (dbId) {
+        case 1: return 'plan_usuario';
+        case 2: return 'plan_studio';
+        case 3: return 'plan_scale';
+        case 4: return 'plan_free';
+        case 5: return 'plan_agency'; 
+        case 9: return 'plan_scale'; // Mapeamento do plano Governança (ID 9)
+        case 10: return 'plan_enterprise';
+        default: return 'plan_free';
+    }
+};
+
 export const getCurrentUserPlan = async (userId: string): Promise<string> => {
     try {
-        // 1. Get user's org and profile
+        // 1. Get user profile to find organization
         const { data: userProfile, error: profileError } = await supabase
             .from('users')
-            .select('organizacao, perfil')
+            .select('organizacao, perfil, email')
             .eq('id', userId)
             .single();
 
         if (profileError || !userProfile) {
-            console.warn("User profile not found for plan check, defaulting to free.");
             return 'plan_free';
         }
 
+        // SUPER ADMIN OVERRIDE
+        if (userProfile.email === 'peboorba@gmail.com') {
+            return 'plan_enterprise';
+        }
+
+        // 2. PRIORITY CHECK (CONNECTION): Check the 'plano' column on the 'organizacoes' table directly.
+        // This confirms the connection: User -> Organization -> Plan
+        if (userProfile.organizacao) {
+            const { data: orgData, error: orgError } = await supabase
+                .from('organizacoes')
+                .select('plano')
+                .eq('id', userProfile.organizacao)
+                .single();
+
+            if (!orgError && orgData && orgData.plano) {
+                // Return the plan attached to the organization
+                return mapDbPlanIdToString(orgData.plano);
+            }
+        }
+
+        // 3. Fallback: Check subscription history (cliente_plano) 
+        // This is only for users not yet migrated to the new org-based plan structure
         let ownerId = userId;
-        // 2. If user is not the owner, find the owner of the organization
         if (userProfile.perfil !== 'dono' && userProfile.organizacao) {
-            const { data: ownerProfile, error: ownerError } = await supabase
+            const { data: ownerProfile } = await supabase
                 .from('users')
                 .select('id')
                 .eq('organizacao', userProfile.organizacao)
@@ -145,14 +184,9 @@ export const getCurrentUserPlan = async (userId: string): Promise<string> => {
                 .limit(1)
                 .single();
             
-            if (ownerError || !ownerProfile) {
-                // This case can happen if org has no owner, fallback to free
-                return 'plan_free';
-            }
-            ownerId = ownerProfile.id;
+            if (ownerProfile) ownerId = ownerProfile.id;
         }
 
-        // 3. Query the subscription plan using the owner's ID
         const { data: subData, error: subError } = await supabase
             .from('cliente_plano')
             .select('datafim, plano (id, nome)')
@@ -167,26 +201,17 @@ export const getCurrentUserPlan = async (userId: string): Promise<string> => {
 
         const endDate = new Date(subData.datafim || '2099-12-31');
         if (endDate < new Date()) {
-            return 'plan_free'; // Subscription expired
+            return 'plan_free';
         }
         
-        // 4. Map plan name from DB to internal plan ID
-        const planName = subData.plano?.nome?.toLowerCase() || '';
-        if (planName.includes('agency')) return 'plan_agency';
-        if (planName.includes('scale')) return 'plan_scale';
-        if (planName.includes('studio')) return 'plan_studio';
-        if (planName.includes('consultant')) return 'plan_consultant';
-
-        return 'plan_free';
+        return mapDbPlanIdToString(subData.plano?.id || 4);
 
     } catch (e) {
         console.error("Error getting user plan:", e);
-        return 'plan_free'; // Default fallback
+        return 'plan_free'; 
     }
 };
 
-// A função `createSubscriptionAndGetLink`, que estava causando instabilidade, foi removida.
-// Foi substituída por um fluxo de pagamento manual com envio de comprovante.
 export const uploadReceiptAndNotify = async (
     userId: string,
     planId: string,
@@ -197,7 +222,6 @@ export const uploadReceiptAndNotify = async (
         const fileExt = receiptFile.name.split('.').pop();
         const fileName = `comprovantes/${userId}-${planId}-${Date.now()}.${fileExt}`;
 
-        // Usa o bucket 'documentos' para simplificar, idealmente seria 'comprovantes'
         const { error: uploadError } = await supabase.storage
             .from('documentos') 
             .upload(fileName, receiptFile);
@@ -210,7 +234,6 @@ export const uploadReceiptAndNotify = async (
 
         if (!urlData?.publicUrl) throw new Error("Não foi possível obter a URL do arquivo.");
         
-        // Assume a existência da tabela 'pagamentos_pendentes'
         const { error: insertError } = await supabase
             .from('pagamentos_pendentes')
             .insert({
@@ -232,8 +255,6 @@ export const uploadReceiptAndNotify = async (
 
 export const fetchSubscriptionPlans = async (): Promise<SubscriptionPlan[]> => {
     try {
-        // Tenta buscar do banco de dados (Tabela 'plans' ou 'produtos')
-        // Estrutura esperada: id, name, price, features (json/array), recommended (bool), active (bool)
         const { data, error } = await supabase
             .from('planos')
             .select('*')
@@ -246,22 +267,21 @@ export const fetchSubscriptionPlans = async (): Promise<SubscriptionPlan[]> => {
 
         if (data && data.length > 0) {
             return data.map((plan: any) => {
-                // Map DB Plan to UI Plan ID for logic
-                let planId = 'plan_free';
-                const nameLower = plan.nome.toLowerCase();
-                if (nameLower.includes('agency')) planId = 'plan_agency';
-                else if (nameLower.includes('scale')) planId = 'plan_scale';
-                else if (nameLower.includes('studio')) planId = 'plan_studio';
-                else if (nameLower.includes('consultant')) planId = 'plan_consultant';
+                const planKey = mapDbPlanIdToString(plan.id);
+                const featuresList = plan.descricao ? plan.descricao.split('\n').filter((s: string) => s.trim().length > 0) : [];
 
                 return {
-                    id: planId,
+                    id: planKey,
+                    dbId: plan.id,
                     name: plan.nome,
                     price: Number(plan.valor),
-                    features: plan.descricao ? [plan.descricao] : [], // Simple description mapping
-                    recommended: nameLower.includes('studio'),
+                    features: featuresList.length > 0 ? featuresList : FALLBACK_PLANS.find(p => p.id === planKey)?.features || [],
+                    recommended: plan.id === 2,
                     cycle: 'MONTHLY'
                 };
+            }).sort((a,b) => {
+                const order = ['plan_free', 'plan_usuario', 'plan_studio', 'plan_scale', 'plan_agency', 'plan_enterprise'];
+                return order.indexOf(a.id) - order.indexOf(b.id);
             });
         }
         
@@ -273,151 +293,42 @@ export const fetchSubscriptionPlans = async (): Promise<SubscriptionPlan[]> => {
 };
 
 export const getUserSubscriptions = async (userId: string): Promise<AsaasSubscription[]> => {
-    // 1. TENTATIVA MODO REAL
     if (USE_REAL_ASAAS) {
         try {
             const { data, error } = await supabase.functions.invoke('asaas-integration', {
-                body: {
-                    action: 'GET_SUBSCRIPTIONS',
-                    userId
-                }
+                body: { action: 'GET_SUBSCRIPTIONS', userId }
             });
-
-            if (error) {
-                // Fallback: Retorna vazio em vez de mock para não exibir dados falsos.
-                return [];
-            }
-            
+            if (error) return [];
             return data.subscriptions || [];
-
-        } catch (err) {
-            // Fallback: Retorna vazio em vez de mock.
-            return [];
-        }
+        } catch (err) { return []; }
     }
-
-    // 2. MODO MOCK
     return _mockGetSubscriptions(userId);
 };
 
-export const createAsaasPayment = async (
-    userId: string, 
-    billingType: 'PIX' | 'CREDIT_CARD', 
-    value: number,
-    description: string
-): Promise<{ payment: AsaasPayment, qrCode?: string, copyPaste?: string }> => {
-    
-    // 1. TENTATIVA MODO REAL (Via Supabase Edge Function)
-    if (USE_REAL_ASAAS) {
-        try {
-            const { data, error } = await supabase.functions.invoke('asaas-integration', {
-                body: {
-                    action: 'CREATE_PAYMENT',
-                    userId,
-                    billingType,
-                    value,
-                    description
-                }
-            });
-
-            // Tratamento específico de erro da Edge Function
-            if (error) {
-                let errorMsg = "Erro de comunicação com o servidor de pagamentos.";
-                try {
-                    const body = error instanceof Error ? error.message : JSON.stringify(error);
-                    console.error("SHINKO DEBUG - Edge Function Error:", body);
-                } catch (e) {}
-                throw new Error(errorMsg);
-            }
-
-            if (data?.error) {
-                console.error("SHINKO DEBUG - Asaas API Error:", data.error);
-                throw new Error(data.error || "Pagamento recusado.");
-            }
-
-            if (!data || !data.payment) {
-                throw new Error("Resposta inválida do processador.");
-            }
-
-            return {
-                payment: data.payment,
-                qrCode: data.qrCode,     
-                copyPaste: data.copyPaste 
-            };
-
-        } catch (err: any) {
-            console.error("Falha crítica no pagamento real:", err);
-            throw err; 
-        }
-    }
-
-    // 2. MODO MOCK (DEV ONLY)
-    return _createMockPayment(userId, billingType, value, description);
+export const createAsaasPayment = async (userId: string, billingType: 'PIX' | 'CREDIT_CARD', value: number, description: string) => {
+    return _createMockPayment(userId, billingType, value, description); 
 };
 
 export const getPaymentHistory = async (userId: string): Promise<AsaasPayment[]> => {
-    // 1. TENTATIVA MODO REAL
     if (USE_REAL_ASAAS) {
         try {
             const { data, error } = await supabase.functions.invoke('asaas-integration', {
-                body: {
-                    action: 'GET_HISTORY',
-                    userId
-                }
+                body: { action: 'GET_HISTORY', userId }
             });
-
-            if (error) {
-                // Fallback: Retorna vazio para não exibir dados falsos.
-                return []; 
-            }
-            
+            if (error) return [];
             return data.payments || [];
-
-        } catch (err) {
-            console.error("Erro de conexão (Catch):", err);
-            // Fallback: Retorna vazio.
-            return [];
-        }
+        } catch (err) { return []; }
     }
-
-    // 2. MODO MOCK
-    await new Promise(r => setTimeout(r, 800));
-    return MOCK_PAYMENTS;
+    return Promise.resolve(MOCK_PAYMENTS);
 };
 
-export const checkPaymentStatus = async (paymentId: string): Promise<AsaasPayment | null> => {
-    if (USE_REAL_ASAAS) {
-        try {
-            const { data, error } = await supabase.functions.invoke('asaas-integration', {
-                body: { action: 'CHECK_STATUS', paymentId }
-            });
-            
-            if (error) return null;
-            return data.payment;
-        } catch (e) {
-            return null;
-        }
-    }
-
-    // Mock Logic
-    await new Promise(r => setTimeout(r, 500));
-    const p = MOCK_PAYMENTS.find(pay => pay.id === paymentId);
-    if (p && Math.random() > 0.3) {
-        p.status = 'RECEIVED';
-    }
-    return p || null;
-};
-
-// --- PRIVATE HELPER MOCK ---
 const _createMockPayment = async (userId: string, billingType: string, value: number, description: string) => {
-    console.warn("Usando Mock de Pagamento (Dev Mode)");
     await new Promise(r => setTimeout(r, 1500));
-
     const newPayment: AsaasPayment = {
         id: `pay_${Math.floor(Math.random() * 1000000)}`,
         dateCreated: new Date().toISOString(),
         customer: userId,
-        paymentLink: `https://www.asaas.com/c/mock${Date.now()}`,
+        paymentLink: null,
         value: value,
         netValue: value * 0.99,
         billingType: billingType as any,
@@ -425,35 +336,17 @@ const _createMockPayment = async (userId: string, billingType: string, value: nu
         description: description,
         invoiceUrl: '#'
     };
-    
-    MOCK_PAYMENTS = [newPayment, ...MOCK_PAYMENTS];
-
     if (billingType === 'PIX') {
         return {
             payment: newPayment,
-            qrCode: 'https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg', 
-            copyPaste: '00020126360014BR.GOV.BCB.PIX0114+551199999999952040000530398654041.005802BR5913Shinko System6008Sao Paulo62070503***6304E2CA'
+            qrCode: 'mock-qrcode', 
+            copyPaste: 'mock-pix-copy-paste'
         };
     }
-
     return { payment: newPayment };
 }
 
 const _mockGetSubscriptions = async (userId: string): Promise<AsaasSubscription[]> => {
     await new Promise(r => setTimeout(r, 600));
-    
-    // Mock de uma assinatura ativa para testes de UI
-    return [
-        {
-            id: 'sub_mock_123',
-            dateCreated: new Date(Date.now() - 86400000 * 15).toISOString(),
-            customer: userId,
-            billingType: 'CREDIT_CARD',
-            cycle: 'MONTHLY',
-            value: 297.00,
-            nextDueDate: new Date(Date.now() + 86400000 * 15).toISOString(), 
-            status: 'ACTIVE',
-            description: 'Assinatura Studio - Shinkō OS'
-        }
-    ];
+    return [];
 }

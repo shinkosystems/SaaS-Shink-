@@ -110,21 +110,37 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onSave, currentPlan }) => {
                       if (!node.checklist) node.checklist = [];
                       
                       if (Array.isArray(node.checklist)) {
-                          node.checklist.forEach((task: BpmnTask) => {
+                          // Iterate using 'any' to catch the raw 'roleId' property from AI JSON before strict typing
+                          node.checklist.forEach((task: any) => {
                               if (!task.displayId) task.displayId = generateDisplayId();
                               
                               // AUTO-ASSIGN LOGIC
-                              // If AI suggested a role ID, find a member with that role
-                              if (task.suggestedRoleId) {
-                                  const matchingMember = orgMembers.find(m => m.cargo === task.suggestedRoleId);
-                                  if (matchingMember) {
-                                      task.assigneeId = matchingMember.id;
-                                      task.assignee = matchingMember.nome;
+                              // The AI returns 'roleId' in the JSON object.
+                              const aiRoleId = task.roleId || task.suggestedRoleId;
+
+                              if (aiRoleId) {
+                                  task.suggestedRoleId = aiRoleId; // Ensure it's stored in correct prop
+
+                                  // Find all members with this role in the organization
+                                  // Ensure loose comparison (string vs number) just in case
+                                  const matchingMembers = orgMembers.filter(m => m.cargo == aiRoleId);
+                                  
+                                  if (matchingMembers.length > 0) {
+                                      // Assign to a member. 
+                                      // Logic: Pick random to distribute load if multiple people have same role
+                                      const assignedMember = matchingMembers[Math.floor(Math.random() * matchingMembers.length)];
+                                      
+                                      task.assigneeId = assignedMember.id;
+                                      task.assignee = assignedMember.nome;
                                   }
-                              } else {
-                                  // Fallback: Assign to current user or leave unassigned
-                                  // Keep unassigned for now so user decides
                               }
+                              
+                              // Fallback Date if AI failed
+                              if (!task.startDate) task.startDate = new Date().toISOString().split('T')[0];
+                              if (!task.dueDate) task.dueDate = new Date().toISOString().split('T')[0];
+                              
+                              // Fallback GUT if AI failed
+                              if (!task.gut) task.gut = { g: 3, u: 3, t: 3 };
                           });
                       }
                   });
@@ -133,7 +149,8 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onSave, currentPlan }) => {
               setData(hydratedResult);
               setHasUnsavedChanges(false); // We autosave immediately
               setShowDocs(false);
-              // Automatically save initial generation to trigger global balancing
+              // Automatically save initial generation to JSON (Visual Only)
+              // DB sync only happens on "Exportar Tasks"
               onSave(hydratedResult, docsContext);
           } else {
               alert("A IA não retornou um fluxo válido. Tente detalhar mais o contexto.");
@@ -300,6 +317,21 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onSave, currentPlan }) => {
   return (
     <div className="flex flex-col lg:flex-row h-auto lg:h-[600px] border border-slate-700 rounded-xl overflow-hidden bg-slate-900 relative">
         
+        {/* Loading Overlay */}
+        {(isLoading || isEnriching) && (
+            <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center animate-in fade-in">
+                <Loader2 className="w-12 h-12 text-purple-500 animate-spin mb-4"/>
+                <h3 className="text-xl font-bold text-white">
+                    {isLoading ? "A IA está desenhando o fluxo..." : "Detalhando tarefas..."}
+                </h3>
+                <p className="text-slate-400 text-sm mt-2">
+                    {isLoading 
+                        ? "Analisando contexto, definindo datas e atribuindo responsáveis." 
+                        : "Quebrando tarefas complexas em checklists técnicos."}
+                </p>
+            </div>
+        )}
+
         {/* Sidebar / Canvas Area */}
         <div className="flex-1 relative overflow-hidden bg-slate-950/50 flex flex-col h-[500px] lg:h-auto">
             
