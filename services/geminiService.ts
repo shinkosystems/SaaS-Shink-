@@ -3,26 +3,35 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { Opportunity } from "../types";
 
 const getApiKey = (): string | undefined => {
-  // 1. Check Standard Process Env (Node/Webpack/CRA)
-  if (typeof process !== 'undefined' && process.env) {
-    if (process.env.API_KEY) return process.env.API_KEY;
-    if (process.env.VITE_API_KEY) return process.env.VITE_API_KEY;
-    if (process.env.NEXT_PUBLIC_API_KEY) return process.env.NEXT_PUBLIC_API_KEY;
-    if (process.env.REACT_APP_API_KEY) return process.env.REACT_APP_API_KEY;
-  }
-  
-  // 2. Check Vite Import Meta (ESM)
+  let key: string | undefined = undefined;
+
+  // 1. Check Vite Import Meta (Preferred for Vercel/Vite)
   try {
     // @ts-ignore
     if (import.meta && import.meta.env) {
         // @ts-ignore
-        if (import.meta.env.VITE_API_KEY) return import.meta.env.VITE_API_KEY;
+        if (import.meta.env.VITE_API_KEY) key = import.meta.env.VITE_API_KEY;
         // @ts-ignore
-        if (import.meta.env.API_KEY) return import.meta.env.API_KEY;
+        else if (import.meta.env.API_KEY) key = import.meta.env.API_KEY;
     }
   } catch(e) {}
 
-  return undefined;
+  // 2. Check Standard Process Env (Fallback)
+  if (!key && typeof process !== 'undefined' && process.env) {
+    if (process.env.VITE_API_KEY) key = process.env.VITE_API_KEY;
+    else if (process.env.API_KEY) key = process.env.API_KEY;
+    else if (process.env.NEXT_PUBLIC_API_KEY) key = process.env.NEXT_PUBLIC_API_KEY;
+    else if (process.env.REACT_APP_API_KEY) key = process.env.REACT_APP_API_KEY;
+  }
+
+  // Debugging log (Safe: shows only presence)
+  if (!key) {
+      console.warn("⚠️ Gemini Service: API Key is MISSING. Check 'VITE_API_KEY' in your environment variables.");
+  } else {
+      // console.log("✅ Gemini Service: API Key detected.");
+  }
+
+  return key;
 };
 
 const getAiClient = () => {
@@ -135,7 +144,7 @@ const cleanJson = (text: string) => {
 
 export const analyzeOpportunity = async (title: string, description: string, orgType?: string): Promise<string> => {
   const ai = getAiClient();
-  if (!ai) return "API Key not found.";
+  if (!ai) return "⚠️ Erro de Configuração: API Key não encontrada. No Vercel, a variável DEVE se chamar 'VITE_API_KEY'.";
 
   const industryContext = orgType ? `Setor: ${orgType}.` : "Setor: Startup de Tecnologia.";
 
@@ -154,7 +163,7 @@ export const analyzeOpportunity = async (title: string, description: string, org
     return response.text || "Não foi possível gerar a análise.";
   } catch (error) {
     console.error("Gemini Analysis Error:", error);
-    return "Erro ao conectar com a IA.";
+    return "Erro ao conectar com a IA. Verifique se a chave API é válida.";
   }
 };
 
@@ -541,7 +550,7 @@ export const optimizeSchedule = async (tasks: any[], availableDevelopers: {id: s
 // --- GURU AI (CHAT) ---
 export const askGuru = async (question: string, context: string): Promise<string> => {
     const ai = getAiClient();
-    if (!ai) return "Sistema de IA indisponível. Verifique a chave de API.";
+    if (!ai) return "Sistema de IA indisponível. Verifique se a variável VITE_API_KEY está configurada no Vercel.";
 
     const prompt = `
     Você é o "Shinkō Guru", uma IA executiva de alta performance especializada em gestão eficiente.

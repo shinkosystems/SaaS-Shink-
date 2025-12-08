@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, Suspense } from 'react';
 import { supabase } from './services/supabaseClient';
 import { Opportunity, BpmnTask } from './types';
@@ -67,7 +68,8 @@ const App: React.FC = () => {
       primaryColor: string,
       aiSector: string,
       aiTone: string,
-      aiContext: string
+      aiContext: string,
+      isWhitelabelActive?: boolean
   }>({ 
       name: '', 
       limit: 1, 
@@ -75,7 +77,8 @@ const App: React.FC = () => {
       primaryColor: '#F59E0B',
       aiSector: '',
       aiTone: '',
-      aiContext: ''
+      aiContext: '',
+      isWhitelabelActive: false
   });
   const [dbStatus, setDbStatus] = useState<'connected'|'disconnected'>('connected');
 
@@ -92,8 +95,14 @@ const App: React.FC = () => {
       if (orgIdParam) {
           getPublicOrgDetails(Number(orgIdParam)).then(details => {
               if (details) {
-                  setOrgDetails(prev => ({ ...prev, ...details }));
-                  setShowAuth(true); // Force Auth Screen on White Label link
+                  setOrgDetails(prev => ({ 
+                      ...prev, 
+                      ...details,
+                      // If loaded via URL param, assume whitelabel context initially
+                      isWhitelabelActive: true 
+                  }));
+                  // Optional: Automatically show Auth if org param exists
+                  // setShowAuth(true); 
               }
           });
       }
@@ -213,7 +222,8 @@ const App: React.FC = () => {
               primaryColor: data.cor || '#F59E0B',
               aiSector: data.setor || '',
               aiTone: data.tomdevoz || '',
-              aiContext: data.dna || ''
+              aiContext: data.dna || '',
+              isWhitelabelActive: data.plano === 10 // Enterprise Plan ID
           });
       }
   };
@@ -303,10 +313,29 @@ const App: React.FC = () => {
       }
   };
 
+  // --- WHITELABEL LOGIC ---
+  // If plan is Enterprise OR isWhitelabelActive (via link), override branding
+  const isEnterprise = currentPlan === 'plan_enterprise';
+  const shouldUseWhitelabel = isEnterprise || orgDetails.isWhitelabelActive;
+  
+  const appBrandName = shouldUseWhitelabel && orgDetails.name ? orgDetails.name : 'Shinkō OS';
+  const appLogoUrl = shouldUseWhitelabel ? orgDetails.logoUrl : null;
+  const appPrimaryColor = shouldUseWhitelabel ? orgDetails.primaryColor : '#F59E0B';
+
+  // Update Page Title
+  useEffect(() => {
+      document.title = appBrandName;
+  }, [appBrandName]);
+
   if (!user && !loading) {
       return (
           <>
-            <LandingPage onEnter={() => setShowAuth(true)} />
+            <LandingPage 
+                onEnter={() => setShowAuth(true)} 
+                customName={shouldUseWhitelabel ? orgDetails.name : undefined}
+                customLogo={shouldUseWhitelabel ? orgDetails.logoUrl : undefined}
+                customColor={shouldUseWhitelabel ? orgDetails.primaryColor : undefined}
+            />
             {showAuth && (
                 <AuthScreen 
                     onClose={() => setShowAuth(false)} 
@@ -316,9 +345,9 @@ const App: React.FC = () => {
                         setUserRole(persona.role);
                         setShowOnboarding(true);
                     }}
-                    customOrgName={orgDetails.name}
-                    customLogoUrl={orgDetails.logoUrl}
-                    customColor={orgDetails.primaryColor}
+                    customOrgName={appBrandName}
+                    customLogoUrl={appLogoUrl}
+                    customColor={appPrimaryColor}
                 />
             )}
             {showResetPassword && <ResetPasswordModal onClose={() => setShowResetPassword(false)} />}
@@ -347,8 +376,9 @@ const App: React.FC = () => {
                 userRole={userRole}
                 userData={userData || { name: 'Carregando...', avatar: null }}
                 currentPlan={currentPlan}
-                customLogoUrl={orgDetails.logoUrl}
-                orgName={orgDetails.name}
+                // WHITELABEL PROPS
+                customLogoUrl={appLogoUrl}
+                orgName={appBrandName}
             />
         )}
         
@@ -369,8 +399,9 @@ const App: React.FC = () => {
                 userRole={userRole}
                 userData={userData || { name: 'Carregando...', avatar: null }}
                 currentPlan={currentPlan}
-                customLogoUrl={orgDetails.logoUrl}
-                orgName={orgDetails.name}
+                // WHITELABEL PROPS
+                customLogoUrl={appLogoUrl}
+                orgName={appBrandName}
             />
         )}
 
@@ -412,6 +443,8 @@ const App: React.FC = () => {
                                     theme={theme}
                                     userRole={userRole}
                                     organizationId={userOrgId || undefined}
+                                    // WHITELABEL PROPS
+                                    appBrandName={appBrandName}
                                 />
                             </div>
                         )}
@@ -443,6 +476,7 @@ const App: React.FC = () => {
                                     onTaskUpdate={() => {}} 
                                     userRole={userRole}
                                     organizationId={userOrgId || undefined}
+                                    customPrimaryColor={appPrimaryColor}
                                 />
                             </div>
                         )}
@@ -488,6 +522,7 @@ const App: React.FC = () => {
                                 setView={setView}
                                 userRole={userRole}
                                 userData={userData}
+                                currentPlan={currentPlan}
                             />
                         )}
                         {view === 'profile' && (

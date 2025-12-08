@@ -1,6 +1,8 @@
 
 
 
+
+
 import React, { useState, useEffect, useRef } from 'react';
 import { BpmnTask, BpmnSubTask, TaskStatus, Attachment } from '../types';
 import { X, User, Calendar as CalendarIcon, CheckSquare, Square, Plus, Trash2, AlignLeft, Clock, PlayCircle, CheckCircle, BarChart3, Timer, Sparkles, Loader2, ArrowLeft, Layers, Hash, Eye, ShieldCheck, CornerDownRight, ChevronDown, Check, Paperclip, UploadCloud, File as FileIcon, ExternalLink, ArrowUpRight } from 'lucide-react';
@@ -362,7 +364,7 @@ const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, o
                    }
                } else {
                    // Se falhou e não tem o ambiente de teste, é Vercel/Prod sem ENV.
-                   alert("⚠️ Configuração Necessária\n\nA chave de API do Gemini não foi encontrada.\nCertifique-se de que a variável de ambiente 'VITE_API_KEY' (ou 'API_KEY') está configurada no Vercel.");
+                   alert("⚠️ Configuração Necessária\n\nA chave de API do Gemini não foi encontrada.\nCertifique-se de que a variável de ambiente 'VITE_API_KEY' (não apenas API_KEY) está configurada no Vercel.");
                    setIsGenerating(false);
                    return;
                }

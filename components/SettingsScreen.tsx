@@ -1,5 +1,6 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { Sun, Moon, Palette, Building2, UploadCloud, Save, Volume2, Monitor, Users, Briefcase, Plus, Trash2, Check, User, BrainCircuit, Sparkles, MessageSquare, BookOpen, Fingerprint, HardDrive, Globe, Loader2, AlertTriangle, Lock } from 'lucide-react';
+import { Sun, Moon, Palette, Building2, UploadCloud, Save, Volume2, Monitor, Users, Briefcase, Plus, Trash2, Check, User, BrainCircuit, Sparkles, MessageSquare, BookOpen, Fingerprint, HardDrive, Globe, Loader2, AlertTriangle, Lock, Link, Copy, CheckCircle } from 'lucide-react';
 import { fetchRoles, createRole, deleteRole, fetchOrganizationMembersWithRoles, updateUserRole } from '../services/organizationService';
 import { PLAN_LIMITS } from '../types';
 import { getCurrentUserPlan } from '../services/asaasService';
@@ -23,10 +24,11 @@ interface Props {
   setView: (view: any) => void;
   userRole: string;
   userData: any;
+  currentPlan?: string;
 }
 
 export const SettingsScreen: React.FC<Props> = ({ 
-    theme, onToggleTheme, onlineUsers, userOrgId, orgDetails, onUpdateOrgDetails, setView, userRole 
+    theme, onToggleTheme, onlineUsers, userOrgId, orgDetails, onUpdateOrgDetails, setView, userRole, currentPlan 
 }) => {
   const [activeTab, setActiveTab] = useState<'general' | 'team' | 'ai'>('general');
   const [color, setColor] = useState(orgDetails.primaryColor || '#F59E0B');
@@ -39,7 +41,9 @@ export const SettingsScreen: React.FC<Props> = ({
   const [members, setMembers] = useState<any[]>([]);
   const [newRoleName, setNewRoleName] = useState('');
   const [loadingTeam, setLoadingTeam] = useState(false);
-  const [currentPlan, setCurrentPlan] = useState('plan_free');
+  
+  // Whitelabel Link State
+  const [whitelabelLinkCopied, setWhitelabelLinkCopied] = useState(false);
 
   // AI Context State (Initialized from props from DB)
   const [aiSector, setAiSector] = useState(orgDetails.aiSector || '');
@@ -48,17 +52,6 @@ export const SettingsScreen: React.FC<Props> = ({
   const [isSavingAi, setIsSavingAi] = useState(false);
 
   const isAdmin = userRole === 'dono';
-
-  useEffect(() => {
-      const loadPlan = async () => {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
-              const plan = await getCurrentUserPlan(user.id);
-              setCurrentPlan(plan);
-          }
-      }
-      loadPlan();
-  }, []);
 
   // Sync state if props change (Data arrives from DB)
   useEffect(() => {
@@ -167,12 +160,17 @@ export const SettingsScreen: React.FC<Props> = ({
       }
   };
 
-  const limitConfig = PLAN_LIMITS[currentPlan] || PLAN_LIMITS['plan_free'];
+  const handleCopyWhitelabelLink = () => {
+      const link = `${window.location.origin}/?org=${userOrgId}`;
+      navigator.clipboard.writeText(link).then(() => {
+          setWhitelabelLinkCopied(true);
+          setTimeout(() => setWhitelabelLinkCopied(false), 2000);
+      });
+  };
+
+  const limitConfig = PLAN_LIMITS[currentPlan || 'plan_free'] || PLAN_LIMITS['plan_free'];
   const userCount = members.length;
   
-  // Use MAXIMUM of Plan Limit and Custom Org Limit to avoid downgrading access incorrectly
-  // If orgLimit is 3 (old data) but plan allows 25, effective is 25.
-  // If orgLimit is 50 (extra seats) and plan allows 25, effective is 50.
   const effectiveLimit = Math.max(orgLimit || 0, limitConfig.maxUsers);
   
   const isUserLimitReached = userCount >= effectiveLimit;
@@ -272,7 +270,7 @@ export const SettingsScreen: React.FC<Props> = ({
                                 </div>
                                 <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Personalização Bloqueada</h3>
                                 <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mb-6 px-4">
-                                    A personalização de marca (White Label) e a mudança de nome da organização são exclusivas para o plano <strong>Agency</strong>.
+                                    A personalização de marca (White Label) e a mudança de nome da organização são exclusivas para o plano <strong>Agency</strong> ou <strong>Enterprise</strong>.
                                 </p>
                                 <button 
                                     onClick={() => setView('profile')}
@@ -329,6 +327,27 @@ export const SettingsScreen: React.FC<Props> = ({
                                         </button>
                                         <input type="file" ref={fileRef} className="hidden" accept="image/*" onChange={handleLogoUpload}/>
                                     </div>
+                                </div>
+
+                                <div className="mt-8">
+                                    <h3 className="text-sm font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
+                                        <Link className="w-4 h-4"/> Link de Login Whitelabel
+                                    </h3>
+                                    <div className="flex gap-2">
+                                        <div className="flex-1 bg-slate-100 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-xl p-3 text-xs text-slate-500 font-mono truncate">
+                                            {`${window.location.origin}/?org=${userOrgId}`}
+                                        </div>
+                                        <button 
+                                            onClick={handleCopyWhitelabelLink}
+                                            className={`px-4 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${whitelabelLinkCopied ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700'}`}
+                                        >
+                                            {whitelabelLinkCopied ? <CheckCircle className="w-4 h-4"/> : <Copy className="w-4 h-4"/>}
+                                            {whitelabelLinkCopied ? 'Copiado!' : 'Copiar'}
+                                        </button>
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 mt-2">
+                                        Compartilhe este link com seu time ou clientes para que eles vejam sua marca desde o login.
+                                    </p>
                                 </div>
 
                                 <div className="mt-8 pt-6 border-t border-slate-200 dark:border-white/5 flex justify-end">

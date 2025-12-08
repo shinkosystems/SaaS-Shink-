@@ -18,13 +18,16 @@ interface Props {
   whitelabel?: boolean;
   onActivateWhitelabel?: () => void;
   organizationId?: number;
+  appBrandName?: string;
 }
 
 export const Dashboard: React.FC<Props> = ({ 
-    opportunities, onNavigate, onOpenProject, user, theme, userRole, whitelabel, onActivateWhitelabel 
+    opportunities, onNavigate, onOpenProject, user, theme, userRole, whitelabel, onActivateWhitelabel, appBrandName
 }) => {
     const [selectedTask, setSelectedTask] = useState<any | null>(null);
     
+    const brand = appBrandName || 'Shinkō';
+
     // Stats
     const totalOpps = opportunities.length;
     const activeOpps = opportunities.filter(o => o.status === 'Active').length;
@@ -59,7 +62,7 @@ export const Dashboard: React.FC<Props> = ({
                             Olá, {user.user_metadata?.full_name?.split(' ')[0] || 'Gestor'}
                         </h1>
                         <p className="text-slate-500 dark:text-slate-400 mt-1">
-                            Aqui está o panorama da sua operação hoje.
+                            Aqui está o panorama do {brand} hoje.
                         </p>
                     </div>
                     {userRole === 'dono' && whitelabel && (

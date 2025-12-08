@@ -1,7 +1,4 @@
 
-
-
-
 import React, { useState } from 'react';
 import { 
     ArrowRight, Sparkles, Rocket, CheckCircle, Star, Quote, 
@@ -13,10 +10,20 @@ import { CasesGallery } from './CasesGallery';
 
 interface Props {
   onEnter: () => void;
+  customName?: string;
+  customLogo?: string | null;
+  customColor?: string;
 }
 
-export const LandingPage: React.FC<Props> = ({ onEnter }) => {
+export const LandingPage: React.FC<Props> = ({ onEnter, customName, customLogo, customColor }) => {
   const [showCases, setShowCases] = useState(false);
+
+  const brandName = customName || "Shinkō OS";
+  const primaryColor = customColor || "#F59E0B";
+
+  // Dynamic Style Injection for Whitelabel
+  const buttonStyle = { backgroundColor: primaryColor, color: '#000' };
+  const textStyle = { color: primaryColor };
 
   const plans = [
       {
@@ -82,8 +89,14 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
       <nav className="relative z-50 w-full px-6 py-6 flex justify-between items-center backdrop-blur-md sticky top-0 bg-slate-950/70 border-b border-white/5">
           <div className="max-w-7xl mx-auto w-full flex justify-between items-center">
             <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.scrollTo(0, 0)}>
-                <div className="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center text-black font-bold shadow-lg shadow-amber-500/20">S</div>
-                <span className="font-bold text-xl tracking-tight">Shinkō OS</span>
+                {customLogo ? (
+                    <img src={customLogo} alt={brandName} className="h-8 object-contain" />
+                ) : (
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center text-black font-bold shadow-lg" style={{ backgroundColor: primaryColor }}>
+                        {brandName.charAt(0)}
+                    </div>
+                )}
+                <span className="font-bold text-xl tracking-tight">{brandName}</span>
             </div>
             <div className="flex items-center gap-6">
                 <div className="hidden md:flex gap-6 text-sm font-medium text-slate-400">
@@ -103,15 +116,15 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
           <section className="w-full max-w-7xl px-6 pt-20 pb-32 flex flex-col items-center text-center relative">
             
             {/* Badge */}
-            <div className="mb-8 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-800/50 border border-slate-700 text-[11px] font-bold uppercase tracking-widest text-amber-400 backdrop-blur-md animate-in fade-in slide-in-from-bottom-4 duration-700 shadow-glow cursor-default hover:bg-slate-800 transition-colors">
+            <div className="mb-8 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-800/50 border border-slate-700 text-[11px] font-bold uppercase tracking-widest backdrop-blur-md animate-in fade-in slide-in-from-bottom-4 duration-700 shadow-glow cursor-default hover:bg-slate-800 transition-colors" style={{ color: primaryColor, borderColor: `${primaryColor}30` }}>
                 <Sparkles className="w-3 h-3"/> Engineering Innovation Framework 2.5
             </div>
 
             {/* Headline */}
             <h1 className="text-5xl md:text-7xl lg:text-8xl font-black mb-8 tracking-tight leading-[1.1] bg-clip-text text-transparent bg-gradient-to-b from-white via-slate-200 to-slate-500 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-100 max-w-5xl">
-                Transforme Incerteza <br/> em <span className="text-amber-500 relative inline-block">
+                Transforme Incerteza <br/> em <span className="relative inline-block" style={{ color: primaryColor }}>
                     Resultado
-                    <svg className="absolute w-full h-3 -bottom-1 left-0 text-amber-500 opacity-60" viewBox="0 0 100 10" preserveAspectRatio="none">
+                    <svg className="absolute w-full h-3 -bottom-1 left-0 opacity-60" viewBox="0 0 100 10" preserveAspectRatio="none" style={{ color: primaryColor }}>
                         <path d="M0 5 Q 50 10 100 5" stroke="currentColor" strokeWidth="8" fill="none" />
                     </svg>
                 </span>.
@@ -126,7 +139,8 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
             <div className="flex flex-col sm:flex-row gap-4 animate-in fade-in zoom-in duration-500 delay-300">
                 <button 
                     onClick={onEnter}
-                    className="group relative px-8 py-4 bg-amber-500 hover:bg-amber-400 text-black font-bold text-lg rounded-full flex items-center justify-center gap-3 transition-all shadow-[0_0_40px_-10px_rgba(245,158,11,0.5)] hover:shadow-[0_0_60px_-10px_rgba(245,158,11,0.7)] hover:-translate-y-1"
+                    className="group relative px-8 py-4 font-bold text-lg rounded-full flex items-center justify-center gap-3 transition-all hover:-translate-y-1"
+                    style={{ backgroundColor: primaryColor, color: '#000', boxShadow: `0 0 40px -10px ${primaryColor}80` }}
                 >
                     Começar Agora
                     <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform"/>
@@ -202,7 +216,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
 
                 {/* Overlay Action */}
                 <div className="absolute inset-0 flex items-center justify-center z-20 opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 backdrop-blur-[2px]">
-                    <button onClick={onEnter} className="px-8 py-4 bg-amber-500 text-black font-bold rounded-full shadow-2xl transform scale-110 hover:scale-125 transition-transform flex items-center gap-2">
+                    <button onClick={onEnter} className="px-8 py-4 text-black font-bold rounded-full shadow-2xl transform scale-110 hover:scale-125 transition-transform flex items-center gap-2" style={{ backgroundColor: primaryColor }}>
                         <Layout className="w-5 h-5"/> Explorar Interface Real
                     </button>
                 </div>
@@ -212,7 +226,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
           {/* --- SOCIAL PROOF --- */}
           <section className="w-full border-y border-white/5 bg-slate-900/50 py-10 overflow-hidden">
               <div className="max-w-7xl mx-auto px-6 text-center">
-                  <p className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-8">Empresas que escalaram com Shinkō</p>
+                  <p className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-8">Empresas que escalaram com {brandName}</p>
                   <div className="flex flex-wrap justify-center items-center gap-12 md:gap-20 opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
                       {/* Fake Logos using Text/Icons for demo */}
                       <div className="flex items-center gap-2 text-xl font-black text-white"><Zap className="w-6 h-6"/> StarkInd</div>
@@ -236,7 +250,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
                               Decisões baseadas em <span className="text-blue-500">Algoritmos</span>, não em palpites.
                           </h2>
                           <p className="text-slate-400 text-lg leading-relaxed">
-                              Pare de gastar recursos em ideias ruins. O Shinkō utiliza modelos matemáticos (Matriz RDE e Score Prio-6) para classificar oportunidades com frieza.
+                              Pare de gastar recursos em ideias ruins. O {brandName} utiliza modelos matemáticos (Matriz RDE e Score Prio-6) para classificar oportunidades com frieza.
                           </p>
                           
                           <div className="space-y-6">
@@ -417,7 +431,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
               <div className="absolute inset-0 bg-amber-500/5"></div>
               <div className="max-w-4xl mx-auto px-6 text-center relative z-10">
                   <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold uppercase tracking-wider border border-amber-500/30 mb-6">
-                      <Sparkles className="w-4 h-4"/> Shinkō AI
+                      <Sparkles className="w-4 h-4"/> {brandName} AI
                   </div>
                   <h2 className="text-4xl md:text-6xl font-black mb-6">
                       Seu copiloto de <span className="text-amber-500">Inteligência</span>.
@@ -537,7 +551,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
                   <div className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"></div>
                   <div className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"></div>
               </div>
-              <p className="text-xs uppercase tracking-widest opacity-50">&copy; 2026 Shinkō Systems. Todos os direitos reservados.</p>
+              <p className="text-xs uppercase tracking-widest opacity-50">&copy; 2026 {brandName} Systems. Todos os direitos reservados.</p>
           </footer>
       </div>
     </div>

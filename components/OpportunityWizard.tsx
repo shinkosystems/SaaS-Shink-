@@ -4,6 +4,8 @@
 
 
 
+
+
 import React, { useState, useEffect } from 'react';
 import { Opportunity, RDEStatus, Archetype, IntensityLevel, TadsCriteria, ProjectStatus } from '../types';
 import { analyzeOpportunity, suggestEvidence } from '../services/geminiService';
@@ -332,19 +334,9 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel, org
     // Pass orgType to prompt
     let result = await analyzeOpportunity(formData.title, formData.description, orgType);
     
-    // Auto-fix mechanism for missing key
-    if ((result === "API Key not found." || result.includes("API Key"))) {
-        if ((window as any).aistudio) {
-            try {
-                await (window as any).aistudio.openSelectKey();
-                // Retry once
-                result = await analyzeOpportunity(formData.title, formData.description, orgType);
-            } catch (e) {
-                console.error("AI Key retry failed", e);
-            }
-        } else {
-            alert("⚠️ Configuração Necessária\n\nA chave de API do Gemini não foi encontrada.\nCertifique-se de que a variável de ambiente 'VITE_API_KEY' (ou 'API_KEY') está configurada no Vercel.");
-        }
+    // Explicit Error Handling for Missing Key
+    if (result.includes("API Key")) {
+        alert("⚠️ Configuração Necessária\n\nA chave de API do Gemini não foi encontrada.\nCertifique-se de que a variável de ambiente 'VITE_API_KEY' (não apenas API_KEY) está configurada no Vercel.");
     }
 
     setAiSuggestion(result);
@@ -363,22 +355,6 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel, org
     // Pass orgType to prompt
     let result = await suggestEvidence(formData.title, formData.description || '', orgType);
     
-    // Auto-fix mechanism for missing key
-    if (!result) {
-        if ((window as any).aistudio) {
-            try {
-                const hasKey = await (window as any).aistudio.hasSelectedApiKey();
-                if (!hasKey) {
-                    await (window as any).aistudio.openSelectKey();
-                    // Retry once
-                    result = await suggestEvidence(formData.title, formData.description || '', orgType);
-                }
-            } catch (e) {
-                console.error("AI Key retry failed", e);
-            }
-        }
-    }
-
     if (result) {
         setFormData(prev => ({
             ...prev,
@@ -389,7 +365,7 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel, org
             }
         }));
     } else {
-        setAiSuggestion("Não foi possível gerar evidências automaticamente. Verifique sua chave de API.");
+        setAiSuggestion("Não foi possível gerar evidências. Verifique se a variável VITE_API_KEY está configurada no Vercel.");
     }
 
     setIsLoadingAi(false);
