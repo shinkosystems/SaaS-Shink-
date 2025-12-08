@@ -209,10 +209,10 @@ const App: React.FC = () => {
   const loadOrganization = async (orgId: number) => {
       const { data } = await supabase.from('organizacoes').select('*').eq('id', orgId).single();
       if (data) {
+          // UPDATE APP STATE FOR PLAN ID
           let planId = Number(data.plano);
           
-          // Fallback: If no plan on org, check active subscription for this org (from cliente_plano)
-          // This handles cases where 'plano' column might be missing or null in 'organizacoes' table
+          // Fallback: If no plan on org, check active subscription
           if (!planId) {
                const { data: sub } = await supabase
                    .from('cliente_plano')
@@ -228,11 +228,10 @@ const App: React.FC = () => {
                }
           }
 
-          planId = planId || 4; // Default to Free (4) if still null
-
+          planId = planId || 4; // Default to Free (4) if null
           setOrgPlanId(planId);
           
-          // FORCE UPDATE CURRENT PLAN IMMEDIATELY
+          // FORCE UPDATE CURRENT PLAN IMMEDIATELY (Source of Truth is Org Table)
           const planString = mapDbPlanIdToString(planId);
           setCurrentPlan(planString);
 
@@ -348,6 +347,21 @@ const App: React.FC = () => {
   useEffect(() => {
       document.title = appBrandName;
   }, [appBrandName]);
+
+  // Inject Custom Brand Color into CSS Variables globally
+  useEffect(() => {
+      const root = document.documentElement;
+      
+      const hexToRgb = (hex: string) => {
+          const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+          return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '245, 158, 11';
+      };
+      
+      if (appPrimaryColor) {
+          root.style.setProperty('--brand-primary', appPrimaryColor);
+          root.style.setProperty('--brand-primary-rgb', hexToRgb(appPrimaryColor));
+      }
+  }, [appPrimaryColor]);
 
   if (!user && !loading) {
       return (
