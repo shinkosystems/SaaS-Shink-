@@ -7,7 +7,7 @@ import { createTask } from './services/projectService';
 import { getPublicOrgDetails, updateOrgDetails, uploadLogo } from './services/organizationService';
 import { subscribeToPresence } from './services/presenceService';
 import { trackUserAccess } from './services/analyticsService';
-import { getCurrentUserPlan } from './services/asaasService';
+import { getCurrentUserPlan, mapDbPlanIdToString } from './services/asaasService';
 
 // Components
 import { Sidebar, MobileDrawer } from './components/Navigation';
@@ -32,6 +32,7 @@ import { DevIndicators } from './components/DevIndicators';
 import { AdminManagerScreen } from './components/AdminManagerScreen';
 import { NpsSurvey } from './components/NpsSurvey';
 import { GuruFab } from './components/GuruFab';
+import { FeedbackModal } from './components/FeedbackModal';
 
 const App: React.FC = () => {
   // State
@@ -41,6 +42,9 @@ const App: React.FC = () => {
   const [userRole, setUserRole] = useState<string>('visitante');
   const [userOrgId, setUserOrgId] = useState<number | null>(null);
   const [currentPlan, setCurrentPlan] = useState<string>('plan_free');
+  
+  // App State for Org Plan ID (Source of Truth)
+  const [orgPlanId, setOrgPlanId] = useState<number | null>(null);
 
   const [view, setView] = useState<string>('dashboard');
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
@@ -52,6 +56,9 @@ const App: React.FC = () => {
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  
+  // New State for Feedback Modal
+  const [showFeedback, setShowFeedback] = useState(false);
 
   const [selectedProject, setSelectedProject] = useState<Opportunity | null>(null);
   const [isSharedMode, setIsSharedMode] = useState(false); // Controls focused view
@@ -65,7 +72,8 @@ const App: React.FC = () => {
       primaryColor: string,
       aiSector: string,
       aiTone: string,
-      aiContext: string
+      aiContext: string,
+      isWhitelabelActive?: boolean
   }>({ 
       name: '', 
       limit: 1, 
@@ -73,7 +81,8 @@ const App: React.FC = () => {
       primaryColor: '#F59E0B',
       aiSector: '',
       aiTone: '',
-      aiContext: ''
+      aiContext: '',
+      isWhitelabelActive: false
   });
   const [dbStatus, setDbStatus] = useState<'connected'|'disconnected'>('connected');
 
@@ -90,12 +99,24 @@ const App: React.FC = () => {
       if (orgIdParam) {
           getPublicOrgDetails(Number(orgIdParam)).then(details => {
               if (details) {
-                  setOrgDetails(prev => ({ ...prev, ...details }));
-                  setShowAuth(true); // Force Auth Screen on White Label link
+                  setOrgDetails(prev => ({ 
+                      ...prev, 
+                      ...details,
+                      // If loaded via URL param, assume whitelabel context initially
+                      isWhitelabelActive: true 
+                  }));
               }
           });
       }
   }, []);
+
+  // Sync Plan from Org State (Redundant safety check)
+  useEffect(() => {
+      if (orgPlanId !== null) {
+          const planString = mapDbPlanIdToString(orgPlanId);
+          setCurrentPlan(planString);
+      }
+  }, [orgPlanId]);
 
   // Auth & Session
   useEffect(() => {
@@ -160,7 +181,8 @@ const App: React.FC = () => {
               setUserOrgId(data.organizacao);
               
               if (data.organizacao) {
-                  loadOrganization(data.organizacao);
+                  // Await ensures Plan ID is set BEFORE rendering main views
+                  await loadOrganization(data.organizacao);
                   loadOpportunities(data.organizacao);
               }
 
@@ -168,9 +190,11 @@ const App: React.FC = () => {
               trackUserAccess(userId);
               const unsubPresence = subscribeToPresence(userId, (ids) => setOnlineUsers(ids));
               
-              // Plan
-              const plan = await getCurrentUserPlan(userId);
-              setCurrentPlan(plan);
+              // Only call fallback if orgPlanId was somehow not set by loadOrganization
+              if (orgPlanId === null) {
+                  const plan = await getCurrentUserPlan(userId);
+                  setCurrentPlan(plan);
+              }
 
               return () => { unsubPresence(); };
           }
@@ -185,6 +209,14 @@ const App: React.FC = () => {
   const loadOrganization = async (orgId: number) => {
       const { data } = await supabase.from('organizacoes').select('*').eq('id', orgId).single();
       if (data) {
+          // UPDATE APP STATE FOR PLAN ID
+          const planId = Number(data.plano) || 4; // Default to Free (4) if null
+          setOrgPlanId(planId);
+          
+          // FORCE UPDATE CURRENT PLAN IMMEDIATELY (Source of Truth is Org Table)
+          const planString = mapDbPlanIdToString(planId);
+          setCurrentPlan(planString);
+
           setOrgDetails({
               name: data.nome,
               limit: data.colaboradores,
@@ -192,7 +224,8 @@ const App: React.FC = () => {
               primaryColor: data.cor || '#F59E0B',
               aiSector: data.setor || '',
               aiTone: data.tomdevoz || '',
-              aiContext: data.dna || ''
+              aiContext: data.dna || '',
+              isWhitelabelActive: planId === 10 // Enterprise Plan ID (Strict Number Check)
           });
       }
   };
@@ -282,10 +315,29 @@ const App: React.FC = () => {
       }
   };
 
+  // --- WHITELABEL LOGIC ---
+  // If plan is Enterprise OR isWhitelabelActive (via link), override branding
+  const isEnterprise = currentPlan === 'plan_enterprise';
+  const shouldUseWhitelabel = isEnterprise || orgDetails.isWhitelabelActive;
+  
+  const appBrandName = shouldUseWhitelabel && orgDetails.name ? orgDetails.name : 'Shinkō OS';
+  const appLogoUrl = shouldUseWhitelabel ? orgDetails.logoUrl : null;
+  const appPrimaryColor = shouldUseWhitelabel ? orgDetails.primaryColor : '#F59E0B';
+
+  // Update Page Title
+  useEffect(() => {
+      document.title = appBrandName;
+  }, [appBrandName]);
+
   if (!user && !loading) {
       return (
           <>
-            <LandingPage onEnter={() => setShowAuth(true)} />
+            <LandingPage 
+                onEnter={() => setShowAuth(true)} 
+                customName={shouldUseWhitelabel ? orgDetails.name : undefined}
+                customLogo={shouldUseWhitelabel ? orgDetails.logoUrl : undefined}
+                customColor={shouldUseWhitelabel ? orgDetails.primaryColor : undefined}
+            />
             {showAuth && (
                 <AuthScreen 
                     onClose={() => setShowAuth(false)} 
@@ -295,9 +347,9 @@ const App: React.FC = () => {
                         setUserRole(persona.role);
                         setShowOnboarding(true);
                     }}
-                    customOrgName={orgDetails.name}
-                    customLogoUrl={orgDetails.logoUrl}
-                    customColor={orgDetails.primaryColor}
+                    customOrgName={appBrandName}
+                    customLogoUrl={appLogoUrl}
+                    customColor={appPrimaryColor}
                 />
             )}
             {showResetPassword && <ResetPasswordModal onClose={() => setShowResetPassword(false)} />}
@@ -319,6 +371,8 @@ const App: React.FC = () => {
                 onToggleTheme={toggleTheme}
                 onLogout={handleLogout}
                 onSearch={(q) => console.log(q)}
+                // PASS FEEDBACK HANDLER
+                onOpenFeedback={() => setShowFeedback(true)}
                 theme={theme}
                 dbStatus={dbStatus}
                 isMobileOpen={isMobileOpen}
@@ -326,8 +380,9 @@ const App: React.FC = () => {
                 userRole={userRole}
                 userData={userData || { name: 'Carregando...', avatar: null }}
                 currentPlan={currentPlan}
-                customLogoUrl={orgDetails.logoUrl}
-                orgName={orgDetails.name}
+                // WHITELABEL PROPS
+                customLogoUrl={appLogoUrl}
+                orgName={appBrandName}
             />
         )}
         
@@ -341,6 +396,8 @@ const App: React.FC = () => {
                 onToggleTheme={toggleTheme}
                 onLogout={handleLogout}
                 onSearch={(q) => console.log(q)}
+                // PASS FEEDBACK HANDLER
+                onOpenFeedback={() => setShowFeedback(true)}
                 theme={theme}
                 dbStatus={dbStatus}
                 isMobileOpen={isMobileOpen}
@@ -348,8 +405,9 @@ const App: React.FC = () => {
                 userRole={userRole}
                 userData={userData || { name: 'Carregando...', avatar: null }}
                 currentPlan={currentPlan}
-                customLogoUrl={orgDetails.logoUrl}
-                orgName={orgDetails.name}
+                // WHITELABEL PROPS
+                customLogoUrl={appLogoUrl}
+                orgName={appBrandName}
             />
         )}
 
@@ -391,6 +449,10 @@ const App: React.FC = () => {
                                     theme={theme}
                                     userRole={userRole}
                                     organizationId={userOrgId || undefined}
+                                    // WHITELABEL PROPS
+                                    appBrandName={appBrandName}
+                                    whitelabel={isEnterprise}
+                                    onActivateWhitelabel={() => setView('settings')}
                                 />
                             </div>
                         )}
@@ -422,6 +484,7 @@ const App: React.FC = () => {
                                     onTaskUpdate={() => {}} 
                                     userRole={userRole}
                                     organizationId={userOrgId || undefined}
+                                    customPrimaryColor={appPrimaryColor}
                                 />
                             </div>
                         )}
@@ -467,6 +530,7 @@ const App: React.FC = () => {
                                 setView={setView}
                                 userRole={userRole}
                                 userData={userData}
+                                currentPlan={currentPlan}
                             />
                         )}
                         {view === 'profile' && (
@@ -502,6 +566,14 @@ const App: React.FC = () => {
                 onClose={() => setShowCreateTask(false)}
                 onSave={handleCreateTask}
                 userRole={userRole}
+            />
+        )}
+
+        {/* FEEDBACK MODAL (NEW) */}
+        {showFeedback && user && (
+            <FeedbackModal 
+                userId={user.id} 
+                onClose={() => setShowFeedback(false)} 
             />
         )}
 

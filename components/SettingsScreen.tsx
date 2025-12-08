@@ -18,7 +18,8 @@ interface Props {
       primaryColor: string,
       aiSector: string,
       aiTone: string,
-      aiContext: string
+      aiContext: string,
+      isWhitelabelActive?: boolean; // Propriedade vinda do DB (plano = 10)
   };
   onUpdateOrgDetails: (updates: { logoFile?: File, color?: string, name?: string, limit?: number, aiSector?: string, aiTone?: string, aiContext?: string }) => Promise<void> | void;
   setView: (view: any) => void;
@@ -174,8 +175,13 @@ export const SettingsScreen: React.FC<Props> = ({
   const effectiveLimit = Math.max(orgLimit || 0, limitConfig.maxUsers);
   
   const isUserLimitReached = userCount >= effectiveLimit;
-  const isAiLocked = !limitConfig.features.aiAdvanced;
-  const isWhitelabelLocked = !limitConfig.features.whitelabel;
+  
+  // LOGIC FIX: Whitelabel is unlocked if Plan says so OR if DB flag (ID 10) is true
+  const isEnterprisePlan = currentPlan === 'plan_enterprise';
+  const isWhitelabelLocked = !limitConfig.features.whitelabel && !orgDetails.isWhitelabelActive && !isEnterprisePlan;
+  
+  // AI is unlocked if Plan says so OR if DB flag (ID 10) is true (Enterprise has AI)
+  const isAiLocked = !limitConfig.features.aiAdvanced && !orgDetails.isWhitelabelActive && !isEnterprisePlan; 
 
   return (
     <div className="h-full flex flex-col p-6 md:p-10 overflow-y-auto custom-scrollbar animate-in fade-in duration-500">
