@@ -4,7 +4,7 @@ import {
     LayoutDashboard, List, Calendar, User, Settings, Search, 
     PlusCircle, LogOut, Sun, Moon, CreditCard, ChevronRight,
     Menu, X, Briefcase, BarChart3, Code2, Users, DollarSign,
-    Shield, Layers, Sparkles
+    Shield, Layers, Sparkles, Lightbulb
 } from 'lucide-react';
 import { PLAN_LIMITS } from '../types';
 import { fetchOrganizationDetails } from '../services/organizationService';
@@ -18,6 +18,7 @@ interface Props {
   onToggleTheme: () => void;
   onLogout: () => void;
   onSearch: (q: string) => void;
+  onOpenFeedback: () => void; // New Prop
   theme: 'dark' | 'light';
   dbStatus: 'connected' | 'disconnected' | 'error';
   isMobileOpen: boolean;
@@ -51,7 +52,6 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, currentPlan: string =
     ];
 
     if (planFeatures.gantt) {
-        // Renamed from Cronograma to Agenda per user request
         groups[1].items.push({ id: 'calendar', label: 'Agenda', icon: Calendar });
     }
 
@@ -131,19 +131,28 @@ export const Sidebar: React.FC<Props> = (props) => {
     <div className={`hidden md:flex flex-col w-64 h-full border-r border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 shrink-0 transition-all duration-300`}>
         
         {/* Header Logo */}
-        <div className="h-20 flex items-center px-6 border-b border-slate-200 dark:border-white/5 bg-white/50 dark:bg-transparent backdrop-blur-sm">
+        <div className="h-20 flex items-center justify-between px-4 border-b border-slate-200 dark:border-white/5 bg-white/50 dark:bg-transparent backdrop-blur-sm">
             {props.customLogoUrl ? (
-                <img src={props.customLogoUrl} alt="Logo" className="h-8 object-contain" />
+                <img src={props.customLogoUrl} alt="Logo" className="h-8 object-contain max-w-[140px]" />
             ) : (
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-shinko-primary to-orange-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-amber-500/20">
                         {props.orgName ? props.orgName.charAt(0).toUpperCase() : 'S'}
                     </div>
-                    <span className="font-bold text-lg tracking-tight text-slate-900 dark:text-white truncate">
+                    <span className="font-bold text-lg tracking-tight text-slate-900 dark:text-white truncate max-w-[100px]">
                         {props.orgName || 'Shinkō OS'}
                     </span>
                 </div>
             )}
+            
+            {/* Feedback Button (Desktop) */}
+            <button 
+                onClick={props.onOpenFeedback}
+                className="p-2 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/20 text-amber-500 dark:text-amber-400 transition-colors"
+                title="Reportar Problema / Sugerir Melhoria"
+            >
+                <Lightbulb className="w-5 h-5"/>
+            </button>
         </div>
 
         {/* Quick Action */}
@@ -293,12 +302,19 @@ export const MobileDrawer: React.FC<Props> = (props) => {
                     </div>
                 </div>
                 
-                {/* Mobile Quick Add */}
-                {!isClient && (
-                    <button onClick={props.onOpenCreateTask} className="w-8 h-8 bg-slate-100 dark:bg-white/10 rounded-full flex items-center justify-center text-slate-600 dark:text-white">
-                        <PlusCircle className="w-5 h-5"/>
+                <div className="flex items-center gap-2">
+                    {/* Feedback Button (Mobile) */}
+                    <button onClick={props.onOpenFeedback} className="p-2 bg-amber-100 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 rounded-full">
+                        <Lightbulb className="w-5 h-5"/>
                     </button>
-                )}
+
+                    {/* Mobile Quick Add */}
+                    {!isClient && (
+                        <button onClick={props.onOpenCreateTask} className="w-8 h-8 bg-slate-100 dark:bg-white/10 rounded-full flex items-center justify-center text-slate-600 dark:text-white">
+                            <PlusCircle className="w-5 h-5"/>
+                        </button>
+                    )}
+                </div>
             </div>
 
             {props.isMobileOpen && (

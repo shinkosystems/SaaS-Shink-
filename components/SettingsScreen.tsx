@@ -229,6 +229,36 @@ export const SettingsScreen: React.FC<Props> = ({
         {/* GENERAL TAB */}
         {activeTab === 'general' && (
             <div className="space-y-8 animate-in slide-in-from-left-4 duration-300">
+                
+                {/* Whitelabel Sharing Card (Prominent for Enterprise) */}
+                {isAdmin && !isWhitelabelLocked && (
+                    <div className="bg-gradient-to-r from-purple-900 to-indigo-900 rounded-2xl p-6 border border-white/10 shadow-2xl relative overflow-hidden group">
+                        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
+                        <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
+                            <div className="text-white">
+                                <h3 className="text-lg font-bold flex items-center gap-2 mb-2">
+                                    <Sparkles className="w-5 h-5 text-yellow-300"/> Link de Compartilhamento White Label
+                                </h3>
+                                <p className="text-sm opacity-80 max-w-lg">
+                                    Use este link exclusivo para que seus clientes e time acessem a plataforma com a <strong>sua marca e identidade</strong> desde o primeiro login.
+                                </p>
+                            </div>
+                            <div className="flex gap-2 w-full md:w-auto">
+                                <div className="flex-1 bg-black/40 border border-white/20 rounded-xl p-3 text-xs text-white font-mono truncate min-w-[200px] flex items-center">
+                                    {`${window.location.origin}/?org=${userOrgId}`}
+                                </div>
+                                <button 
+                                    onClick={handleCopyWhitelabelLink}
+                                    className={`px-6 py-3 rounded-xl text-sm font-bold transition-all shadow-lg flex items-center gap-2 whitespace-nowrap ${whitelabelLinkCopied ? 'bg-emerald-500 text-white' : 'bg-white text-purple-900 hover:bg-purple-100'}`}
+                                >
+                                    {whitelabelLinkCopied ? <CheckCircle className="w-4 h-4"/> : <Copy className="w-4 h-4"/>}
+                                    {whitelabelLinkCopied ? 'Copiado!' : 'Copiar'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Theme & Display */}
                 <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-900/50">
                     <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
@@ -327,27 +357,6 @@ export const SettingsScreen: React.FC<Props> = ({
                                         </button>
                                         <input type="file" ref={fileRef} className="hidden" accept="image/*" onChange={handleLogoUpload}/>
                                     </div>
-                                </div>
-
-                                <div className="mt-8">
-                                    <h3 className="text-sm font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
-                                        <Link className="w-4 h-4"/> Link de Login Whitelabel
-                                    </h3>
-                                    <div className="flex gap-2">
-                                        <div className="flex-1 bg-slate-100 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-xl p-3 text-xs text-slate-500 font-mono truncate">
-                                            {`${window.location.origin}/?org=${userOrgId}`}
-                                        </div>
-                                        <button 
-                                            onClick={handleCopyWhitelabelLink}
-                                            className={`px-4 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${whitelabelLinkCopied ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700'}`}
-                                        >
-                                            {whitelabelLinkCopied ? <CheckCircle className="w-4 h-4"/> : <Copy className="w-4 h-4"/>}
-                                            {whitelabelLinkCopied ? 'Copiado!' : 'Copiar'}
-                                        </button>
-                                    </div>
-                                    <p className="text-[10px] text-slate-400 mt-2">
-                                        Compartilhe este link com seu time ou clientes para que eles vejam sua marca desde o login.
-                                    </p>
                                 </div>
 
                                 <div className="mt-8 pt-6 border-t border-slate-200 dark:border-white/5 flex justify-end">

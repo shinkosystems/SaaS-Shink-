@@ -32,6 +32,7 @@ import { DevIndicators } from './components/DevIndicators';
 import { AdminManagerScreen } from './components/AdminManagerScreen';
 import { NpsSurvey } from './components/NpsSurvey';
 import { GuruFab } from './components/GuruFab';
+import { FeedbackModal } from './components/FeedbackModal';
 
 const App: React.FC = () => {
   // State
@@ -55,6 +56,9 @@ const App: React.FC = () => {
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  
+  // New State for Feedback Modal
+  const [showFeedback, setShowFeedback] = useState(false);
 
   const [selectedProject, setSelectedProject] = useState<Opportunity | null>(null);
   const [isSharedMode, setIsSharedMode] = useState(false); // Controls focused view
@@ -101,14 +105,12 @@ const App: React.FC = () => {
                       // If loaded via URL param, assume whitelabel context initially
                       isWhitelabelActive: true 
                   }));
-                  // Optional: Automatically show Auth if org param exists
-                  // setShowAuth(true); 
               }
           });
       }
   }, []);
 
-  // Sync Plan from Org State
+  // Sync Plan from Org State (Redundant safety check)
   useEffect(() => {
       if (orgPlanId !== null) {
           const planString = mapDbPlanIdToString(orgPlanId);
@@ -179,7 +181,8 @@ const App: React.FC = () => {
               setUserOrgId(data.organizacao);
               
               if (data.organizacao) {
-                  loadOrganization(data.organizacao);
+                  // Await ensures Plan ID is set BEFORE rendering main views
+                  await loadOrganization(data.organizacao);
                   loadOpportunities(data.organizacao);
               }
 
@@ -187,11 +190,9 @@ const App: React.FC = () => {
               trackUserAccess(userId);
               const unsubPresence = subscribeToPresence(userId, (ids) => setOnlineUsers(ids));
               
-              // Fallback Plan check (Legacy support or if org has no plan yet)
-              // We only run this if orgPlanId is not yet set by loadOrganization
-              const plan = await getCurrentUserPlan(userId);
-              // Only override if orgPlanId is null (meaning loadOrganization didn't find one or wasn't authoritative)
+              // Only call fallback if orgPlanId was somehow not set by loadOrganization
               if (orgPlanId === null) {
+                  const plan = await getCurrentUserPlan(userId);
                   setCurrentPlan(plan);
               }
 
@@ -209,11 +210,12 @@ const App: React.FC = () => {
       const { data } = await supabase.from('organizacoes').select('*').eq('id', orgId).single();
       if (data) {
           // UPDATE APP STATE FOR PLAN ID
-          if (data.plano) {
-              setOrgPlanId(data.plano);
-          } else {
-              setOrgPlanId(4); // Default Free
-          }
+          const planId = data.plano || 4; // Default to Free (4) if null
+          setOrgPlanId(planId);
+          
+          // FORCE UPDATE CURRENT PLAN IMMEDIATELY (Source of Truth is Org Table)
+          const planString = mapDbPlanIdToString(planId);
+          setCurrentPlan(planString);
 
           setOrgDetails({
               name: data.nome,
@@ -223,7 +225,7 @@ const App: React.FC = () => {
               aiSector: data.setor || '',
               aiTone: data.tomdevoz || '',
               aiContext: data.dna || '',
-              isWhitelabelActive: data.plano === 10 // Enterprise Plan ID
+              isWhitelabelActive: planId === 10 // Enterprise Plan ID
           });
       }
   };
@@ -369,6 +371,8 @@ const App: React.FC = () => {
                 onToggleTheme={toggleTheme}
                 onLogout={handleLogout}
                 onSearch={(q) => console.log(q)}
+                // PASS FEEDBACK HANDLER
+                onOpenFeedback={() => setShowFeedback(true)}
                 theme={theme}
                 dbStatus={dbStatus}
                 isMobileOpen={isMobileOpen}
@@ -392,6 +396,8 @@ const App: React.FC = () => {
                 onToggleTheme={toggleTheme}
                 onLogout={handleLogout}
                 onSearch={(q) => console.log(q)}
+                // PASS FEEDBACK HANDLER
+                onOpenFeedback={() => setShowFeedback(true)}
                 theme={theme}
                 dbStatus={dbStatus}
                 isMobileOpen={isMobileOpen}
@@ -445,6 +451,8 @@ const App: React.FC = () => {
                                     organizationId={userOrgId || undefined}
                                     // WHITELABEL PROPS
                                     appBrandName={appBrandName}
+                                    whitelabel={isEnterprise}
+                                    onActivateWhitelabel={() => setView('settings')}
                                 />
                             </div>
                         )}
@@ -558,6 +566,14 @@ const App: React.FC = () => {
                 onClose={() => setShowCreateTask(false)}
                 onSave={handleCreateTask}
                 userRole={userRole}
+            />
+        )}
+
+        {/* FEEDBACK MODAL (NEW) */}
+        {showFeedback && user && (
+            <FeedbackModal 
+                userId={user.id} 
+                onClose={() => setShowFeedback(false)} 
             />
         )}
 

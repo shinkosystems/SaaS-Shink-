@@ -68,9 +68,9 @@ export const Dashboard: React.FC<Props> = ({
                     {userRole === 'dono' && whitelabel && (
                         <button 
                             onClick={onActivateWhitelabel}
-                            className="text-xs font-bold text-purple-500 bg-purple-500/10 px-3 py-1.5 rounded-full hover:bg-purple-500/20 transition-colors flex items-center gap-2"
+                            className="text-xs font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 px-4 py-2 rounded-xl hover:shadow-lg hover:scale-105 transition-all flex items-center gap-2 shadow-md"
                         >
-                            <Zap className="w-3 h-3"/> Configurar White Label
+                            <Zap className="w-3 h-3 text-yellow-300 fill-yellow-300"/> Configurar White Label
                         </button>
                     )}
                 </div>

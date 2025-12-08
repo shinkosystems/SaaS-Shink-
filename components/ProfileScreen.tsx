@@ -403,8 +403,8 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
                     <div>
                         <h3 className="text-lg font-bold text-slate-500 uppercase mb-6 tracking-wider">Planos Disponíveis</h3>
                         
-                        {/* Responsive Grid: Vertical on mobile, Horizontal on desktop */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 xl:flex xl:overflow-x-auto xl:pb-4 xl:gap-4 xl:no-scrollbar xl:snap-x gap-6">
+                        {/* Responsive Grid: Vertical on mobile, Grid on larger screens */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {availablePlans.map(plan => {
                                 const styles = getPlanStyle(plan.id);
                                 const isCurrent = currentPlan === plan.id;
@@ -412,7 +412,7 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
                                 return (
                                     <div 
                                         key={plan.id} 
-                                        className={`relative p-6 rounded-2xl border bg-white dark:bg-black flex flex-col justify-between xl:min-w-[300px] h-[480px] snap-center shadow-sm ${isCurrent ? 'border-amber-500 ring-1 ring-amber-500' : styles.border}`}
+                                        className={`relative p-6 rounded-2xl border bg-white dark:bg-black/40 flex flex-col justify-between min-h-[480px] shadow-sm ${isCurrent ? 'border-amber-500 ring-1 ring-amber-500 bg-amber-50 dark:bg-amber-900/10' : styles.border}`}
                                     >
                                         {isCurrent && (
                                             <div className="absolute top-4 right-4 bg-amber-500 text-black text-[10px] font-bold px-2 py-1 rounded uppercase">
@@ -450,7 +450,7 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
                                             disabled={isCurrent}
                                             className={`w-full py-3 rounded-lg text-sm font-bold mt-4 transition-colors ${
                                                 isCurrent
-                                                ? 'bg-slate-100 dark:bg-white/10 text-slate-400 dark:text-white/50 cursor-default'
+                                                ? 'bg-slate-200 dark:bg-white/10 text-slate-500 dark:text-white/50 cursor-default'
                                                 : styles.buttonColor + ' text-slate-900 dark:text-white shadow-sm border border-slate-200 dark:border-transparent'
                                         }`}>
                                             {isCurrent ? 'Plano Atual' : 'Selecionar'}
