@@ -1,7 +1,7 @@
-
 import { supabase } from './supabaseClient';
 import { DbPlan, FinancialTransaction } from '../types';
 import { fetchSubscriptionPlans } from './asaasService';
+import { updateOrgModules } from './organizationService';
 
 export interface AdminUser {
     id: string;
@@ -412,6 +412,36 @@ export const approveSubscription = async (transactionId: string, orgId: number):
         if (orgError) {
             console.error("Org update error:", orgError);
             throw new Error("Falha ao atualizar vencimento: " + orgError.message);
+        }
+
+        // 3. Provisionamento Automático (Módulos, Usuários, etc)
+        // Busca o metadata da transação para saber o que foi comprado
+        const { data: transData } = await supabase
+            .from('transacoes')
+            .select('metadata')
+            .eq('id', transactionId)
+            .single();
+
+        if (transData?.metadata) {
+            const meta = transData.metadata;
+            console.log("Provisionando com metadata:", meta);
+
+            // A. Atualiza Limite de Usuários
+            if (meta.users) {
+                await supabase
+                    .from('organizacoes')
+                    .update({ colaboradores: meta.users })
+                    .eq('id', orgId);
+            }
+
+            // B. Atualiza Módulos Ativos (Substitui os antigos pelo novo set)
+            if (meta.modules && Array.isArray(meta.modules)) {
+                // Ensure 'whitelabel' ID is mapped correctly inside updateOrgModules logic
+                await updateOrgModules(orgId, meta.modules);
+            }
+            
+            // C. Provisiona AI (opcional, se houver campo específico)
+            // if (meta.ai) { ... }
         }
 
         return { success: true };

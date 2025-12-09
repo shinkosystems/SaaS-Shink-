@@ -1,6 +1,3 @@
-
-
-
 import { AsaasPayment, SubscriptionPlan, AsaasSubscription } from '../types';
 import { supabase } from './supabaseClient';
 
@@ -229,7 +226,8 @@ export const uploadReceiptAndNotify = async (
     planId: string,
     planPrice: number,
     receiptFile: File,
-    description: string
+    description: string,
+    metadata?: any // NEW: Optional metadata for auto-provisioning
 ): Promise<{ success: boolean; error?: string }> => {
     try {
         const fileExt = receiptFile.name.split('.').pop();
@@ -259,7 +257,8 @@ export const uploadReceiptAndNotify = async (
                 category: 'Assinatura',
                 date: new Date().toISOString().split('T')[0],
                 pago: false,
-                comprovante: urlData.publicUrl
+                comprovante: urlData.publicUrl,
+                metadata: metadata // Save metadata JSON
             });
 
         if (insertError) throw new Error(`Erro ao salvar transação: ${insertError.message}`);

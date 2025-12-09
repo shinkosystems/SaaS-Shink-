@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { User, Mail, Phone, Building2, MapPin, Save, Camera, Shield, CreditCard, Loader2, UploadCloud, Check, X, Calendar, AlertTriangle, History, Zap, Lock, Calculator, Minus, Plus, HelpCircle, Clock, CheckCircle, XCircle, FileText } from 'lucide-react';
+import { User, Mail, Phone, Building2, MapPin, Save, Camera, Shield, CreditCard, Loader2, UploadCloud, Check, X, Calendar, AlertTriangle, History, Zap, Lock, Calculator, Minus, Plus, HelpCircle, Clock, CheckCircle, XCircle, FileText, Layers, BarChart3, TrendingUp, Code2, Users, DollarSign, Palette, Crown } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { fetchSubscriptionPlans, getPaymentHistory, calculateSubscriptionStatus, getUserSubscriptions, uploadReceiptAndNotify } from '../services/asaasService';
 import { createStripePaymentIntent } from '../services/stripeService';
@@ -14,15 +14,25 @@ const PIX_KEY = "60.428.589/0001-55"; // CNPJ
 const STRIPE_PUBLISHABLE_KEY = 'pk_test_PLACEHOLDER_KEY'; 
 const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
 
-// --- CONFIGURAÇÃO DE PREÇOS (BASEADA NA IMAGEM/OCR) ---
+// --- CONFIGURAÇÃO DE PREÇOS (PRICE ENGINE) ---
 const PRICING = {
-    USER_BASE: 89.90, // 1º Usuário
-    USER_EXTRA: 69.90, // N - 1
+    LICENSE: {
+        BASE: 89.90, // 1º Usuário
+        EXTRA: 69.90 // A partir do 2º
+    },
     AI: {
-        price: 199.00,
-        quotaPrice: 99.00,
-        baseQuota: 500
-    }
+        FIXED: 199.00, // Acesso Base
+        QUOTA_PRICE: 99.00, // Pacote Extra
+        BASE_QUOTA: 500
+    },
+    MODULES: [
+        { id: 'crm', label: 'CRM (Vendas)', price: 149.00, icon: TrendingUp, desc: 'Gestão de Pipeline e Receita' },
+        { id: 'financial', label: 'Financeiro', price: 149.00, icon: DollarSign, desc: 'Controle de Caixa e Faturamento' },
+        { id: 'clients', label: 'Clientes', price: 149.00, icon: Users, desc: 'Gestão de Stakeholders' },
+        { id: 'product', label: 'Produto (Métricas)', price: 199.00, icon: BarChart3, desc: 'Indicadores de Uso e NPS' },
+        { id: 'dora', label: 'Engenharia (DORA)', price: 299.00, icon: Code2, desc: 'Governança e Performance Tech' },
+        { id: 'whitelabel', label: 'Whitelabel (Agency)', price: 999.00, icon: Palette, desc: 'Marca Própria e Portal do Cliente' }
+    ]
 };
 
 interface Props {
@@ -130,32 +140,46 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
   const [calcUsers, setCalcUsers] = useState(1);
   const [calcAi, setCalcAi] = useState(false);
   const [calcAiExtra, setCalcAiExtra] = useState(0); // Extra quotas
+  const [calcModules, setCalcModules] = useState<string[]>([]); // Selected Module IDs
 
-  // --- CALCULATOR LOGIC (MEMOIZED) ---
+  // --- CALCULATOR LOGIC (PRICE ENGINE) ---
   const calculation = useMemo(() => {
-      // 1. License Cost
-      const licenseBase = PRICING.USER_BASE;
-      const licenseExtra = Math.max(0, calcUsers - 1) * PRICING.USER_EXTRA;
+      // 1. License Cost (Pilar I)
+      // Regra: 89.90 (1º usuário) + (N - 1) * 69.90
+      const licenseBase = PRICING.LICENSE.BASE; // 1st User
+      const extraUsersCount = Math.max(0, calcUsers - 1);
+      const licenseExtra = extraUsersCount * PRICING.LICENSE.EXTRA;
       const licenseTotal = licenseBase + licenseExtra;
 
-      // 2. AI Cost
-      const aiBase = calcAi ? PRICING.AI.price : 0;
-      const aiExtra = calcAi ? (calcAiExtra * PRICING.AI.quotaPrice) : 0;
-      const aiTotal = aiBase + aiExtra;
+      // 2. Fixed Modules Cost (Pilar II & IV)
+      const modulesTotal = calcModules.reduce((acc, modId) => {
+          const mod = PRICING.MODULES.find(m => m.id === modId);
+          return acc + (mod ? mod.price : 0);
+      }, 0);
 
-      const grandTotal = licenseTotal + aiTotal;
+      // 3. AI Cost (Pilar III)
+      const aiBase = calcAi ? PRICING.AI.FIXED : 0;
+      const aiExtraCost = calcAi ? (calcAiExtra * PRICING.AI.QUOTA_PRICE) : 0;
+      const aiTotal = aiBase + aiExtraCost;
+
+      const grandTotal = licenseTotal + modulesTotal + aiTotal;
 
       return {
           licenseTotal,
+          licenseBase,
+          licenseExtra,
+          modulesTotal,
           aiTotal,
+          aiBase,
+          aiExtraCost,
           grandTotal,
           details: {
               users: calcUsers,
-              extraUsers: Math.max(0, calcUsers - 1),
-              aiQuotas: 500 + (calcAiExtra * 500)
+              extraUsers: extraUsersCount,
+              aiQuotas: calcAi ? (PRICING.AI.BASE_QUOTA + (calcAiExtra * 500)) : 0
           }
       };
-  }, [calcUsers, calcAi, calcAiExtra]);
+  }, [calcUsers, calcAi, calcAiExtra, calcModules]);
 
   // Fetch User Data on Mount
   useEffect(() => {
@@ -270,6 +294,13 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
   // --- HANDLE CUSTOM PLAN SELECTION ---
   const handleCustomPlanCheckout = () => {
       const customFeatures = [`${calcUsers} Colaboradores`];
+      
+      // Add selected modules to features text
+      calcModules.forEach(modId => {
+          const mod = PRICING.MODULES.find(m => m.id === modId);
+          if (mod) customFeatures.push(mod.label);
+      });
+
       if (calcAi) customFeatures.push(`IA (${calculation.details.aiQuotas} cotas)`);
 
       const customPlan: SubscriptionPlan = {
@@ -283,6 +314,14 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
       };
 
       handlePlanSelection(customPlan);
+  };
+
+  const toggleModule = (modId: string) => {
+      if (calcModules.includes(modId)) {
+          setCalcModules(calcModules.filter(id => id !== modId));
+      } else {
+          setCalcModules([...calcModules, modId]);
+      }
   };
 
   const handleCloseModal = () => {
@@ -337,13 +376,14 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
     }
     setIsUploadingReceipt(true);
     try {
-        // Construct Detailed Description
+        // Construct Detailed Description for Admin
         let detailedDescription = '';
         if (selectedPlanForPayment.id === 'plan_custom') {
             const parts = [];
-            parts.push(`Assinatura Personalizada: ${calcUsers} Usuário(s)`);
-            if (calcAi) parts.push(`IA (${calculation.details.aiQuotas} cotas)`);
-            detailedDescription = parts.join(', ');
+            parts.push(`Usuários: ${calcUsers}`);
+            if (calcModules.length > 0) parts.push(`Módulos: ${calcModules.map(m => PRICING.MODULES.find(pm => pm.id === m)?.label).join(', ')}`);
+            if (calcAi) parts.push(`IA: ${calculation.details.aiQuotas} cotas`);
+            detailedDescription = `Assinatura Personalizada: ${parts.join(' | ')}`;
         } else {
             detailedDescription = `Assinatura Plano: ${selectedPlanForPayment.name}`;
         }
@@ -354,7 +394,14 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
             selectedPlanForPayment.id, 
             selectedPlanForPayment.price, 
             receiptFile,
-            detailedDescription
+            detailedDescription,
+            // Pass Metadata for Auto-Provisioning
+            {
+                modules: calcModules,
+                users: calcUsers,
+                ai: calcAi,
+                aiQuotas: calcAiExtra
+            }
         );
 
         if (result.success) {
@@ -561,13 +608,17 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
             {activeTab === 'workspace' && (
                  <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
                         <div className="animate-in fade-in slide-in-from-bottom-4">
+                            <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6">Price Engine <span className="text-slate-400 font-medium text-lg">v2.0</span></h2>
+                            
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                 
                                 {/* Controls */}
                                 <div className="space-y-8">
+                                    
+                                    {/* 1. Licenças */}
                                     <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-900/50">
-                                        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-                                            <User className="w-5 h-5 text-blue-500"/> Usuários & Licenças
+                                        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2 border-b border-slate-200 dark:border-white/10 pb-2">
+                                            <User className="w-5 h-5 text-blue-500"/> 1. Custo de Licença (Obrigatório)
                                         </h3>
                                         <div className="mb-6">
                                             <div className="flex justify-between mb-2">
@@ -582,16 +633,60 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
                                                 onChange={(e) => setCalcUsers(parseInt(e.target.value))}
                                                 className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
                                             />
-                                            <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/10 rounded-lg text-xs text-slate-600 dark:text-slate-400 border border-blue-100 dark:border-blue-900/20">
-                                                <strong>Regra de Cálculo:</strong> R$ 89,90 (1º usuário) + R$ 69,90 por usuário extra.
+                                            <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/10 rounded-lg text-xs text-slate-600 dark:text-slate-400 border border-blue-100 dark:border-blue-900/20 grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <span className="font-bold block">1º Usuário (Base)</span>
+                                                    R$ 89,90/mês
+                                                </div>
+                                                <div>
+                                                    <span className="font-bold block">Extra (N-1)</span>
+                                                    R$ 69,90/mês cada
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
 
+                                    {/* 2. Módulos Premium */}
                                     <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-900/50">
-                                        <div className="flex items-center justify-between mb-4">
+                                        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2 border-b border-slate-200 dark:border-white/10 pb-2">
+                                            <Layers className="w-5 h-5 text-purple-500"/> 2. Módulos Premium (Fixos)
+                                        </h3>
+                                        <div className="space-y-3">
+                                            {PRICING.MODULES.filter(m => m.id !== 'whitelabel').map(module => (
+                                                <div 
+                                                    key={module.id}
+                                                    onClick={() => toggleModule(module.id)}
+                                                    className={`p-4 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
+                                                        calcModules.includes(module.id) 
+                                                        ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-500 shadow-sm' 
+                                                        : 'bg-white dark:bg-black/20 border-slate-200 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/20'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`p-2 rounded-lg ${calcModules.includes(module.id) ? 'bg-purple-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'}`}>
+                                                            <module.icon className="w-4 h-4"/>
+                                                        </div>
+                                                        <div>
+                                                            <div className="font-bold text-sm text-slate-900 dark:text-white">{module.label}</div>
+                                                            <div className="text-[10px] text-slate-500">{module.desc}</div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <div className={`font-bold text-sm ${calcModules.includes(module.id) ? 'text-purple-600 dark:text-purple-400' : 'text-slate-500'}`}>
+                                                            R$ {module.price.toFixed(2)}
+                                                        </div>
+                                                        {calcModules.includes(module.id) && <CheckCircle className="w-4 h-4 text-purple-500 ml-auto mt-1"/>}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* 3. AI */}
+                                    <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-900/50">
+                                        <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-200 dark:border-white/10">
                                             <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                                <Zap className="w-5 h-5 text-yellow-500"/> Módulo Inteligência Artificial
+                                                <Zap className="w-5 h-5 text-yellow-500"/> 3. Inteligência Artificial
                                             </h3>
                                             <div 
                                                 className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-colors ${calcAi ? 'bg-yellow-500' : 'bg-slate-300 dark:bg-slate-700'}`}
@@ -623,6 +718,38 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
                                             </div>
                                         </div>
                                     </div>
+
+                                    {/* 4. Whitelabel (PILAR IV) */}
+                                    <div className="glass-panel p-6 rounded-2xl border border-amber-500/30 bg-amber-500/5">
+                                        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2 border-b border-amber-500/20 pb-2">
+                                            <Crown className="w-5 h-5 text-amber-500"/> 4. Whitelabel (Alto Valor)
+                                        </h3>
+                                        <div 
+                                            onClick={() => toggleModule('whitelabel')}
+                                            className={`p-4 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
+                                                calcModules.includes('whitelabel') 
+                                                ? 'bg-amber-100 dark:bg-amber-900/30 border-amber-500 shadow-md' 
+                                                : 'bg-white dark:bg-black/20 border-slate-200 dark:border-white/5 hover:border-amber-500/50'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className={`p-2 rounded-lg ${calcModules.includes('whitelabel') ? 'bg-amber-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'}`}>
+                                                    <Palette className="w-4 h-4"/>
+                                                </div>
+                                                <div>
+                                                    <div className="font-bold text-sm text-slate-900 dark:text-white">Whitelabel (Agency)</div>
+                                                    <div className="text-[10px] text-slate-500">Marca Própria e Portal do Cliente</div>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className={`font-bold text-sm ${calcModules.includes('whitelabel') ? 'text-amber-600 dark:text-amber-400' : 'text-slate-500'}`}>
+                                                    R$ 999,00
+                                                </div>
+                                                {calcModules.includes('whitelabel') && <CheckCircle className="w-4 h-4 text-amber-500 ml-auto mt-1"/>}
+                                            </div>
+                                        </div>
+                                    </div>
+
                                 </div>
 
                                 {/* Receipt / Summary */}
@@ -633,20 +760,20 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
                                         
                                         <div className="p-8">
                                             <h3 className="text-center text-xl font-black text-slate-900 dark:text-white uppercase tracking-widest mb-1 border-b-2 border-slate-900 dark:border-white pb-4">
-                                                Resumo do Plano
+                                                Simulação de Custo
                                             </h3>
                                             <div className="text-center text-xs text-slate-500 mt-2 mb-6 font-mono">
-                                                {new Date().toLocaleDateString()} • CALCULADORA SHINKŌ
+                                                {new Date().toLocaleDateString()} • {calcUsers} Usuários • {calcModules.length} Módulos
                                             </div>
 
                                             <div className="space-y-4 text-sm">
+                                                
                                                 {/* License Breakdown */}
                                                 <div className="flex justify-between items-start pb-4 border-b border-slate-100 dark:border-white/5 border-dashed">
                                                     <div>
-                                                        <div className="font-bold text-slate-800 dark:text-slate-200">Licenças de Usuário ({calcUsers})</div>
+                                                        <div className="font-bold text-slate-800 dark:text-slate-200">Licenças de Usuário</div>
                                                         <div className="text-xs text-slate-500 mt-1 pl-2">
-                                                            <div>1x Base (R$ 89,90)</div>
-                                                            {calcUsers > 1 && <div>{calcUsers - 1}x Extra (R$ 69,90)</div>}
+                                                            <div>R$ 89,90 + ({calculation.details.extraUsers} x R$ 69,90)</div>
                                                         </div>
                                                     </div>
                                                     <div className="font-mono font-bold text-slate-900 dark:text-white">
@@ -654,14 +781,28 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
                                                     </div>
                                                 </div>
 
+                                                {/* Modules Breakdown */}
+                                                {calcModules.map(modId => {
+                                                    const mod = PRICING.MODULES.find(m => m.id === modId);
+                                                    return (
+                                                        <div key={modId} className="flex justify-between items-start pb-2 border-b border-slate-100 dark:border-white/5 border-dashed">
+                                                            <div className="font-bold text-slate-800 dark:text-slate-200">
+                                                                Módulo {mod?.label.split('(')[0].trim()} (Fixo)
+                                                            </div>
+                                                            <div className="font-mono font-bold text-slate-900 dark:text-white">
+                                                                R$ {mod?.price.toFixed(2)}
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                })}
+
                                                 {/* AI Breakdown */}
                                                 {calcAi && (
                                                     <div className="flex justify-between items-start pb-4 border-b border-slate-100 dark:border-white/5 border-dashed">
                                                         <div>
-                                                            <div className="font-bold text-slate-800 dark:text-slate-200">Módulo IA</div>
+                                                            <div className="font-bold text-slate-800 dark:text-slate-200">Módulo IA (Fixo)</div>
                                                             <div className="text-xs text-slate-500 mt-1 pl-2">
-                                                                <div>Base (+R$ 199,00)</div>
-                                                                {calcAiExtra > 0 && <div>{calcAiExtra}x Cotas Extras (+R$ {(calcAiExtra * 99).toFixed(2)})</div>}
+                                                                <div>Base + {calcAiExtra} Pcts Extras</div>
                                                             </div>
                                                         </div>
                                                         <div className="font-mono font-bold text-slate-900 dark:text-white">
@@ -672,7 +813,7 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
                                             </div>
 
                                             <div className="mt-8 pt-4 border-t-2 border-slate-900 dark:border-white flex justify-between items-end">
-                                                <div className="text-xs font-bold text-slate-500 uppercase">Custo Mensal Total</div>
+                                                <div className="text-xs font-bold text-slate-500 uppercase">Custo Mínimo Total</div>
                                                 <div className="text-3xl font-black text-slate-900 dark:text-white">
                                                     R$ {calculation.grandTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                                 </div>

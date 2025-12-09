@@ -1,4 +1,3 @@
-
 import { supabase } from './supabaseClient';
 import { PLAN_LIMITS } from '../types';
 
@@ -8,7 +7,7 @@ const LOGO_BUCKET = 'fotoperfil';
 // System Modules Definition (Keys used for logic)
 // Estes devem corresponder exatamente aos IDs usados no Frontend (SettingsScreen)
 const SYSTEM_MODULES_DEF = [
-    'projects', 'kanban', 'gantt', 'calendar', 'crm', 'financial', 'clients', 'engineering', 'product', 'ia'
+    'projects', 'kanban', 'gantt', 'calendar', 'crm', 'financial', 'clients', 'engineering', 'product', 'ia', 'whitelabel'
 ];
 
 // Helper to determine plan string from ID
