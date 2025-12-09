@@ -4,7 +4,7 @@ import {
     ArrowRight, Sparkles, Rocket, CheckCircle, Star, Quote, 
     Play, BarChart3, Users, DollarSign, Code2, 
     Workflow, Calendar, Zap, Layout, Layers, BrainCircuit, 
-    Activity, TrendingUp, Check, Shield
+    Activity, TrendingUp, Check, Shield, Smartphone, Palette, Globe
 } from 'lucide-react';
 import { CasesGallery } from './CasesGallery';
 
@@ -21,10 +21,6 @@ export const LandingPage: React.FC<Props> = ({ onEnter, customName, customLogo, 
   // Fallback defaults
   const brandName = customName || "Shinkō OS";
   const primaryColor = customColor || "#F59E0B";
-
-  // Dynamic Style Injection for Whitelabel
-  const buttonStyle = { backgroundColor: primaryColor, color: '#000', borderColor: primaryColor };
-  const textStyle = { color: primaryColor };
 
   const plans = [
       {
@@ -436,27 +432,144 @@ export const LandingPage: React.FC<Props> = ({ onEnter, customName, customLogo, 
                       <Sparkles className="w-4 h-4"/> {brandName} AI
                   </div>
                   <h2 className="text-4xl md:text-6xl font-black mb-6">
-                      Seu copiloto de <span className="text-amber-500">Inteligência</span>.
+                      Seu copiloto de <span style={{ color: primaryColor }}>Inteligência</span>.
                   </h2>
                   <p className="text-xl text-slate-400 mb-12 max-w-2xl mx-auto">
                       A IA não é apenas um chat. Ela opera o sistema: quebra tarefas, estima prazos, otimiza sua agenda e lê contratos.
                   </p>
                   
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
-                      <div className="p-8 rounded-3xl bg-slate-900 border border-white/10 hover:border-amber-500/50 transition-colors shadow-xl">
-                          <Zap className="w-10 h-10 text-amber-500 mb-6"/>
+                      <div className="p-8 rounded-3xl bg-slate-900 border border-white/10 hover:border-amber-500/50 transition-colors shadow-xl group">
+                          <Zap className="w-10 h-10 mb-6" style={{ color: primaryColor }}/>
                           <h4 className="font-bold text-white text-xl">Otimização de Agenda</h4>
-                          <p className="text-sm text-slate-400 mt-3 leading-relaxed">A IA analisa a carga de trabalho de cada membro e realoca tarefas automaticamente para evitar gargalos.</p>
+                          <p className="text-sm text-slate-400 mt-3 leading-relaxed">A IA analisa a carga de trabalho de cada membro e realoca tarefas automaticamente.</p>
                       </div>
-                      <div className="p-8 rounded-3xl bg-slate-900 border border-white/10 hover:border-amber-500/50 transition-colors shadow-xl">
-                          <Layers className="w-10 h-10 text-amber-500 mb-6"/>
+                      <div className="p-8 rounded-3xl bg-slate-900 border border-white/10 hover:border-amber-500/50 transition-colors shadow-xl group">
+                          <Layers className="w-10 h-10 mb-6" style={{ color: primaryColor }}/>
                           <h4 className="font-bold text-white text-xl">Gerador de Escopo</h4>
                           <p className="text-sm text-slate-400 mt-3 leading-relaxed">Transforme um título vago ("Criar App") em um checklist técnico detalhado com horas estimadas.</p>
                       </div>
-                      <div className="p-8 rounded-3xl bg-slate-900 border border-white/10 hover:border-amber-500/50 transition-colors shadow-xl">
-                          <Shield className="w-10 h-10 text-amber-500 mb-6"/>
+                      <div className="p-8 rounded-3xl bg-slate-900 border border-white/10 hover:border-amber-500/50 transition-colors shadow-xl group">
+                          <Shield className="w-10 h-10 mb-6" style={{ color: primaryColor }}/>
                           <h4 className="font-bold text-white text-xl">Análise de Risco</h4>
-                          <p className="text-sm text-slate-400 mt-3 leading-relaxed">Antes de iniciar, a IA avalia a viabilidade e os riscos potenciais do projeto com base no histórico.</p>
+                          <p className="text-sm text-slate-400 mt-3 leading-relaxed">Antes de iniciar, a IA avalia a viabilidade e os riscos potenciais do projeto.</p>
+                      </div>
+                  </div>
+              </div>
+          </section>
+
+          {/* --- WHITE LABEL SECTION (NEW) --- */}
+          <section className="w-full py-32 bg-slate-950 border-t border-white/5 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-indigo-600/5 rounded-full blur-[120px] pointer-events-none"></div>
+              <div className="max-w-7xl mx-auto px-6 relative z-10">
+                  <div className="flex flex-col md:flex-row items-center gap-16">
+                      <div className="flex-1 space-y-8">
+                          <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-indigo-500/10 text-indigo-400 text-xs font-bold uppercase tracking-wider border border-indigo-500/20">
+                              <Palette className="w-4 h-4"/> White Label & Identidade
+                          </div>
+                          <h2 className="text-4xl md:text-5xl font-black leading-tight">
+                              Sua Marca, <br/><span className="text-indigo-500">Nossa Tecnologia</span>.
+                          </h2>
+                          <p className="text-slate-400 text-lg leading-relaxed">
+                              Personalize o Shinkō OS com seu logotipo, cores e domínio. Entregue uma experiência premium para seus clientes e colaboradores como se o software fosse seu.
+                          </p>
+                          <ul className="space-y-4">
+                              <li className="flex items-center gap-3 text-slate-300">
+                                  <div className="w-6 h-6 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400"><Check className="w-4 h-4"/></div>
+                                  <span>Logotipo personalizado na interface e login</span>
+                              </li>
+                              <li className="flex items-center gap-3 text-slate-300">
+                                  <div className="w-6 h-6 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400"><Check className="w-4 h-4"/></div>
+                                  <span>Esquema de cores da sua marca</span>
+                              </li>
+                              <li className="flex items-center gap-3 text-slate-300">
+                                  <div className="w-6 h-6 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400"><Check className="w-4 h-4"/></div>
+                                  <span>Domínio e links de convite personalizados</span>
+                              </li>
+                          </ul>
+                      </div>
+                      
+                      <div className="flex-1 w-full relative group">
+                          {/* Card Example */}
+                          <div className="relative z-10 bg-white rounded-2xl p-6 shadow-2xl transform rotate-3 group-hover:rotate-0 transition-transform duration-500 border border-slate-200">
+                              <div className="flex items-center justify-between mb-6 border-b border-slate-100 pb-4">
+                                  <div className="flex items-center gap-2">
+                                      <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold">A</div>
+                                      <span className="font-bold text-slate-900">Acme Corp</span>
+                                  </div>
+                                  <div className="w-8 h-8 rounded-full bg-slate-100"></div>
+                              </div>
+                              <div className="space-y-4">
+                                  <div className="h-32 bg-slate-50 rounded-xl border-2 border-dashed border-slate-200 flex items-center justify-center text-slate-400 text-xs font-bold uppercase tracking-wider">
+                                      Área do Cliente
+                                  </div>
+                                  <div className="flex gap-2">
+                                      <div className="h-8 w-1/3 bg-indigo-600 rounded-lg"></div>
+                                      <div className="h-8 w-2/3 bg-slate-100 rounded-lg"></div>
+                                  </div>
+                              </div>
+                          </div>
+                          
+                          {/* Background Glow */}
+                          <div className="absolute inset-0 bg-indigo-500/20 blur-3xl -z-10 transform scale-110"></div>
+                      </div>
+                  </div>
+              </div>
+          </section>
+
+          {/* --- MOBILE SECTION (NEW) --- */}
+          <section className="w-full py-24 bg-slate-900/50 border-t border-white/5">
+              <div className="max-w-7xl mx-auto px-6">
+                  <div className="flex flex-col md:flex-row-reverse items-center gap-20">
+                      <div className="flex-1 space-y-8">
+                          <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-slate-800 text-slate-300 text-xs font-bold uppercase tracking-wider border border-white/10">
+                              <Smartphone className="w-4 h-4"/> Mobile Command Center
+                          </div>
+                          <h2 className="text-4xl md:text-5xl font-black leading-tight text-white">
+                              Gestão Total na <br/>Palma da Mão.
+                          </h2>
+                          <p className="text-slate-400 text-lg leading-relaxed">
+                              Não espere chegar ao escritório. Aprove tarefas, verifique métricas financeiras e responda ao time diretamente do celular com nossa interface 100% responsiva.
+                          </p>
+                          <div className="flex gap-4">
+                              <div className="flex flex-col items-center bg-slate-900 p-4 rounded-xl border border-white/5 w-32">
+                                  <Activity className="w-6 h-6 text-emerald-500 mb-2"/>
+                                  <span className="text-xs font-bold text-white">KPIs Reais</span>
+                              </div>
+                              <div className="flex flex-col items-center bg-slate-900 p-4 rounded-xl border border-white/5 w-32">
+                                  <Globe className="w-6 h-6 text-blue-500 mb-2"/>
+                                  <span className="text-xs font-bold text-white">De Qualquer Lugar</span>
+                              </div>
+                          </div>
+                      </div>
+                      
+                      <div className="flex-1 flex justify-center">
+                          <div className="relative w-[300px] h-[600px] bg-slate-950 rounded-[40px] border-8 border-slate-800 shadow-2xl overflow-hidden">
+                              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-slate-800 rounded-b-xl z-20"></div>
+                              
+                              {/* Mobile Screen Mockup */}
+                              <div className="w-full h-full bg-slate-900 overflow-y-auto pt-10 px-4 pb-4 custom-scrollbar">
+                                  <div className="flex justify-between items-center mb-6">
+                                      <div className="w-8 h-8 rounded bg-gradient-to-br from-amber-500 to-orange-600"></div>
+                                      <div className="w-8 h-8 rounded-full bg-slate-800"></div>
+                                  </div>
+                                  <div className="space-y-4">
+                                      <div className="p-4 bg-slate-800 rounded-xl border border-white/5">
+                                          <div className="h-4 w-24 bg-slate-700 rounded mb-2"></div>
+                                          <div className="h-8 w-16 bg-slate-700 rounded"></div>
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-4">
+                                          <div className="p-4 bg-slate-800 rounded-xl border border-white/5 h-24"></div>
+                                          <div className="p-4 bg-slate-800 rounded-xl border border-white/5 h-24"></div>
+                                      </div>
+                                      <div className="p-4 bg-slate-800 rounded-xl border border-white/5 space-y-2">
+                                          <div className="h-10 w-full bg-slate-700/50 rounded"></div>
+                                          <div className="h-10 w-full bg-slate-700/50 rounded"></div>
+                                          <div className="h-10 w-full bg-slate-700/50 rounded"></div>
+                                      </div>
+                                  </div>
+                              </div>
+                          </div>
                       </div>
                   </div>
               </div>

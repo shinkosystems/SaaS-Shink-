@@ -1,6 +1,7 @@
 
 import { supabase } from './supabaseClient';
 import { DbPlan } from '../types';
+import { fetchSubscriptionPlans } from './asaasService';
 
 export interface AdminUser {
     id: string;
@@ -38,11 +39,20 @@ export interface GlobalMetrics {
 
 export const fetchPlans = async (): Promise<DbPlan[]> => {
     try {
-        const { data, error } = await supabase.from('planos').select('*').order('valor');
-        if (error) throw error;
-        return data as DbPlan[];
-    } catch (error) {
-        console.error('Error fetching plans:', error);
+        // Use the robust service from asaasService which has fallbacks
+        const plans = await fetchSubscriptionPlans();
+        
+        // Map SubscriptionPlan back to DbPlan format for admin usage
+        return plans.map(p => ({
+            id: p.dbId || 0,
+            nome: p.name,
+            valor: p.price,
+            meses: p.cycle === 'YEARLY' ? 12 : 1,
+            descricao: p.features.join('\n'),
+            colabtotal: 0 // Not strictly needed for display
+        }));
+    } catch (error: any) {
+        console.error('Error fetching plans:', error.message || error);
         return [];
     }
 }
@@ -51,100 +61,104 @@ export const fetchGlobalMetrics = async (startDate?: string, endDate?: string): 
     try {
         const start = startDate ? new Date(startDate) : new Date(new Date().getFullYear(), 0, 1); // Default: start of year
         
-        // FIX: Adjust end date to cover the full day (23:59:59)
         const end = endDate ? new Date(endDate) : new Date(); 
         end.setHours(23, 59, 59, 999);
 
         // 1. Financial Metrics (Historical MRR from Subscription History)
-        // We look for plans that were active during the period (overlap logic)
-        // datainicio <= end AND (datafim >= start OR datafim IS NULL)
-        let query = supabase
-            .from('cliente_plano')
-            .select('valor, datainicio, datafim, dono');
+        let totalMrr = 0;
+        let activeClients = 0;
+        let avgTicket = 0;
 
-        // Optimizing: Only fetch records that started before the end of the period
-        query = query.lte('datainicio', end.toISOString());
-        
-        const { data: historyData, error: historyError } = await query;
-        if (historyError) throw historyError;
+        try {
+            let query = supabase
+                .from('cliente_plano')
+                .select('valor, datainicio, datafim, dono');
 
-        // Filter overlap in memory to be safe with null dates
-        const activeInPeriod = historyData?.filter(h => {
-            const hStart = new Date(h.datainicio);
-            const hEnd = h.datafim ? new Date(h.datafim) : new Date('2099-12-31');
-            return hStart <= end && hEnd >= start;
-        }) || [];
-
-        // Unique Active Clients in Period
-        const uniqueClients = new Set(activeInPeriod.map(h => h.dono));
-        const activeClients = uniqueClients.size;
-
-        // MRR Calculation (Sum of latest value for each client in period)
-        // Strategy: "Exit MRR" (MRR at the end of the period)
-        const exitMrrData = historyData?.filter(h => {
-            const hStart = new Date(h.datainicio);
-            const hEnd = h.datafim ? new Date(h.datafim) : new Date('2099-12-31');
-            // Active AT the end date of the filter
-            return hStart <= end && hEnd >= end;
-        }) || [];
-        
-        // Dedup: if multiple plans for same user (rare but possible), take distinct sum
-        const activeMap = new Map<string, number>();
-        exitMrrData.forEach(h => activeMap.set(h.dono, h.valor));
-        const totalMrr = Array.from(activeMap.values()).reduce((a, b) => a + b, 0);
-
-        const avgTicket = activeClients > 0 ? totalMrr / activeClients : 0;
-
-        // 2. Churn Rate
-        // Simplified: Count users blocked currently. 
-        // Ideally we would check users blocked WITHIN the date range, but 'status' is current state.
-        // We use total blocked count as a proxy for all-time churn rate relative to total users.
-        const { count: churnedCount } = await supabase
-            .from('users')
-            .select('*', { count: 'exact', head: true })
-            .eq('status', 'Bloqueado');
-        
-        const { count: allTimeCustomers } = await supabase
-            .from('users')
-            .select('*', { count: 'exact', head: true })
-            .eq('perfil', 'dono');
+            query = query.lte('datainicio', end.toISOString());
             
-        const churnRate = allTimeCustomers ? (churnedCount || 0) / allTimeCustomers * 100 : 0;
+            const { data: historyData, error: historyError } = await query;
+            if (historyError) throw historyError;
 
-        // Calculate LTV
-        const churnDecimal = churnRate === 0 ? 0.01 : (churnRate / 100);
-        const ltv = avgTicket / churnDecimal;
+            if (historyData) {
+                // Filter overlap in memory
+                const activeInPeriod = historyData.filter(h => {
+                    const hStart = new Date(h.datainicio);
+                    const hEnd = h.datafim ? new Date(h.datafim) : new Date('2099-12-31');
+                    return hStart <= end && hEnd >= start;
+                });
 
-        // 3. Total Users (Growth in Period)
-        let userQuery = supabase.from('users').select('created_at', { count: 'exact' });
-        if (startDate) userQuery = userQuery.gte('created_at', start.toISOString());
-        // Use adjusted end date
-        if (endDate) userQuery = userQuery.lte('created_at', end.toISOString());
-        const { count: usersInPeriod } = await userQuery;
+                const uniqueClients = new Set(activeInPeriod.map(h => h.dono));
+                activeClients = uniqueClients.size;
 
-        const { count: totalUsersAbsolute } = await supabase.from('users').select('*', { count: 'exact', head: true });
-
-        // 4. Product Metrics (NPS in Period)
-        let npsQuery = supabase.from('nps').select('nota');
-        if (startDate) npsQuery = npsQuery.gte('created_at', start.toISOString());
-        if (endDate) npsQuery = npsQuery.lte('created_at', end.toISOString());
-        const { data: npsData } = await npsQuery;
-        
-        let npsScore = 0;
-        if (npsData && npsData.length > 0) {
-            const promoters = npsData.filter(n => n.nota >= 9).length;
-            const detractors = npsData.filter(n => n.nota <= 6).length;
-            npsScore = ((promoters - detractors) / npsData.length) * 100;
+                // MRR Calculation (Exit MRR)
+                const exitMrrData = historyData.filter(h => {
+                    const hStart = new Date(h.datainicio);
+                    const hEnd = h.datafim ? new Date(h.datafim) : new Date('2099-12-31');
+                    return hStart <= end && hEnd >= end;
+                });
+                
+                const activeMap = new Map<string, number>();
+                exitMrrData.forEach(h => activeMap.set(h.dono, h.valor));
+                totalMrr = Array.from(activeMap.values()).reduce((a, b) => a + b, 0);
+                avgTicket = activeClients > 0 ? totalMrr / activeClients : 0;
+            }
+        } catch (err: any) {
+            console.warn("Erro parcial (Financeiro):", err.message);
         }
 
-        // 5. Engagement (Simulated based on period length)
+        // 2. Churn & LTV
+        let churnRate = 0;
+        let ltv = 0;
+        try {
+            const { count: churnedCount } = await supabase
+                .from('users')
+                .select('*', { count: 'exact', head: true })
+                .eq('status', 'Bloqueado');
+            
+            const { count: allTimeCustomers } = await supabase
+                .from('users')
+                .select('*', { count: 'exact', head: true })
+                .eq('perfil', 'dono');
+                
+            churnRate = allTimeCustomers ? (churnedCount || 0) / allTimeCustomers * 100 : 0;
+            const churnDecimal = churnRate === 0 ? 0.01 : (churnRate / 100);
+            ltv = avgTicket / churnDecimal;
+        } catch (err) {}
+
+        // 3. Total Users
+        let totalUsers = 0;
+        try {
+            let userQuery = supabase.from('users').select('created_at', { count: 'exact' });
+            if (startDate) userQuery = userQuery.gte('created_at', start.toISOString());
+            if (endDate) userQuery = userQuery.lte('created_at', end.toISOString());
+            const { count } = await userQuery;
+            totalUsers = count || 0;
+        } catch (err) {}
+
+        // 4. NPS
+        let npsScore = 0;
+        try {
+            let npsQuery = supabase.from('nps').select('nota');
+            if (startDate) npsQuery = npsQuery.gte('created_at', start.toISOString());
+            if (endDate) npsQuery = npsQuery.lte('created_at', end.toISOString());
+            const { data: npsData } = await npsQuery;
+            
+            if (npsData && npsData.length > 0) {
+                const promoters = npsData.filter(n => n.nota >= 9).length;
+                const detractors = npsData.filter(n => n.nota <= 6).length;
+                npsScore = ((promoters - detractors) / npsData.length) * 100;
+            }
+        } catch (err) {}
+
+        // 5. Engagement (Simulated/Proxy)
+        const { count: totalUsersAbsolute } = await supabase.from('users').select('*', { count: 'exact', head: true });
         const mau = Math.floor((totalUsersAbsolute || 0) * 0.85);
         const dau = Math.floor(mau * 0.42);
 
         return {
             totalMrr,
             activeClients,
-            totalUsers: usersInPeriod || 0,
+            totalUsers,
             avgTicket,
             npsScore: Math.round(npsScore),
             churnRate,
@@ -152,9 +166,8 @@ export const fetchGlobalMetrics = async (startDate?: string, endDate?: string): 
             dau,
             mau
         };
-    } catch (e) {
-        console.error("Erro ao calcular métricas globais:", e);
-        // Return zeroed data to prevent UI crash
+    } catch (e: any) {
+        console.error("Erro crítico em métricas globais:", e.message || e);
         return { 
             totalMrr: 0, activeClients: 0, totalUsers: 0, avgTicket: 0,
             npsScore: 0, churnRate: 0, ltv: 0, dau: 0, mau: 0
@@ -164,54 +177,65 @@ export const fetchGlobalMetrics = async (startDate?: string, endDate?: string): 
 
 export const fetchAllOwners = async (): Promise<AdminUser[]> => {
     try {
-        const { data: users, error } = await supabase
+        // 1. Fetch Users directly (Dono only)
+        const { data: users, error: userError } = await supabase
             .from('users')
-            .select(`
-                *,
-                organizacoes (
-                    id,
-                    nome,
-                    colaboradores,
-                    plano
-                )
-            `)
+            .select('*')
             .eq('perfil', 'dono')
             .order('nome');
 
-        if (error) throw error;
+        if (userError) throw userError;
+        if (!users) return [];
 
-        // Fetch Plans to map ID to Name efficiently
-        const { data: plans } = await supabase.from('planos').select('id, nome');
-        const planMap = new Map();
-        plans?.forEach(p => planMap.set(p.id, p.nome));
-
-        const userIds = users.map((u: any) => u.id);
-        let subs: any[] = [];
+        // 2. Fetch Organizations Manually (Avoids Relationship Errors)
+        const orgIds = [...new Set(users.map((u: any) => u.organizacao).filter(Boolean))];
+        let orgMap = new Map<number, any>();
         
-        if (userIds.length > 0) {
-            const { data } = await supabase
-                .from('cliente_plano')
-                .select(`
-                    dono,
-                    datainicio,
-                    datafim,
-                    plano (
-                        id,
-                        nome
-                    )
-                `)
-                .in('dono', userIds)
-                .order('created_at', { ascending: false });
-            subs = data || [];
+        if (orgIds.length > 0) {
+            const { data: orgs, error: orgError } = await supabase
+                .from('organizacoes')
+                .select('id, nome, colaboradores, plano')
+                .in('id', orgIds);
+                
+            if (!orgError && orgs) {
+                orgs.forEach((o: any) => orgMap.set(o.id, o));
+            }
         }
 
-        const mappedUsers = users.map((u: any) => {
-            const latestSub: any = subs.find((s: any) => s.dono === u.id);
-            const orgData = Array.isArray(u.organizacoes) ? u.organizacoes[0] : u.organizacoes;
+        // 3. Fetch Plans to map ID to Name
+        const plans = await fetchPlans(); 
+        const planMap = new Map();
+        plans.forEach(p => planMap.set(p.id, p.nome));
+
+        // 4. Fetch Subscriptions (Manual Join)
+        const userIds = users.map((u: any) => u.id);
+        let subMap = new Map();
+        
+        if (userIds.length > 0) {
+            const { data: subs, error: subError } = await supabase
+                .from('cliente_plano')
+                .select('dono, datainicio, datafim, plano') // Fetch plano ID directly
+                .in('dono', userIds)
+                .order('created_at', { ascending: false });
+                
+            if (!subError && subs) {
+                // Keep only the first (latest) for each user
+                subs.forEach((s: any) => {
+                    if(!subMap.has(s.dono)) {
+                        subMap.set(s.dono, s);
+                    }
+                });
+            }
+        }
+
+        // 5. Map & Merge Data
+        return users.map((u: any) => {
+            const org = orgMap.get(u.organizacao) || {};
+            const sub = subMap.get(u.id);
             
-            // Priority: Org Plan -> Latest History Plan
-            const currentPlanId = orgData?.plano || latestSub?.plano?.id;
-            const currentPlanName = planMap.get(currentPlanId) || latestSub?.plano?.nome || 'Free';
+            // Priority: Org Plan ID -> Sub Plan ID -> Free
+            const currentPlanId = org.plano || sub?.plano;
+            const currentPlanName = planMap.get(currentPlanId) || 'Free';
 
             return {
                 id: u.id,
@@ -222,18 +246,17 @@ export const fetchAllOwners = async (): Promise<AdminUser[]> => {
                 status: u.status,
                 planName: currentPlanName,
                 currentPlanId: currentPlanId,
-                subscription_start: latestSub?.datainicio || null,
-                subscription_end: latestSub?.datafim || null,
-                orgName: orgData?.nome || 'N/A',
-                orgColaboradores: orgData?.colaboradores || 1,
+                subscription_start: sub?.datainicio || null,
+                subscription_end: sub?.datafim || null,
+                orgName: org.nome || 'N/A',
+                orgColaboradores: org.colaboradores || 1,
                 acessos: u.acessos || 0,
                 ultimo_acesso: u.ultimo_acesso || null
             };
         });
 
-        return mappedUsers;
-    } catch (e) {
-        console.error('Exceção ao buscar donos:', e);
+    } catch (e: any) {
+        console.error('Exceção ao buscar donos:', e.message || e);
         return [];
     }
 };
@@ -266,7 +289,6 @@ export const updateGlobalClientData = async (data: UpdatePayload): Promise<{ suc
         }
 
         // 2. Update Organization Info (Limit & Name)
-        // CRITICAL: We also update the plan directly on the Organization table here.
         if (data.orgId) {
             const orgUpdatePayload: any = {
                 nome: data.orgName,
@@ -301,14 +323,7 @@ export const updateGlobalClientData = async (data: UpdatePayload): Promise<{ suc
         
         const errors = results.filter(r => r.error);
         if (errors.length > 0) {
-            console.error("Erros parciais no update:", errors);
-            const errorMessages = errors.map(e => {
-                if (e.error) {
-                    return e.error.message || e.error.details || JSON.stringify(e.error);
-                }
-                return "Erro desconhecido";
-            });
-            
+            const errorMessages = errors.map(e => e.error?.message || "Erro desconhecido");
             return { success: false, msg: errorMessages.join('; ') };
         }
 
@@ -318,10 +333,6 @@ export const updateGlobalClientData = async (data: UpdatePayload): Promise<{ suc
         console.error('Exceção no serviço de update global:', err);
         return { success: false, msg: err.message || JSON.stringify(err) };
     }
-};
-
-export const updateUserSubscription = async (userId: string, data: { planId: number, start: string, end: string, value: number }): Promise<{ success: boolean, msg?: string }> => {
-    return { success: false, msg: "Função obsoleta. Use updateGlobalClientData." };
 };
 
 export const updateUserStatus = async (userId: string, newStatus: string): Promise<{ success: boolean }> => {

@@ -1,4 +1,6 @@
 
+
+
 import React, { useState, useEffect, Suspense } from 'react';
 import { supabase } from './services/supabaseClient';
 import { Opportunity, BpmnTask } from './types';
@@ -45,6 +47,9 @@ const App: React.FC = () => {
   
   // App State for Org Plan ID (Source of Truth)
   const [orgPlanId, setOrgPlanId] = useState<number | null>(null);
+
+  // Trial State
+  const [trialDaysRemaining, setTrialDaysRemaining] = useState<number | null>(null);
 
   const [view, setView] = useState<string>('dashboard');
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
@@ -210,25 +215,30 @@ const App: React.FC = () => {
       const { data } = await supabase.from('organizacoes').select('*').eq('id', orgId).single();
       if (data) {
           // UPDATE APP STATE FOR PLAN ID
-          let planId = Number(data.plano);
+          let planId = data.plano || 4; // Default to Free (4) if null
           
-          // Fallback: If no plan on org, check active subscription
-          if (!planId) {
-               const { data: sub } = await supabase
-                   .from('cliente_plano')
-                   .select('plano')
-                   .eq('organizacao', orgId)
-                   .gte('datafim', new Date().toISOString())
-                   .order('created_at', { ascending: false })
-                   .limit(1)
-                   .single();
-               
-               if (sub && sub.plano) {
-                   planId = Number(sub.plano);
-               }
+          // TRIAL LOGIC Check (IDs 6 and 8)
+          if (planId === 6 || planId === 8) {
+              const createdAt = new Date(data.created_at);
+              const now = new Date();
+              const diffTime = Math.abs(now.getTime() - createdAt.getTime());
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+              const remaining = 15 - diffDays;
+
+              if (remaining < 0) {
+                  // Trial Expired - Force Free Plan
+                  planId = 4;
+                  alert("Seu período de avaliação (Trial) de 15 dias expirou. Sua conta foi migrada para o plano Free. Faça um upgrade para continuar usando os recursos Enterprise.");
+                  setTrialDaysRemaining(null);
+              } else {
+                  // Active Trial
+                  setTrialDaysRemaining(remaining);
+                  // Plan ID stays 6 or 8, which maps to plan_trial (Enterprise features)
+              }
+          } else {
+              setTrialDaysRemaining(null);
           }
 
-          planId = planId || 4; // Default to Free (4) if null
           setOrgPlanId(planId);
           
           // FORCE UPDATE CURRENT PLAN IMMEDIATELY (Source of Truth is Org Table)
@@ -243,8 +253,8 @@ const App: React.FC = () => {
               aiSector: data.setor || '',
               aiTone: data.tomdevoz || '',
               aiContext: data.dna || '',
-              // Explicit check for ID 10 (Enterprise) or 5 (Agency) to unlock features
-              isWhitelabelActive: planId === 10 || planId === 5 
+              // Enterprise Plan ID is 10, but Trial (6 or 8) also unlocks whitelabel if active
+              isWhitelabelActive: planId === 10 || planId === 6 || planId === 8
           });
       }
   };
@@ -335,7 +345,7 @@ const App: React.FC = () => {
   };
 
   // --- WHITELABEL LOGIC ---
-  // If plan is Enterprise OR isWhitelabelActive (via link/db), override branding
+  // If plan is Enterprise OR isWhitelabelActive (via link), override branding
   const isEnterprise = currentPlan === 'plan_enterprise';
   const shouldUseWhitelabel = isEnterprise || orgDetails.isWhitelabelActive;
   
@@ -395,29 +405,38 @@ const App: React.FC = () => {
   return (
     <div className={`flex h-screen w-full bg-slate-100 dark:bg-black text-slate-900 dark:text-slate-100 transition-colors duration-300 ${theme}`}>
         
+        {/* Trial Banner */}
+        {trialDaysRemaining !== null && (
+            <div className="fixed top-0 left-0 right-0 z-[100] h-8 bg-gradient-to-r from-purple-600 to-pink-600 flex items-center justify-center text-white text-xs font-bold shadow-md">
+                <span>🔥 Modo Trial Enterprise Ativo: {trialDaysRemaining} dias restantes para testar tudo sem limites!</span>
+            </div>
+        )}
+
         {/* HIDE SIDEBAR IN SHARED MODE */}
         {!isSharedMode && (
-            <Sidebar 
-                currentView={view} 
-                onChangeView={setView} 
-                onOpenCreate={() => setShowCreate(true)}
-                onOpenCreateTask={() => setShowCreateTask(true)}
-                onToggleTheme={toggleTheme}
-                onLogout={handleLogout}
-                onSearch={(q) => console.log(q)}
-                // PASS FEEDBACK HANDLER
-                onOpenFeedback={() => setShowFeedback(true)}
-                theme={theme}
-                dbStatus={dbStatus}
-                isMobileOpen={isMobileOpen}
-                setIsMobileOpen={setIsMobileOpen}
-                userRole={userRole}
-                userData={userData || { name: 'Carregando...', avatar: null }}
-                currentPlan={currentPlan}
-                // WHITELABEL PROPS
-                customLogoUrl={appLogoUrl}
-                orgName={appBrandName}
-            />
+            <div className={trialDaysRemaining !== null ? 'mt-8' : ''}>
+                <Sidebar 
+                    currentView={view} 
+                    onChangeView={setView} 
+                    onOpenCreate={() => setShowCreate(true)}
+                    onOpenCreateTask={() => setShowCreateTask(true)}
+                    onToggleTheme={toggleTheme}
+                    onLogout={handleLogout}
+                    onSearch={(q) => console.log(q)}
+                    // PASS FEEDBACK HANDLER
+                    onOpenFeedback={() => setShowFeedback(true)}
+                    theme={theme}
+                    dbStatus={dbStatus}
+                    isMobileOpen={isMobileOpen}
+                    setIsMobileOpen={setIsMobileOpen}
+                    userRole={userRole}
+                    userData={userData || { name: 'Carregando...', avatar: null }}
+                    currentPlan={currentPlan}
+                    // WHITELABEL PROPS
+                    customLogoUrl={appLogoUrl}
+                    orgName={appBrandName}
+                />
+            </div>
         )}
         
         {/* HIDE MOBILE DRAWER IN SHARED MODE */}
@@ -446,7 +465,7 @@ const App: React.FC = () => {
         )}
 
         {/* Adjust Main Padding if Shared Mode (Remove mobile header spacing) */}
-        <main className={`flex-1 overflow-hidden relative ${!isSharedMode ? 'pt-16 xl:pt-0' : ''}`}>
+        <main className={`flex-1 overflow-hidden relative ${!isSharedMode ? 'pt-16 xl:pt-0' : ''} ${trialDaysRemaining !== null ? 'mt-8' : ''}`}>
             <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500"></div></div>}>
                 {selectedProject ? (
                     <ProjectWorkspace 

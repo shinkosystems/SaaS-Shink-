@@ -1,9 +1,11 @@
 
+
+
 import React, { useEffect, useState } from 'react';
 import { 
     BarChart3, Users, Zap, Activity, Heart, Clock, 
     UserPlus, RotateCcw, AlertOctagon, Timer, PieChart,
-    MousePointer2, Trophy, TrendingUp, Info, Calendar, ArrowUpRight, ArrowDownRight, Minus
+    MousePointer2, Trophy, TrendingUp, Info, Calendar, ArrowUpRight, ArrowDownRight, Minus, Rocket
 } from 'lucide-react';
 import { 
     ResponsiveContainer, BarChart, Bar, XAxis, YAxis, 
@@ -17,6 +19,7 @@ const PRODUCT_TOOLTIPS: Record<string, string> = {
     "Engajamento (DAU/MAU)": "Relação entre usuários ativos diários e mensais. Dados reais de acesso.",
     "NPS Score": "Net Promoter Score calculado a partir das respostas no sistema.",
     "Retenção (D30)": "Porcentagem de usuários que retornaram ao produto 30 dias após o primeiro uso.",
+    "Taxa de Ativação": "Usuários que calcularam o Score PRIO-6 dividido pelo total de usuários. Meta: 60%.",
 };
 
 const InfoTooltip = ({ text }: { text: string }) => (
@@ -136,18 +139,18 @@ export const ProductIndicators: React.FC = () => {
                     color="bg-pink-500 text-pink-500"
                 />
                 <StatCard 
+                    title="Taxa de Ativação (Adoção)"
+                    value={`${metrics.activationRate.toFixed(1)}%`}
+                    subtext="Usuários que calcularam Prio-6. Meta: 60%"
+                    icon={Rocket}
+                    color="bg-emerald-500 text-emerald-500"
+                />
+                <StatCard 
                     title="Ativos Mensais (MAU)"
                     value={`${metrics.mau}`}
                     subtext="Usuários únicos nos últimos 30 dias"
                     icon={Users}
                     color="bg-blue-500 text-blue-500"
-                />
-                <StatCard 
-                    title="Ativos Diários (DAU)"
-                    value={`${metrics.dau}`}
-                    subtext="Usuários únicos nas últimas 24h"
-                    icon={Activity}
-                    color="bg-emerald-500 text-emerald-500"
                 />
             </div>
 

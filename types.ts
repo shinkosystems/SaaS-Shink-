@@ -27,6 +27,7 @@ export enum IntensityLevel {
 // ID 2: Studio
 // ID 3: Governança (was Scale)
 // ID 5: Agency (Legacy - Now mostly mapped to Governance features but kept for compat)
+// ID 6, 8: Trial (Enterprise features for 15 days)
 // ID 10: Enterprise (Whitelabel & Full AI)
 
 export const PLAN_LIMITS: Record<string, { 
@@ -88,6 +89,20 @@ export const PLAN_LIMITS: Record<string, {
         maxUsers: 50,
         aiLimit: 9999,
         features: { financial: true, clients: true, metrics: true, pdfUpload: true, gantt: true, whitelabel: false, aiAdvanced: true }
+    },
+    'plan_trial': { // ID 6, 8 - Trial (15 days Enterprise)
+        maxProjects: 999999,
+        maxUsers: 999999,
+        aiLimit: 999999,
+        features: { 
+            financial: true, 
+            clients: true, 
+            metrics: true, 
+            pdfUpload: true, 
+            gantt: true, 
+            whitelabel: true, 
+            aiAdvanced: true 
+        }
     },
     'plan_enterprise': { // ID 10 - Enterprise - USO ILIMITADO
         maxProjects: 999999,

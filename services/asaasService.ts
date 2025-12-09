@@ -1,4 +1,6 @@
 
+
+
 import { AsaasPayment, SubscriptionPlan, AsaasSubscription } from '../types';
 import { supabase } from './supabaseClient';
 
@@ -130,8 +132,11 @@ export const calculateSubscriptionStatus = (lastPaymentDate: string | Date) => {
 export const mapDbPlanIdToString = (dbId: number | string): string => {
     const id = Number(dbId);
     
-    // Check for ID 10 specifically first
+    // Check for ID 10 specifically first (Enterprise)
     if (id === 10) return 'plan_enterprise';
+    
+    // Check for IDs 6 and 8 (TRIAL)
+    if (id === 6 || id === 8) return 'plan_trial';
     
     // Check for ID 5 (Agency - maps to legacy or enterprise features depending on logic)
     if (id === 5) return 'plan_agency';
