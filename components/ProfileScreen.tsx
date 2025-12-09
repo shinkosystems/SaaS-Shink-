@@ -35,6 +35,9 @@ const PRICING = {
     ]
 };
 
+// Módulos que SEMPRE devem estar ativos para qualquer plano pago
+const CORE_MODULES = ['projects', 'kanban', 'gantt', 'calendar'];
+
 interface Props {
   currentPlan: string;
   onRefresh: () => void;
@@ -389,8 +392,19 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
         }
 
         // Prepare Metadata for Auto Provisioning
+        // VITAL: Merge CORE_MODULES with selected calcModules so the user doesn't lose access to basics.
+        const mergedModules = [...CORE_MODULES, ...calcModules];
+        
+        // Ensure IA module key is present if AI is enabled
+        if (calcAi && !mergedModules.includes('ia')) {
+            mergedModules.push('ia');
+        }
+
+        // Deduplicate
+        const finalModules = [...new Set(mergedModules)];
+
         const metadata = {
-            modules: calcModules,
+            modules: finalModules, // Send full array of module keys
             users: calcUsers,
             ai: calcAi,
             aiQuotas: calcAiExtra
