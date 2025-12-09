@@ -360,7 +360,8 @@ export const fetchPendingApprovals = async (): Promise<FinancialTransaction[]> =
         .from('transacoes')
         .select('*, organizacoes(nome)')
         .eq('pago', false)
-        .not('comprovante', 'is', null) 
+        .not('comprovante', 'is', null)
+        .neq('comprovante', '') // Filter empty strings
         .order('date', { ascending: false });
 
     if (error) {
@@ -393,7 +394,8 @@ export const approveSubscription = async (transactionId: string, orgId: number):
         const { error: transError } = await supabase
             .from('transacoes')
             .update({ pago: true })
-            .eq('id', transactionId);
+            .eq('id', transactionId)
+            .select(); // Ensure we get confirmation
 
         if (transError) {
             console.error("Trans update error:", transError);
@@ -407,7 +409,8 @@ export const approveSubscription = async (transactionId: string, orgId: number):
         const { error: orgError } = await supabase
             .from('organizacoes')
             .update({ vencimento: newExpiry.toISOString() })
-            .eq('id', orgId);
+            .eq('id', orgId)
+            .select(); // Ensure confirmation
 
         if (orgError) {
             console.error("Org update error:", orgError);

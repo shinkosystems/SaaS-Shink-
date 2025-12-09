@@ -388,6 +388,14 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
             detailedDescription = `Assinatura Plano: ${selectedPlanForPayment.name}`;
         }
 
+        // Prepare Metadata for Auto Provisioning
+        const metadata = {
+            modules: calcModules,
+            users: calcUsers,
+            ai: calcAi,
+            aiQuotas: calcAiExtra
+        };
+
         const result = await uploadReceiptAndNotify(
             userId, 
             orgId,
@@ -395,13 +403,7 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
             selectedPlanForPayment.price, 
             receiptFile,
             detailedDescription,
-            // Pass Metadata for Auto-Provisioning
-            {
-                modules: calcModules,
-                users: calcUsers,
-                ai: calcAi,
-                aiQuotas: calcAiExtra
-            }
+            metadata // Pass Metadata here
         );
 
         if (result.success) {

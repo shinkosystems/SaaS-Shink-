@@ -361,3 +361,22 @@ export const checkAndIncrementAiUsage = async (orgId: number): Promise<{ success
         return { success: false, usage: 0, limit: 0 };
     }
 };
+
+// Helper for App.tsx fallback
+export const getPlanDefaultModules = (planId: number): string[] => {
+    const planKey = getPlanKeyFromId(planId);
+    const planConfig = PLAN_LIMITS[planKey];
+    
+    if (!planConfig) return ['projects', 'kanban'];
+
+    const modules = ['projects', 'kanban'];
+    if (planConfig.features.gantt) modules.push('gantt', 'calendar');
+    if (planConfig.features.financial) modules.push('financial');
+    if (planConfig.features.clients) modules.push('clients');
+    if (planConfig.features.metrics) modules.push('engineering', 'product');
+    if (planConfig.features.crm) modules.push('crm');
+    if (planConfig.features.aiAdvanced) modules.push('ia');
+    if (planConfig.features.whitelabel) modules.push('whitelabel');
+
+    return modules;
+};

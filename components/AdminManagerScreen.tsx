@@ -72,31 +72,33 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
         setIsLoadingApprovals(false);
     };
 
-    const handleApprove = async (transactionId: string, orgId: number) => {
+    const handleApprove = async (transactionId: string | number, orgId: number) => {
+        console.log("Clique em Aprovar detectado:", transactionId, orgId);
+
         if (!orgId) {
-            alert("Erro: ID da Organização inválido.");
+            alert("Erro crítico: ID da Organização inválido/não encontrado na transação.");
             return;
         }
 
-        if (!window.confirm("Confirmar aprovação e liberar acesso por 30 dias?")) return;
+        if (!window.confirm("Confirmar aprovação do pagamento?\nIsso liberará o acesso e estenderá o vencimento.")) return;
         
         const safeId = String(transactionId);
         setApprovingId(safeId);
         
         try {
-            console.log(`[AdminManager] Approving ${safeId} for Org ${orgId}`);
+            console.log(`[AdminManager] Chamando serviço para aprovar ${safeId}...`);
             const res = await approveSubscription(safeId, orgId);
             
             if (res.success) {
-                // UI Feedback
-                // Remove localmente para feedback instantâneo
+                // UI Feedback: Remove immediately
                 setApprovals(prev => prev.filter(t => String(t.id) !== safeId));
-                alert("✅ Assinatura aprovada com sucesso!\nO vencimento da organização foi estendido em 30 dias.");
+                alert("✅ Pagamento aprovado e plano liberado com sucesso!");
             } else {
-                alert(`❌ Erro ao aprovar: ${res.msg}`);
+                console.error("Erro no serviço:", res.msg);
+                alert(`❌ Falha ao aprovar: ${res.msg}`);
             }
         } catch (e: any) {
-            console.error(e);
+            console.error("Exceção no handleApprove:", e);
             alert("Erro inesperado: " + e.message);
         } finally {
             setApprovingId(null);
@@ -306,7 +308,7 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                         }`}
                     >
                         <CheckCircle className="w-4 h-4"/> Aprovações
-                        {approvals.length > 0 && <span className="bg-red-500 text-white text-[10px] px-1.5 rounded-full">{approvals.length}</span>}
+                        {approvals.length > 0 && <span className="bg-red-500 text-white text-[10px] px-1.5 rounded-full ml-1">{approvals.length}</span>}
                     </button>
                 </div>
             </div>
