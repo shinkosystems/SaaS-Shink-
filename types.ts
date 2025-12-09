@@ -1,5 +1,6 @@
 
 
+
 export enum RDEStatus {
   HOT = 'Quente',
   WARM = 'Morno',
@@ -23,11 +24,10 @@ export enum IntensityLevel {
 
 // --- PLAN CONFIGURATION (Mapped to DB IDs) ---
 // ID 4: Free
-// ID 1: Básico (was Usuário)
-// ID 2: Studio
-// ID 3: Governança (was Scale)
-// ID 5: Agency (Legacy - Now mostly mapped to Governance features but kept for compat)
-// ID 6, 8: Trial (Enterprise features for 15 days)
+// ID 1: Básico (was Usuário) - Gateway
+// ID 2: Studio - Upsell / High Value
+// ID 3: Governança (was Scale) - High Volume / Enterprise Lite
+// ID 5: Agency (Legacy)
 // ID 10: Enterprise (Whitelabel & Full AI)
 
 export const PLAN_LIMITS: Record<string, { 
@@ -40,71 +40,93 @@ export const PLAN_LIMITS: Record<string, {
         metrics: boolean; // DORA & Product
         pdfUpload: boolean; 
         gantt: boolean;
+        kanban: boolean; 
         whitelabel: boolean;
         aiAdvanced: boolean;
+        crm: boolean; 
     } 
 }> = {
     'plan_free': { // ID 4
         maxProjects: 1, // Strict Limit: 1 Project to trigger need
         maxUsers: 1,
         aiLimit: 0, // Zero AI to trigger upgrade
-        features: { financial: false, clients: false, metrics: false, pdfUpload: false, gantt: false, whitelabel: false, aiAdvanced: false }
+        features: { 
+            financial: false, 
+            clients: false, 
+            metrics: false, 
+            pdfUpload: false, 
+            gantt: false, 
+            kanban: true, // FREE FOR EVERYONE
+            whitelabel: false, 
+            aiAdvanced: false, 
+            crm: true 
+        }
     },
-    'plan_usuario': { // ID 1 - Básico
+    'plan_usuario': { // ID 1 - Básico (Gateway)
         maxProjects: 9999,
         maxUsers: 1,
         aiLimit: 50,
-        features: { financial: false, clients: false, metrics: false, pdfUpload: false, gantt: true, whitelabel: false, aiAdvanced: false }
+        features: { 
+            financial: false, // Básico has NO Financial
+            clients: false, 
+            metrics: false, 
+            pdfUpload: false, 
+            gantt: true, 
+            kanban: true,
+            whitelabel: false, 
+            aiAdvanced: false, 
+            crm: true 
+        }
     },
-    'plan_studio': { // ID 2
+    'plan_studio': { // ID 2 - Studio (Upsell)
         maxProjects: 9999,
         maxUsers: 5,
         aiLimit: 500,
         features: { 
-            financial: true, 
+            financial: true, // Studio INCLUDES Financial (Bonus)
             clients: true, 
-            metrics: false, 
+            metrics: false, // DORA is Scale+
             pdfUpload: true, 
             gantt: true, 
+            kanban: true,
             whitelabel: false, 
-            aiAdvanced: false // IA Generativa apenas (sem personalização de Cérebro/Contexto profunda)
+            aiAdvanced: true, // Studio gets AI
+            crm: true
         }
     },
     'plan_scale': { // ID 3 - Governança
         maxProjects: 9999,
-        maxUsers: 25, // Aumentado para 25 usuários
+        maxUsers: 15, 
         aiLimit: 9999,
         features: { 
             financial: true, 
             clients: true, 
-            metrics: false, // Bloqueado: Sem métricas de Produto/Engenharia
+            metrics: true, // Scale gets DORA
             pdfUpload: true, 
             gantt: true, 
+            kanban: true,
             whitelabel: false, 
-            aiAdvanced: true // Mantém IA Avançada para Nivelamento de Recursos
+            aiAdvanced: true,
+            crm: true
         }
     },
-    'plan_agency': { // ID 5 - Legacy (Maps similar to Governance but more users, NO Whitelabel)
+    'plan_agency': { // ID 5 - Legacy
         maxProjects: 9999,
         maxUsers: 50,
         aiLimit: 9999,
-        features: { financial: true, clients: true, metrics: true, pdfUpload: true, gantt: true, whitelabel: false, aiAdvanced: true }
-    },
-    'plan_trial': { // ID 6, 8 - Trial (15 days Enterprise)
-        maxProjects: 999999,
-        maxUsers: 999999,
-        aiLimit: 999999,
         features: { 
             financial: true, 
             clients: true, 
             metrics: true, 
             pdfUpload: true, 
             gantt: true, 
-            whitelabel: true, 
-            aiAdvanced: true 
+            kanban: true,
+            whitelabel: false, 
+            aiAdvanced: true, 
+            crm: true 
         }
     },
-    'plan_enterprise': { // ID 10 - Enterprise - USO ILIMITADO
+    'plan_trial': { // ID 6, 8 - Trial
         maxProjects: 999999,
         maxUsers: 999999,
         aiLimit: 999999,
@@ -114,11 +136,80 @@ export const PLAN_LIMITS: Record<string, {
             metrics: true, 
             pdfUpload: true, 
             gantt: true, 
+            kanban: true,
             whitelabel: true, 
-            aiAdvanced: true 
+            aiAdvanced: true,
+            crm: true
+        }
+    },
+    'plan_enterprise': { // ID 10 - Enterprise
+        maxProjects: 999999,
+        maxUsers: 999999,
+        aiLimit: 999999,
+        features: { 
+            financial: true, 
+            clients: true, 
+            metrics: true, 
+            pdfUpload: true, 
+            gantt: true, 
+            kanban: true,
+            whitelabel: true, 
+            aiAdvanced: true,
+            crm: true
         }
     }
 };
+
+// --- CRM TYPES ---
+
+export type CrmStage = 'qualification' | 'proposal' | 'negotiation' | 'won' | 'lost';
+
+export interface CrmActivity {
+    id: string;
+    type: 'call' | 'email' | 'meeting' | 'task';
+    subject: string;
+    date: string;
+    duration?: string;
+    status: 'pending' | 'completed';
+    owner: string;
+}
+
+export interface CrmContact {
+    name: string;
+    role: string;
+    email: string;
+    phone: string;
+    linkedin?: string;
+    source?: string;
+}
+
+export interface CrmCompany {
+    name: string;
+    cnpj?: string;
+    site?: string;
+    address?: string;
+    sector?: string;
+    size?: string;
+}
+
+export interface CrmOpportunity {
+    id: string;
+    organizationId?: number; // Added for DB context
+    title: string;
+    value: number;
+    probability: number;
+    stage: CrmStage;
+    expectedCloseDate: string;
+    owner: string;
+    
+    // Embedded Data for simplicity (In a full SQL schema these would be relations)
+    contact: CrmContact;
+    company: CrmCompany;
+    activities: CrmActivity[];
+    
+    createdAt: string;
+    lastInteraction: string;
+}
 
 // --- DB SCHEMA TYPES (POSTGRESQL) ---
 
@@ -387,6 +478,11 @@ export interface FinancialTransaction {
     category: string;
     organizationId: number; // Mapped from organization_id
     isContract?: boolean;
+    
+    // New Fields for Payment Proof
+    pago?: boolean;
+    comprovante?: string;
+    orgName?: string; // Hydrated for Admin View
 }
 
 export interface FinancialRecord {

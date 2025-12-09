@@ -1,4 +1,6 @@
 
+
+
 import React, { useState } from 'react';
 import { 
     ArrowRight, Sparkles, Rocket, CheckCircle, Star, Quote, 
@@ -33,26 +35,26 @@ export const LandingPage: React.FC<Props> = ({ onEnter, customName, customLogo, 
       },
       {
           name: "Básico",
-          price: "99,90",
+          price: "89,90",
           desc: "Para indivíduos e testes de conceito.",
-          features: ["1 Usuário", "Projetos Ilimitados", "Framework Básico (6 etapas)", "Kanban e Cronograma"],
+          features: ["1 Usuário Incluso", "Projetos Ilimitados", "Framework Básico (6 etapas)", "Kanban e Execução"],
           cta: "Assinar Básico",
           highlight: false
       },
       {
           name: "Studio",
-          price: "349,00",
+          price: "297,00",
           desc: "Para pequenas agências e times ágeis.",
-          features: ["5 Usuários", "Módulo Financeiro (MRR)", "Portal do Cliente (Leitura)", "IA Generativa Básica"],
+          features: ["5 Usuários Inclusos", "Módulo Financeiro (Bônus)", "Portal do Cliente (Leitura)", "IA Generativa Completa", "Economia de R$ 82/mês"],
           cta: "Assinar Studio",
           highlight: true,
           badge: "Melhor Custo-Benefício"
       },
       {
           name: "Governança",
-          price: "1.990",
+          price: "899",
           desc: "Para empresas em escala.",
-          features: ["15 Usuários", "Métricas de Engenharia (DORA)", "Score PRIO-6 Ilimitado", "Otimização AI de Recursos", "Suporte Prioritário"],
+          features: ["15 Usuários Inclusos", "Métricas de Engenharia (DORA)", "Score PRIO-6 Ilimitado", "Otimização AI de Recursos", "Suporte Prioritário"],
           cta: "Assinar Governança",
           highlight: false
       },

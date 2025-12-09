@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Opportunity, ProjectStatus, PLAN_LIMITS } from '../types';
 import { Search, Filter, LayoutGrid, Zap, Target, ArrowRight, Lock, Briefcase, Trello, GanttChartSquare, Plus, AlertTriangle, CheckCircle2 } from 'lucide-react';
@@ -13,11 +12,12 @@ interface Props {
   organizationId?: number;
   onOpenCreate?: () => void;
   initialFilterStatus?: string;
+  activeModules?: string[];
 }
 
 type ViewMode = 'grid' | 'kanban' | 'gantt';
 
-export const ProjectList: React.FC<Props> = ({ opportunities, onOpenProject, userRole, organizationId, onOpenCreate, initialFilterStatus }) => {
+export const ProjectList: React.FC<Props> = ({ opportunities, onOpenProject, userRole, organizationId, onOpenCreate, initialFilterStatus, activeModules }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>(initialFilterStatus || 'All');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
@@ -116,6 +116,8 @@ export const ProjectList: React.FC<Props> = ({ opportunities, onOpenProject, use
       );
   };
 
+  const isGanttEnabled = activeModules ? activeModules.includes('gantt') : true;
+
   return (
     <div className="w-full flex flex-col h-full animate-in fade-in duration-500">
         
@@ -176,22 +178,24 @@ export const ProjectList: React.FC<Props> = ({ opportunities, onOpenProject, use
                     </button>
                     
                     {/* Gantt Button Lock */}
-                    <button 
-                        onClick={() => canViewGantt ? setViewMode('gantt') : alert("Gantt disponível apenas nos planos superiores. Faça upgrade para visualizar.")}
-                        className={`p-2 rounded-lg transition-all relative group ${
-                            viewMode === 'gantt' 
-                            ? 'bg-white dark:bg-slate-700 shadow text-shinko-primary' 
-                            : canViewGantt ? 'text-slate-500 hover:text-slate-900 dark:hover:text-white' : 'text-slate-300 dark:text-slate-700 cursor-not-allowed'
-                        }`}
-                        title={canViewGantt ? "Cronograma Global" : "Bloqueado no Plano Free"}
-                    >
-                        <GanttChartSquare className="w-4 h-4"/>
-                        {!canViewGantt && (
-                            <div className="absolute top-0 right-0 -mt-1 -mr-1">
-                                <Lock className="w-3 h-3 text-red-500 fill-white dark:fill-slate-900"/>
-                            </div>
-                        )}
-                    </button>
+                    {isGanttEnabled && (
+                        <button 
+                            onClick={() => canViewGantt ? setViewMode('gantt') : alert("Gantt disponível apenas nos planos superiores. Faça upgrade para visualizar.")}
+                            className={`p-2 rounded-lg transition-all relative group ${
+                                viewMode === 'gantt' 
+                                ? 'bg-white dark:bg-slate-700 shadow text-shinko-primary' 
+                                : canViewGantt ? 'text-slate-500 hover:text-slate-900 dark:hover:text-white' : 'text-slate-300 dark:text-slate-700 cursor-not-allowed'
+                            }`}
+                            title={canViewGantt ? "Cronograma Global" : "Bloqueado no Plano Free"}
+                        >
+                            <GanttChartSquare className="w-4 h-4"/>
+                            {!canViewGantt && (
+                                <div className="absolute top-0 right-0 -mt-1 -mr-1">
+                                    <Lock className="w-3 h-3 text-red-500 fill-white dark:fill-slate-900"/>
+                                </div>
+                            )}
+                        </button>
+                    )}
                 </div>
 
                 {viewMode === 'grid' && (
@@ -322,7 +326,7 @@ export const ProjectList: React.FC<Props> = ({ opportunities, onOpenProject, use
             )}
 
             {/* GANTT VIEW */}
-            {viewMode === 'gantt' && canViewGantt && (
+            {viewMode === 'gantt' && canViewGantt && isGanttEnabled && (
                 <div className="h-full w-full bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm overflow-hidden">
                     <GanttView 
                         opportunities={filteredOpps} 
@@ -334,11 +338,11 @@ export const ProjectList: React.FC<Props> = ({ opportunities, onOpenProject, use
                 </div>
             )}
             
-            {viewMode === 'gantt' && !canViewGantt && (
+            {viewMode === 'gantt' && (!canViewGantt || !isGanttEnabled) && (
                 <div className="h-full w-full flex flex-col items-center justify-center text-center p-8 bg-slate-50 dark:bg-black/20 rounded-2xl border border-dashed border-slate-200 dark:border-white/10">
                     <Lock className="w-16 h-16 text-slate-300 dark:text-slate-700 mb-4"/>
                     <h3 className="text-xl font-bold text-slate-500">Visualização Bloqueada</h3>
-                    <p className="text-slate-400 mt-2 max-w-md">O gráfico de Gantt Global é exclusivo para planos Studio ou superiores. Faça um upgrade para organizar seu cronograma mestre.</p>
+                    <p className="text-slate-400 mt-2 max-w-md">O gráfico de Gantt Global é exclusivo para planos Studio ou superiores, ou requer ativação do módulo.</p>
                 </div>
             )}
 

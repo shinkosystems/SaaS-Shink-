@@ -1,10 +1,16 @@
 
+
+
+
+
+
+
 import React, { useEffect, useState } from 'react';
 import { 
     LayoutDashboard, List, Calendar, User, Settings, Search, 
     PlusCircle, LogOut, Sun, Moon, CreditCard, ChevronRight,
     Menu, X, Briefcase, BarChart3, Code2, Users, DollarSign,
-    Shield, Layers, Sparkles
+    Shield, Layers, Sparkles, Lightbulb, TrendingUp
 } from 'lucide-react';
 import { PLAN_LIMITS } from '../types';
 import { fetchOrganizationDetails } from '../services/organizationService';
@@ -18,6 +24,7 @@ interface Props {
   onToggleTheme: () => void;
   onLogout: () => void;
   onSearch: (q: string) => void;
+  onOpenFeedback: () => void; 
   theme: 'dark' | 'light';
   dbStatus: 'connected' | 'disconnected' | 'error';
   isMobileOpen: boolean;
@@ -27,10 +34,11 @@ interface Props {
   currentPlan?: string;
   customLogoUrl?: string | null;
   orgName?: string;
+  activeModules?: string[];
 }
 
 // Helper para definir grupos de menu
-const getMenuGroups = (userRole: string, isAdmin: boolean, currentPlan: string = 'plan_free', userEmail?: string) => {
+const getMenuGroups = (userRole: string, isAdmin: boolean, currentPlan: string = 'plan_free', userEmail?: string, activeModules: string[] = []) => {
     const isClient = userRole === 'cliente';
     const planFeatures = PLAN_LIMITS[currentPlan]?.features || PLAN_LIMITS['plan_free'].features;
 
@@ -43,23 +51,34 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, currentPlan: string =
         },
         {
             title: 'Execução',
-            items: [
-                { id: 'list', label: 'Projetos', icon: List },
-                { id: 'kanban', label: 'Tarefas', icon: Briefcase },
-            ]
+            items: [] as any[]
         }
     ];
 
-    if (planFeatures.gantt) {
+    // Helper for case insensitive module check
+    const hasModule = (key: string) => activeModules.some(m => m.toLowerCase() === key.toLowerCase());
+
+    // Modules filtering for Execution
+    if (hasModule('projects')) {
+        groups[1].items.push({ id: 'list', label: 'Projetos', icon: List });
+    }
+    if (hasModule('kanban')) {
+        groups[1].items.push({ id: 'kanban', label: 'Tarefas', icon: Briefcase });
+    }
+    if (planFeatures.gantt && hasModule('calendar')) {
         groups[1].items.push({ id: 'calendar', label: 'Cronograma', icon: Calendar });
     }
 
     if (!isClient) {
         const businessItems = [];
-        if (planFeatures.financial) {
+        // CRM Module - Check with helper and plan
+        if (planFeatures.crm && hasModule('crm')) {
+            businessItems.push({ id: 'crm', label: 'CRM / Vendas', icon: TrendingUp });
+        }
+        if (planFeatures.financial && hasModule('financial')) {
             businessItems.push({ id: 'financial', label: 'Financeiro', icon: DollarSign });
         }
-        if (planFeatures.clients) {
+        if (planFeatures.clients && hasModule('clients')) {
             businessItems.push({ id: 'clients', label: 'Clientes', icon: Users });
         }
 
@@ -73,10 +92,12 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, currentPlan: string =
         const intelItems = [];
         if (planFeatures.metrics) {
             // RESTRIÇÃO: Apenas peboorba@gmail.com vê Métricas Produto
-            if (userEmail === 'peboorba@gmail.com') {
+            if (userEmail === 'peboorba@gmail.com' && hasModule('product')) {
                 intelItems.push({ id: 'product', label: 'Métricas Produto', icon: BarChart3 });
             }
-            intelItems.push({ id: 'dev-metrics', label: 'Engenharia', icon: Code2 });
+            if (hasModule('engineering')) {
+                intelItems.push({ id: 'dev-metrics', label: 'Engenharia', icon: Code2 });
+            }
         }
 
         if (intelItems.length > 0) {
@@ -106,7 +127,7 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, currentPlan: string =
 export const Sidebar: React.FC<Props> = (props) => {
   const isClient = props.userRole === 'cliente';
   const isAdmin = props.userData.name === 'Pedro Borba';
-  const menuGroups = getMenuGroups(props.userRole, isAdmin, props.currentPlan, props.userData?.email);
+  const menuGroups = getMenuGroups(props.userRole, isAdmin, props.currentPlan, props.userData?.email, props.activeModules);
   const planLimits = PLAN_LIMITS[props.currentPlan || 'plan_free'];
   const [aiUsage, setAiUsage] = useState(0);
 
@@ -130,19 +151,34 @@ export const Sidebar: React.FC<Props> = (props) => {
     <div className={`hidden md:flex flex-col w-64 h-full border-r border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 shrink-0 transition-all duration-300`}>
         
         {/* Header Logo */}
-        <div className="h-20 flex items-center px-6 border-b border-slate-200 dark:border-white/5 bg-white/50 dark:bg-transparent backdrop-blur-sm">
+        <div className="h-20 flex items-center justify-between px-4 border-b border-slate-200 dark:border-white/5 bg-white/50 dark:bg-transparent backdrop-blur-sm relative z-20">
             {props.customLogoUrl ? (
-                <img src={props.customLogoUrl} alt="Logo" className="h-8 object-contain" />
+                <img src={props.customLogoUrl} alt="Logo" className="h-8 object-contain max-w-[140px]" />
             ) : (
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-shinko-primary to-orange-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-amber-500/20">
                         {props.orgName ? props.orgName.charAt(0).toUpperCase() : 'S'}
                     </div>
-                    <span className="font-bold text-lg tracking-tight text-slate-900 dark:text-white truncate">
+                    <span className="font-bold text-lg tracking-tight text-slate-900 dark:text-white truncate max-w-[100px]">
                         {props.orgName || 'Shinkō OS'}
                     </span>
                 </div>
             )}
+            
+            {/* Feedback Button (Desktop) */}
+            <button 
+                type="button"
+                onClick={(e) => { 
+                    e.preventDefault(); 
+                    e.stopPropagation(); 
+                    console.log("Feedback clicked");
+                    props.onOpenFeedback(); 
+                }}
+                className="p-2 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/20 text-amber-500 dark:text-amber-400 transition-colors relative z-50 cursor-pointer"
+                title="Reportar Problema / Sugerir Melhoria"
+            >
+                <Lightbulb className="w-5 h-5"/>
+            </button>
         </div>
 
         {/* Quick Action */}
@@ -182,7 +218,7 @@ export const Sidebar: React.FC<Props> = (props) => {
                 <div key={idx} className="relative">
                     {idx > 0 && <div className="mx-2 mb-4 h-px bg-slate-200/50 dark:bg-white/5"></div>}
                     
-                    {group.title && (
+                    {group.title && group.items.length > 0 && (
                         <h3 className="px-3 mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 opacity-80">
                             {group.title}
                         </h3>
@@ -269,7 +305,7 @@ export const Sidebar: React.FC<Props> = (props) => {
 export const MobileDrawer: React.FC<Props> = (props) => {
     const isClient = props.userRole === 'cliente';
     const isAdmin = props.userData.name === 'Pedro Borba';
-    const menuGroups = getMenuGroups(props.userRole, isAdmin, props.currentPlan, props.userData?.email);
+    const menuGroups = getMenuGroups(props.userRole, isAdmin, props.currentPlan, props.userData?.email, props.activeModules);
 
     return (
         <>
@@ -292,12 +328,22 @@ export const MobileDrawer: React.FC<Props> = (props) => {
                     </div>
                 </div>
                 
-                {/* Mobile Quick Add */}
-                {!isClient && (
-                    <button onClick={props.onOpenCreateTask} className="w-8 h-8 bg-slate-100 dark:bg-white/10 rounded-full flex items-center justify-center text-slate-600 dark:text-white">
-                        <PlusCircle className="w-5 h-5"/>
+                <div className="flex items-center gap-2">
+                    {/* Feedback Button (Mobile) */}
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); props.onOpenFeedback(); }}
+                        className="p-2 bg-amber-100 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 rounded-full relative z-50"
+                    >
+                        <Lightbulb className="w-5 h-5"/>
                     </button>
-                )}
+
+                    {/* Mobile Quick Add */}
+                    {!isClient && (
+                        <button onClick={props.onOpenCreateTask} className="w-8 h-8 bg-slate-100 dark:bg-white/10 rounded-full flex items-center justify-center text-slate-600 dark:text-white">
+                            <PlusCircle className="w-5 h-5"/>
+                        </button>
+                    )}
+                </div>
             </div>
 
             {props.isMobileOpen && (
@@ -325,7 +371,7 @@ export const MobileDrawer: React.FC<Props> = (props) => {
                         <div className="flex-1 overflow-y-auto px-4 pb-4 custom-scrollbar space-y-6 pt-4">
                             {menuGroups.map((group, idx) => (
                                 <div key={idx}>
-                                    {group.title && (
+                                    {group.title && group.items.length > 0 && (
                                         <h3 className="mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
                                             {group.title}
                                         </h3>

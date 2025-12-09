@@ -12,7 +12,7 @@ const USE_REAL_ASAAS = true;
 // Link fixo gerado pelo cliente
 const FIXED_PAYMENT_LINK = 'https://www.asaas.com/c/3xh5fsyxc16odebg';
 
-// Updated Fallback Plans based on new Pricing Structure
+// Updated Fallback Plans based on Shinkō Pricing Playbook
 const FALLBACK_PLANS: SubscriptionPlan[] = [
     {
         id: 'plan_free',
@@ -32,14 +32,14 @@ const FALLBACK_PLANS: SubscriptionPlan[] = [
         id: 'plan_usuario',
         dbId: 1,
         name: 'Básico',
-        price: 99.90,
+        price: 89.90, // Updated per Playbook (Gateway Price)
         features: [
-            '1 Usuário',
+            '1 Usuário Incluso',
             'Projetos Ilimitados',
-            'Framework Shinkō Básico (6 etapas)',
-            'Kanban e Cronograma Básico',
+            'Metodologia 6 Etapas',
+            'Kanban e Cronograma',
             'Sem Financeiro',
-            'IA Limitada'
+            'Sem DORA/Métricas'
         ],
         recommended: false,
         cycle: 'MONTHLY'
@@ -48,13 +48,13 @@ const FALLBACK_PLANS: SubscriptionPlan[] = [
         id: 'plan_studio',
         dbId: 2,
         name: 'Studio',
-        price: 349.00,
+        price: 297.00, // Updated per Playbook (Upsell Trigger)
         features: [
-            'Pequenas Agências e Times de Produto',
-            'Até 5 Usuários inclusos',
-            'Módulo Financeiro (MRR/Conciliação)',
-            'Portal do Cliente (Modo Leitura)',
-            'IA Generativa (BPMN e Tasks)'
+            '5 Usuários Inclusos',
+            'Módulo Financeiro (Bônus R$149 off)',
+            'Portal do Cliente (Leitura)',
+            'IA Generativa',
+            'Gestão de Clientes'
         ],
         recommended: true,
         cycle: 'MONTHLY'
@@ -62,13 +62,12 @@ const FALLBACK_PLANS: SubscriptionPlan[] = [
     {
         id: 'plan_scale',
         dbId: 3,
-        name: 'Governança',
-        price: 1990.00,
+        name: 'Governança', // Scale
+        price: 899.00, // Estimated for 15 users based on playbook tiering
         features: [
-            'Empresas em Crescimento',
-            'Até 25 Usuários inclusos',
+            '15 Usuários Inclusos',
+            'Módulo Engenharia (DORA Metrics)',
             'Score PRIO-6 Ilimitado',
-            'Matriz Visual de Projetos (MVV)',
             'Nivelamento de Recursos (AI)',
             'Suporte Prioritário'
         ],
@@ -99,8 +98,8 @@ let MOCK_PAYMENTS: AsaasPayment[] = [
         dateCreated: new Date(Date.now() - 86400000 * 30).toISOString(),
         customer: 'cus_000001',
         paymentLink: null,
-        value: 349.00,
-        netValue: 340.00,
+        value: 297.00,
+        netValue: 290.00,
         billingType: 'CREDIT_CARD',
         status: 'RECEIVED',
         description: 'Assinatura Studio (Fallback Mode)',
@@ -226,14 +225,17 @@ export const getCurrentUserPlan = async (userId: string): Promise<string> => {
 
 export const uploadReceiptAndNotify = async (
     userId: string,
+    orgId: number,
     planId: string,
     planPrice: number,
-    receiptFile: File
+    receiptFile: File,
+    description: string
 ): Promise<{ success: boolean; error?: string }> => {
     try {
         const fileExt = receiptFile.name.split('.').pop();
-        const fileName = `comprovantes/${userId}-${planId}-${Date.now()}.${fileExt}`;
+        const fileName = `comprovantes/${userId}-${Date.now()}.${fileExt}`;
 
+        // 1. Upload File
         const { error: uploadError } = await supabase.storage
             .from('documentos') 
             .upload(fileName, receiptFile);
@@ -246,8 +248,21 @@ export const uploadReceiptAndNotify = async (
 
         if (!urlData?.publicUrl) throw new Error("Não foi possível obter a URL do arquivo.");
         
-        // Removed table 'pagamentos_pendentes' usage as it doesn't exist in schema
-        // Just return success for now (mocking the notification part)
+        // 2. Insert into 'transacoes' table
+        const { error: insertError } = await supabase
+            .from('transacoes')
+            .insert({
+                organization_id: orgId,
+                description: description,
+                amount: planPrice,
+                type: 'inflow',
+                category: 'Assinatura',
+                date: new Date().toISOString().split('T')[0],
+                pago: false,
+                comprovante: urlData.publicUrl
+            });
+
+        if (insertError) throw new Error(`Erro ao salvar transação: ${insertError.message}`);
         
         return { success: true };
     } catch (err: any) {

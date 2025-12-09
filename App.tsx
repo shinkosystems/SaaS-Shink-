@@ -6,7 +6,7 @@ import { supabase } from './services/supabaseClient';
 import { Opportunity, BpmnTask } from './types';
 import { fetchOpportunities, createOpportunity, updateOpportunity, deleteOpportunity, fetchOpportunityById } from './services/opportunityService';
 import { createTask } from './services/projectService';
-import { getPublicOrgDetails, updateOrgDetails, uploadLogo } from './services/organizationService';
+import { getPublicOrgDetails, updateOrgDetails, uploadLogo, fetchActiveOrgModules } from './services/organizationService';
 import { subscribeToPresence } from './services/presenceService';
 import { trackUserAccess } from './services/analyticsService';
 import { getCurrentUserPlan, mapDbPlanIdToString } from './services/asaasService';
@@ -35,6 +35,7 @@ import { AdminManagerScreen } from './components/AdminManagerScreen';
 import { NpsSurvey } from './components/NpsSurvey';
 import { GuruFab } from './components/GuruFab';
 import { FeedbackModal } from './components/FeedbackModal';
+import { CrmBoard } from './components/CrmBoard';
 
 const App: React.FC = () => {
   // State
@@ -54,6 +55,9 @@ const App: React.FC = () => {
   const [view, setView] = useState<string>('dashboard');
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Active Modules State (default to core)
+  const [activeModules, setActiveModules] = useState<string[]>(['projects', 'kanban', 'ia']); // Default IA to visible unless fetched otherwise
 
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
@@ -107,7 +111,6 @@ const App: React.FC = () => {
                   setOrgDetails(prev => ({ 
                       ...prev, 
                       ...details,
-                      // If loaded via URL param, assume whitelabel context initially
                       isWhitelabelActive: true 
                   }));
               }
@@ -155,7 +158,6 @@ const App: React.FC = () => {
           
           if (projectId) {
               console.log("Deep Link detectado para o projeto:", projectId);
-              // Activate Shared Mode (Hides Navigation)
               setIsSharedMode(true);
               
               const opp = await fetchOpportunityById(projectId);
@@ -163,7 +165,7 @@ const App: React.FC = () => {
                   setSelectedProject(opp);
               } else {
                   console.warn("Projeto não encontrado ou usuário sem permissão.");
-                  setIsSharedMode(false); // Revert if failed
+                  setIsSharedMode(false); 
               }
           }
       };
@@ -186,7 +188,6 @@ const App: React.FC = () => {
               setUserOrgId(data.organizacao);
               
               if (data.organizacao) {
-                  // Await ensures Plan ID is set BEFORE rendering main views
                   await loadOrganization(data.organizacao);
                   loadOpportunities(data.organizacao);
               }
@@ -195,7 +196,6 @@ const App: React.FC = () => {
               trackUserAccess(userId);
               const unsubPresence = subscribeToPresence(userId, (ids) => setOnlineUsers(ids));
               
-              // Only call fallback if orgPlanId was somehow not set by loadOrganization
               if (orgPlanId === null) {
                   const plan = await getCurrentUserPlan(userId);
                   setCurrentPlan(plan);
@@ -214,8 +214,7 @@ const App: React.FC = () => {
   const loadOrganization = async (orgId: number) => {
       const { data } = await supabase.from('organizacoes').select('*').eq('id', orgId).single();
       if (data) {
-          // UPDATE APP STATE FOR PLAN ID
-          let planId = data.plano || 4; // Default to Free (4) if null
+          let planId = data.plano || 4; 
           
           // TRIAL LOGIC Check (IDs 6 and 8)
           if (planId === 6 || planId === 8) {
@@ -226,14 +225,11 @@ const App: React.FC = () => {
               const remaining = 15 - diffDays;
 
               if (remaining < 0) {
-                  // Trial Expired - Force Free Plan
                   planId = 4;
                   alert("Seu período de avaliação (Trial) de 15 dias expirou. Sua conta foi migrada para o plano Free. Faça um upgrade para continuar usando os recursos Enterprise.");
                   setTrialDaysRemaining(null);
               } else {
-                  // Active Trial
                   setTrialDaysRemaining(remaining);
-                  // Plan ID stays 6 or 8, which maps to plan_trial (Enterprise features)
               }
           } else {
               setTrialDaysRemaining(null);
@@ -241,7 +237,6 @@ const App: React.FC = () => {
 
           setOrgPlanId(planId);
           
-          // FORCE UPDATE CURRENT PLAN IMMEDIATELY (Source of Truth is Org Table)
           const planString = mapDbPlanIdToString(planId);
           setCurrentPlan(planString);
 
@@ -253,9 +248,12 @@ const App: React.FC = () => {
               aiSector: data.setor || '',
               aiTone: data.tomdevoz || '',
               aiContext: data.dna || '',
-              // Enterprise Plan ID is 10, but Trial (6 or 8) also unlocks whitelabel if active
               isWhitelabelActive: planId === 10 || planId === 6 || planId === 8
           });
+
+          // NEW: Load Active Modules via Relational Table
+          const modules = await fetchActiveOrgModules(orgId);
+          setActiveModules(modules);
       }
   };
 
@@ -306,7 +304,7 @@ const App: React.FC = () => {
       loadOpportunities(userOrgId);
   };
 
-  const handleUpdateOrgDetails = async (updates: { logoFile?: File, color?: string, name?: string, limit?: number, aiSector?: string, aiTone?: string, aiContext?: string }) => {
+  const handleUpdateOrgDetails = async (updates: { logoFile?: File, color?: string, name?: string, limit?: number, aiSector?: string, aiTone?: string, aiContext?: string, modulos?: string[] }) => {
       if (!userOrgId) return;
       try {
           let logoUrl = undefined;
@@ -322,13 +320,20 @@ const App: React.FC = () => {
               aiSector: updates.aiSector,
               aiTone: updates.aiTone,
               aiContext: updates.aiContext
+              // Removed modulos from this call to avoid error
           });
           
-          // Refresh local state
           loadOrganization(userOrgId);
           alert('Configurações atualizadas!');
       } catch (e: any) {
           alert('Erro ao atualizar: ' + e.message);
+      }
+  };
+
+  const handleRefreshModules = async () => {
+      if (userOrgId) {
+          const modules = await fetchActiveOrgModules(userOrgId);
+          setActiveModules(modules);
       }
   };
 
@@ -344,8 +349,6 @@ const App: React.FC = () => {
       }
   };
 
-  // --- WHITELABEL LOGIC ---
-  // If plan is Enterprise OR isWhitelabelActive (via link), override branding
   const isEnterprise = currentPlan === 'plan_enterprise';
   const shouldUseWhitelabel = isEnterprise || orgDetails.isWhitelabelActive;
   
@@ -353,12 +356,10 @@ const App: React.FC = () => {
   const appLogoUrl = shouldUseWhitelabel ? orgDetails.logoUrl : null;
   const appPrimaryColor = shouldUseWhitelabel ? orgDetails.primaryColor : '#F59E0B';
 
-  // Update Page Title
   useEffect(() => {
       document.title = appBrandName;
   }, [appBrandName]);
 
-  // Inject Custom Brand Color into CSS Variables globally
   useEffect(() => {
       const root = document.documentElement;
       
@@ -401,18 +402,15 @@ const App: React.FC = () => {
       );
   }
 
-  // App Layout
   return (
     <div className={`flex h-screen w-full bg-slate-100 dark:bg-black text-slate-900 dark:text-slate-100 transition-colors duration-300 ${theme}`}>
         
-        {/* Trial Banner */}
         {trialDaysRemaining !== null && (
             <div className="fixed top-0 left-0 right-0 z-[100] h-8 bg-gradient-to-r from-purple-600 to-pink-600 flex items-center justify-center text-white text-xs font-bold shadow-md">
                 <span>🔥 Modo Trial Enterprise Ativo: {trialDaysRemaining} dias restantes para testar tudo sem limites!</span>
             </div>
         )}
 
-        {/* HIDE SIDEBAR IN SHARED MODE */}
         {!isSharedMode && (
             <div className={trialDaysRemaining !== null ? 'mt-8' : ''}>
                 <Sidebar 
@@ -423,7 +421,6 @@ const App: React.FC = () => {
                     onToggleTheme={toggleTheme}
                     onLogout={handleLogout}
                     onSearch={(q) => console.log(q)}
-                    // PASS FEEDBACK HANDLER
                     onOpenFeedback={() => setShowFeedback(true)}
                     theme={theme}
                     dbStatus={dbStatus}
@@ -432,14 +429,13 @@ const App: React.FC = () => {
                     userRole={userRole}
                     userData={userData || { name: 'Carregando...', avatar: null }}
                     currentPlan={currentPlan}
-                    // WHITELABEL PROPS
                     customLogoUrl={appLogoUrl}
                     orgName={appBrandName}
+                    activeModules={activeModules}
                 />
             </div>
         )}
         
-        {/* HIDE MOBILE DRAWER IN SHARED MODE */}
         {!isSharedMode && (
             <MobileDrawer 
                 currentView={view} 
@@ -449,7 +445,6 @@ const App: React.FC = () => {
                 onToggleTheme={toggleTheme}
                 onLogout={handleLogout}
                 onSearch={(q) => console.log(q)}
-                // PASS FEEDBACK HANDLER
                 onOpenFeedback={() => setShowFeedback(true)}
                 theme={theme}
                 dbStatus={dbStatus}
@@ -458,20 +453,18 @@ const App: React.FC = () => {
                 userRole={userRole}
                 userData={userData || { name: 'Carregando...', avatar: null }}
                 currentPlan={currentPlan}
-                // WHITELABEL PROPS
                 customLogoUrl={appLogoUrl}
                 orgName={appBrandName}
+                activeModules={activeModules}
             />
         )}
 
-        {/* Adjust Main Padding if Shared Mode (Remove mobile header spacing) */}
         <main className={`flex-1 overflow-hidden relative ${!isSharedMode ? 'pt-16 xl:pt-0' : ''} ${trialDaysRemaining !== null ? 'mt-8' : ''}`}>
             <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500"></div></div>}>
                 {selectedProject ? (
                     <ProjectWorkspace 
                         opportunity={selectedProject} 
                         onBack={() => {
-                            // If in shared mode, clicking back should exit shared mode and clear URL
                             if (isSharedMode) {
                                 window.history.replaceState(null, '', '/');
                                 setIsSharedMode(false);
@@ -479,11 +472,12 @@ const App: React.FC = () => {
                             setSelectedProject(null);
                         }}
                         onUpdate={(opp) => updateOpportunity(opp).then(() => loadOpportunities(userOrgId!))}
-                        onEdit={(opp) => { setShowCreate(true); /* Logic to populate wizard could be added here */ }}
+                        onEdit={(opp) => { setShowCreate(true); }}
                         onDelete={(id) => deleteOpportunity(id).then(() => { setSelectedProject(null); loadOpportunities(userOrgId!); })}
                         userRole={userRole}
                         currentPlan={currentPlan}
                         isSharedMode={isSharedMode}
+                        activeModules={activeModules}
                     />
                 ) : (
                     <>
@@ -493,7 +487,6 @@ const App: React.FC = () => {
                                     opportunities={opportunities} 
                                     onNavigate={(status) => {
                                         if (status === 'Active' || status === 'Negotiation' || status === 'Future') {
-                                            // Ideally filter the list, for now just stay on dashboard or move to kanban/list
                                             setView('kanban'); 
                                         }
                                     }}
@@ -502,34 +495,36 @@ const App: React.FC = () => {
                                     theme={theme}
                                     userRole={userRole}
                                     organizationId={userOrgId || undefined}
-                                    // WHITELABEL PROPS
                                     appBrandName={appBrandName}
                                     whitelabel={isEnterprise}
                                     onActivateWhitelabel={() => setView('settings')}
+                                    activeModules={activeModules}
                                 />
                             </div>
                         )}
-                        {view === 'list' && (
+                        {view === 'list' && activeModules.includes('projects') && (
                             <div className="h-full p-4 md:p-8 overflow-y-auto custom-scrollbar">
                                 <ProjectList 
                                     opportunities={opportunities} 
                                     onOpenProject={setSelectedProject}
                                     userRole={userRole}
                                     organizationId={userOrgId || undefined}
+                                    activeModules={activeModules}
                                 />
                             </div>
                         )}
-                        {view === 'kanban' && (
+                        {view === 'kanban' && activeModules.includes('kanban') && (
                             <div className="h-full p-4 md:p-8 overflow-hidden">
                                 <KanbanBoard 
                                     onSelectOpportunity={setSelectedProject} 
                                     userRole={userRole}
                                     organizationId={userOrgId || undefined}
                                     currentPlan={currentPlan}
+                                    activeModules={activeModules}
                                 />
                             </div>
                         )}
-                        {view === 'gantt' && (
+                        {view === 'gantt' && activeModules.includes('gantt') && (
                             <div className="h-full p-4 md:p-8 overflow-hidden">
                                 <GanttView 
                                     opportunities={opportunities} 
@@ -538,10 +533,11 @@ const App: React.FC = () => {
                                     userRole={userRole}
                                     organizationId={userOrgId || undefined}
                                     customPrimaryColor={appPrimaryColor}
+                                    activeModules={activeModules}
                                 />
                             </div>
                         )}
-                        {view === 'calendar' && (
+                        {view === 'calendar' && activeModules.includes('calendar') && (
                             <div className="h-full p-4 md:p-8 overflow-hidden">
                                 <CalendarView 
                                     opportunities={opportunities} 
@@ -549,25 +545,31 @@ const App: React.FC = () => {
                                     onTaskUpdate={() => {}} 
                                     userRole={userRole}
                                     organizationId={userOrgId || undefined}
+                                    activeModules={activeModules}
                                 />
                             </div>
                         )}
-                        {view === 'financial' && (
+                        {view === 'crm' && activeModules.includes('crm') && (
+                            <div className="h-full p-4 md:p-8 overflow-hidden">
+                                <CrmBoard organizationId={userOrgId || undefined} />
+                            </div>
+                        )}
+                        {view === 'financial' && activeModules.includes('financial') && (
                             <div className="h-full p-4 md:p-8 overflow-hidden">
                                 <FinancialScreen orgType={orgDetails.name} />
                             </div>
                         )}
-                        {view === 'clients' && (
+                        {view === 'clients' && activeModules.includes('clients') && (
                             <div className="h-full p-4 md:p-8 overflow-hidden">
                                 <ClientsScreen userRole={userRole} onlineUsers={onlineUsers} organizationId={userOrgId || undefined}/>
                             </div>
                         )}
-                        {view === 'product' && (
+                        {view === 'product' && activeModules.includes('product') && (
                             <div className="h-full p-4 md:p-8 overflow-hidden">
                                 <ProductIndicators />
                             </div>
                         )}
-                        {view === 'dev-metrics' && (
+                        {view === 'dev-metrics' && activeModules.includes('engineering') && (
                             <div className="h-full p-4 md:p-8 overflow-hidden">
                                 <DevIndicators organizationId={userOrgId || undefined} />
                             </div>
@@ -584,6 +586,8 @@ const App: React.FC = () => {
                                 userRole={userRole}
                                 userData={userData}
                                 currentPlan={currentPlan}
+                                activeModules={activeModules}
+                                onRefreshModules={handleRefreshModules}
                             />
                         )}
                         {view === 'profile' && (
@@ -610,6 +614,7 @@ const App: React.FC = () => {
                 }}
                 onCancel={() => setShowCreate(false)}
                 orgType={orgDetails.name}
+                activeModules={activeModules}
             />
         )}
 
@@ -622,7 +627,6 @@ const App: React.FC = () => {
             />
         )}
 
-        {/* FEEDBACK MODAL (NEW) */}
         {showFeedback && user && (
             <FeedbackModal 
                 userId={user.id} 
@@ -630,8 +634,7 @@ const App: React.FC = () => {
             />
         )}
 
-        {/* Global AI Assistant Button - Only Show if not in Shared Mode */}
-        {user && userRole !== 'cliente' && !isSharedMode && (
+        {user && userRole !== 'cliente' && !isSharedMode && activeModules.includes('ia') && (
             <GuruFab 
                 opportunities={opportunities} 
                 user={user} 

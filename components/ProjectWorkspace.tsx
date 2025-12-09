@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Opportunity, BpmnTask, ProjectStatus, PLAN_LIMITS } from '../types';
 import { KanbanBoard } from './KanbanBoard';
@@ -16,11 +15,12 @@ interface Props {
   userRole?: string;
   currentPlan?: string;
   isSharedMode?: boolean;
+  activeModules?: string[];
 }
 
 type Tab = 'overview' | 'kanban' | 'gantt' | 'calendar';
 
-export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdate, onEdit, onDelete, userRole, currentPlan, isSharedMode }) => {
+export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdate, onEdit, onDelete, userRole, currentPlan, isSharedMode, activeModules }) => {
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [copiedLink, setCopiedLink] = useState(false);
 
@@ -60,6 +60,14 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
           setTimeout(() => setCopiedLink(false), 3000);
       });
   };
+
+  // Filter tabs based on activeModules
+  const tabs = [
+      { id: 'overview', label: 'Visão Geral', icon: LayoutDashboard, moduleId: 'projects' },
+      { id: 'kanban', label: 'Kanban', icon: Trello, moduleId: 'kanban' },
+      { id: 'gantt', label: 'Gantt', icon: GanttChartSquare, locked: !canViewGantt, moduleId: 'gantt' },
+      { id: 'calendar', label: 'Agenda', icon: CalendarIcon, moduleId: 'calendar' },
+  ].filter(tab => !activeModules || activeModules.includes(tab.moduleId) || tab.moduleId === 'projects'); // Always show overview/projects
 
   return (
     <div className="h-full flex flex-col bg-slate-50/50 dark:bg-[#050505] overflow-hidden">
@@ -120,12 +128,7 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
 
       {/* Navigation Tabs */}
       <div className="bg-white dark:bg-[#0a0a0a] border-b border-slate-200 dark:border-white/10 px-6 flex gap-6 shrink-0 overflow-x-auto no-scrollbar">
-          {[
-              { id: 'overview', label: 'Visão Geral', icon: LayoutDashboard },
-              { id: 'kanban', label: 'Kanban', icon: Trello },
-              { id: 'gantt', label: 'Gantt', icon: GanttChartSquare, locked: !canViewGantt },
-              { id: 'calendar', label: 'Agenda', icon: CalendarIcon },
-          ].map(tab => (
+          {tabs.map(tab => (
               <button
                   key={tab.id}
                   onClick={() => tab.locked ? alert('Gantt disponível apenas no plano Studio ou superior.') : setActiveTab(tab.id as Tab)}
@@ -168,6 +171,7 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
                       projectId={opportunity.dbProjectId?.toString() || opportunity.id}
                       organizationId={opportunity.organizationId} 
                       currentPlan={currentPlan}
+                      activeModules={activeModules}
                   />
               </div>
           )}

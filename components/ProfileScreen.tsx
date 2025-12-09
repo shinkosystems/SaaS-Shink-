@@ -1,10 +1,9 @@
-
-import React, { useState, useEffect, useRef } from 'react';
-import { User, Mail, Phone, Building2, MapPin, Save, Camera, Shield, CreditCard, Loader2, UploadCloud, Check, X, Calendar, AlertTriangle, History, Zap, Lock } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { User, Mail, Phone, Building2, MapPin, Save, Camera, Shield, CreditCard, Loader2, UploadCloud, Check, X, Calendar, AlertTriangle, History, Zap, Lock, Calculator, Minus, Plus, HelpCircle, Clock, CheckCircle, XCircle, FileText } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { fetchSubscriptionPlans, getPaymentHistory, calculateSubscriptionStatus, getUserSubscriptions, uploadReceiptAndNotify } from '../services/asaasService';
 import { createStripePaymentIntent } from '../services/stripeService';
-import { AsaasPayment, SubscriptionPlan, AsaasSubscription } from '../types';
+import { AsaasPayment, SubscriptionPlan, AsaasSubscription, FinancialTransaction } from '../types';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
@@ -12,9 +11,19 @@ const DEFAULT_AVATAR = "https://zjssfnbcboibqeoubeou.supabase.co/storage/v1/obje
 const PIX_KEY = "60.428.589/0001-55"; // CNPJ
 
 // Initialize Stripe outside component
-// WARNING: Replace this placeholder with your actual publishable key from Stripe Dashboard
 const STRIPE_PUBLISHABLE_KEY = 'pk_test_PLACEHOLDER_KEY'; 
 const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
+
+// --- CONFIGURAÇÃO DE PREÇOS (BASEADA NA IMAGEM/OCR) ---
+const PRICING = {
+    USER_BASE: 89.90, // 1º Usuário
+    USER_EXTRA: 69.90, // N - 1
+    AI: {
+        price: 199.00,
+        quotaPrice: 99.00,
+        baseQuota: 500
+    }
+};
 
 interface Props {
   currentPlan: string;
@@ -97,11 +106,11 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
   
   // Organization Info
   const [orgName, setOrgName] = useState('');
+  const [orgId, setOrgId] = useState<number | null>(null);
+  const [orgExpiration, setOrgExpiration] = useState<string | null>(null);
 
   // Finance State
-  const [availablePlans, setAvailablePlans] = useState<SubscriptionPlan[]>([]);
-  const [payments, setPayments] = useState<AsaasPayment[]>([]);
-  const [subscriptions, setSubscriptions] = useState<AsaasSubscription[]>([]);
+  const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
   
   // Payment Modal State
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -117,14 +126,42 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
   const [isInitializingStripe, setIsInitializingStripe] = useState(false);
   const [clientSecret, setClientSecret] = useState<string>('');
 
+  // --- CALCULATOR STATE ---
+  const [calcUsers, setCalcUsers] = useState(1);
+  const [calcAi, setCalcAi] = useState(false);
+  const [calcAiExtra, setCalcAiExtra] = useState(0); // Extra quotas
+
+  // --- CALCULATOR LOGIC (MEMOIZED) ---
+  const calculation = useMemo(() => {
+      // 1. License Cost
+      const licenseBase = PRICING.USER_BASE;
+      const licenseExtra = Math.max(0, calcUsers - 1) * PRICING.USER_EXTRA;
+      const licenseTotal = licenseBase + licenseExtra;
+
+      // 2. AI Cost
+      const aiBase = calcAi ? PRICING.AI.price : 0;
+      const aiExtra = calcAi ? (calcAiExtra * PRICING.AI.quotaPrice) : 0;
+      const aiTotal = aiBase + aiExtra;
+
+      const grandTotal = licenseTotal + aiTotal;
+
+      return {
+          licenseTotal,
+          aiTotal,
+          grandTotal,
+          details: {
+              users: calcUsers,
+              extraUsers: Math.max(0, calcUsers - 1),
+              aiQuotas: 500 + (calcAiExtra * 500)
+          }
+      };
+  }, [calcUsers, calcAi, calcAiExtra]);
+
   // Fetch User Data on Mount
   useEffect(() => {
     const loadUserData = async () => {
       setLoading(true);
       try {
-        const plans = await fetchSubscriptionPlans();
-        setAvailablePlans(plans);
-
         const { data } = await supabase.auth.getUser();
         const user = data?.user;
 
@@ -137,7 +174,7 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
 
           const { data: userProfile, error: profileError } = await supabase
             .from('users')
-            .select(`*, organizacoes (nome)`)
+            .select(`*, organizacoes (id, nome, vencimento)`)
             .eq('id', user.id)
             .single();
 
@@ -148,25 +185,39 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
             if (userProfile.localizacao) setLocation(userProfile.localizacao as string);
             else if (meta.location) setLocation(meta.location);
             
-            // Set Org Name
+            // Set Org Info
             if (userProfile.organizacoes) {
-                setOrgName(Array.isArray(userProfile.organizacoes) ? userProfile.organizacoes[0].nome : userProfile.organizacoes.nome);
+                const org = Array.isArray(userProfile.organizacoes) ? userProfile.organizacoes[0] : userProfile.organizacoes;
+                setOrgName(org.nome);
+                setOrgId(org.id);
+                setOrgExpiration(org.vencimento);
+
+                // Fetch Last Transactions
+                const { data: txs } = await supabase
+                    .from('transacoes')
+                    .select('*')
+                    .eq('organization_id', org.id)
+                    .order('date', { ascending: false })
+                    .limit(10);
+                
+                if (txs) {
+                    setTransactions(txs.map((t:any) => ({
+                        id: t.id,
+                        date: t.date,
+                        description: t.description,
+                        amount: Number(t.amount),
+                        type: t.type,
+                        category: t.category,
+                        organizationId: t.organization_id,
+                        pago: t.pago,
+                        comprovante: t.comprovante
+                    })));
+                }
             }
-          } else {
-             setName(meta.full_name || 'Usuário ShinkŌS');
-             if (meta.location) setLocation(meta.location);
           }
-
-          const [history, userSubs] = await Promise.all([
-              getPaymentHistory(user.id),
-              getUserSubscriptions(user.id)
-          ]);
-
-          setPayments(history || []);
-          setSubscriptions(userSubs || []);
         }
       } catch (error) {
-        console.error("Erro ao carregar perfil:", error);
+          console.error("Erro ao carregar perfil:", error);
       } finally {
         setLoading(false);
       }
@@ -209,9 +260,6 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
   };
   
   const handlePlanSelection = (plan: SubscriptionPlan) => {
-      if (plan.price === 0) return; // Free plan
-      if (plan.id === currentPlan) return; // Already on plan
-      
       setSelectedPlanForPayment(plan);
       setReceiptFile(null);
       setPaymentMethod('PIX'); // Default reset
@@ -219,9 +267,26 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
       setShowPaymentModal(true);
   };
 
+  // --- HANDLE CUSTOM PLAN SELECTION ---
+  const handleCustomPlanCheckout = () => {
+      const customFeatures = [`${calcUsers} Colaboradores`];
+      if (calcAi) customFeatures.push(`IA (${calculation.details.aiQuotas} cotas)`);
+
+      const customPlan: SubscriptionPlan = {
+          id: 'plan_custom',
+          name: 'Plano Personalizado',
+          price: calculation.grandTotal,
+          features: customFeatures,
+          recommended: false,
+          cycle: 'MONTHLY',
+          dbId: 999 // Special ID for custom plans
+      };
+
+      handlePlanSelection(customPlan);
+  };
+
   const handleCloseModal = () => {
       setShowPaymentModal(false);
-      // Clean up state to prevent old data from flashing on next open
       setTimeout(() => {
           setSelectedPlanForPayment(null);
           setClientSecret('');
@@ -266,16 +331,35 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
   };
 
   const handleReceiptSubmit = async () => {
-    if (!receiptFile || !selectedPlanForPayment || !userId) {
-        alert("Por favor, anexe o comprovante de pagamento.");
+    if (!receiptFile || !selectedPlanForPayment || !userId || !orgId) {
+        alert("Por favor, anexe o comprovante de pagamento. Verifique se sua organização está carregada.");
         return;
     }
     setIsUploadingReceipt(true);
     try {
-        const result = await uploadReceiptAndNotify(userId, selectedPlanForPayment.id, selectedPlanForPayment.price, receiptFile);
+        // Construct Detailed Description
+        let detailedDescription = '';
+        if (selectedPlanForPayment.id === 'plan_custom') {
+            const parts = [];
+            parts.push(`Assinatura Personalizada: ${calcUsers} Usuário(s)`);
+            if (calcAi) parts.push(`IA (${calculation.details.aiQuotas} cotas)`);
+            detailedDescription = parts.join(', ');
+        } else {
+            detailedDescription = `Assinatura Plano: ${selectedPlanForPayment.name}`;
+        }
+
+        const result = await uploadReceiptAndNotify(
+            userId, 
+            orgId,
+            selectedPlanForPayment.id, 
+            selectedPlanForPayment.price, 
+            receiptFile,
+            detailedDescription
+        );
+
         if (result.success) {
             handleCloseModal();
-            alert("Comprovante enviado com sucesso! Sua assinatura será ativada em até 24h úteis.");
+            alert("Comprovante enviado com sucesso! Sua assinatura será ativada em até 24h úteis após aprovação.");
             onRefresh();
         } else {
             throw new Error(result.error || 'Erro desconhecido');
@@ -292,15 +376,6 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
           setPixKeyCopied(true);
           setTimeout(() => setPixKeyCopied(false), 2000);
       });
-  };
-
-  const getPlanStyle = (planId: string) => {
-      if (planId === 'plan_free') return { border: 'border-amber-500', titleColor: 'text-amber-600 dark:text-amber-500', buttonColor: 'bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20' };
-      if (planId === 'plan_usuario') return { border: 'border-amber-600', titleColor: 'text-amber-700 dark:text-amber-600', buttonColor: 'bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20' };
-      if (planId === 'plan_studio') return { border: 'border-slate-200 dark:border-white/10', titleColor: 'text-slate-900 dark:text-white', buttonColor: 'bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20' }; 
-      if (planId === 'plan_scale') return { border: 'border-slate-200 dark:border-white/10', titleColor: 'text-slate-900 dark:text-white', buttonColor: 'bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20' };
-      if (planId === 'plan_agency') return { border: 'border-slate-200 dark:border-white/10', titleColor: 'text-slate-900 dark:text-white', buttonColor: 'bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20' };
-      return { border: 'border-slate-200 dark:border-white/10', titleColor: 'text-slate-900 dark:text-white', buttonColor: 'bg-slate-100 dark:bg-white/10' };
   };
 
   if (loading) {
@@ -350,7 +425,7 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
                     activeTab === 'workspace' ? 'bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/5'
                 }`}
              >
-                <Building2 className="w-5 h-5" /> Planos & Cobrança
+                <Calculator className="w-5 h-5" /> Calculadora Modular
              </button>
          </div>
 
@@ -358,108 +433,267 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
          <div className="flex-1">
 
             {activeTab === 'personal' && (
-                <div className="space-y-8 max-w-2xl">
-                    <div className="flex items-center gap-6">
-                        <div className="relative group shrink-0">
-                            <div className="w-24 h-24 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden ring-2 ring-white dark:ring-white/10">
-                                {avatarUrl && <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover"/>}
+                <div className="space-y-8">
+                    {/* Expiration Card */}
+                    <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-gradient-to-r from-slate-900 to-slate-800 text-white relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-32 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none -mr-16 -mt-16"></div>
+                        <div className="relative z-10 flex justify-between items-center">
+                            <div>
+                                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-2">
+                                    <Clock className="w-4 h-4"/> Vencimento da Assinatura
+                                </h3>
+                                <div className="text-3xl font-black">
+                                    {orgExpiration ? new Date(orgExpiration).toLocaleDateString() : '—'}
+                                </div>
+                                <div className="text-xs text-slate-400 mt-2">
+                                    Mantenha sua assinatura em dia para evitar bloqueios.
+                                </div>
                             </div>
-                            <button onClick={() => fileInputRef.current?.click()} className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full text-white">
-                                {uploading ? <Loader2 className="w-6 h-6 animate-spin"/> : <Camera className="w-6 h-6"/>}
+                            <button onClick={() => setActiveTab('workspace')} className="px-6 py-3 bg-white text-slate-900 font-bold rounded-xl hover:bg-slate-200 transition-colors shadow-lg">
+                                Renovar Agora
                             </button>
-                            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleAvatarUpload}/>
-                        </div>
-                        <div>
-                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">{name}</h3>
-                            <p className="text-slate-500 dark:text-slate-400">{email}</p>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-6">
-                        <div>
-                            <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Nome Completo</label>
-                            <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full h-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 text-slate-900 dark:text-white outline-none focus:border-amber-500"/>
+                    <div className="max-w-2xl space-y-8">
+                        <div className="flex items-center gap-6">
+                            <div className="relative group shrink-0">
+                                <div className="w-24 h-24 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden ring-2 ring-white dark:ring-white/10">
+                                    {avatarUrl && <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover"/>}
+                                </div>
+                                <button onClick={() => fileInputRef.current?.click()} className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full text-white">
+                                    {uploading ? <Loader2 className="w-6 h-6 animate-spin"/> : <Camera className="w-6 h-6"/>}
+                                </button>
+                                <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleAvatarUpload}/>
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-bold text-slate-900 dark:text-white">{name}</h3>
+                                <p className="text-slate-500 dark:text-slate-400">{email}</p>
+                            </div>
                         </div>
-                        <div>
-                            <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Telefone</label>
-                            <input type="text" value={phone} onChange={e => setPhone(e.target.value)} className="w-full h-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 text-slate-900 dark:text-white outline-none focus:border-amber-500"/>
+
+                        <div className="grid grid-cols-1 gap-6">
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Nome Completo</label>
+                                <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full h-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 text-slate-900 dark:text-white outline-none focus:border-amber-500"/>
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Telefone</label>
+                                <input type="text" value={phone} onChange={e => setPhone(e.target.value)} className="w-full h-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 text-slate-900 dark:text-white outline-none focus:border-amber-500"/>
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Localização</label>
+                                <input type="text" value={location} onChange={e => setLocation(e.target.value)} className="w-full h-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 text-slate-900 dark:text-white outline-none focus:border-amber-500"/>
+                            </div>
                         </div>
-                        <div>
-                            <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Localização</label>
-                            <input type="text" value={location} onChange={e => setLocation(e.target.value)} className="w-full h-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 text-slate-900 dark:text-white outline-none focus:border-amber-500"/>
+
+                        <div className="flex justify-end">
+                            <button onClick={handleSaveProfile} disabled={saving} className="h-12 px-8 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl flex items-center gap-2 disabled:opacity-50 shadow-lg">
+                                {saving ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4"/>} Salvar
+                            </button>
                         </div>
                     </div>
 
-                    <div className="flex justify-end">
-                        <button onClick={handleSaveProfile} disabled={saving} className="h-12 px-8 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl flex items-center gap-2 disabled:opacity-50 shadow-lg">
-                            {saving ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4"/>} Salvar
-                        </button>
+                    {/* Transactions List */}
+                    <div className="mt-12">
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+                            <History className="w-5 h-5 text-blue-500"/> Últimas Transações
+                        </h3>
+                        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+                            <table className="w-full text-left text-sm">
+                                <thead className="bg-slate-50 dark:bg-slate-950 text-slate-500 border-b border-slate-200 dark:border-slate-800">
+                                    <tr>
+                                        <th className="p-4 font-medium">Data</th>
+                                        <th className="p-4 font-medium">Descrição</th>
+                                        <th className="p-4 font-medium text-right">Valor</th>
+                                        <th className="p-4 font-medium text-center">Status</th>
+                                        <th className="p-4 font-medium text-center">Comprovante</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                    {transactions.length === 0 && (
+                                        <tr>
+                                            <td colSpan={5} className="p-8 text-center text-slate-500">
+                                                Nenhuma transação encontrada.
+                                            </td>
+                                        </tr>
+                                    )}
+                                    {transactions.map((t) => (
+                                        <tr key={t.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                                            <td className="p-4 text-slate-600 dark:text-slate-400 font-mono text-xs">
+                                                {new Date(t.date).toLocaleDateString()}
+                                            </td>
+                                            <td className="p-4 font-medium text-slate-900 dark:text-white">
+                                                {t.description}
+                                            </td>
+                                            <td className={`p-4 text-right font-bold ${t.type === 'inflow' ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                {t.type === 'inflow' ? '+' : '-'} R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                            </td>
+                                            <td className="p-4 text-center">
+                                                {t.pago ? (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
+                                                        <CheckCircle className="w-3 h-3"/> Pago
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
+                                                        <Clock className="w-3 h-3"/> Pendente
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="p-4 text-center">
+                                                {t.comprovante ? (
+                                                    <a href={t.comprovante} target="_blank" className="text-blue-500 hover:underline text-xs font-bold flex items-center justify-center gap-1">
+                                                        <FileText className="w-3 h-3"/> Ver
+                                                    </a>
+                                                ) : (
+                                                    <span className="text-slate-400 text-xs">-</span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             )}
 
             {activeTab === 'workspace' && (
                  <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
-                    <div>
-                        <h3 className="text-lg font-bold text-slate-500 uppercase mb-6 tracking-wider">Planos Disponíveis</h3>
-                        
-                        {/* Responsive Grid: Vertical on mobile, Grid on larger screens */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {availablePlans.map(plan => {
-                                const styles = getPlanStyle(plan.id);
-                                const isCurrent = currentPlan === plan.id;
+                        <div className="animate-in fade-in slide-in-from-bottom-4">
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                 
-                                return (
-                                    <div 
-                                        key={plan.id} 
-                                        className={`relative p-6 rounded-2xl border bg-white dark:bg-black/40 flex flex-col justify-between min-h-[480px] shadow-sm ${isCurrent ? 'border-amber-500 ring-1 ring-amber-500 bg-amber-50 dark:bg-amber-900/10' : styles.border}`}
-                                    >
-                                        {isCurrent && (
-                                            <div className="absolute top-4 right-4 bg-amber-500 text-black text-[10px] font-bold px-2 py-1 rounded uppercase">
-                                                Seu Plano
+                                {/* Controls */}
+                                <div className="space-y-8">
+                                    <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-900/50">
+                                        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+                                            <User className="w-5 h-5 text-blue-500"/> Usuários & Licenças
+                                        </h3>
+                                        <div className="mb-6">
+                                            <div className="flex justify-between mb-2">
+                                                <label className="text-sm font-bold text-slate-600 dark:text-slate-300">Número de Colaboradores (N)</label>
+                                                <span className="text-lg font-black text-blue-600 dark:text-blue-400">{calcUsers}</span>
                                             </div>
-                                        )}
-                                        {plan.recommended && !isCurrent && (
-                                            <div className="absolute top-[-12px] left-1/2 -translate-x-1/2 bg-amber-500 text-black text-[10px] font-bold px-3 py-1 rounded-full uppercase shadow-lg z-10">
-                                                Mais Popular
+                                            <input 
+                                                type="range" 
+                                                min="1" 
+                                                max="50" 
+                                                value={calcUsers} 
+                                                onChange={(e) => setCalcUsers(parseInt(e.target.value))}
+                                                className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                            />
+                                            <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/10 rounded-lg text-xs text-slate-600 dark:text-slate-400 border border-blue-100 dark:border-blue-900/20">
+                                                <strong>Regra de Cálculo:</strong> R$ 89,90 (1º usuário) + R$ 69,90 por usuário extra.
                                             </div>
-                                        )}
-
-                                        <div>
-                                            <h4 className={`text-xl font-bold mb-4 ${styles.titleColor}`}>{plan.name}</h4>
-                                            <div className="flex items-baseline gap-1 mb-6">
-                                                <span className="text-3xl font-black text-slate-900 dark:text-white">R$ {plan.price.toFixed(2)}</span>
-                                                <span className="text-xs text-slate-500">/mês</span>
-                                            </div>
-                                            
-                                            <ul className="space-y-3">
-                                                {plan.features.map((feat, i) => {
-                                                    const isNegative = feat.startsWith('X') || feat.includes('Sem ');
-                                                    return (
-                                                        <li key={i} className={`text-xs flex items-start gap-2 ${isNegative ? 'text-slate-400 dark:text-slate-500 line-through decoration-slate-400' : 'text-slate-600 dark:text-slate-300'}`}>
-                                                            {isNegative ? <X className="w-3 h-3 text-red-500 mt-0.5 shrink-0"/> : <Check className="w-3 h-3 text-emerald-500 mt-0.5 shrink-0"/>}
-                                                            <span className="leading-snug">{feat}</span>
-                                                        </li>
-                                                    );
-                                                })}
-                                            </ul>
                                         </div>
-
-                                        <button 
-                                            onClick={() => handlePlanSelection(plan)}
-                                            disabled={isCurrent}
-                                            className={`w-full py-3 rounded-lg text-sm font-bold mt-4 transition-colors ${
-                                                isCurrent
-                                                ? 'bg-slate-200 dark:bg-white/10 text-slate-500 dark:text-white/50 cursor-default'
-                                                : styles.buttonColor + ' text-slate-900 dark:text-white shadow-sm border border-slate-200 dark:border-transparent'
-                                        }`}>
-                                            {isCurrent ? 'Plano Atual' : 'Selecionar'}
-                                        </button>
                                     </div>
-                                );
-                            })}
+
+                                    <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-900/50">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                                <Zap className="w-5 h-5 text-yellow-500"/> Módulo Inteligência Artificial
+                                            </h3>
+                                            <div 
+                                                className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-colors ${calcAi ? 'bg-yellow-500' : 'bg-slate-300 dark:bg-slate-700'}`}
+                                                onClick={() => setCalcAi(!calcAi)}
+                                            >
+                                                <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform ${calcAi ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                                            </div>
+                                        </div>
+                                        <div className={`transition-all duration-300 ${calcAi ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
+                                            <div className="flex justify-between items-center mb-4 text-sm">
+                                                <span className="text-slate-600 dark:text-slate-300">Base (500 cotas inclusas)</span>
+                                                <span className="font-bold text-slate-900 dark:text-white">R$ 199,00</span>
+                                            </div>
+                                            <div className="bg-slate-100 dark:bg-black/20 p-4 rounded-xl border border-slate-200 dark:border-white/5">
+                                                <div className="flex justify-between items-center mb-2">
+                                                    <span className="text-xs font-bold text-slate-500 uppercase">Cotas Extras (+500 cada)</span>
+                                                    <span className="text-xs font-bold text-slate-900 dark:text-white">+{calcAiExtra} pacotes</span>
+                                                </div>
+                                                <div className="flex items-center gap-4">
+                                                    <button onClick={() => setCalcAiExtra(Math.max(0, calcAiExtra - 1))} className="p-1 bg-white dark:bg-slate-800 rounded shadow hover:bg-slate-100"><Minus className="w-4 h-4"/></button>
+                                                    <div className="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                                                        <div className="h-full bg-yellow-500" style={{ width: `${Math.min(100, calcAiExtra * 10)}%` }}></div>
+                                                    </div>
+                                                    <button onClick={() => setCalcAiExtra(calcAiExtra + 1)} className="p-1 bg-white dark:bg-slate-800 rounded shadow hover:bg-slate-100"><Plus className="w-4 h-4"/></button>
+                                                </div>
+                                                <div className="text-right text-xs text-slate-500 mt-2">
+                                                    + R$ {(calcAiExtra * 99).toFixed(2)}/mês
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Receipt / Summary */}
+                                <div className="lg:sticky lg:top-4 h-fit space-y-6">
+                                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl overflow-hidden relative">
+                                        {/* Paper tear effect (CSS simulation) */}
+                                        <div className="h-2 bg-slate-900 dark:bg-black w-full absolute top-0 left-0 opacity-10" style={{backgroundImage: 'radial-gradient(circle, transparent 50%, inherit 50%)', backgroundSize: '10px 10px', backgroundPosition: '0 5px'}}></div>
+                                        
+                                        <div className="p-8">
+                                            <h3 className="text-center text-xl font-black text-slate-900 dark:text-white uppercase tracking-widest mb-1 border-b-2 border-slate-900 dark:border-white pb-4">
+                                                Resumo do Plano
+                                            </h3>
+                                            <div className="text-center text-xs text-slate-500 mt-2 mb-6 font-mono">
+                                                {new Date().toLocaleDateString()} • CALCULADORA SHINKŌ
+                                            </div>
+
+                                            <div className="space-y-4 text-sm">
+                                                {/* License Breakdown */}
+                                                <div className="flex justify-between items-start pb-4 border-b border-slate-100 dark:border-white/5 border-dashed">
+                                                    <div>
+                                                        <div className="font-bold text-slate-800 dark:text-slate-200">Licenças de Usuário ({calcUsers})</div>
+                                                        <div className="text-xs text-slate-500 mt-1 pl-2">
+                                                            <div>1x Base (R$ 89,90)</div>
+                                                            {calcUsers > 1 && <div>{calcUsers - 1}x Extra (R$ 69,90)</div>}
+                                                        </div>
+                                                    </div>
+                                                    <div className="font-mono font-bold text-slate-900 dark:text-white">
+                                                        R$ {calculation.licenseTotal.toFixed(2)}
+                                                    </div>
+                                                </div>
+
+                                                {/* AI Breakdown */}
+                                                {calcAi && (
+                                                    <div className="flex justify-between items-start pb-4 border-b border-slate-100 dark:border-white/5 border-dashed">
+                                                        <div>
+                                                            <div className="font-bold text-slate-800 dark:text-slate-200">Módulo IA</div>
+                                                            <div className="text-xs text-slate-500 mt-1 pl-2">
+                                                                <div>Base (+R$ 199,00)</div>
+                                                                {calcAiExtra > 0 && <div>{calcAiExtra}x Cotas Extras (+R$ {(calcAiExtra * 99).toFixed(2)})</div>}
+                                                            </div>
+                                                        </div>
+                                                        <div className="font-mono font-bold text-slate-900 dark:text-white">
+                                                            R$ {calculation.aiTotal.toFixed(2)}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="mt-8 pt-4 border-t-2 border-slate-900 dark:border-white flex justify-between items-end">
+                                                <div className="text-xs font-bold text-slate-500 uppercase">Custo Mensal Total</div>
+                                                <div className="text-3xl font-black text-slate-900 dark:text-white">
+                                                    R$ {calculation.grandTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="bg-slate-50 dark:bg-black/30 p-4 border-t border-slate-200 dark:border-slate-800">
+                                            <button 
+                                                onClick={handleCustomPlanCheckout}
+                                                className="w-full py-4 bg-slate-900 dark:bg-white text-white dark:text-black font-bold rounded-xl shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                                            >
+                                                Contratar Personalizado <Zap className="w-4 h-4 fill-current"/>
+                                            </button>
+                                            <p className="text-[10px] text-center text-slate-400 mt-3">
+                                                Cobrança mensal recorrente. Cancelamento a qualquer momento.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                    </div>
                 </div>
             )}
         </div>

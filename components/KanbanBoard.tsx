@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Opportunity, TaskStatus, DbTask, PLAN_LIMITS } from '../types';
 import { Trello, Filter, User, Hash, Clock, Briefcase, RefreshCw, Calendar as CalendarIcon, GitMerge, GanttChartSquare, Lock } from 'lucide-react';
@@ -16,6 +17,7 @@ interface Props {
   projectId?: string; // Prop para filtrar por projeto específico
   organizationId?: number; // Prop para filtrar por organização
   currentPlan?: string;
+  activeModules?: string[];
 }
 
 interface KanbanColumn {
@@ -35,7 +37,7 @@ const COLUMNS: KanbanColumn[] = [
     { id: 'done', label: 'Concluído', color: 'bg-emerald-500' }
 ];
 
-export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, projectId, organizationId, onTaskUpdate, currentPlan }) => {
+export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, projectId, organizationId, onTaskUpdate, currentPlan, activeModules }) => {
     const [viewMode, setViewMode] = useState<ViewMode>('board');
     const [tasks, setTasks] = useState<DbTask[]>([]);
     const [projectsList, setProjectsList] = useState<{id: number, nome: string}[]>([]);
@@ -169,6 +171,8 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
         return '';
     };
 
+    const isGanttEnabled = activeModules ? activeModules.includes('gantt') : true;
+
     return (
         <div className="flex flex-col h-full animate-in fade-in duration-500">
             <div className="mb-6 flex flex-col gap-4">
@@ -191,22 +195,24 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
                                 >
                                     <Trello className="w-4 h-4"/> Quadro
                                 </button>
-                                <button 
-                                    onClick={() => canViewGantt ? setViewMode('gantt') : alert("Visualização Gantt disponível apenas nos planos Studio e superiores.")}
-                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all relative group ${
-                                        viewMode === 'gantt' 
-                                        ? 'bg-white dark:bg-slate-700 shadow text-shinko-primary' 
-                                        : canViewGantt ? 'text-slate-500 hover:text-slate-900 dark:hover:text-white' : 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
-                                    }`}
-                                    title={!canViewGantt ? "Disponível no plano Studio" : ""}
-                                >
-                                    <GanttChartSquare className="w-4 h-4"/> Gantt
-                                    {!canViewGantt && (
-                                        <div className="absolute top-0 right-0 -mt-1 -mr-1">
-                                            <Lock className="w-3 h-3 text-red-500 fill-white dark:fill-slate-900"/>
-                                        </div>
-                                    )}
-                                </button>
+                                {isGanttEnabled && (
+                                    <button 
+                                        onClick={() => canViewGantt ? setViewMode('gantt') : alert("Visualização Gantt disponível apenas nos planos Studio e superiores.")}
+                                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all relative group ${
+                                            viewMode === 'gantt' 
+                                            ? 'bg-white dark:bg-slate-700 shadow text-shinko-primary' 
+                                            : canViewGantt ? 'text-slate-500 hover:text-slate-900 dark:hover:text-white' : 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
+                                        }`}
+                                        title={!canViewGantt ? "Disponível no plano Studio" : ""}
+                                    >
+                                        <GanttChartSquare className="w-4 h-4"/> Gantt
+                                        {!canViewGantt && (
+                                            <div className="absolute top-0 right-0 -mt-1 -mr-1">
+                                                <Lock className="w-3 h-3 text-red-500 fill-white dark:fill-slate-900"/>
+                                            </div>
+                                        )}
+                                    </button>
+                                )}
                             </div>
                         </div>
                     )}
@@ -287,7 +293,7 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
             </div>
 
             {/* GANTT VIEW MODE */}
-            {viewMode === 'gantt' && canViewGantt && (
+            {viewMode === 'gantt' && canViewGantt && isGanttEnabled && (
                 <div className="flex-1 overflow-hidden bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm">
                     <GanttView 
                         opportunities={[]} // Data is fetched internally by organizationId
@@ -296,15 +302,16 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
                         userRole={userRole}
                         projectId={projectId}
                         organizationId={organizationId}
+                        activeModules={activeModules}
                     />
                 </div>
             )}
 
-            {viewMode === 'gantt' && !canViewGantt && (
+            {viewMode === 'gantt' && (!canViewGantt || !isGanttEnabled) && (
                 <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-slate-50 dark:bg-black/20 rounded-2xl border border-dashed border-slate-200 dark:border-white/10">
                     <Lock className="w-16 h-16 text-slate-300 dark:text-slate-700 mb-4"/>
                     <h3 className="text-xl font-bold text-slate-500">Visualização Bloqueada</h3>
-                    <p className="text-slate-400 mt-2 max-w-md">O gráfico de Gantt Global é exclusivo para planos Studio ou superiores. Faça um upgrade para organizar seu cronograma mestre.</p>
+                    <p className="text-slate-400 mt-2 max-w-md">O gráfico de Gantt Global é exclusivo para planos Studio ou superiores, ou requer ativação do módulo.</p>
                 </div>
             )}
 

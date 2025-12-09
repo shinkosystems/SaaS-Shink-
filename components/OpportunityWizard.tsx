@@ -6,6 +6,8 @@
 
 
 
+
+
 import React, { useState, useEffect } from 'react';
 import { Opportunity, RDEStatus, Archetype, IntensityLevel, TadsCriteria, ProjectStatus } from '../types';
 import { analyzeOpportunity, suggestEvidence } from '../services/geminiService';
@@ -22,6 +24,7 @@ interface Props {
   onSave: (opp: Opportunity) => void;
   onCancel: () => void;
   orgType?: string;
+  activeModules?: string[];
 }
 
 interface SimpleUser {
@@ -104,7 +107,7 @@ const DOMAIN_LABELS: any = {
     }
 };
 
-const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel, orgType = 'Startup' }) => {
+const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel, orgType = 'Startup', activeModules }) => {
   const [step, setStep] = useState(0);
   const [isLoadingAi, setIsLoadingAi] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
@@ -149,6 +152,8 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel, org
     },
     status: 'Future' 
   });
+
+  const aiEnabled = activeModules ? activeModules.includes('ia') : true; // Default true if not passed
 
   // Helper to get labels based on orgType (Robust Matching)
   const getLabel = (key: string, subKey?: string) => {
@@ -469,16 +474,18 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel, org
                 />
               </label>
 
-              <div className="flex justify-end">
-                <button 
-                  onClick={handleAiAnalysis}
-                  disabled={isLoadingAi}
-                  className="glass-button px-6 py-2 rounded-xl flex items-center gap-2 text-purple-500 hover:text-purple-400 hover:bg-purple-500/10 transition-all"
-                >
-                  {isLoadingAi ? <Loader2 className="animate-spin w-4 h-4"/> : <BrainCircuit className="w-4 h-4" />}
-                  <span>Análise Shinkō AI</span>
-                </button>
-              </div>
+              {aiEnabled && (
+                  <div className="flex justify-end">
+                    <button 
+                      onClick={handleAiAnalysis}
+                      disabled={isLoadingAi}
+                      className="glass-button px-6 py-2 rounded-xl flex items-center gap-2 text-purple-500 hover:text-purple-400 hover:bg-purple-500/10 transition-all"
+                    >
+                      {isLoadingAi ? <Loader2 className="animate-spin w-4 h-4"/> : <BrainCircuit className="w-4 h-4" />}
+                      <span>Análise Shinkō AI</span>
+                    </button>
+                  </div>
+              )}
 
               {aiSuggestion && (
                 <div className="glass-panel p-4 rounded-xl text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap animate-ios-pop border-l-4 border-purple-500">
@@ -727,14 +734,16 @@ const OpportunityWizard: React.FC<Props> = ({ initialData, onSave, onCancel, org
           <div className="space-y-6 animate-ios-slide-right">
              <div className="flex justify-between items-end">
               <h3 className="text-xl font-bold text-slate-900 dark:text-white">Mapa de Evidências</h3>
-              <button 
-                  onClick={handleAiEvidence}
-                  disabled={isLoadingAi}
-                  className="flex items-center gap-2 text-xs font-bold text-purple-400 hover:text-purple-300 transition-colors bg-purple-500/10 px-3 py-1.5 rounded-lg border border-purple-500/20"
-                >
-                  {isLoadingAi ? <Loader2 className="w-3 h-3 animate-spin"/> : <Lightbulb className="w-3 h-3" />}
-                  Sugerir Evidências
-              </button>
+              {aiEnabled && (
+                  <button 
+                      onClick={handleAiEvidence}
+                      disabled={isLoadingAi}
+                      className="flex items-center gap-2 text-xs font-bold text-purple-400 hover:text-purple-300 transition-colors bg-purple-500/10 px-3 py-1.5 rounded-lg border border-purple-500/20"
+                    >
+                      {isLoadingAi ? <Loader2 className="w-3 h-3 animate-spin"/> : <Lightbulb className="w-3 h-3" />}
+                      Sugerir Evidências
+                  </button>
+              )}
              </div>
 
              {aiSuggestion && !formData.evidence?.clientsAsk.length && (

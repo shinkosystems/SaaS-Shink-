@@ -5,6 +5,12 @@ import { PLAN_LIMITS } from '../types';
 const ORG_TABLE = 'organizacoes';
 const LOGO_BUCKET = 'fotoperfil'; 
 
+// System Modules Definition (Keys used for logic)
+// Estes devem corresponder exatamente aos IDs usados no Frontend (SettingsScreen)
+const SYSTEM_MODULES_DEF = [
+    'projects', 'kanban', 'gantt', 'calendar', 'crm', 'financial', 'clients', 'engineering', 'product', 'ia'
+];
+
 // Helper to determine plan string from ID
 const getPlanKeyFromId = (id: number): string => {
     switch (id) {
@@ -63,6 +69,7 @@ export const fetchOrganizationDetails = async (orgId: number) => {
 };
 
 // Updates all organization details in the database
+// REMOVED 'modulos' from this update to prevent "invalid input syntax for type bigint"
 export const updateOrgDetails = async (
     orgId: number, 
     { logoUrl, primaryColor, name, limit, aiSector, aiTone, aiContext }: 
@@ -77,8 +84,8 @@ export const updateOrgDetails = async (
     if (name !== undefined) updates.nome = name;
     if (limit !== undefined) updates.colaboradores = limit;
 
-    // AI Fields Mapping to DB Schema (Corrected based on schema provided)
-    if (aiSector !== undefined) updates.setor = aiSector; // Fixed: orientacoesia -> setor
+    // AI Fields Mapping to DB Schema
+    if (aiSector !== undefined) updates.setor = aiSector; 
     if (aiTone !== undefined) updates.tomdevoz = aiTone;
     if (aiContext !== undefined) updates.dna = aiContext;
 
@@ -94,13 +101,11 @@ export const updateOrgDetails = async (
             .select();
 
         if (error) {
-            // Converte o erro para string legível
             const errorDetails = error.message || JSON.stringify(error);
             console.error("Erro detalhado no update do Supabase:", errorDetails);
             throw new Error(errorDetails);
         }
         
-        console.log("Update realizado com sucesso. Dados retornados:", data);
         return { success: true, data };
     } catch (err: any) {
         const msg = err.message || JSON.stringify(err);
@@ -108,21 +113,105 @@ export const updateOrgDetails = async (
     }
 };
 
+// --- MODULE MANAGEMENT (RELATIONAL) ---
+
+// Seeding: Ensures the 'modulos' table has the basic system modules
+export const seedSystemModules = async () => {
+    try {
+        const { data: existing } = await supabase.from('modulos').select('nome');
+        const existingNames = new Set(existing?.map(m => m.nome) || []);
+
+        const toInsert = SYSTEM_MODULES_DEF
+            .filter(key => !existingNames.has(key))
+            .map(key => ({ nome: key }));
+
+        if (toInsert.length > 0) {
+            console.log("Seeding modules:", toInsert);
+            await supabase.from('modulos').insert(toInsert);
+        }
+    } catch (e) {
+        console.error("Error seeding modules:", e);
+    }
+};
+
+export const fetchActiveOrgModules = async (orgId: number): Promise<string[]> => {
+    try {
+        const { data, error } = await supabase
+            .from('organizacao_modulo')
+            .select('modulo (nome)') // Relational join
+            .eq('organizacao', orgId);
+
+        if (error) {
+            console.error("Error fetching active modules:", error);
+            // Return empty on error to avoid false positives. 
+            // If DB access fails, better to show nothing enabled than everything.
+            return []; 
+        }
+
+        // Map data structure: [{ modulo: { nome: 'projects' } }, ...] -> ['projects', ...]
+        const modules = data.map((item: any) => item.modulo?.nome).filter(Boolean);
+        
+        // STRICT BEHAVIOR: If no rows exist, return empty array.
+        // This ensures that switches are OFF if nothing is explicitly enabled in the DB.
+        
+        return modules;
+    } catch (e) {
+        console.error("Exception active modules:", e);
+        return [];
+    }
+};
+
+export const updateOrgModules = async (orgId: number, moduleKeys: string[]) => {
+    try {
+        console.log(`Updating modules for Org ${orgId}. New active set:`, moduleKeys);
+
+        // 1. Ensure modules exist in DB (Seed)
+        await seedSystemModules();
+
+        // 2. Fetch Module IDs from 'modulos' table
+        const { data: allModules } = await supabase.from('modulos').select('id, nome');
+        if (!allModules) throw new Error("System modules not found.");
+
+        const moduleMap = new Map(allModules.map(m => [m.nome, m.id]));
+
+        // 3. Map selected keys to IDs
+        const idsToInsert = moduleKeys.map(k => moduleMap.get(k)).filter(Boolean);
+
+        // 4. Clean existing relations for this Org
+        // Isso garante: "se estiver true e vira false, remove a linha"
+        // Removemos tudo e inserimos apenas o que está ativo agora.
+        const { error: deleteError } = await supabase.from('organizacao_modulo').delete().eq('organizacao', orgId);
+        if (deleteError) throw deleteError;
+
+        // 5. Insert new relations
+        // Isso garante: "switch = true, deve inserir linha"
+        if (idsToInsert.length > 0) {
+            const payload = idsToInsert.map(modId => ({
+                organizacao: orgId,
+                modulo: modId
+            }));
+            const { error: insertError } = await supabase.from('organizacao_modulo').insert(payload);
+            if (insertError) throw insertError;
+        }
+        
+        return { success: true };
+    } catch (err: any) {
+        console.error("Error updating org modules:", err);
+        throw new Error(err.message);
+    }
+};
+
 // Fetches public organization details for White Label Login
 export const getPublicOrgDetails = async (orgId: number) => {
     try {
-        // Select 'plano' instead of 'whitelable' because the column 'whitelable' likely doesn't exist
         const { data, error } = await supabase
-            .from(ORG_TABLE)
+            .from('organizacoes')
             .select('nome, logo, cor, plano') 
             .eq('id', orgId)
             .single();
 
         if (error || !data) return null;
         
-        // Authorization Logic:
-        // Only return custom branding if Plan ID is 10 (Enterprise) or 5 (Agency)
-        // Or if the query happens to include a 'whitelable' boolean (if schema changes later)
         const isWhitelabelAllowed = data.plano === 10 || data.plano === 5 || (data as any).whitelable === true;
 
         if (isWhitelabelAllowed) {
@@ -134,11 +223,10 @@ export const getPublicOrgDetails = async (orgId: number) => {
             };
         }
         
-        // Return null if whitelabel is not active for this org
         return null;
 
     } catch (error) {
-        console.error("Error fetching public org details:", error);
+        // console.error("Error fetching public org details:", error);
         return null;
     }
 };

@@ -1,4 +1,6 @@
 
+
+
 import React, { useMemo, useState, useEffect } from 'react';
 import { Opportunity, TaskStatus, BpmnTask, DbTask } from '../types';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, User, Clock, Zap, Plus, LayoutGrid, Columns, Square, Loader2, CheckCircle2, Hash, RefreshCw, Grid, CornerDownRight, AlignLeft, Layers } from 'lucide-react';
@@ -16,6 +18,7 @@ interface Props {
   userRole?: string;
   projectId?: string; // Prop para filtrar
   organizationId?: number; // Prop para filtrar por organização
+  activeModules?: string[]; // Prop para módulos ativos
 }
 
 interface EditableTaskContext {
@@ -86,7 +89,7 @@ const getBusinessDatesInRange = (startDate: Date, endDate: Date): Date[] => {
     return dates;
 };
 
-export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportunity, onTaskUpdate, onCreateAdhocTask, onRefresh, userRole, projectId, organizationId }) => {
+export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportunity, onTaskUpdate, onCreateAdhocTask, onRefresh, userRole, projectId, organizationId, activeModules }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [editingContext, setEditingContext] = useState<EditableTaskContext | null>(null);
@@ -573,10 +576,12 @@ export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportuni
                         {showSubtasks ? 'Com Subs' : 'Sem Subs'}
                     </button>
 
-                    <button onClick={handleBalanceClick} disabled={isBalancing} className="flex items-center gap-2 px-4 h-9 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-lg shadow-sm transition-all active:scale-95 disabled:opacity-50 disabled:cursor-wait ml-2">
-                        {isBalancing ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <Zap className="w-3.5 h-3.5"/>}
-                        {isBalancing ? 'Otimizando...' : 'Otimizar Agenda'}
-                    </button>
+                    {activeModules && activeModules.includes('ia') && (
+                        <button onClick={handleBalanceClick} disabled={isBalancing} className="flex items-center gap-2 px-4 h-9 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-lg shadow-sm transition-all active:scale-95 disabled:opacity-50 disabled:cursor-wait ml-2">
+                            {isBalancing ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <Zap className="w-3.5 h-3.5"/>}
+                            {isBalancing ? 'Otimizando...' : 'Otimizar Agenda'}
+                        </button>
+                    )}
                 </div>
             )}
         </div>

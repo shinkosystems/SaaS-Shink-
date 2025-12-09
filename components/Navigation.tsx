@@ -4,7 +4,7 @@ import {
     LayoutDashboard, List, Calendar, User, Settings, Search, 
     PlusCircle, LogOut, Sun, Moon, CreditCard, ChevronRight,
     Menu, X, Briefcase, BarChart3, Code2, Users, DollarSign,
-    Shield, Layers, Sparkles, Lightbulb
+    Shield, Layers, Sparkles, Lightbulb, TrendingUp
 } from 'lucide-react';
 import { PLAN_LIMITS } from '../types';
 import { fetchOrganizationDetails } from '../services/organizationService';
@@ -28,10 +28,11 @@ interface Props {
   currentPlan?: string;
   customLogoUrl?: string | null;
   orgName?: string;
+  activeModules?: string[];
 }
 
 // Helper para definir grupos de menu
-const getMenuGroups = (userRole: string, isAdmin: boolean, currentPlan: string = 'plan_free', userEmail?: string) => {
+const getMenuGroups = (userRole: string, isAdmin: boolean, currentPlan: string = 'plan_free', userEmail?: string, activeModules: string[] = []) => {
     const isClient = userRole === 'cliente';
     const planFeatures = PLAN_LIMITS[currentPlan]?.features || PLAN_LIMITS['plan_free'].features;
 
@@ -44,23 +45,33 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, currentPlan: string =
         },
         {
             title: 'Execução',
-            items: [
-                { id: 'list', label: 'Projetos', icon: List },
-                { id: 'kanban', label: 'Tarefas', icon: Briefcase },
-            ]
+            items: [] as any[]
         }
     ];
 
-    if (planFeatures.gantt) {
+    // Modules filtering for Execution
+    if (activeModules.includes('projects')) {
+        groups[1].items.push({ id: 'list', label: 'Projetos', icon: List });
+    }
+    if (activeModules.includes('kanban')) {
+        groups[1].items.push({ id: 'kanban', label: 'Tarefas', icon: Briefcase });
+    }
+    if (planFeatures.gantt && activeModules.includes('calendar')) {
         groups[1].items.push({ id: 'calendar', label: 'Cronograma', icon: Calendar });
     }
 
     if (!isClient) {
         const businessItems = [];
-        if (planFeatures.financial) {
+        
+        // CRM (Vendas)
+        if (planFeatures.crm && activeModules.includes('crm')) {
+            businessItems.push({ id: 'crm', label: 'CRM (Vendas)', icon: TrendingUp });
+        }
+
+        if (planFeatures.financial && activeModules.includes('financial')) {
             businessItems.push({ id: 'financial', label: 'Financeiro', icon: DollarSign });
         }
-        if (planFeatures.clients) {
+        if (planFeatures.clients && activeModules.includes('clients')) {
             businessItems.push({ id: 'clients', label: 'Clientes', icon: Users });
         }
 
@@ -74,10 +85,12 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, currentPlan: string =
         const intelItems = [];
         if (planFeatures.metrics) {
             // RESTRIÇÃO: Apenas peboorba@gmail.com vê Métricas Produto
-            if (userEmail === 'peboorba@gmail.com') {
+            if (userEmail === 'peboorba@gmail.com' && activeModules.includes('product')) {
                 intelItems.push({ id: 'product', label: 'Métricas Produto', icon: BarChart3 });
             }
-            intelItems.push({ id: 'dev-metrics', label: 'Engenharia', icon: Code2 });
+            if (activeModules.includes('engineering')) {
+                intelItems.push({ id: 'dev-metrics', label: 'Engenharia', icon: Code2 });
+            }
         }
 
         if (intelItems.length > 0) {
@@ -107,7 +120,7 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, currentPlan: string =
 export const Sidebar: React.FC<Props> = (props) => {
   const isClient = props.userRole === 'cliente';
   const isAdmin = props.userData.name === 'Pedro Borba';
-  const menuGroups = getMenuGroups(props.userRole, isAdmin, props.currentPlan, props.userData?.email);
+  const menuGroups = getMenuGroups(props.userRole, isAdmin, props.currentPlan, props.userData?.email, props.activeModules);
   const planLimits = PLAN_LIMITS[props.currentPlan || 'plan_free'];
   const [aiUsage, setAiUsage] = useState(0);
 
@@ -198,7 +211,7 @@ export const Sidebar: React.FC<Props> = (props) => {
                 <div key={idx} className="relative">
                     {idx > 0 && <div className="mx-2 mb-4 h-px bg-slate-200/50 dark:bg-white/5"></div>}
                     
-                    {group.title && (
+                    {group.title && group.items.length > 0 && (
                         <h3 className="px-3 mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 opacity-80">
                             {group.title}
                         </h3>
@@ -285,7 +298,7 @@ export const Sidebar: React.FC<Props> = (props) => {
 export const MobileDrawer: React.FC<Props> = (props) => {
     const isClient = props.userRole === 'cliente';
     const isAdmin = props.userData.name === 'Pedro Borba';
-    const menuGroups = getMenuGroups(props.userRole, isAdmin, props.currentPlan, props.userData?.email);
+    const menuGroups = getMenuGroups(props.userRole, isAdmin, props.currentPlan, props.userData?.email, props.activeModules);
 
     return (
         <>
@@ -351,7 +364,7 @@ export const MobileDrawer: React.FC<Props> = (props) => {
                         <div className="flex-1 overflow-y-auto px-4 pb-4 custom-scrollbar space-y-6 pt-4">
                             {menuGroups.map((group, idx) => (
                                 <div key={idx}>
-                                    {group.title && (
+                                    {group.title && group.items.length > 0 && (
                                         <h3 className="mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
                                             {group.title}
                                         </h3>

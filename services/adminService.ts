@@ -1,6 +1,6 @@
 
 import { supabase } from './supabaseClient';
-import { DbPlan } from '../types';
+import { DbPlan, FinancialTransaction } from '../types';
 import { fetchSubscriptionPlans } from './asaasService';
 
 export interface AdminUser {
@@ -350,5 +350,73 @@ export const updateUserStatus = async (userId: string, newStatus: string): Promi
     } catch (e) {
         console.error('Exception updating user status:', e);
         return { success: false };
+    }
+};
+
+// --- APPROVALS LOGIC ---
+
+export const fetchPendingApprovals = async (): Promise<FinancialTransaction[]> => {
+    const { data, error } = await supabase
+        .from('transacoes')
+        .select('*, organizacoes(nome)')
+        .eq('pago', false)
+        .not('comprovante', 'is', null) 
+        .order('date', { ascending: false });
+
+    if (error) {
+        console.error("Erro ao buscar aprovações pendentes:", error);
+        return [];
+    }
+
+    return data.map((d: any) => ({
+        id: d.id,
+        date: d.date,
+        description: d.description,
+        amount: d.amount,
+        type: d.type,
+        category: d.category,
+        organizationId: d.organization_id,
+        pago: d.pago,
+        comprovante: d.comprovante,
+        orgName: d.organizacoes?.nome || 'Organização Desconhecida'
+    }));
+};
+
+export const approveSubscription = async (transactionId: string, orgId: number): Promise<{ success: boolean; msg?: string }> => {
+    try {
+        console.log(`[AdminService] Approving Transaction: ${transactionId} for Org: ${orgId}`);
+
+        if (!transactionId) throw new Error("Transaction ID is missing");
+        if (!orgId) throw new Error("Organization ID is missing");
+
+        // 1. Marcar transação como Paga
+        const { error: transError } = await supabase
+            .from('transacoes')
+            .update({ pago: true })
+            .eq('id', transactionId);
+
+        if (transError) {
+            console.error("Trans update error:", transError);
+            throw new Error("Falha ao atualizar transação: " + transError.message);
+        }
+
+        // 2. Atualizar vencimento da organização (+30 dias)
+        const newExpiry = new Date();
+        newExpiry.setDate(newExpiry.getDate() + 30);
+
+        const { error: orgError } = await supabase
+            .from('organizacoes')
+            .update({ vencimento: newExpiry.toISOString() })
+            .eq('id', orgId);
+
+        if (orgError) {
+            console.error("Org update error:", orgError);
+            throw new Error("Falha ao atualizar vencimento: " + orgError.message);
+        }
+
+        return { success: true };
+    } catch (e: any) {
+        console.error("Erro na aprovação:", e);
+        return { success: false, msg: e.message || "Erro desconhecido" };
     }
 };
