@@ -6,7 +6,7 @@ const LOGO_BUCKET = 'fotoperfil';
 
 // System Modules Definition (Keys used for logic)
 // Estes devem corresponder exatamente aos IDs usados no Frontend (SettingsScreen)
-const SYSTEM_MODULES_DEF = [
+export const SYSTEM_MODULES_DEF = [
     'projects', 'kanban', 'gantt', 'calendar', 'crm', 'financial', 'clients', 'engineering', 'product', 'ia', 'whitelabel'
 ];
 
@@ -133,6 +133,19 @@ export const seedSystemModules = async () => {
     }
 };
 
+// Helper to get map of module names to IDs
+export const fetchSystemModuleMap = async (): Promise<Record<string, number>> => {
+    await seedSystemModules(); // Ensure they exist
+    const { data } = await supabase.from('modulos').select('id, nome');
+    if (!data) return {};
+    
+    const map: Record<string, number> = {};
+    data.forEach(m => {
+        if (m.nome) map[m.nome] = m.id;
+    });
+    return map;
+};
+
 export const fetchActiveOrgModules = async (orgId: number): Promise<string[]> => {
     try {
         const { data, error } = await supabase
@@ -160,32 +173,39 @@ export const fetchActiveOrgModules = async (orgId: number): Promise<string[]> =>
     }
 };
 
+// Updates org modules using String Keys (Legacy/UI compatibility)
 export const updateOrgModules = async (orgId: number, moduleKeys: string[]) => {
     try {
         console.log(`Updating modules for Org ${orgId}. New active set:`, moduleKeys);
 
-        // 1. Ensure modules exist in DB (Seed)
-        await seedSystemModules();
-
-        // 2. Fetch Module IDs from 'modulos' table
+        // 1. Fetch Module IDs from 'modulos' table
         const { data: allModules } = await supabase.from('modulos').select('id, nome');
         if (!allModules) throw new Error("System modules not found.");
 
         const moduleMap = new Map(allModules.map(m => [m.nome, m.id]));
 
-        // 3. Map selected keys to IDs
-        const idsToInsert = moduleKeys.map(k => moduleMap.get(k)).filter(Boolean);
+        // 2. Map selected keys to IDs
+        const idsToInsert = moduleKeys.map(k => moduleMap.get(k)).filter(Boolean) as number[];
 
-        // 4. Clean existing relations for this Org
-        // Isso garante: "se estiver true e vira false, remove a linha"
-        // Removemos tudo e inserimos apenas o que está ativo agora.
+        return updateOrgModulesByIds(orgId, idsToInsert);
+    } catch (err: any) {
+        console.error("Error updating org modules (String Keys):", err);
+        throw new Error(err.message);
+    }
+};
+
+// Updates org modules using Integer IDs (Direct/Admin compatibility)
+export const updateOrgModulesByIds = async (orgId: number, moduleIds: number[]) => {
+    try {
+        console.log(`Updating modules for Org ${orgId} using IDs:`, moduleIds);
+
+        // 1. Clean existing relations for this Org
         const { error: deleteError } = await supabase.from('organizacao_modulo').delete().eq('organizacao', orgId);
         if (deleteError) throw deleteError;
 
-        // 5. Insert new relations
-        // Isso garante: "switch = true, deve inserir linha"
-        if (idsToInsert.length > 0) {
-            const payload = idsToInsert.map(modId => ({
+        // 2. Insert new relations
+        if (moduleIds.length > 0) {
+            const payload = moduleIds.map(modId => ({
                 organizacao: orgId,
                 modulo: modId
             }));
@@ -195,7 +215,7 @@ export const updateOrgModules = async (orgId: number, moduleKeys: string[]) => {
         
         return { success: true };
     } catch (err: any) {
-        console.error("Error updating org modules:", err);
+        console.error("Error updating org modules (IDs):", err);
         throw new Error(err.message);
     }
 };

@@ -1,7 +1,7 @@
 import { supabase } from './supabaseClient';
 import { DbPlan, FinancialTransaction } from '../types';
 import { fetchSubscriptionPlans } from './asaasService';
-import { updateOrgModules } from './organizationService';
+import { updateOrgModulesByIds } from './organizationService';
 
 export interface AdminUser {
     id: string;
@@ -418,18 +418,20 @@ export const approveSubscription = async (transactionId: string, orgId: number):
         }
 
         // 3. Provisionamento Automático (Módulos, Usuários, etc)
-        // Busca o metadata da transação para saber o que foi comprado
+        // Busca a transação completa para pegar o campo 'modulos' e 'metadata'
         const { data: transData } = await supabase
             .from('transacoes')
-            .select('metadata')
+            .select('metadata, modulos')
             .eq('id', transactionId)
             .single();
 
-        if (transData?.metadata) {
-            const meta = transData.metadata;
-            console.log("Provisionando com metadata:", meta);
+        if (transData) {
+            const meta = transData.metadata || {};
+            const modulesArray = transData.modulos;
 
-            // A. Atualiza Limite de Usuários
+            console.log("Provisionando...", { meta, modulesArray });
+
+            // A. Atualiza Limite de Usuários (from metadata)
             if (meta.users) {
                 await supabase
                     .from('organizacoes')
@@ -437,10 +439,14 @@ export const approveSubscription = async (transactionId: string, orgId: number):
                     .eq('id', orgId);
             }
 
-            // B. Atualiza Módulos Ativos (Substitui os antigos pelo novo set)
-            if (meta.modules && Array.isArray(meta.modules)) {
-                // Ensure 'whitelabel' ID is mapped correctly inside updateOrgModules logic
-                await updateOrgModules(orgId, meta.modules);
+            // B. Atualiza Módulos Ativos (from DB Column `modulos`)
+            if (modulesArray && Array.isArray(modulesArray) && modulesArray.length > 0) {
+                // Use the new helper that accepts IDs directly
+                await updateOrgModulesByIds(orgId, modulesArray);
+            } else if (meta.modules && Array.isArray(meta.modules)) {
+                // Fallback for old transactions (String keys)
+                // This shouldn't be hit for new transactions created after the fix
+                // await updateOrgModules(orgId, meta.modules);
             }
             
             // C. Provisiona AI (opcional, se houver campo específico)

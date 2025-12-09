@@ -1,5 +1,6 @@
 import { AsaasPayment, SubscriptionPlan, AsaasSubscription } from '../types';
 import { supabase } from './supabaseClient';
+import { fetchSystemModuleMap } from './organizationService';
 
 // --- CONFIGURAÇÃO ---
 // TRUE = Tenta usar Supabase Edge Function. 
@@ -227,7 +228,7 @@ export const uploadReceiptAndNotify = async (
     planPrice: number,
     receiptFile: File,
     description: string,
-    metadata?: any // NEW: Optional metadata for auto-provisioning
+    metadata?: any // Contains module keys (strings)
 ): Promise<{ success: boolean; error?: string }> => {
     try {
         const fileExt = receiptFile.name.split('.').pop();
@@ -246,7 +247,18 @@ export const uploadReceiptAndNotify = async (
 
         if (!urlData?.publicUrl) throw new Error("Não foi possível obter a URL do arquivo.");
         
-        // 2. Insert into 'transacoes' table
+        // 2. Map Module Keys (Strings) to Module IDs (Integers)
+        let moduleIds: number[] = [];
+        if (metadata && metadata.modules && Array.isArray(metadata.modules)) {
+            const moduleMap = await fetchSystemModuleMap();
+            moduleIds = metadata.modules
+                .map((key: string) => moduleMap[key])
+                .filter((id: number) => id !== undefined);
+                
+            console.log("Mapped Modules for Transaction:", { keys: metadata.modules, ids: moduleIds });
+        }
+
+        // 3. Insert into 'transacoes' table
         const { error: insertError } = await supabase
             .from('transacoes')
             .insert({
@@ -258,7 +270,8 @@ export const uploadReceiptAndNotify = async (
                 date: new Date().toISOString().split('T')[0],
                 pago: false,
                 comprovante: urlData.publicUrl,
-                metadata: metadata // Save metadata JSON
+                metadata: metadata, // Save metadata JSON (optional but good for debugging)
+                modulos: moduleIds.length > 0 ? moduleIds : null // Save IDs array to specific column
             });
 
         if (insertError) throw new Error(`Erro ao salvar transação: ${insertError.message}`);

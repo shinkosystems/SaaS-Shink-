@@ -479,10 +479,12 @@ export interface FinancialTransaction {
     organizationId: number; // Mapped from organization_id
     isContract?: boolean;
     
-    // New Fields for Payment Proof
+    // New Fields for Payment Proof & Provisioning
     pago?: boolean;
     comprovante?: string;
     orgName?: string; // Hydrated for Admin View
+    metadata?: any; // JSONB for extra context
+    modulos?: number[]; // Array of Module IDs (Integer)
 }
 
 export interface FinancialRecord {
