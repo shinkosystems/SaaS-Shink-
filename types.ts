@@ -1,6 +1,4 @@
 
-
-
 export enum RDEStatus {
   HOT = 'Quente',
   WARM = 'Morno',
@@ -22,22 +20,15 @@ export enum IntensityLevel {
   L4 = 4
 }
 
-// --- PLAN CONFIGURATION (Mapped to DB IDs) ---
-// ID 4: Free
-// ID 1: Básico (was Usuário) - Gateway
-// ID 2: Studio - Upsell / High Value
-// ID 3: Governança (was Scale) - High Volume / Enterprise Lite
-// ID 5: Agency (Legacy)
-// ID 10: Enterprise (Whitelabel & Full AI)
-
+// --- PLAN CONFIGURATION ---
 export const PLAN_LIMITS: Record<string, { 
     maxProjects: number; 
     maxUsers: number;
-    aiLimit: number; // Monthly requests or Total requests
+    aiLimit: number; 
     features: { 
         financial: boolean; 
         clients: boolean; 
-        metrics: boolean; // DORA & Product
+        metrics: boolean; 
         pdfUpload: boolean; 
         gantt: boolean;
         kanban: boolean; 
@@ -46,122 +37,16 @@ export const PLAN_LIMITS: Record<string, {
         crm: boolean; 
     } 
 }> = {
-    'plan_free': { // ID 4
-        maxProjects: 1, // Strict Limit: 1 Project to trigger need
-        maxUsers: 1,
-        aiLimit: 0, // Zero AI to trigger upgrade
-        features: { 
-            financial: false, 
-            clients: false, 
-            metrics: false, 
-            pdfUpload: false, 
-            gantt: false, 
-            kanban: true, // FREE FOR EVERYONE
-            whitelabel: false, 
-            aiAdvanced: false, 
-            crm: true 
-        }
-    },
-    'plan_usuario': { // ID 1 - Básico (Gateway)
-        maxProjects: 9999,
-        maxUsers: 1,
-        aiLimit: 50,
-        features: { 
-            financial: false, // Básico has NO Financial
-            clients: false, 
-            metrics: false, 
-            pdfUpload: false, 
-            gantt: true, 
-            kanban: true,
-            whitelabel: false, 
-            aiAdvanced: false, 
-            crm: true 
-        }
-    },
-    'plan_studio': { // ID 2 - Studio (Upsell)
-        maxProjects: 9999,
-        maxUsers: 5,
-        aiLimit: 500,
-        features: { 
-            financial: true, // Studio INCLUDES Financial (Bonus)
-            clients: true, 
-            metrics: false, // DORA is Scale+
-            pdfUpload: true, 
-            gantt: true, 
-            kanban: true,
-            whitelabel: false, 
-            aiAdvanced: true, // Studio gets AI
-            crm: true
-        }
-    },
-    'plan_scale': { // ID 3 - Governança
-        maxProjects: 9999,
-        maxUsers: 15, 
-        aiLimit: 9999,
-        features: { 
-            financial: true, 
-            clients: true, 
-            metrics: true, // Scale gets DORA
-            pdfUpload: true, 
-            gantt: true, 
-            kanban: true,
-            whitelabel: false, 
-            aiAdvanced: true,
-            crm: true
-        }
-    },
-    'plan_agency': { // ID 5 - Legacy
-        maxProjects: 9999,
-        maxUsers: 50,
-        aiLimit: 9999,
-        features: { 
-            financial: true, 
-            clients: true, 
-            metrics: true, 
-            pdfUpload: true, 
-            gantt: true, 
-            kanban: true,
-            whitelabel: false, 
-            aiAdvanced: true, 
-            crm: true 
-        }
-    },
-    'plan_trial': { // ID 6, 8 - Trial
-        maxProjects: 999999,
-        maxUsers: 999999,
-        aiLimit: 999999,
-        features: { 
-            financial: true, 
-            clients: true, 
-            metrics: true, 
-            pdfUpload: true, 
-            gantt: true, 
-            kanban: true,
-            whitelabel: true, 
-            aiAdvanced: true,
-            crm: true
-        }
-    },
-    'plan_enterprise': { // ID 10 - Enterprise
-        maxProjects: 999999,
-        maxUsers: 999999,
-        aiLimit: 999999,
-        features: { 
-            financial: true, 
-            clients: true, 
-            metrics: true, 
-            pdfUpload: true, 
-            gantt: true, 
-            kanban: true,
-            whitelabel: true, 
-            aiAdvanced: true,
-            crm: true
-        }
-    }
+    'plan_free': { maxProjects: 1, maxUsers: 1, aiLimit: 0, features: { financial: false, clients: false, metrics: false, pdfUpload: false, gantt: false, kanban: true, whitelabel: false, aiAdvanced: false, crm: true } },
+    'plan_usuario': { maxProjects: 9999, maxUsers: 1, aiLimit: 50, features: { financial: false, clients: false, metrics: false, pdfUpload: false, gantt: true, kanban: true, whitelabel: false, aiAdvanced: false, crm: true } },
+    'plan_studio': { maxProjects: 9999, maxUsers: 5, aiLimit: 500, features: { financial: true, clients: true, metrics: false, pdfUpload: true, gantt: true, kanban: true, whitelabel: false, aiAdvanced: true, crm: true } },
+    'plan_scale': { maxProjects: 9999, maxUsers: 15, aiLimit: 9999, features: { financial: true, clients: true, metrics: true, pdfUpload: true, gantt: true, kanban: true, whitelabel: false, aiAdvanced: true, crm: true } },
+    'plan_agency': { maxProjects: 9999, maxUsers: 50, aiLimit: 9999, features: { financial: true, clients: true, metrics: true, pdfUpload: true, gantt: true, kanban: true, whitelabel: false, aiAdvanced: true, crm: true } },
+    'plan_trial': { maxProjects: 999999, maxUsers: 999999, aiLimit: 999999, features: { financial: true, clients: true, metrics: true, pdfUpload: true, gantt: true, kanban: true, whitelabel: true, aiAdvanced: true, crm: true } },
+    'plan_enterprise': { maxProjects: 999999, maxUsers: 999999, aiLimit: 999999, features: { financial: true, clients: true, metrics: true, pdfUpload: true, gantt: true, kanban: true, whitelabel: true, aiAdvanced: true, crm: true } }
 };
 
 // --- CRM TYPES ---
-
 export type CrmStage = 'qualification' | 'proposal' | 'negotiation' | 'won' | 'lost';
 
 export interface CrmActivity {
@@ -194,19 +79,16 @@ export interface CrmCompany {
 
 export interface CrmOpportunity {
     id: string;
-    organizationId?: number; // Added for DB context
+    organizationId?: number;
     title: string;
     value: number;
     probability: number;
     stage: CrmStage;
     expectedCloseDate: string;
     owner: string;
-    
-    // Embedded Data for simplicity (In a full SQL schema these would be relations)
     contact: CrmContact;
     company: CrmCompany;
     activities: CrmActivity[];
-    
     createdAt: string;
     lastInteraction: string;
 }
@@ -227,18 +109,8 @@ export interface DbPlan {
   colabtotal?: number;
 }
 
-export interface DbClientPlan {
-  id: number;
-  created_at: string;
-  dono: string; // UUID
-  plano: number; // FK
-  datainicio: string;
-  datafim: string;
-  valor: number;
-}
-
 export interface DbClient {
-  id: string; // UUID
+  id: string;
   nome: string;
   email: string;
   telefone: string;
@@ -257,12 +129,10 @@ export interface DbClient {
 }
 
 export interface DbProject {
-  id: number; // BigInt
+  id: number;
   nome: string;
-  cliente: string | null; // UUID FK -> clientes.id
+  cliente: string | null;
   descricao: string;
-  
-  // Shinko Framework Fields
   rde: string;
   velocidade: number;
   viabilidade: number;
@@ -270,24 +140,17 @@ export interface DbProject {
   prioseis: number;
   arquetipo: string;
   intensidade: number;
-  
-  // TADS Flags
   tadsescalabilidade: boolean;
   tadsintegracao: boolean;
   tadsdorreal: boolean;
   tadsrecorrencia: boolean;
   tadsvelocidade: boolean;
-
   organizacao: number;
-  projoport: boolean; // True se for apenas oportunidade, False se virou projeto
+  projoport: boolean;
   created_at: string;
-  cor?: string; // NEW: Project Color for Calendar/Agenda
-  
-  // AI & Structure
+  cor?: string;
   bpmn_structure?: any;
   contexto_ia?: string;
-
-  // Relations (Hydrated in Service)
   clienteData?: { nome: string, logo_url?: string };
   tasks?: DbTask[];
 }
@@ -295,12 +158,16 @@ export interface DbProject {
 // Mapped to table 'tasks'
 export interface DbTask {
   id: number; // BigInt
-  projeto: number | null; // FK -> projetos.id (Null allowed for Free Tasks)
+  projeto: number | null; 
   titulo: string;
   descricao: string;
   status: string;
-  responsavel: string; // UUID FK -> auth.users.id (NOT NULL)
+  responsavel: string; // UUID FK
   
+  // New Arrays
+  membros: string[]; // UUID[]
+  etiquetas: string[]; // text[]
+
   // GUT
   gravidade: number;
   urgencia: number;
@@ -311,17 +178,26 @@ export interface DbTask {
   deadline?: string;
   datainicio?: string;
   datafim?: string;
+  
+  // Lifecycle Dates
+  dataafazer?: string;
+  datafazendo?: string;
+  datarealizando?: string;
+  datarevisao?: string;
+  dataaprovacao?: string;
+  dataconclusao?: string;
+
   duracaohoras: number;
   
   // Structure
   sutarefa: boolean;
-  tarefa?: number | null; // Parent Task ID (or tarefamae)
-  tarefamae?: number | null; // Optional alias if DB schema uses this
+  tarefa?: number | null;
+  tarefamae?: number | null;
   
   organizacao: number;
   createdat: string;
 
-  // Relations (Manually Hydrated)
+  // Relations
   projetoData?: { nome: string, cor?: string }; 
   responsavelData?: { nome: string, desenvolvedor: boolean, organizacao: number, avatar_url?: string };
 }
@@ -347,27 +223,38 @@ export interface BpmnTask {
   description?: string;
   completed: boolean;
   completedAt?: string;
-  createdAt?: string; // New field for Metrics
+  createdAt?: string; 
   status: TaskStatus;
   startDate?: string;
   dueDate?: string;
+  deadline?: string;
   assignee?: string;
-  assigneeId?: string; // UUID for DB
+  assigneeId?: string; // Main Assignee
+  members?: string[]; // Multiple Assignees (UUIDs)
+  tags?: string[]; // Labels
+  
   subtasks?: BpmnSubTask[];
   gut?: { g: number, u: number, t: number };
   estimatedHours?: number;
   
-  // Internal tracking
   dbId?: number;
   projectId?: number;
+  projectTitle?: string;
   isSubtask?: boolean;
   parentId?: number;
   assigneeIsDev?: boolean; 
-  
-  // AI Role Suggestion
   suggestedRoleId?: number;
-  
   attachments?: Attachment[];
+
+  // Lifecycle for Timeline
+  lifecycle?: {
+      created: string;
+      todo?: string;
+      doing?: string;
+      review?: string;
+      approval?: string;
+      done?: string;
+  };
 }
 
 export interface BpmnSubTask {
@@ -433,16 +320,12 @@ export interface TadsCriteria {
     mvpSpeed: boolean;
 }
 
-// Unified Opportunity Interface (Frontend Model)
 export interface Opportunity {
-  id: string; // Cast from BigInt to string for frontend consistency
+  id: string;
   title: string;
   description: string;
-  
   clientId?: string;
   organizationId?: number;
-  
-  // Framework Fields
   rde: RDEStatus;
   viability: number;
   velocity: number;
@@ -453,18 +336,13 @@ export interface Opportunity {
   tads: TadsCriteria;
   tadsScore: number;
   evidence: any;
-  
-  // Execution
-  bpmn?: BpmnData; // Construct this from 'tasks' relation
-  
+  bpmn?: BpmnData;
   status: ProjectStatus;
   createdAt: string;
   priorityLock?: boolean;
-  color?: string; // NEW: Project Color
-  
+  color?: string;
   attachments?: Attachment[];
   comments?: Comment[];
-  
   dbProjectId?: number;
   docsContext?: string;
 }
@@ -476,15 +354,13 @@ export interface FinancialTransaction {
     amount: number;
     type: 'inflow' | 'outflow';
     category: string;
-    organizationId: number; // Mapped from organization_id
+    organizationId: number;
     isContract?: boolean;
-    
-    // New Fields for Payment Proof & Provisioning
     pago?: boolean;
     comprovante?: string;
-    orgName?: string; // Hydrated for Admin View
-    metadata?: any; // JSONB for extra context
-    modulos?: number[]; // Array of Module IDs (Integer)
+    orgName?: string;
+    metadata?: any;
+    modulos?: number[];
 }
 
 export interface FinancialRecord {
@@ -570,8 +446,8 @@ export interface AsaasSubscription {
 }
 
 export interface SubscriptionPlan {
-    id: string; // 'plan_free', 'plan_usuario', etc.
-    dbId?: number; // 4, 1, 2, 3, 5, 10
+    id: string; 
+    dbId?: number;
     name: string;
     price: number;
     features: string[];

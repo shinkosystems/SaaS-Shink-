@@ -8,7 +8,6 @@ const PROJECT_TABLE = 'projetos';
 // --- PROJETOS ---
 
 export const fetchProjects = async (organizationId?: number): Promise<DbProject[]> => {
-    // Strict Organization Filter
     if (!organizationId) return [];
 
     let query = supabase
@@ -72,7 +71,7 @@ export const createProject = async (nome: string, cliente: string | null, userId
             tadsvelocidade: false,
             organizacao: orgId,
             projoport: false,
-            cor: '#3b82f6' // Default Blue
+            cor: '#3b82f6'
         })
         .select()
         .single();
@@ -86,17 +85,13 @@ export const createProject = async (nome: string, cliente: string | null, userId
 
 export const addAttachmentToProject = async (projectId: number, attachment: Attachment) => {
     try {
-        // Fetch current project structure
         const { data: proj, error } = await supabase.from(PROJECT_TABLE).select('bpmn_structure').eq('id', projectId).single();
         if (error || !proj) throw new Error("Project not found or load failed");
 
         const structure = proj.bpmn_structure || { nodes: [], lanes: [], edges: [] };
         const currentAttachments = (structure as any).attachments || [];
-        
-        // Add new attachment
         (structure as any).attachments = [attachment, ...currentAttachments];
 
-        // Update project
         await supabase.from(PROJECT_TABLE).update({ bpmn_structure: structure }).eq('id', projectId);
         return true;
     } catch (e: any) {
@@ -116,7 +111,6 @@ export const fetchProjectAttachments = async (projectId: number): Promise<Attach
 // --- ÁREAS DE ATUAÇÃO & MEMBROS ---
 
 export const fetchAreasAtuacao = async (): Promise<AreaAtuacao[]> => {
-    // Select * instead of specific columns to avoid error if 'nome' is missing
     const { data, error } = await supabase.from('area_atuacao').select('*');
     
     if (error) {
@@ -124,7 +118,6 @@ export const fetchAreasAtuacao = async (): Promise<AreaAtuacao[]> => {
         return [];
     }
     
-    // Map with fallbacks for the name property
     return data.map((d: any) => ({
         id: d.id,
         nome: d.nome || d.name || d.titulo || d.descricao || `Cargo ${d.id}`
@@ -142,12 +135,10 @@ export const fetchOrgMembers = async (organizationId: number): Promise<{id: stri
         return [];
     }
 
-    // Manual Hydration for Area Name (avoiding join issues)
     const cargoIds = [...new Set(users.map((u: any) => u.cargo).filter(Boolean))];
     let areaMap = new Map<number, string>();
 
     if (cargoIds.length > 0) {
-        // Select * to be safe
         const { data: areas } = await supabase.from('area_atuacao').select('*').in('id', cargoIds);
         areas?.forEach((a: any) => {
             const name = a.nome || a.name || a.titulo || a.descricao || `Cargo ${a.id}`;
@@ -166,7 +157,6 @@ export const fetchOrgMembers = async (organizationId: number): Promise<{id: stri
 // --- TAREFAS (TASKS) ---
 
 export const fetchAllTasks = async (organizationId?: number): Promise<DbTask[]> => {
-    // Strict Organization Filter
     if (!organizationId) return [];
 
     try {
@@ -212,81 +202,11 @@ export const fetchAllTasks = async (organizationId?: number): Promise<DbTask[]> 
     }
 };
 
-export const fetchUserTasks = async (userId: string, organizationId?: number): Promise<DbTask[]> => {
-    // STRICT SECURITY: Organization ID is mandatory to prevent data leakage
-    if (!organizationId) return [];
-
-    try {
-        let query = supabase
-            .from(TASKS_TABLE)
-            .select(`
-                *,
-                projetoData:projetos(nome, cor)
-            `)
-            .eq('responsavel', userId)
-            .eq('organizacao', organizationId) // Always filter by organization
-            .neq('status', 'done')
-            .neq('status', 'Archived')
-            .order('datafim', { ascending: true });
-
-        const { data: tasks, error } = await query;
-
-        if (error) throw error;
-        return tasks as DbTask[];
-    } catch (error: any) {
-        console.error('Erro ao buscar tarefas do usuário:', error.message);
-        return [];
-    }
-};
-
-export const fetchSubtasks = async (parentId: number): Promise<any[]> => {
-    try {
-        // Busca subtarefas ligadas ao pai
-        const { data, error } = await supabase
-            .from(TASKS_TABLE)
-            .select('*')
-            .eq('tarefamae', parentId)
-            .order('dataproposta', { ascending: true });
-
-        if (error) throw error;
-        if (!data || data.length === 0) return [];
-
-        // Manual Hydration
-        const userIds = [...new Set(data.map((t: any) => t.responsavel).filter(Boolean))];
-        let userMap = new Map<string, string>();
-
-        if (userIds.length > 0) {
-            const { data: users } = await supabase
-                .from('users')
-                .select('id, nome')
-                .in('id', userIds);
-            
-            users?.forEach(u => userMap.set(u.id, u.nome));
-        }
-
-        // Mapeia para o formato BpmnSubTask usado no frontend
-        return data.map((t: any) => ({
-            id: t.id.toString(),
-            text: t.titulo,
-            completed: t.status === 'done',
-            startDate: t.datainicio,
-            dueDate: t.datafim,
-            estimatedHours: t.duracaohoras,
-            assigneeId: t.responsavel,
-            assignee: userMap.get(t.responsavel) || 'Desconhecido'
-        }));
-    } catch (error: any) {
-        console.error('Erro ao buscar subtarefas:', error.message);
-        return [];
-    }
-};
-
 export const fetchAssignableUsers = async (organizationId: number): Promise<{id: string, nome: string}[]> => {
     const { data, error } = await supabase
         .from('users')
         .select('id, nome')
         .eq('organizacao', organizationId);
-        // Removed filter for 'desenvolvedor' to support all types of assignable users
 
     if (error) {
         console.error('Erro ao buscar usuários atribuíveis:', error.message);
@@ -315,20 +235,22 @@ export const createTask = async (task: Partial<DbTask>): Promise<DbTask | null> 
         const payload = {
             projeto: cleanTask.projeto || null,
             titulo: cleanTask.titulo,
-            descricao: cleanTask.descricao || 'VAZIO',
+            descricao: cleanTask.descricao || '',
             status: cleanTask.status || 'todo',
             responsavel: cleanTask.responsavel,
             gravidade: cleanTask.gravidade || 1,
             urgencia: cleanTask.urgencia || 1,
             tendencia: cleanTask.tendencia || 1,
             dataproposta: prazo,
-            deadline: prazo,
+            deadline: cleanTask.deadline || prazo,
             datainicio: cleanTask.datainicio || new Date().toISOString(),
             datafim: prazo,
-            duracaohoras: cleanTask.duracaohoras ? Math.round(Number(cleanTask.duracaohoras)) : 2, // Force Integer
+            duracaohoras: cleanTask.duracaohoras ? Math.round(Number(cleanTask.duracaohoras)) : 2, 
             sutarefa: cleanTask.sutarefa || false,
             tarefamae: cleanTask.tarefamae || null,
-            organizacao: cleanTask.organizacao
+            organizacao: cleanTask.organizacao,
+            membros: cleanTask.membros || [],
+            etiquetas: cleanTask.etiquetas || []
         };
 
         const { data, error } = await supabase
@@ -346,21 +268,20 @@ export const createTask = async (task: Partial<DbTask>): Promise<DbTask | null> 
 };
 
 export const updateTask = async (id: number, updates: Partial<DbTask>): Promise<DbTask | null> => {
-    // Explicitly clean payload: Remove undefined, null (unless intended), and extra hydration fields
+    // Explicitly clean payload
     const payload: any = {};
     
     Object.entries(updates).forEach(([key, value]) => {
-        // Exclude internal/hydration keys and undefined values
+        // Filter out hydration and local-only fields
         if (value !== undefined && key !== 'projetoData' && key !== 'responsavelData' && key !== 'createdat' && key !== 'id') {
             if (key === 'duracaohoras') {
-                payload[key] = Math.round(Number(value)); // Force Integer
+                payload[key] = Math.round(Number(value));
             } else {
                 payload[key] = value;
             }
         }
     });
 
-    // Safety: Ensure we don't accidentally set responsavel to NULL if it's not allowed
     if (payload.responsavel === null) {
         delete payload.responsavel;
     }
@@ -380,13 +301,11 @@ export const updateTask = async (id: number, updates: Partial<DbTask>): Promise<
 };
 
 export const deleteTask = async (id: number): Promise<boolean> => {
-    // 1. Delete Subtasks first to avoid constraint errors
     const { error: subError } = await supabase.from(TASKS_TABLE).delete().eq('tarefamae', id);
     if (subError) {
         console.error('Erro ao deletar subtarefas:', subError.message);
     }
 
-    // 2. Delete Main Task
     const { error } = await supabase.from(TASKS_TABLE).delete().eq('id', id);
     if (error) {
         console.error('Erro ao deletar tarefa:', error.message);
@@ -395,45 +314,16 @@ export const deleteTask = async (id: number): Promise<boolean> => {
     return true;
 };
 
-export const syncSubtasks = async (parentTaskId: number, subtasks: { nome: string, status: string, dueDate?: string, startDate?: string, estimatedHours?: number, assigneeId?: string }[]) => {
-    const { data: parent } = await supabase.from(TASKS_TABLE).select('projeto, responsavel, organizacao').eq('id', parentTaskId).single();
-    if (!parent) return;
-
-    const inserts = subtasks.map(sub => ({
-        projeto: parent.projeto,
-        titulo: sub.nome,
-        status: sub.status,
-        responsavel: sub.assigneeId || parent.responsavel, 
-        organizacao: parent.organizacao,
-        sutarefa: true,
-        tarefamae: parentTaskId,
-        duracaohoras: sub.estimatedHours ? Math.round(Number(sub.estimatedHours)) : 2, // Force Integer
-        gravidade: 1, urgencia: 1, tendencia: 1,
-        dataproposta: new Date().toISOString(),
-        datainicio: sub.startDate || new Date().toISOString(),
-        datafim: sub.dueDate || undefined,
-        deadline: sub.dueDate || undefined
-    }));
-
-    if (inserts.length > 0) {
-        await supabase.from(TASKS_TABLE).insert(inserts);
-    }
-};
-
-// Function to Sync BPMN Nodes directly to Tasks Table
+// ... existing sync functions kept as is ...
 export const syncBpmnTasks = async (projectId: number, organizationId: number, nodes: BpmnNode[]): Promise<BpmnNode[]> => {
-    const updatedNodes = JSON.parse(JSON.stringify(nodes)); // Deep copy to avoid mutation issues
+    const updatedNodes = JSON.parse(JSON.stringify(nodes));
     
-    // Default Assignee fallback (current user if possible, but we don't have user context here easily, so require assigneeId on tasks)
-    // We assume tasks already have assigneeId from the UI or AI assignment step.
-
     for (const node of updatedNodes) {
         if (!node.checklist) continue;
 
         for (let i = 0; i < node.checklist.length; i++) {
             const task = node.checklist[i];
             
-            // Validate Assignee
             if (!task.assigneeId) {
                 console.warn(`Task "${task.text}" skipped sync: No assigneeId.`);
                 continue; 
@@ -441,9 +331,7 @@ export const syncBpmnTasks = async (projectId: number, organizationId: number, n
 
             let dbId = task.dbId;
 
-            // 1. CREATE or UPDATE Parent Task
             if (dbId) {
-                // Update existing
                 await updateTask(dbId, {
                     titulo: task.text,
                     descricao: task.description,
@@ -454,11 +342,10 @@ export const syncBpmnTasks = async (projectId: number, organizationId: number, n
                     datafim: task.dueDate
                 });
             } else {
-                // Insert new
                 const created = await createTask({
                     projeto: projectId,
                     titulo: task.text,
-                    descricao: task.description || node.label, // Use node label as description context
+                    descricao: task.description || node.label,
                     status: task.status || 'todo',
                     responsavel: task.assigneeId,
                     duracaohoras: task.estimatedHours || 2,
@@ -471,11 +358,11 @@ export const syncBpmnTasks = async (projectId: number, organizationId: number, n
                 if (created) {
                     dbId = created.id;
                     task.dbId = created.id;
-                    task.id = created.id.toString(); // Sync frontend ID to DB ID
+                    task.id = created.id.toString(); 
                 }
             }
 
-            // 2. Sync Subtasks
+            // Sync Subtasks
             if (dbId && task.subtasks && task.subtasks.length > 0) {
                 for (let j = 0; j < task.subtasks.length; j++) {
                     const sub = task.subtasks[j];
@@ -514,19 +401,4 @@ export const syncBpmnTasks = async (projectId: number, organizationId: number, n
     }
 
     return updatedNodes;
-};
-
-// --- PROMOTION ---
-export const promoteSubtask = async (subtaskId: number): Promise<boolean> => {
-    // Desvincula a tarefa do pai (tarefamae = null) e remove a flag sutarefa
-    const { error } = await supabase
-        .from(TASKS_TABLE)
-        .update({ sutarefa: false, tarefamae: null })
-        .eq('id', subtaskId);
-
-    if (error) {
-        console.error('Erro ao promover subtarefa:', error.message);
-        return false;
-    }
-    return true;
 };

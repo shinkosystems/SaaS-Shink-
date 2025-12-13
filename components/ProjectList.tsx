@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Opportunity, ProjectStatus } from '../types';
-import { Search, Filter, LayoutGrid, Zap, Target, ArrowRight, Lock, Briefcase, Trello, GanttChartSquare, Plus } from 'lucide-react';
+import { Search, Filter, LayoutGrid, Zap, Target, ArrowRight, Lock, Briefcase, GanttChartSquare, Plus } from 'lucide-react';
 import { GanttView } from './GanttView';
 import { getCurrentUserPlan } from '../services/asaasService';
 import { supabase } from '../services/supabaseClient';
@@ -16,7 +16,7 @@ interface Props {
   activeModules?: string[];
 }
 
-type ViewMode = 'grid' | 'kanban' | 'gantt';
+type ViewMode = 'grid' | 'gantt';
 
 export const ProjectList: React.FC<Props> = ({ opportunities, onOpenProject, userRole, organizationId, onOpenCreate, initialFilterStatus, activeModules }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -115,21 +115,19 @@ export const ProjectList: React.FC<Props> = ({ opportunities, onOpenProject, use
                     <button 
                         onClick={() => setViewMode('grid')}
                         className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'text-slate-900 dark:text-white bg-slate-100 dark:bg-white/10' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
+                        title="Grade"
                     >
                         <LayoutGrid className="w-4 h-4"/>
                     </button>
-                    <button 
-                        onClick={() => setViewMode('kanban')}
-                        className={`p-2 rounded-lg transition-all ${viewMode === 'kanban' ? 'text-slate-900 dark:text-white bg-slate-100 dark:bg-white/10' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
-                    >
-                        <Trello className="w-4 h-4"/>
-                    </button>
-                    <button 
-                        onClick={() => canViewGantt ? setViewMode('gantt') : alert("Módulo inativo")}
-                        className={`p-2 rounded-lg transition-all ${viewMode === 'gantt' ? 'text-slate-900 dark:text-white bg-slate-100 dark:bg-white/10' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
-                    >
-                        <GanttChartSquare className="w-4 h-4"/>
-                    </button>
+                    {canViewGantt && (
+                        <button 
+                            onClick={() => setViewMode('gantt')}
+                            className={`p-2 rounded-lg transition-all ${viewMode === 'gantt' ? 'text-slate-900 dark:text-white bg-slate-100 dark:bg-white/10' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
+                            title="Cronograma Gantt"
+                        >
+                            <GanttChartSquare className="w-4 h-4"/>
+                        </button>
+                    )}
                 </div>
 
                 {viewMode === 'grid' && (
@@ -142,7 +140,7 @@ export const ProjectList: React.FC<Props> = ({ opportunities, onOpenProject, use
                             <option value="All">Todos</option>
                             <option value="Active">Ativos</option>
                             <option value="Negotiation">Negociação</option>
-                            <option value="Future">Futuros</option>
+                            <option value="Future">Backlog</option>
                             <option value="Frozen">Congelados</option>
                             <option value="Archived">Arquivados</option>
                         </select>
@@ -207,13 +205,7 @@ export const ProjectList: React.FC<Props> = ({ opportunities, onOpenProject, use
                 </div>
             )}
 
-            {/* KANBAN & GANTT */}
-            {viewMode === 'kanban' && (
-                <div className="h-full overflow-x-auto overflow-y-hidden custom-scrollbar pb-2 text-center text-slate-500 text-sm py-20">
-                    A visualização Kanban está sendo otimizada.
-                </div>
-            )}
-
+            {/* GANTT VIEW */}
             {viewMode === 'gantt' && canViewGantt && (
                 <div className="h-full w-full bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm overflow-hidden">
                     <GanttView 

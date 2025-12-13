@@ -11,6 +11,8 @@ interface Props {
   customColor?: string;
 }
 
+const DEFAULT_LOGO = "https://zjssfnbcboibqeoubeou.supabase.co/storage/v1/object/public/fotoperfil/fotoperfil/2.png";
+
 const AuthScreen: React.FC<Props> = ({ onGuestLogin, onClose, customOrgName, customLogoUrl, customColor }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -41,6 +43,7 @@ const AuthScreen: React.FC<Props> = ({ onGuestLogin, onClose, customOrgName, cus
   };
 
   const primaryColor = customColor || '#0f172a'; // Default slate-900
+  const displayLogo = customLogoUrl || DEFAULT_LOGO;
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
@@ -51,15 +54,13 @@ const AuthScreen: React.FC<Props> = ({ onGuestLogin, onClose, customOrgName, cus
         </button>
 
         <div className="p-8 pb-0 flex flex-col items-center">
-            {customLogoUrl ? (
-                <img src={customLogoUrl} alt="Logo" className="h-12 w-auto mb-6" />
-            ) : (
-                <div className="w-12 h-12 rounded-xl bg-slate-900 dark:bg-white flex items-center justify-center mb-6 shadow-lg">
-                    <span className="text-white dark:text-black font-bold text-xl">S</span>
-                </div>
-            )}
+            <img 
+                src={displayLogo} 
+                alt="Logo" 
+                className="h-32 w-auto mb-6 object-contain drop-shadow-md" 
+            />
             <h2 className="text-xl font-bold text-slate-900 dark:text-white text-center">
-                {customOrgName || 'Bem-vindo'}
+                {customOrgName || 'Shinkō OS'}
             </h2>
             <p className="text-xs text-slate-500 text-center mt-2">
                 Acesse sua conta para continuar.
@@ -78,7 +79,7 @@ const AuthScreen: React.FC<Props> = ({ onGuestLogin, onClose, customOrgName, cus
                     type="email" 
                     value={email}
                     onChange={e => setEmail(e.target.value)}
-                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm outline-none focus:border-slate-400 transition-all"
+                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm outline-none focus:border-slate-400 transition-all text-slate-900 dark:text-white"
                     placeholder="Email"
                     required
                 />
@@ -89,7 +90,7 @@ const AuthScreen: React.FC<Props> = ({ onGuestLogin, onClose, customOrgName, cus
                     type="password" 
                     value={password}
                     onChange={e => setPassword(e.target.value)}
-                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm outline-none focus:border-slate-400 transition-all"
+                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm outline-none focus:border-slate-400 transition-all text-slate-900 dark:text-white"
                     placeholder="Senha"
                     required
                 />

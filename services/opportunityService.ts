@@ -45,6 +45,13 @@ export const fetchOpportunities = async (organizationId?: number): Promise<Oppor
     let userMap = new Map<string, any>();
     if (tasks && tasks.length > 0) {
         const userIds = [...new Set(tasks.map((t: any) => t.responsavel).filter(Boolean))];
+        // Add members to user fetching
+        tasks.forEach((t: any) => {
+            if (t.membros && Array.isArray(t.membros)) {
+                t.membros.forEach((m: string) => userIds.push(m));
+            }
+        });
+
         if (userIds.length > 0) {
             const { data: users } = await supabase.from('users').select('id, nome, desenvolvedor').in('id', userIds);
             users?.forEach(u => userMap.set(u.id, u));
@@ -90,6 +97,12 @@ export const fetchOpportunityById = async (id: string): Promise<Opportunity | nu
         let userMap = new Map<string, any>();
         if (tasks && tasks.length > 0) {
              const userIds = [...new Set(tasks.map((t: any) => t.responsavel).filter(Boolean))];
+             tasks.forEach((t: any) => {
+                if (t.membros && Array.isArray(t.membros)) {
+                    t.membros.forEach((m: string) => userIds.push(m));
+                }
+             });
+
              if (userIds.length > 0) {
                  const { data: users } = await supabase.from('users').select('id, nome, desenvolvedor').in('id', userIds);
                  users?.forEach(u => userMap.set(u.id, u));
@@ -260,8 +273,6 @@ const mapDbProjectToOpportunity = (row: DbProject, tasks: DbTask[] = []): Opport
             let completedDateStr = undefined;
             if (t.status === 'done') {
                 const now = new Date();
-                // If datafim is provided, check if it's in future. If so, cap at now for metrics.
-                // Or better, use `createdat` + duration if available? No, simpler:
                 const fim = t.datafim ? new Date(t.datafim) : now;
                 completedDateStr = fim > now ? now.toISOString() : fim.toISOString();
             }
@@ -274,16 +285,27 @@ const mapDbProjectToOpportunity = (row: DbProject, tasks: DbTask[] = []): Opport
                 status: t.status as any,
                 completed: t.status === 'done',
                 completedAt: completedDateStr,
-                createdAt: t.createdat, // IMPORTANT: Map createdAt for Lead Time calc
+                createdAt: t.createdat, 
                 assignee: t.responsavelData?.nome || undefined,
-                assigneeId: t.responsavel || undefined, // Map UUID for logic
+                assigneeId: t.responsavel || undefined, 
                 assigneeIsDev: t.responsavelData?.desenvolvedor,
+                members: t.membros || [],
+                tags: t.etiquetas || [],
                 startDate: t.datainicio || t.dataproposta,
                 dueDate: t.datafim || t.deadline,
                 estimatedHours: t.duracaohoras,
                 gut: { g: t.gravidade, u: t.urgencia, t: t.tendencia },
                 subtasks: [],
-                projectId: row.id // Bind project ID
+                projectId: row.id,
+                // MAP LIFECYCLE FOR TIMELINE
+                lifecycle: {
+                    created: t.createdat,
+                    todo: t.dataafazer,
+                    doing: t.datafazendo,
+                    review: t.datarevisao,
+                    approval: t.dataaprovacao,
+                    done: t.dataconclusao
+                }
             };
         });
 
@@ -339,14 +361,11 @@ const mapDbProjectToOpportunity = (row: DbProject, tasks: DbTask[] = []): Opport
                 let fresh = freshTaskMap.get(task.id);
                 if (!fresh && task.dbId) fresh = freshTaskMap.get(task.dbId.toString());
                 
-                // Secondary match by Title if ID is temporary (risky but helpful for unsynced structures)
-                // if (!fresh) fresh = mappedTasks.find(t => t.text === task.text);
-
                 if (fresh) {
                     usedTaskIds.add(fresh.id); // Mark as used
                     return {
                         ...task,
-                        ...fresh, // Overwrite with fresh DB data (status, dates, assignee)
+                        ...fresh, // Overwrite with fresh DB data (status, dates, assignee, arrays)
                         subtasks: fresh.subtasks // Use fresh subtasks from DB
                     };
                 }
@@ -413,7 +432,7 @@ const mapDbProjectToOpportunity = (row: DbProject, tasks: DbTask[] = []): Opport
         revenue: row.receita,
         prioScore: row.prioseis,
         archetype: row.arquetipo as Archetype,
-        intensity: row.intensidade as IntensityLevel,
+        intensity: row.intensidade as IntensityLevel, // Fixed: renamed to intensity
         tads: tads,
         tadsScore: tadsScore,
         evidence: { clientsAsk: [], clientsSuffer: [], wontPay: [] },

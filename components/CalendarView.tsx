@@ -1,203 +1,177 @@
 
-import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { Opportunity, TaskStatus, BpmnTask, DbTask } from '../types';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, User, Clock, Zap, Plus, LayoutGrid, Columns, Square, Loader2, CheckCircle2, Hash, RefreshCw, Grid, CornerDownRight, AlignLeft, Layers } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Opportunity, DbTask } from '../types';
+import { fetchAllTasks, updateTask, deleteTask } from '../services/projectService';
 import { TaskDetailModal } from './TaskDetailModal';
-import { optimizeSchedule } from '../services/geminiService';
-import { supabase } from '../services/supabaseClient';
-import { fetchAssignableUsers, updateTask, fetchAllTasks, deleteTask } from '../services/projectService';
+import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 
 interface Props {
   opportunities: Opportunity[];
   onSelectOpportunity: (opp: Opportunity) => void;
-  onTaskUpdate: (oppId: string, nodeId: string, task: BpmnTask) => void;
-  onCreateAdhocTask?: (task: BpmnTask) => void;
-  onRefresh?: () => void;
+  onTaskUpdate: (oppId: string, nodeId: string, task: any) => void;
   userRole?: string;
   projectId?: string;
   organizationId?: number;
   activeModules?: string[];
 }
 
-interface EditableTaskContext {
-    task: BpmnTask;
-    oppId: string;
-    nodeId: string;
-    nodeLabel: string;
-    opportunity?: Opportunity;
-}
+export const CalendarView: React.FC<Props> = ({ 
+    opportunities, onSelectOpportunity, onTaskUpdate, userRole, projectId, organizationId, activeModules 
+}) => {
+    const [tasks, setTasks] = useState<DbTask[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [currentDate, setCurrentDate] = useState(new Date());
+    const [editingTaskCtx, setEditingTaskCtx] = useState<any | null>(null);
 
-type ViewMode = 'month' | 'week' | 'day';
+    useEffect(() => {
+        loadTasks();
+    }, [organizationId, projectId]);
 
-export const CalendarView: React.FC<Props> = ({ opportunities, onSelectOpportunity, onTaskUpdate, onCreateAdhocTask, onRefresh, userRole, projectId, organizationId, activeModules }) => {
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState<ViewMode>('month');
-  const [editingTaskCtx, setEditingTaskCtx] = useState<{task: BpmnTask, oppId: string, nodeLabel: string} | null>(null);
-  const [dbTasks, setDbTasks] = useState<DbTask[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+    const loadTasks = async () => {
+        setLoading(true);
+        if (organizationId) {
+            const allTasks = await fetchAllTasks(organizationId);
+            if (projectId) {
+                setTasks(allTasks.filter(t => t.projeto?.toString() === projectId));
+            } else {
+                setTasks(allTasks);
+            }
+        }
+        setLoading(false);
+    };
 
-  useEffect(() => {
-      loadTasks();
-  }, [organizationId, onRefresh]);
-
-  const loadTasks = async () => {
-      setIsLoading(true);
-      const tasks = await fetchAllTasks(organizationId);
-      setDbTasks(tasks);
-      setIsLoading(false);
-  };
-
-  const getDaysInMonth = (date: Date) => {
-      const year = date.getFullYear();
-      const month = date.getMonth();
-      const days = new Date(year, month + 1, 0).getDate();
-      return Array.from({ length: days }, (_, i) => new Date(year, month, i + 1));
-  };
-
-  const monthDays = useMemo(() => getDaysInMonth(currentDate), [currentDate]);
-
-  const handlePrev = () => {
-      const newDate = new Date(currentDate);
-      newDate.setMonth(newDate.getMonth() - 1);
-      setCurrentDate(newDate);
-  };
-
-  const handleNext = () => {
-      const newDate = new Date(currentDate);
-      newDate.setMonth(newDate.getMonth() + 1);
-      setCurrentDate(newDate);
-  };
-
-  const tasksByDay = useMemo(() => {
-      const map = new Map<string, DbTask[]>();
-      dbTasks.forEach(task => {
-          if (!task.datainicio) return;
-          const dateStr = task.datainicio.split('T')[0];
-          if (!map.has(dateStr)) map.set(dateStr, []);
-          map.get(dateStr)?.push(task);
-      });
-      return map;
-  }, [dbTasks]);
-
-  const getStatusColor = (status: string) => {
-      switch(status) {
-          case 'done': return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300';
-          case 'doing': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300';
-          default: return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
-      }
-  };
-
-  return (
-    <div className="h-full flex flex-col animate-in fade-in duration-500 bg-white dark:bg-[#0a0a0a]">
+    const daysInMonth = useMemo(() => {
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        const days = [];
         
-        {/* Header Clean */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-white/5">
-            <div>
-                <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <CalendarIcon className="w-6 h-6"/> Agenda
-                </h2>
-            </div>
-            
-            <div className="flex items-center gap-4">
-                <div className="flex items-center bg-slate-50 dark:bg-white/5 rounded-xl p-1">
-                    <button onClick={handlePrev} className="p-2 hover:bg-white dark:hover:bg-white/10 rounded-lg text-slate-500 transition-colors"><ChevronLeft className="w-4 h-4"/></button>
-                    <span className="px-4 text-sm font-bold text-slate-700 dark:text-white capitalize w-32 text-center">
-                        {currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
-                    </span>
-                    <button onClick={handleNext} className="p-2 hover:bg-white dark:hover:bg-white/10 rounded-lg text-slate-500 transition-colors"><ChevronRight className="w-4 h-4"/></button>
-                </div>
-                <button onClick={loadTasks} className="p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white">
-                    <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`}/>
-                </button>
-            </div>
-        </div>
+        // Pad start
+        for (let i = 0; i < firstDay.getDay(); i++) {
+            days.push(null);
+        }
+        // Days
+        for (let i = 1; i <= lastDay.getDate(); i++) {
+            days.push(new Date(year, month, i));
+        }
+        return days;
+    }, [currentDate]);
 
-        {/* Calendar Grid */}
-        <div className="flex-1 p-6 overflow-y-auto">
-            <div className="grid grid-cols-7 gap-4">
+    const getTasksForDate = (date: Date) => {
+        return tasks.filter(t => {
+            const tDate = t.datafim ? new Date(t.datafim) : new Date(t.dataproposta);
+            return tDate.getDate() === date.getDate() && 
+                   tDate.getMonth() === date.getMonth() && 
+                   tDate.getFullYear() === date.getFullYear();
+        });
+    };
+
+    return (
+        <div className="flex flex-col h-full bg-white dark:bg-slate-900 rounded-xl overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-white/5">
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() - 1)))} className="p-1 hover:bg-slate-100 dark:hover:bg-white/10 rounded"><ChevronLeft className="w-5 h-5"/></button>
+                        <h2 className="text-lg font-bold text-slate-900 dark:text-white capitalize w-48 text-center">
+                            {currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+                        </h2>
+                        <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() + 1)))} className="p-1 hover:bg-slate-100 dark:hover:bg-white/10 rounded"><ChevronRight className="w-5 h-5"/></button>
+                    </div>
+                    <button onClick={loadTasks} className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 rounded"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`}/></button>
+                </div>
+            </div>
+
+            {/* Calendar Grid */}
+            <div className="flex-1 grid grid-cols-7 grid-rows-[auto_1fr] bg-slate-200 dark:bg-slate-800 gap-[1px]">
                 {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
-                    <div key={day} className="text-xs font-bold text-slate-400 uppercase text-center mb-2">{day}</div>
+                    <div key={day} className="bg-white dark:bg-slate-900 p-2 text-center text-xs font-bold text-slate-500 uppercase">
+                        {day}
+                    </div>
                 ))}
                 
-                {/* Empty slots for start of month */}
-                {Array.from({ length: new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay() }).map((_, i) => (
-                    <div key={`empty-${i}`} className="h-32"></div>
-                ))}
-
-                {monthDays.map(date => {
-                    const dateKey = date.toISOString().split('T')[0];
-                    const dayTasks = tasksByDay.get(dateKey) || [];
+                {daysInMonth.map((date, i) => {
+                    if (!date) return <div key={`empty-${i}`} className="bg-slate-50 dark:bg-slate-950/50"></div>;
+                    
+                    const dayTasks = getTasksForDate(date);
                     const isToday = new Date().toDateString() === date.toDateString();
 
                     return (
-                        <div key={dateKey} className={`min-h-[120px] p-2 rounded-xl border transition-all ${isToday ? 'bg-blue-50/30 border-blue-200 dark:bg-blue-900/10 dark:border-blue-800' : 'bg-slate-50/50 dark:bg-white/5 border-slate-100 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/20'}`}>
-                            <div className={`text-xs font-bold mb-2 ${isToday ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500'}`}>
+                        <div key={date.toISOString()} className={`bg-white dark:bg-slate-900 p-2 min-h-[100px] flex flex-col gap-1 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors ${isToday ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}>
+                            <span className={`text-xs font-bold mb-1 ${isToday ? 'text-blue-500 bg-blue-100 dark:bg-blue-900/30 px-2 py-0.5 rounded-full w-fit' : 'text-slate-700 dark:text-slate-300'}`}>
                                 {date.getDate()}
-                            </div>
-                            <div className="space-y-1">
-                                {dayTasks.slice(0, 3).map(task => (
+                            </span>
+                            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-1">
+                                {dayTasks.map(task => (
                                     <div 
-                                        key={task.id}
-                                        onClick={() => setEditingTaskCtx({
-                                            task: {
-                                                id: task.id.toString(),
-                                                text: task.titulo,
-                                                status: task.status as any,
-                                                completed: task.status === 'done',
-                                                description: task.descricao,
-                                                assignee: task.responsavelData?.nome,
-                                                assigneeId: task.responsavel,
-                                                startDate: task.datainicio,
-                                                dueDate: task.datafim,
-                                                estimatedHours: task.duracaohoras
-                                            },
-                                            oppId: task.projeto?.toString() || '',
-                                            nodeLabel: 'Agenda'
-                                        })}
-                                        className={`px-2 py-1.5 rounded text-[10px] font-medium truncate cursor-pointer hover:opacity-80 transition-opacity ${getStatusColor(task.status)}`}
+                                        key={task.id} 
+                                        onClick={() => setEditingTaskCtx({ task: {
+                                            id: task.id.toString(),
+                                            text: task.titulo,
+                                            description: task.descricao,
+                                            status: task.status as any,
+                                            startDate: task.datainicio,
+                                            dueDate: task.datafim,
+                                            assigneeId: task.responsavel,
+                                            estimatedHours: task.duracaohoras,
+                                            completed: task.status === 'done',
+                                            gut: { g: task.gravidade, u: task.urgencia, t: task.tendencia },
+                                            tags: task.etiquetas || [],
+                                            members: task.membros || [],
+                                            dbId: task.id
+                                        }, nodeLabel: task.projetoData?.nome || 'Tarefa' })}
+                                        className={`text-[10px] p-1.5 rounded border border-l-4 cursor-pointer truncate shadow-sm transition-transform hover:scale-[1.02] ${
+                                            task.status === 'done' ? 'bg-emerald-100 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 border-l-emerald-500 text-emerald-700 dark:text-emerald-300' :
+                                            task.status === 'doing' ? 'bg-blue-100 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 border-l-blue-500 text-blue-700 dark:text-blue-300' :
+                                            new Date(task.datafim || '') < new Date() ? 'bg-red-100 dark:bg-red-900/20 border-red-200 dark:border-red-800 border-l-red-500 text-red-700 dark:text-red-300' :
+                                            'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 border-l-slate-400 text-slate-700 dark:text-slate-300'
+                                        }`}
                                     >
                                         {task.titulo}
                                     </div>
                                 ))}
-                                {dayTasks.length > 3 && (
-                                    <div className="text-[10px] text-slate-400 text-center cursor-pointer hover:text-slate-600">
-                                        + {dayTasks.length - 3} mais
-                                    </div>
-                                )}
                             </div>
                         </div>
                     );
                 })}
             </div>
-        </div>
 
-        {/* Modal */}
-        {editingTaskCtx && (
-            <TaskDetailModal 
-                task={editingTaskCtx.task}
-                nodeTitle="Tarefa"
-                opportunityTitle="Detalhes"
-                onClose={() => setEditingTaskCtx(null)}
-                onSave={async (updated) => {
-                    await updateTask(Number(updated.id), {
-                        titulo: updated.text,
-                        descricao: updated.description,
-                        status: updated.status,
-                        datainicio: updated.startDate,
-                        datafim: updated.dueDate,
-                        responsavel: updated.assigneeId
-                    });
-                    loadTasks();
-                }}
-                onDelete={async (id) => {
-                    if (window.confirm("Excluir tarefa?")) {
-                        await deleteTask(Number(id));
+            {/* Modal */}
+            {editingTaskCtx && (
+                <TaskDetailModal 
+                    task={editingTaskCtx.task}
+                    nodeTitle={editingTaskCtx.nodeLabel}
+                    opportunityTitle="Detalhes"
+                    organizationId={organizationId}
+                    onClose={() => setEditingTaskCtx(null)}
+                    onSave={async (updated) => {
+                        if (updated.id) {
+                            await updateTask(Number(updated.id), {
+                                titulo: updated.text,
+                                descricao: updated.description,
+                                status: updated.status,
+                                responsavel: updated.assigneeId,
+                                duracaohoras: updated.estimatedHours,
+                                datafim: updated.dueDate,
+                                datainicio: updated.startDate,
+                                etiquetas: updated.tags,
+                                membros: updated.members
+                            });
+                        }
                         loadTasks();
-                        setEditingTaskCtx(null);
-                    }
-                }}
-            />
-        )}
-    </div>
-  );
+                    }}
+                    onDelete={async (id) => {
+                        if (!isNaN(Number(id))) {
+                            if (window.confirm("Excluir tarefa?")) {
+                                await deleteTask(Number(id));
+                                loadTasks();
+                                setEditingTaskCtx(null);
+                            }
+                        }
+                    }}
+                />
+            )}
+        </div>
+    );
 };

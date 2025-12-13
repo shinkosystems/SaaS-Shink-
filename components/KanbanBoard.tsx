@@ -73,6 +73,14 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
             ]);
             setTasks(tasksData);
             setProjectsList(projectsData.map(p => ({ id: p.id, nome: p.nome })));
+            
+            // Sync editing context if open (prevents stale data)
+            if (editingTaskCtx) {
+                const freshTask = tasksData.find(t => t.id === editingTaskCtx.id);
+                if (freshTask) {
+                    setEditingTaskCtx(freshTask);
+                }
+            }
         } catch (error) {
             console.error("Erro ao carregar Kanban:", error);
         } finally {
@@ -322,10 +330,14 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
                         assigneeIsDev: editingTaskCtx.responsavelData?.desenvolvedor,
                         gut: { g: editingTaskCtx.gravidade, u: editingTaskCtx.urgencia, t: editingTaskCtx.tendencia },
                         subtasks: [],
-                        projectId: editingTaskCtx.projeto || undefined 
+                        members: editingTaskCtx.membros || [],
+                        tags: editingTaskCtx.etiquetas || [],
+                        projectId: editingTaskCtx.projeto || undefined,
+                        dbId: editingTaskCtx.id
                     }}
                     nodeTitle={editingTaskCtx.projetoData?.nome || 'Projeto'}
                     opportunityTitle={editingTaskCtx.projetoData?.nome}
+                    organizationId={organizationId} // Pass ID
                     onClose={() => setEditingTaskCtx(null)}
                     onDelete={async (id) => {
                         if (!isNaN(Number(id))) {
@@ -345,7 +357,9 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
                             datainicio: updatedTask.startDate,
                             gravidade: updatedTask.gut?.g,
                             urgencia: updatedTask.gut?.u,
-                            tendencia: updatedTask.gut?.t
+                            tendencia: updatedTask.gut?.t,
+                            etiquetas: updatedTask.tags,
+                            membros: updatedTask.members
                         });
                         loadData();
                     }}

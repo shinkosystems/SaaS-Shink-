@@ -31,19 +31,21 @@ interface Props {
   activeModules?: string[];
 }
 
-// Helper para definir grupos de menu com nomes mais minimalistas
+const LOGO_HORIZONTAL = "https://zjssfnbcboibqeoubeou.supabase.co/storage/v1/object/public/fotoperfil/fotoperfil/1%20(1).png";
+
+// Helper para definir grupos de menu
 const getMenuGroups = (userRole: string, isAdmin: boolean, currentPlan: string = 'plan_free', userEmail?: string, activeModules: string[] = []) => {
     const isClient = userRole === 'cliente';
     
     const groups = [
         {
-            title: 'Principal',
+            title: 'Gestão',
             items: [
-                { id: 'dashboard', label: 'Visão Geral', icon: LayoutDashboard },
+                { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
             ]
         },
         {
-            title: 'Operacional',
+            title: 'Execução',
             items: [] as any[]
         }
     ];
@@ -66,7 +68,7 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, currentPlan: string =
         const businessItems = [];
         // CRM Module
         if (hasModule('crm')) {
-            businessItems.push({ id: 'crm', label: 'Vendas', icon: TrendingUp });
+            businessItems.push({ id: 'crm', label: 'CRM / Vendas', icon: TrendingUp });
         }
         if (hasModule('financial')) {
             businessItems.push({ id: 'financial', label: 'Financeiro', icon: DollarSign });
@@ -77,7 +79,7 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, currentPlan: string =
 
         if (businessItems.length > 0) {
             groups.push({
-                title: 'Corporativo',
+                title: 'Negócios',
                 items: businessItems
             });
         }
@@ -85,7 +87,7 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, currentPlan: string =
         const intelItems = [];
         // Metrics Modules
         if (userEmail === 'peboorba@gmail.com' && hasModule('product')) {
-            intelItems.push({ id: 'product', label: 'Métricas de Produto', icon: BarChart3 });
+            intelItems.push({ id: 'product', label: 'Métricas Produto', icon: BarChart3 });
         }
         if (hasModule('engineering')) {
             intelItems.push({ id: 'dev-metrics', label: 'Engenharia', icon: Code2 });
@@ -93,18 +95,18 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, currentPlan: string =
 
         if (intelItems.length > 0) {
             groups.push({
-                title: 'Estratégia',
+                title: 'Inteligência',
                 items: intelItems
             });
         }
     }
 
     const systemItems = [
-        { id: 'settings', label: 'Ajustes', icon: Settings },
+        { id: 'settings', label: 'Configurações', icon: Settings },
     ];
 
     if (isAdmin) {
-        systemItems.push({ id: 'admin-manager', label: 'Administração', icon: Shield });
+        systemItems.push({ id: 'admin-manager', label: 'Super Admin', icon: Shield });
     }
 
     groups.push({
@@ -119,6 +121,7 @@ export const Sidebar: React.FC<Props> = (props) => {
   const isClient = props.userRole === 'cliente';
   const isAdmin = props.userData.name === 'Pedro Borba';
   const menuGroups = getMenuGroups(props.userRole, isAdmin, props.currentPlan, props.userData?.email, props.activeModules);
+  // Still use PLAN_LIMITS for AI usage display if needed, but primary logic is Modules
   const planLimits = PLAN_LIMITS[props.currentPlan || 'plan_free']; 
   const [aiUsage, setAiUsage] = useState(0);
 
@@ -139,73 +142,89 @@ export const Sidebar: React.FC<Props> = (props) => {
   }, []);
 
   return (
-    <div className={`hidden md:flex flex-col w-64 h-full border-r border-slate-200 dark:border-white/5 bg-slate-50/30 dark:bg-[#050505] shrink-0 transition-all duration-300 backdrop-blur-xl`}>
+    <div className={`hidden md:flex flex-col w-64 h-full border-r border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 shrink-0 transition-all duration-300`}>
         
-        {/* Header Logo - Mais limpo */}
-        <div className="h-20 flex items-center justify-between px-6 mb-2">
+        {/* Header Logo */}
+        <div className="h-24 flex items-center justify-between px-4 border-b border-slate-200 dark:border-white/5 bg-white/50 dark:bg-transparent backdrop-blur-sm relative z-20">
             {props.customLogoUrl ? (
-                <img src={props.customLogoUrl} alt="Logo" className="h-8 object-contain max-w-[120px]" />
+                <img src={props.customLogoUrl} alt="Logo" className="h-10 object-contain max-w-[140px]" />
             ) : (
-                <div className="flex items-center gap-3 group cursor-pointer">
-                    <div className="w-8 h-8 rounded-xl bg-slate-900 dark:bg-white flex items-center justify-center text-white dark:text-black font-bold text-lg">
-                        {props.orgName ? props.orgName.charAt(0).toUpperCase() : 'S'}
-                    </div>
-                    <span className="font-bold text-lg tracking-tight text-slate-900 dark:text-white truncate max-w-[100px] opacity-90 group-hover:opacity-100 transition-opacity">
-                        {props.orgName || 'Shinkō'}
-                    </span>
+                <div className="flex items-center gap-2 w-full">
+                    <img src={LOGO_HORIZONTAL} alt="Shinkō OS" className="h-10 object-contain" />
                 </div>
             )}
+            
+            <button 
+                type="button"
+                onClick={(e) => { 
+                    e.preventDefault(); 
+                    e.stopPropagation(); 
+                    props.onOpenFeedback(); 
+                }}
+                className="p-2 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/20 text-amber-500 dark:text-amber-400 transition-colors relative z-50 cursor-pointer"
+                title="Reportar Problema"
+            >
+                <Lightbulb className="w-5 h-5"/>
+            </button>
         </div>
 
-        {/* Quick Action - Minimalista */}
+        {/* Quick Action */}
         {!isClient && (
-            <div className="px-6 mb-6">
+            <div className="p-4 pb-2 space-y-2">
                 <button 
                     onClick={props.onOpenCreate}
-                    className="w-full h-10 bg-slate-900 dark:bg-white text-white dark:text-black rounded-lg font-medium text-xs flex items-center justify-center gap-2 hover:opacity-90 transition-opacity shadow-sm"
+                    className="w-full h-11 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all"
                 >
                     <PlusCircle className="w-4 h-4" /> Novo Projeto
+                </button>
+                <button 
+                    onClick={props.onOpenCreateTask}
+                    className="w-full h-10 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/10 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all"
+                >
+                    <PlusCircle className="w-3 h-3" /> Tarefa Rápida
                 </button>
             </div>
         )}
 
-        {/* Search - Mais discreto */}
-        <div className="px-6 mb-4">
+        {/* Search */}
+        <div className="px-4 py-2 mb-2">
             <div className="relative group">
-                <Search className="absolute left-0 top-2.5 w-4 h-4 text-slate-400 group-focus-within:text-slate-600 dark:group-focus-within:text-slate-200 transition-colors" />
+                <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400 group-focus-within:text-shinko-primary transition-colors" />
                 <input 
                     type="text" 
                     placeholder="Buscar..." 
                     onChange={(e) => props.onSearch(e.target.value)}
-                    className="w-full h-9 pl-6 pr-4 bg-transparent border-b border-slate-200 dark:border-white/10 text-xs font-medium text-slate-900 dark:text-white placeholder-slate-400 focus:border-slate-400 dark:focus:border-slate-500 outline-none transition-all"
+                    className="w-full h-9 pl-9 pr-4 rounded-xl bg-white dark:bg-white/5 border border-slate-200 dark:border-transparent text-xs font-medium text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-shinko-primary/50 focus:border-shinko-primary outline-none transition-all shadow-sm"
                 />
             </div>
         </div>
 
-        {/* Menu Items - Estilo Lista Limpa */}
-        <div className="flex-1 overflow-y-auto px-4 pb-4 custom-scrollbar space-y-8">
+        {/* Menu Items */}
+        <div className="flex-1 overflow-y-auto px-4 pb-4 custom-scrollbar space-y-6">
             {menuGroups.map((group, idx) => (
                 <div key={idx} className="relative">
+                    {idx > 0 && <div className="mx-2 mb-4 h-px bg-slate-200/50 dark:bg-white/5"></div>}
+                    
                     {group.title && group.items.length > 0 && (
-                        <h3 className="px-4 mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400 opacity-60">
+                        <h3 className="px-3 mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 opacity-80">
                             {group.title}
                         </h3>
                     )}
-                    <div className="space-y-0.5">
+                    <div className="space-y-1">
                         {group.items.map(item => (
                             <button
                                 key={item.id}
                                 onClick={() => props.onChangeView(item.id)}
-                                className={`w-full h-9 flex items-center gap-3 px-4 rounded-lg text-sm transition-all group relative ${
+                                className={`w-full h-10 flex items-center gap-3 px-3 rounded-xl text-sm font-medium transition-all group relative ${
                                     props.currentView === item.id 
-                                    ? 'text-slate-900 dark:text-white font-semibold bg-slate-200/50 dark:bg-white/5' 
-                                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'
+                                    ? 'bg-white dark:bg-white/10 text-shinko-primary shadow-sm ring-1 ring-slate-200 dark:ring-white/10 font-bold' 
+                                    : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'
                                 }`}
                             >
-                                <item.icon className={`w-4 h-4 transition-colors ${props.currentView === item.id ? 'text-slate-900 dark:text-white' : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300'}`} />
-                                <span className="flex-1 text-left tracking-tight">{item.label}</span>
+                                <item.icon className={`w-4 h-4 transition-colors ${props.currentView === item.id ? 'text-shinko-primary' : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300'}`} />
+                                <span className="flex-1 text-left">{item.label}</span>
                                 {props.currentView === item.id && (
-                                    <div className="w-1 h-1 rounded-full bg-slate-900 dark:bg-white"></div>
+                                    <div className="w-1.5 h-1.5 rounded-full bg-shinko-primary shadow-glow"></div>
                                 )}
                             </button>
                         ))}
@@ -214,13 +233,40 @@ export const Sidebar: React.FC<Props> = (props) => {
             ))}
         </div>
 
-        {/* Bottom Panel - Minimalista */}
-        <div className="p-4 mx-2 mb-2 bg-white dark:bg-white/5 rounded-xl border border-slate-100 dark:border-white/5 shadow-sm">
+        {/* AI Counter */}
+        {!isClient && (
+            <div className="px-4 pb-4">
+                <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs font-bold text-purple-600 dark:text-purple-400">
+                        <Sparkles className="w-3 h-3"/>
+                        IA Créditos
+                    </div>
+                    <span className="text-xs font-mono text-purple-700 dark:text-purple-300">
+                        {planLimits?.aiLimit >= 999999 ? '∞' : `${Math.max(0, (planLimits?.aiLimit || 0) - aiUsage)}/${planLimits?.aiLimit === 9999 ? '∞' : planLimits?.aiLimit}`}
+                    </span>
+                </div>
+            </div>
+        )}
+
+        {/* Bottom Panel */}
+        <div className="p-4 border-t border-slate-200 dark:border-white/5 bg-white/50 dark:bg-black/20 backdrop-blur-xl">
+            <div className="flex items-center justify-between mb-4">
+                <button 
+                    onClick={props.onToggleTheme}
+                    className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 transition-colors"
+                >
+                    {props.theme === 'dark' ? <Sun className="w-4 h-4"/> : <Moon className="w-4 h-4"/>}
+                </button>
+                <span className="text-[9px] font-bold px-2 py-1 bg-slate-100 dark:bg-white/10 rounded-full text-slate-500 uppercase tracking-wider border border-slate-200 dark:border-white/5">
+                    v2.5 BETA
+                </span>
+            </div>
+
             <div 
-                className="flex items-center gap-3 cursor-pointer group" 
+                className="flex items-center gap-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-white/5 p-2 rounded-xl transition-colors group" 
                 onClick={() => props.onChangeView('profile')}
             >
-                <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-white/10 flex items-center justify-center text-xs font-bold overflow-hidden text-slate-600 dark:text-slate-300">
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-900 ring-2 ring-white dark:ring-white/10 flex items-center justify-center text-xs font-bold overflow-hidden shadow-sm">
                     {props.userData?.avatar ? (
                         <img src={props.userData.avatar} alt="Avatar" className="w-full h-full object-cover" />
                     ) : (
@@ -228,20 +274,15 @@ export const Sidebar: React.FC<Props> = (props) => {
                     )}
                 </div>
                 <div className="flex flex-col min-w-0 flex-1">
-                    <span className="text-xs font-bold text-slate-900 dark:text-white truncate">{props.userData?.name || 'Usuário'}</span>
-                    <span className="text-[10px] text-slate-400 truncate">{props.userRole}</span>
+                    <span className="text-xs font-bold text-slate-900 dark:text-white truncate group-hover:text-shinko-primary transition-colors">{props.userData?.name || 'Usuário'}</span>
+                    <span className="text-slate-500 text-[10px] flex items-center gap-1 uppercase tracking-wide">
+                        <span className={`w-1.5 h-1.5 rounded-full ${props.dbStatus === 'connected' ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+                        {props.userRole}
+                    </span>
                 </div>
-                <div className="flex gap-1">
-                    <button 
-                        onClick={(e) => { e.stopPropagation(); props.onToggleTheme(); }}
-                        className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
-                    >
-                        {props.theme === 'dark' ? <Sun className="w-3 h-3"/> : <Moon className="w-3 h-3"/>}
-                    </button>
-                    <button onClick={(e) => { e.stopPropagation(); props.onLogout(); }} className="text-slate-400 hover:text-red-500 p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors">
-                        <LogOut className="w-3 h-3"/>
-                    </button>
-                </div>
+                <button onClick={(e) => { e.stopPropagation(); props.onLogout(); }} className="text-slate-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors">
+                    <LogOut className="w-4 h-4"/>
+                </button>
             </div>
         </div>
     </div>
@@ -261,9 +302,11 @@ export const MobileDrawer: React.FC<Props> = (props) => {
                     <button onClick={() => props.setIsMobileOpen(true)} className="p-2 -ml-2 text-slate-500 hover:text-slate-900 dark:hover:text-white">
                         <Menu className="w-6 h-6"/>
                     </button>
-                    <div className="font-bold text-lg text-slate-900 dark:text-white">
-                        {props.orgName || 'Shinkō'}
-                    </div>
+                    {props.customLogoUrl ? (
+                        <img src={props.customLogoUrl} alt="Logo" className="h-8 object-contain max-w-[120px]" />
+                    ) : (
+                        <img src={LOGO_HORIZONTAL} alt="Shinkō OS" className="h-8 object-contain" />
+                    )}
                 </div>
                 
                 <div className="flex items-center gap-2">
@@ -280,7 +323,7 @@ export const MobileDrawer: React.FC<Props> = (props) => {
                     <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => props.setIsMobileOpen(false)}></div>
                     <div className="absolute inset-y-0 left-0 w-[80%] max-w-xs bg-white dark:bg-[#0a0a0a] shadow-2xl flex flex-col animate-in slide-in-from-left duration-300 border-r border-slate-200 dark:border-white/5">
                         <div className="p-6 border-b border-slate-100 dark:border-white/5 flex justify-between items-center">
-                            <span className="font-bold text-lg text-slate-900 dark:text-white">Menu</span>
+                            <img src={LOGO_HORIZONTAL} alt="Shinkō OS" className="h-8 object-contain" />
                             <button onClick={() => props.setIsMobileOpen(false)}><X className="w-5 h-5 text-slate-400"/></button>
                         </div>
                         
