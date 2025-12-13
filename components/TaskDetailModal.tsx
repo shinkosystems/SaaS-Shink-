@@ -139,7 +139,9 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
       setNewLabelText('');
   };
 
-  const handleRemoveLabel = (tag: string) => {
+  const handleRemoveLabel = (e: React.MouseEvent, tag: string) => {
+      e.preventDefault();
+      e.stopPropagation();
       const updatedData = { ...formData, tags: (formData.tags || []).filter(t => t !== tag) };
       setFormData(updatedData);
       onSave(updatedData);
@@ -243,8 +245,14 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                 {formData.tags && formData.tags.length > 0 && (
                     <div className="flex flex-wrap gap-2 pl-9">
                         {formData.tags.map((tag, idx) => (
-                            <span key={idx} className="px-3 py-1 rounded-full font-bold text-[10px] uppercase tracking-wide bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+                            <span key={idx} className="group relative px-3 py-1 rounded-full font-bold text-[10px] uppercase tracking-wide bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 flex items-center gap-1 cursor-default transition-all hover:pr-6">
                                 {tag}
+                                <button 
+                                    onClick={(e) => handleRemoveLabel(e, tag)}
+                                    className="hidden group-hover:flex absolute right-1.5 top-1/2 -translate-y-1/2 text-amber-900 dark:text-amber-200 hover:text-red-500 p-0.5 rounded-full hover:bg-black/10 dark:hover:bg-white/10"
+                                >
+                                    <X className="w-3 h-3"/>
+                                </button>
                             </span>
                         ))}
                     </div>
@@ -650,7 +658,11 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                                         className="w-full flex items-center justify-between px-2 py-1.5 rounded bg-slate-100 dark:bg-white/5 text-xs text-slate-700 dark:text-slate-300 group"
                                     >
                                         <span>{tag}</span>
-                                        <button onClick={() => handleRemoveLabel(tag)} className="text-slate-400 hover:text-red-500">
+                                        <button 
+                                            type="button"
+                                            onClick={(e) => handleRemoveLabel(e, tag)} 
+                                            className="text-slate-400 hover:text-red-500 p-1 rounded hover:bg-white dark:hover:bg-white/10 transition-colors"
+                                        >
                                             <X className="w-3 h-3"/>
                                         </button>
                                     </div>
