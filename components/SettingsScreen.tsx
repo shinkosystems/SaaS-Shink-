@@ -1,9 +1,7 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { Sun, Moon, Palette, Building2, UploadCloud, Save, Volume2, Monitor, Users, Briefcase, Plus, Trash2, Check, User, BrainCircuit, Sparkles, MessageSquare, BookOpen, Fingerprint, HardDrive, Globe, Loader2, AlertTriangle, Lock, Link, Copy, CheckCircle, LayoutGrid, ToggleRight, ToggleLeft } from 'lucide-react';
+import { Settings, Sun, Moon, Palette, Building2, UploadCloud, Save, Monitor, Users, Briefcase, Plus, Trash2, Check, User, BrainCircuit, Sparkles, BookOpen, Fingerprint, Loader2, AlertTriangle, Lock, Copy, CheckCircle, LayoutGrid, DollarSign, Code2, BarChart3, Calendar, TrendingUp, ShieldCheck } from 'lucide-react';
 import { fetchRoles, createRole, deleteRole, fetchOrganizationMembersWithRoles, updateUserRole, updateOrgModules } from '../services/organizationService';
-import { PLAN_LIMITS } from '../types';
-import { getCurrentUserPlan } from '../services/asaasService';
-import { supabase } from '../services/supabaseClient';
 import { ElasticSwitch } from './ElasticSwitch';
 
 interface Props {
@@ -30,62 +28,45 @@ interface Props {
   onRefreshModules: () => void;
 }
 
-// Os IDs aqui devem bater com SYSTEM_MODULES_DEF em organizationService.ts
 const AVAILABLE_MODULES = [
-    { id: 'ia', label: 'Inteligência Artificial', desc: 'Assistentes virtuais, geração de conteúdo e análise.', icon: Sparkles },
-    { id: 'projects', label: 'Projetos', desc: 'Gestão de portfólio, Matriz RDE e Score.', icon: Briefcase },
-    { id: 'kanban', label: 'Kanban (Tarefas)', desc: 'Quadro visual de tarefas e status.', icon: LayoutGrid },
-    { id: 'gantt', label: 'Gráfico de Gantt', desc: 'Cronograma visual de projetos.', icon: CheckCircle }, 
-    { id: 'calendar', label: 'Agenda (Cronograma)', desc: 'Visualização mensal/semanal de prazos.', icon: Calendar }, 
-    { id: 'crm', label: 'CRM (Vendas)', desc: 'Pipeline de oportunidades, contatos e empresas.', icon: TrendingUp },
-    { id: 'financial', label: 'Financeiro', desc: 'Controle de caixa e contratos.', icon: DollarSign }, 
-    { id: 'clients', label: 'Clientes', desc: 'Base de contatos e CRM simples.', icon: Users },
-    { id: 'engineering', label: 'Engenharia (DORA)', desc: 'Métricas de DevOps e performance.', icon: Code2 },
-    { id: 'product', label: 'Produto (Métricas)', desc: 'Indicadores de uso e NPS.', icon: BarChart3 }
+    { id: 'ia', label: 'Inteligência Artificial', desc: 'Assistentes virtuais e automação.', icon: Sparkles },
+    { id: 'projects', label: 'Projetos', desc: 'Gestão de portfólio.', icon: Briefcase },
+    { id: 'kanban', label: 'Kanban', desc: 'Quadro visual de tarefas.', icon: LayoutGrid },
+    { id: 'gantt', label: 'Gantt', desc: 'Cronograma visual.', icon: CheckCircle }, 
+    { id: 'calendar', label: 'Agenda', desc: 'Visualização de prazos.', icon: Calendar }, 
+    { id: 'crm', label: 'CRM', desc: 'Pipeline de vendas.', icon: TrendingUp },
+    { id: 'financial', label: 'Financeiro', desc: 'Controle de caixa.', icon: DollarSign }, 
+    { id: 'clients', label: 'Clientes', desc: 'Base de contatos.', icon: Users },
+    { id: 'engineering', label: 'Engenharia', desc: 'Métricas DORA.', icon: Code2 },
+    { id: 'product', label: 'Produto', desc: 'Indicadores de uso.', icon: BarChart3 },
+    { id: 'whitelabel', label: 'Whitelabel', desc: 'Marca própria.', icon: Palette }
 ];
 
-import { DollarSign, Code2, BarChart3, Calendar, TrendingUp } from 'lucide-react'; 
-
 export const SettingsScreen: React.FC<Props> = ({ 
-    theme, onToggleTheme, onlineUsers, userOrgId, orgDetails, onUpdateOrgDetails, setView, userRole, currentPlan, activeModules, onRefreshModules
+    theme, onToggleTheme, onlineUsers, userOrgId, orgDetails, onUpdateOrgDetails, setView, userRole, userData, currentPlan, activeModules, onRefreshModules
 }) => {
   const [activeTab, setActiveTab] = useState<'general' | 'team' | 'ai' | 'modules'>('general');
   const [color, setColor] = useState(orgDetails.primaryColor || '#F59E0B');
   const [orgName, setOrgName] = useState(orgDetails.name);
-  const [orgLimit, setOrgLimit] = useState(orgDetails.limit);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Team & Roles State
+  // Team
   const [roles, setRoles] = useState<{id: number, nome: string}[]>([]);
   const [members, setMembers] = useState<any[]>([]);
   const [newRoleName, setNewRoleName] = useState('');
   const [loadingTeam, setLoadingTeam] = useState(false);
   
-  // Modules State
+  // Modules
   const [localModules, setLocalModules] = useState<string[]>(activeModules || []);
   const [isSavingModules, setIsSavingModules] = useState(false);
   
-  // Whitelabel Link State
-  const [whitelabelLinkCopied, setWhitelabelLinkCopied] = useState(false);
-
-  // AI Context State
+  // AI
   const [aiSector, setAiSector] = useState(orgDetails.aiSector || '');
   const [aiTone, setAiTone] = useState(orgDetails.aiTone || 'Técnico e Direto');
   const [aiContext, setAiContext] = useState(orgDetails.aiContext || '');
   const [isSavingAi, setIsSavingAi] = useState(false);
 
   const isAdmin = userRole === 'dono';
-
-  useEffect(() => {
-      if (orgDetails) {
-          setAiSector(orgDetails.aiSector || '');
-          setAiTone(orgDetails.aiTone || 'Técnico e Direto');
-          setAiContext(orgDetails.aiContext || '');
-          setOrgName(orgDetails.name || '');
-          setOrgLimit(orgDetails.limit || 1);
-          setColor(orgDetails.primaryColor || '#F59E0B');
-      }
-  }, [orgDetails]);
 
   useEffect(() => {
       setLocalModules(activeModules);
@@ -108,57 +89,51 @@ export const SettingsScreen: React.FC<Props> = ({
           setRoles(rolesData);
           setMembers(membersData);
       } catch (e) {
-          console.error("Erro ao carregar dados do time", e);
+          console.error(e);
       } finally {
           setLoadingTeam(false);
       }
-  };
-
-  const handleSave = () => {
-      onUpdateOrgDetails({
-          color: color !== orgDetails.primaryColor ? color : undefined,
-          name: orgName !== orgDetails.name ? orgName : undefined,
-          limit: orgLimit !== orgDetails.limit ? orgLimit : undefined
-      });
   };
 
   const handleSaveModules = async () => {
       if (!userOrgId) return;
       setIsSavingModules(true);
       try {
-          // Salva os módulos que estão com Switch = TRUE
-          // O backend irá remover todos os antigos e inserir estes novos.
           await updateOrgModules(userOrgId, localModules);
-          
-          // REFRESH PARENT STATE
           onRefreshModules();
-
-          alert('Módulos atualizados com sucesso!');
+          alert("Módulos atualizados!");
       } catch (e: any) {
-          alert('Erro ao salvar módulos: ' + e.message);
+          alert("Erro: " + e.message);
       } finally {
           setIsSavingModules(false);
       }
   };
 
-  const toggleModule = (id: string) => {
-      // Kanban is strictly locked to TRUE
-      if (id === 'kanban') return;
-
-      if (localModules.includes(id)) {
-          // Switch virou FALSE: Remove da lista local
-          setLocalModules(localModules.filter(m => m !== id));
-      } else {
-          // Switch virou TRUE: Adiciona na lista local
-          setLocalModules([...localModules, id]);
-      }
+  const handleCreateRole = async () => {
+      if (!userOrgId || !newRoleName.trim()) return;
+      try {
+          await createRole(newRoleName, userOrgId);
+          setNewRoleName('');
+          loadTeamData();
+      } catch (e) { alert("Erro ao criar cargo."); }
   };
 
-  const handleSaveAi = async () => {
-      if (!userOrgId) {
-          alert("Erro: Organização não identificada.");
-          return;
-      }
+  const handleDeleteRole = async (id: number) => {
+      if (!window.confirm("Excluir cargo?")) return;
+      try {
+          await deleteRole(id);
+          loadTeamData();
+      } catch (e) { alert("Erro ao excluir cargo (pode estar em uso)."); }
+  };
+
+  const handleUpdateMemberRole = async (userId: string, roleId: string) => {
+      try {
+          await updateUserRole(userId, roleId ? Number(roleId) : null);
+          loadTeamData();
+      } catch (e) { alert("Erro ao atualizar membro."); }
+  };
+
+  const handleSaveAiSettings = async () => {
       setIsSavingAi(true);
       try {
           await onUpdateOrgDetails({
@@ -166,459 +141,219 @@ export const SettingsScreen: React.FC<Props> = ({
               aiTone,
               aiContext
           });
+          alert("Configurações de IA salvas!");
       } catch (e) {
-          console.error("Erro ao salvar IA:", e);
+          alert("Erro ao salvar.");
       } finally {
           setIsSavingAi(false);
       }
   };
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (e.target.files?.[0]) {
-          onUpdateOrgDetails({ logoFile: e.target.files[0] });
-      }
-  };
-
-  const handleAddRole = async () => {
-      if (!newRoleName.trim() || !userOrgId) return;
-      try {
-          const newRole = await createRole(newRoleName, userOrgId);
-          if (newRole) {
-              setRoles([...roles, newRole]);
-              setNewRoleName('');
-          }
-      } catch (e) {
-          alert('Erro ao criar cargo.');
-      }
-  };
-
-  const handleDeleteRole = async (id: number) => {
-      if (!confirm('Tem certeza? Isso removerá o cargo da lista.')) return;
-      try {
-          await deleteRole(id);
-          setRoles(roles.filter(r => r.id !== id));
-      } catch (e) {
-          alert('Erro ao excluir cargo.');
-      }
-  };
-
-  const handleMemberRoleUpdate = async (userId: string, roleIdString: string) => {
-      const roleId = roleIdString ? Number(roleIdString) : null;
-      setMembers(members.map(m => m.id === userId ? { ...m, cargo: roleId } : m));
-      try {
-          await updateUserRole(userId, roleId);
-      } catch (e) {
-          console.error(e);
-          alert('Erro ao atualizar membro.');
-          loadTeamData(); 
-      }
-  };
-
-  const handleCopyWhitelabelLink = () => {
-      const link = `${window.location.origin}/?org=${userOrgId}`;
-      navigator.clipboard.writeText(link).then(() => {
-          setWhitelabelLinkCopied(true);
-          setTimeout(() => setWhitelabelLinkCopied(false), 2000);
-      });
-  };
-
-  const limitConfig = PLAN_LIMITS[currentPlan || 'plan_free'] || PLAN_LIMITS['plan_free'];
-  const userCount = members.length;
-  const effectiveLimit = Math.max(orgLimit || 0, limitConfig.maxUsers);
-  const isUserLimitReached = userCount >= effectiveLimit;
-  const isEnterprisePlan = currentPlan === 'plan_enterprise';
-  const isWhitelabelLocked = !limitConfig.features.whitelabel && !orgDetails.isWhitelabelActive && !isEnterprisePlan;
-  const isAiLocked = !limitConfig.features.aiAdvanced && !orgDetails.isWhitelabelActive && !isEnterprisePlan; 
-
-  const isModuleAllowed = (moduleId: string) => {
-      // Basic core modules always allowed
-      if (['projects', 'ia', 'kanban'].includes(moduleId)) return true;
-      
-      // CRM is allowed for Free plan as well (per previous update)
-      if (moduleId === 'crm') return true;
-
-      // Check plan features for others
-      const featureKey = moduleId === 'gantt' ? 'gantt' : 
-                         moduleId === 'financial' ? 'financial' :
-                         moduleId === 'clients' ? 'clients' :
-                         moduleId === 'engineering' || moduleId === 'product' ? 'metrics' : null;
-      
-      if (!featureKey) return true; // Default allow if not mapped
-      // @ts-ignore
-      return limitConfig.features[featureKey] !== false;
-  };
-
   return (
-    <div className="h-full flex flex-col p-6 md:p-10 overflow-y-auto custom-scrollbar animate-in fade-in duration-500">
-      <div className="max-w-5xl mx-auto w-full space-y-8">
-        
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-                <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
-                    <Palette className="w-8 h-8 text-shinko-primary"/> Configurações
-                </h1>
-                <p className="text-slate-500 dark:text-slate-400 mt-2">Personalize a aparência e gerencie sua organização.</p>
-            </div>
-
-            {isAdmin && (
-                <div className="flex bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-x-auto max-w-full">
-                    <button 
-                        onClick={() => setActiveTab('general')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${
-                            activeTab === 'general' 
-                            ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' 
-                            : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'
-                        }`}
-                    >
-                        <Monitor className="w-4 h-4"/> Geral
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('modules')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${
-                            activeTab === 'modules' 
-                            ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' 
-                            : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'
-                        }`}
-                    >
-                        <LayoutGrid className="w-4 h-4"/> Módulos
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('team')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${
-                            activeTab === 'team' 
-                            ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' 
-                            : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'
-                        }`}
-                    >
-                        <Users className="w-4 h-4"/> Time
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('ai')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${
-                            activeTab === 'ai' 
-                            ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 shadow-sm' 
-                            : 'text-slate-500 hover:text-purple-500 dark:hover:text-purple-400'
-                        }`}
-                    >
-                        {isAiLocked && <Lock className="w-3 h-3 text-slate-400"/>}
-                        <BrainCircuit className="w-4 h-4"/> Inteligência (AI)
-                    </button>
-                </div>
-            )}
+    <div className="flex flex-col h-full animate-in fade-in duration-500 max-w-5xl mx-auto p-4 md:p-8">
+        {/* Header */}
+        <div className="mb-8">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Configurações</h1>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Gerencie sua organização e preferências.</p>
         </div>
 
-        {/* GENERAL TAB */}
-        {activeTab === 'general' && (
-            <div className="space-y-8 animate-in slide-in-from-left-4 duration-300">
-                {/* Whitelabel Sharing Card */}
-                {isAdmin && !isWhitelabelLocked && (
-                    <div className="bg-gradient-to-r from-purple-900 to-indigo-900 rounded-2xl p-6 border border-white/10 shadow-2xl relative overflow-hidden group">
-                        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
-                        <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
-                            <div className="text-white">
-                                <h3 className="text-lg font-bold flex items-center gap-2 mb-2">
-                                    <Sparkles className="w-5 h-5 text-yellow-300"/> Link de Compartilhamento White Label
-                                </h3>
-                                <p className="text-sm opacity-80 max-w-lg">
-                                    Use este link exclusivo para que seus clientes e time acessem a plataforma com a <strong>sua marca e identidade</strong> desde o primeiro login.
-                                </p>
-                            </div>
-                            <div className="flex gap-2 w-full md:w-auto">
-                                <div className="flex-1 bg-black/40 border border-white/20 rounded-xl p-3 text-xs text-white font-mono truncate min-w-[200px] flex items-center">
-                                    {`${window.location.origin}/?org=${userOrgId}`}
-                                </div>
-                                <button 
-                                    onClick={handleCopyWhitelabelLink}
-                                    className={`px-6 py-3 rounded-xl text-sm font-bold transition-all shadow-lg flex items-center gap-2 whitespace-nowrap ${whitelabelLinkCopied ? 'bg-emerald-500 text-white' : 'bg-white text-purple-900 hover:bg-purple-100'}`}
-                                >
-                                    {whitelabelLinkCopied ? <CheckCircle className="w-4 h-4"/> : <Copy className="w-4 h-4"/>}
-                                    {whitelabelLinkCopied ? 'Copiado!' : 'Copiar'}
-                                </button>
-                            </div>
+        {/* Tabs */}
+        <div className="flex gap-2 mb-8 border-b border-slate-200 dark:border-white/10 pb-1 overflow-x-auto">
+            {[
+                { id: 'general', label: 'Geral', icon: Monitor },
+                { id: 'modules', label: 'Módulos', icon: LayoutGrid },
+                { id: 'team', label: 'Time', icon: Users },
+                { id: 'ai', label: 'Inteligência', icon: BrainCircuit }
+            ].map(tab => (
+                <button 
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as any)}
+                    className={`flex items-center gap-2 px-4 py-2 text-sm font-bold transition-colors border-b-2 ${activeTab === tab.id ? 'border-slate-900 dark:border-white text-slate-900 dark:text-white' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                >
+                    <tab.icon className="w-4 h-4"/> {tab.label}
+                </button>
+            ))}
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar pb-10">
+            {activeTab === 'general' && (
+                <div className="space-y-8 max-w-2xl animate-in slide-in-from-left-4">
+                    <div className="space-y-4">
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">Aparência</h3>
+                        <div className="flex gap-4">
+                            <button onClick={onToggleTheme} className={`flex-1 p-4 rounded-xl border flex items-center justify-center gap-3 transition-all ${theme === 'light' ? 'bg-white border-slate-300 shadow-sm' : 'bg-slate-50 border-transparent text-slate-400'}`}>
+                                <Sun className="w-5 h-5"/> Claro
+                            </button>
+                            <button onClick={onToggleTheme} className={`flex-1 p-4 rounded-xl border flex items-center justify-center gap-3 transition-all ${theme === 'dark' ? 'bg-slate-900 border-slate-700 text-white shadow-sm' : 'bg-slate-100 border-transparent text-slate-400'}`}>
+                                <Moon className="w-5 h-5"/> Escuro
+                            </button>
                         </div>
                     </div>
-                )}
 
-                {/* Theme & Display */}
-                <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-900/50">
-                    <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                        <Monitor className="w-5 h-5 text-blue-500"/> Aparência
-                    </h2>
-                    <div className="flex items-center justify-between p-4 bg-slate-100 dark:bg-black/20 rounded-xl">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-white dark:bg-slate-800 rounded-lg shadow-sm">
-                                {theme === 'dark' ? <Moon className="w-5 h-5"/> : <Sun className="w-5 h-5 text-amber-500"/>}
-                            </div>
+                    <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-white/10">
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">Organização</h3>
+                        <div className="space-y-4">
                             <div>
-                                <div className="font-bold text-slate-900 dark:text-white">Modo Escuro</div>
-                                <div className="text-xs text-slate-500">Alternar entre tema claro e escuro.</div>
+                                <label className="text-xs font-bold text-slate-500 mb-1 block">Nome da Empresa</label>
+                                <input type="text" value={orgName} onChange={e => setOrgName(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 outline-none text-sm" disabled={!isAdmin}/>
                             </div>
+                            {isAdmin && (
+                                <button onClick={() => onUpdateOrgDetails({ name: orgName })} className="px-6 py-2 bg-slate-900 dark:bg-white text-white dark:text-black rounded-lg text-sm font-bold shadow-sm hover:opacity-90">
+                                    Salvar Alterações
+                                </button>
+                            )}
                         </div>
-                        <button 
-                            onClick={onToggleTheme}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${theme === 'dark' ? 'bg-blue-600' : 'bg-slate-300'}`}
-                        >
-                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${theme === 'dark' ? 'translate-x-6' : 'translate-x-1'}`}/>
-                        </button>
                     </div>
                 </div>
+            )}
 
-                {/* Organization Settings */}
-                {isAdmin && (
-                    <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-900/50">
-                        <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-                            <Building2 className="w-5 h-5 text-purple-500"/> Identidade da Organização
-                        </h2>
-                        
-                        {isWhitelabelLocked ? (
-                             <div className="flex flex-col items-center justify-center py-8 text-center bg-slate-50 dark:bg-black/20 rounded-2xl border border-slate-200 dark:border-white/5">
-                                <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4 relative border border-slate-200 dark:border-slate-700">
-                                    <Building2 className="w-8 h-8 text-slate-400 dark:text-slate-500"/>
-                                    <div className="absolute -bottom-1 -right-1 bg-amber-500 rounded-full p-1.5 border-2 border-white dark:border-slate-800">
-                                        <Lock className="w-3 h-3 text-white" />
-                                    </div>
-                                </div>
-                                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Personalização Bloqueada</h3>
-                                <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mb-6 px-4">
-                                    A personalização de marca (White Label) e a mudança de nome da organização são exclusivas para o plano <strong>Enterprise</strong>.
-                                </p>
-                                <button 
-                                    onClick={() => setView('profile')}
-                                    className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl shadow-lg text-sm transition-colors flex items-center gap-2"
-                                >
-                                    <Sparkles className="w-4 h-4"/> Fazer Upgrade
-                                </button>
-                             </div>
-                        ) : (
-                            <>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                    <div className="space-y-4">
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Nome do Workspace</label>
-                                            <input 
-                                                type="text" 
-                                                value={orgName} 
-                                                onChange={e => setOrgName(e.target.value)}
-                                                className="w-full glass-input rounded-xl p-3 outline-none focus:border-purple-500"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Cor da Marca (Hex)</label>
-                                            <div className="flex gap-2">
-                                                <input 
-                                                    type="color" 
-                                                    value={color}
-                                                    onChange={e => setColor(e.target.value)}
-                                                    className="h-11 w-12 rounded-xl cursor-pointer border-0 p-1 bg-white dark:bg-slate-800"
-                                                />
-                                                <input 
-                                                    type="text" 
-                                                    value={color}
-                                                    onChange={e => setColor(e.target.value)}
-                                                    className="flex-1 glass-input rounded-xl p-3 outline-none uppercase font-mono"
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl bg-slate-50 dark:bg-black/20">
-                                        {orgDetails.logoUrl ? (
-                                            <img src={orgDetails.logoUrl} alt="Logo" className="h-24 object-contain mb-4"/>
-                                        ) : (
-                                            <div className="w-24 h-24 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center mb-4">
-                                                <Building2 className="w-10 h-10 text-slate-400"/>
-                                            </div>
-                                        )}
-                                        <button 
-                                            onClick={() => fileRef.current?.click()}
-                                            className="px-4 py-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 hover:border-purple-500 transition-colors flex items-center gap-2"
-                                        >
-                                            <UploadCloud className="w-3 h-3"/> Upload Logo
-                                        </button>
-                                        <input type="file" ref={fileRef} className="hidden" accept="image/*" onChange={handleLogoUpload}/>
-                                    </div>
-                                </div>
-
-                                <div className="mt-8 pt-6 border-t border-slate-200 dark:border-white/5 flex justify-end">
-                                    <button 
-                                        onClick={handleSave}
-                                        className="px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-black font-bold rounded-xl shadow-lg hover:opacity-90 transition-transform active:scale-95 flex items-center gap-2"
-                                    >
-                                        <Save className="w-4 h-4"/> Salvar Alterações
-                                    </button>
-                                </div>
-                            </>
+            {activeTab === 'modules' && (
+                <div className="animate-in slide-in-from-right-4">
+                    <div className="flex justify-between items-center mb-6">
+                        <p className="text-sm text-slate-500">Ative as funcionalidades que seu time usa.</p>
+                        {isAdmin && (
+                            <button onClick={handleSaveModules} disabled={isSavingModules} className="px-6 py-2 bg-slate-900 dark:bg-white text-white dark:text-black rounded-lg text-sm font-bold shadow-sm hover:opacity-90">
+                                {isSavingModules ? 'Salvando...' : 'Salvar Módulos'}
+                            </button>
                         )}
                     </div>
-                )}
-            </div>
-        )}
-
-        {/* MODULES TAB */}
-        {activeTab === 'modules' && isAdmin && (
-            <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
-                <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-900/50">
-                    <div className="flex justify-between items-center mb-6">
-                        <div>
-                            <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                <LayoutGrid className="w-5 h-5 text-purple-500"/> Módulos do Sistema
-                            </h2>
-                            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                                Ative apenas as funcionalidades que seu time utiliza.
-                            </p>
-                        </div>
-                        <button 
-                            onClick={handleSaveModules}
-                            disabled={isSavingModules}
-                            className="px-6 py-2 bg-slate-900 dark:bg-white text-white dark:text-black font-bold rounded-xl shadow-lg hover:opacity-90 transition-transform active:scale-95 flex items-center gap-2 text-xs disabled:opacity-70"
-                        >
-                            {isSavingModules ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4"/>} 
-                            Salvar Módulos
-                        </button>
-                    </div>
-
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {AVAILABLE_MODULES.map((module) => {
-                            // Kanban Force Logic
-                            const isKanban = module.id === 'kanban';
-                            const isEnabled = isKanban ? true : localModules.includes(module.id);
-                            const allowed = isModuleAllowed(module.id);
-
+                        {AVAILABLE_MODULES.map(mod => {
+                            const isActive = localModules.includes(mod.id);
                             return (
-                                <div key={module.id} className={`p-4 rounded-xl border transition-all ${isEnabled ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-500/50' : 'bg-slate-50 dark:bg-black/20 border-slate-200 dark:border-white/5 opacity-70'} ${!allowed ? 'opacity-50 cursor-not-allowed grayscale' : ''}`}>
-                                    <div className="flex justify-between items-start mb-2">
-                                        <div className="flex items-center gap-2">
-                                            <div className={`p-2 rounded-lg ${isEnabled ? 'bg-purple-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'}`}>
-                                                <module.icon className="w-4 h-4"/>
-                                            </div>
-                                            <span className={`font-bold text-sm ${isEnabled ? 'text-purple-700 dark:text-purple-300' : 'text-slate-600 dark:text-slate-400'}`}>
-                                                {module.label}
-                                            </span>
+                                <div key={mod.id} onClick={() => isAdmin && setLocalModules(prev => prev.includes(mod.id) ? prev.filter(m => m !== mod.id) : [...prev, mod.id])} className={`p-4 rounded-xl border cursor-pointer transition-all ${isActive ? 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 shadow-sm' : 'bg-slate-50 dark:bg-white/5 border-transparent opacity-60'}`}>
+                                    <div className="flex justify-between items-center mb-2">
+                                        <div className="p-2 rounded-lg bg-slate-100 dark:bg-white/10 text-slate-900 dark:text-white">
+                                            <mod.icon className="w-5 h-5"/>
                                         </div>
-                                        {allowed ? (
-                                            <ElasticSwitch 
-                                                checked={isEnabled} 
-                                                onChange={() => toggleModule(module.id)} 
-                                                disabled={isKanban} // Disable click for Kanban
-                                            />
-                                        ) : (
-                                            <Lock className="w-4 h-4 text-slate-400" title="Bloqueado no seu plano"/>
-                                        )}
+                                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${isActive ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-slate-300 dark:border-slate-600'}`}>
+                                            {isActive && <Check className="w-3 h-3"/>}
+                                        </div>
                                     </div>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 h-8 leading-tight">
-                                        {module.desc}
-                                    </p>
-                                    {!allowed && (
-                                        <div className="mt-2 text-[10px] text-amber-500 font-bold uppercase tracking-wide">
-                                            Upgrade Necessário
-                                        </div>
-                                    )}
+                                    <h4 className="font-bold text-sm text-slate-900 dark:text-white">{mod.label}</h4>
+                                    <p className="text-xs text-slate-500 mt-1">{mod.desc}</p>
                                 </div>
                             );
                         })}
                     </div>
                 </div>
-            </div>
-        )}
+            )}
 
-        {/* AI CONTEXT & TEAM TABS (Existing content)... */}
-        {activeTab === 'ai' && isAdmin && (
-            isAiLocked ? (
-                <div className="flex flex-col items-center justify-center h-[400px] glass-panel rounded-2xl border border-white/10 bg-white/5 text-center p-8 animate-in zoom-in-95 duration-300">
-                    <div className="w-20 h-20 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center mb-6 relative border border-slate-200 dark:border-slate-800">
-                        <BrainCircuit className="w-10 h-10 text-slate-400 dark:text-slate-600" />
-                        <div className="absolute -bottom-1 -right-1 bg-red-500 rounded-full p-2 border-4 border-white dark:border-slate-950 shadow-lg">
-                            <Lock className="w-4 h-4 text-white" />
+            {activeTab === 'team' && (
+                <div className="animate-in slide-in-from-right-4 space-y-8">
+                    {/* Roles Management */}
+                    <div>
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-4">Cargos & Permissões</h3>
+                        <div className="flex gap-2 mb-4">
+                            <input 
+                                value={newRoleName}
+                                onChange={e => setNewRoleName(e.target.value)}
+                                placeholder="Novo Cargo (ex: Designer)"
+                                className="flex-1 p-2 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg text-sm outline-none"
+                            />
+                            <button onClick={handleCreateRole} className="px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-black rounded-lg text-xs font-bold">
+                                Adicionar
+                            </button>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {roles.map(role => (
+                                <div key={role.id} className="px-3 py-1.5 bg-slate-100 dark:bg-white/5 rounded-lg border border-slate-200 dark:border-white/10 flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 group">
+                                    {role.nome}
+                                    <button onClick={() => handleDeleteRole(role.id)} className="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Trash2 className="w-3 h-3"/>
+                                    </button>
+                                </div>
+                            ))}
                         </div>
                     </div>
-                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Cérebro Central Bloqueado</h2>
-                    <p className="text-slate-500 dark:text-slate-400 max-w-md mb-8 leading-relaxed">
-                        A personalização do DNA da IA (Setor, Tom de Voz e Contexto) é exclusiva para planos <strong>Studio</strong> ou superiores.
-                    </p>
-                    <button
-                        onClick={() => setView('profile')}
-                        className="px-8 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold rounded-xl shadow-lg hover:scale-105 transition-transform flex items-center gap-2"
+
+                    {/* Members List */}
+                    <div>
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-4">Membros do Time</h3>
+                        <div className="space-y-2">
+                            {loadingTeam ? <Loader2 className="w-6 h-6 animate-spin text-slate-400 mx-auto"/> : members.map(member => (
+                                <div key={member.id} className="flex items-center justify-between p-3 bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/5 rounded-xl">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden">
+                                            {member.avatar_url ? <img src={member.avatar_url} className="w-full h-full object-cover"/> : <User className="w-4 h-4 m-2 text-slate-500"/>}
+                                        </div>
+                                        <div>
+                                            <div className="text-sm font-bold text-slate-900 dark:text-white">{member.nome}</div>
+                                            <div className="text-xs text-slate-500">{member.email}</div>
+                                        </div>
+                                    </div>
+                                    <select 
+                                        value={member.cargo || ''} 
+                                        onChange={(e) => handleUpdateMemberRole(member.id, e.target.value)}
+                                        className="bg-slate-50 dark:bg-white/5 border-transparent rounded-lg text-xs p-2 outline-none cursor-pointer"
+                                    >
+                                        <option value="">Sem Cargo</option>
+                                        {roles.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}
+                                    </select>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'ai' && (
+                <div className="animate-in slide-in-from-right-4 max-w-2xl space-y-6">
+                    <div className="p-4 bg-purple-500/5 border border-purple-500/20 rounded-xl mb-6">
+                        <h3 className="text-sm font-bold text-purple-600 dark:text-purple-400 flex items-center gap-2">
+                            <Sparkles className="w-4 h-4"/> Personalidade da IA
+                        </h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                            Defina como a inteligência artificial deve se comportar ao gerar tarefas e análises para sua empresa.
+                        </p>
+                    </div>
+
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Setor de Atuação</label>
+                        <input 
+                            value={aiSector}
+                            onChange={e => setAiSector(e.target.value)}
+                            placeholder="Ex: SaaS B2B, Logística, Marketing..."
+                            className="w-full p-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-sm outline-none"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Tom de Voz</label>
+                        <select 
+                            value={aiTone}
+                            onChange={e => setAiTone(e.target.value)}
+                            className="w-full p-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-sm outline-none cursor-pointer"
+                        >
+                            <option>Técnico e Direto</option>
+                            <option>Executivo e Estratégico</option>
+                            <option>Criativo e Informal</option>
+                            <option>Formal e Corporativo</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">DNA da Empresa (Contexto)</label>
+                        <textarea 
+                            value={aiContext}
+                            onChange={e => setAiContext(e.target.value)}
+                            placeholder="Descreva brevemente o que sua empresa faz, seus valores e objetivos. A IA usará isso para contextualizar sugestões."
+                            className="w-full p-3 h-32 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-sm outline-none resize-none"
+                        />
+                    </div>
+
+                    <button 
+                        onClick={handleSaveAiSettings} 
+                        disabled={isSavingAi}
+                        className="px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl text-sm font-bold shadow-lg hover:scale-105 transition-transform flex items-center gap-2"
                     >
-                        <Sparkles className="w-4 h-4"/>
-                        Desbloquear Inteligência
+                        {isSavingAi ? <Loader2 className="w-4 h-4 animate-spin"/> : <BrainCircuit className="w-4 h-4"/>}
+                        Salvar Preferências
                     </button>
                 </div>
-            ) : (
-                <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
-                    {/* ... AI content ... */}
-                    <div className="bg-purple-500/10 border border-purple-500/20 p-6 rounded-2xl">
-                        <div className="flex items-start gap-4">
-                            <div className="p-3 bg-purple-500 rounded-xl text-white shadow-lg shadow-purple-500/20">
-                                <BrainCircuit className="w-8 h-8"/>
-                            </div>
-                            <div>
-                                <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Cérebro Central Shinkō</h2>
-                                <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-                                    Configure aqui o DNA da sua empresa. A Inteligência Artificial usará essas informações para personalizar 
-                                    automaticamente a criação de tarefas, textos, análises de risco e sugestões estratégicas em todos os seus projetos.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-900/50 space-y-6">
-                            <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                                <Fingerprint className="w-4 h-4"/> Identidade
-                            </h3>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Setor de Atuação</label>
-                                <input type="text" value={aiSector} onChange={e => setAiSector(e.target.value)} className="w-full glass-input rounded-xl p-3 outline-none focus:border-purple-500"/>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Tom de Voz</label>
-                                <select value={aiTone} onChange={e => setAiTone(e.target.value)} className="w-full glass-input rounded-xl p-3 outline-none focus:border-purple-500 appearance-none cursor-pointer bg-white dark:bg-black/20">
-                                    <option className="dark:bg-slate-900" value="Técnico e Direto">Técnico e Direto</option>
-                                    <option className="dark:bg-slate-900" value="Corporativo e Formal">Corporativo e Formal</option>
-                                    <option className="dark:bg-slate-900" value="Inovador e Casual">Inovador e Casual</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-900/50 flex flex-col h-full">
-                            <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2 mb-4">
-                                <BookOpen className="w-4 h-4"/> DNA & Contexto Estratégico
-                            </h3>
-                            <div className="flex-1">
-                                <textarea value={aiContext} onChange={e => setAiContext(e.target.value)} className="w-full h-48 glass-input rounded-xl p-4 text-sm leading-relaxed resize-none outline-none focus:border-purple-500 custom-scrollbar"/>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="flex justify-end pt-4 border-t border-slate-200 dark:border-white/5">
-                        <button onClick={handleSaveAi} disabled={isSavingAi} className="px-8 py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl shadow-lg flex items-center gap-2 transition-transform active:scale-95 disabled:opacity-70">
-                            {isSavingAi ? <Loader2 className="w-4 h-4 animate-spin"/> : <Sparkles className="w-4 h-4"/>} Salvar Preferências
-                        </button>
-                    </div>
-                </div>
-            )
-        )}
-
-        {/* TEAM TAB (Simplified view for context) */}
-        {activeTab === 'team' && isAdmin && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 animate-in slide-in-from-right-4 duration-300">
-                {/* Team Management Content */}
-                <div className="col-span-full glass-panel p-6 rounded-2xl border border-white/10 bg-white/50 dark:bg-slate-900/50">
-                     <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-                        <Users className="w-5 h-5 text-blue-500"/> Membros da Organização
-                    </h2>
-                    {/* ... Team List Implementation ... */}
-                    <div className="text-center text-slate-500 py-8">
-                        Funcionalidade de Gestão de Time (Visível no código original)
-                    </div>
-                </div>
-            </div>
-        )}
-
-        <div className="py-8 text-center">
-            <span className="text-xs text-slate-400 font-medium opacity-50 uppercase tracking-widest">
-                Desenvolvido por Shinkō Systems©
-            </span>
+            )}
         </div>
-      </div>
     </div>
   );
 };

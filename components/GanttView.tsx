@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Opportunity, BpmnTask, DbTask, DbProject } from '../types';
 import { ChevronDown, ChevronRight as ChevronRightIcon, Zap, Loader2, AlertTriangle, Columns, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Grid, LayoutGrid, Square, RefreshCw, Layers, CornerDownRight, Hash, CheckCircle2 } from 'lucide-react';
-import TaskDetailModal from './TaskDetailModal';
+import { TaskDetailModal } from './TaskDetailModal';
 import { optimizeSchedule } from '../services/geminiService';
 import { fetchAllTasks, updateTask, fetchAssignableUsers, fetchProjects, deleteTask } from '../services/projectService';
 import { supabase } from '../services/supabaseClient';

@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Opportunity, BpmnData, BpmnNode, BpmnTask, BpmnSubTask, PLAN_LIMITS } from '../types';
 import { generateBpmn, extractPdfContext, generateSubtasksForTask } from '../services/geminiService';
 import { fetchAreasAtuacao, fetchOrgMembers, syncBpmnTasks } from '../services/projectService';
-import TaskDetailModal from './TaskDetailModal';
+import { TaskDetailModal } from './TaskDetailModal';
 import { Loader2, Sparkles, PlayCircle, CheckSquare, Square, Save, RefreshCw, Plus, Trash2, ArrowRight, FileText, X, UploadCloud, FileType, Calendar as CalendarIcon, MoreHorizontal, User, BarChart3, CalendarClock, Layers, Hash, Lock, Share2, CheckCircle2 } from 'lucide-react';
 
 interface Props {

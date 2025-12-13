@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, useMemo } from 'react';
 import { supabase } from './services/supabaseClient';
 import { Opportunity, BpmnTask } from './types';
 import { fetchOpportunities, createOpportunity, updateOpportunity, deleteOpportunity, fetchOpportunityById } from './services/opportunityService';
@@ -33,6 +33,8 @@ import { AdminManagerScreen } from './components/AdminManagerScreen';
 import { NpsSurvey } from './components/NpsSurvey';
 import { GuruFab } from './components/GuruFab';
 import { FeedbackModal } from './components/FeedbackModal';
+import { CrmBoard } from './components/CrmBoard';
+import { fetchActiveOrgModules, getPlanDefaultModules } from './services/organizationService';
 
 const App: React.FC = () => {
   // State
@@ -46,9 +48,15 @@ const App: React.FC = () => {
   // App State for Org Plan ID (Source of Truth)
   const [orgPlanId, setOrgPlanId] = useState<number | null>(null);
 
+  // Search State
+  const [searchTerm, setSearchTerm] = useState('');
+
   const [view, setView] = useState<string>('dashboard');
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Active Modules State
+  const [activeModules, setActiveModules] = useState<string[]>(['projects', 'kanban']); 
 
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
@@ -102,7 +110,6 @@ const App: React.FC = () => {
                   setOrgDetails(prev => ({ 
                       ...prev, 
                       ...details,
-                      // If loaded via URL param, assume whitelabel context initially
                       isWhitelabelActive: true 
                   }));
               }
@@ -150,7 +157,6 @@ const App: React.FC = () => {
           
           if (projectId) {
               console.log("Deep Link detectado para o projeto:", projectId);
-              // Activate Shared Mode (Hides Navigation)
               setIsSharedMode(true);
               
               const opp = await fetchOpportunityById(projectId);
@@ -158,7 +164,7 @@ const App: React.FC = () => {
                   setSelectedProject(opp);
               } else {
                   console.warn("Projeto não encontrado ou usuário sem permissão.");
-                  setIsSharedMode(false); // Revert if failed
+                  setIsSharedMode(false); 
               }
           }
       };
@@ -181,7 +187,6 @@ const App: React.FC = () => {
               setUserOrgId(data.organizacao);
               
               if (data.organizacao) {
-                  // Await ensures Plan ID is set BEFORE rendering main views
                   await loadOrganization(data.organizacao);
                   loadOpportunities(data.organizacao);
               }
@@ -190,7 +195,6 @@ const App: React.FC = () => {
               trackUserAccess(userId);
               const unsubPresence = subscribeToPresence(userId, (ids) => setOnlineUsers(ids));
               
-              // Only call fallback if orgPlanId was somehow not set by loadOrganization
               if (orgPlanId === null) {
                   const plan = await getCurrentUserPlan(userId);
                   setCurrentPlan(plan);
@@ -209,11 +213,9 @@ const App: React.FC = () => {
   const loadOrganization = async (orgId: number) => {
       const { data } = await supabase.from('organizacoes').select('*').eq('id', orgId).single();
       if (data) {
-          // UPDATE APP STATE FOR PLAN ID
-          const planId = data.plano || 4; // Default to Free (4) if null
+          const planId = data.plano || 4;
           setOrgPlanId(planId);
           
-          // FORCE UPDATE CURRENT PLAN IMMEDIATELY (Source of Truth is Org Table)
           const planString = mapDbPlanIdToString(planId);
           setCurrentPlan(planString);
 
@@ -225,8 +227,20 @@ const App: React.FC = () => {
               aiSector: data.setor || '',
               aiTone: data.tomdevoz || '',
               aiContext: data.dna || '',
-              isWhitelabelActive: planId === 10 // Enterprise Plan ID
+              // For initial load, we don't rely on isWhitelabelActive from plan anymore in UI logic,
+              // but we keep the state for URL params override.
+              isWhitelabelActive: false 
           });
+
+          // LOAD ACTIVE MODULES (With Fallback)
+          const modules = await fetchActiveOrgModules(orgId);
+          if (modules.length > 0) {
+              setActiveModules(modules);
+          } else {
+              // Fallback logic if no modules are explicitly set
+              const defaultModules = getPlanDefaultModules(planId);
+              setActiveModules(defaultModules);
+          }
       }
   };
 
@@ -277,7 +291,7 @@ const App: React.FC = () => {
       loadOpportunities(userOrgId);
   };
 
-  const handleUpdateOrgDetails = async (updates: { logoFile?: File, color?: string, name?: string, limit?: number, aiSector?: string, aiTone?: string, aiContext?: string }) => {
+  const handleUpdateOrgDetails = async (updates: { logoFile?: File, color?: string, name?: string, limit?: number, aiSector?: string, aiTone?: string, aiContext?: string, modulos?: string[] }) => {
       if (!userOrgId) return;
       try {
           let logoUrl = undefined;
@@ -295,11 +309,18 @@ const App: React.FC = () => {
               aiContext: updates.aiContext
           });
           
-          // Refresh local state
           loadOrganization(userOrgId);
           alert('Configurações atualizadas!');
       } catch (e: any) {
           alert('Erro ao atualizar: ' + e.message);
+      }
+  };
+
+  const handleRefreshModules = async () => {
+      if (userOrgId) {
+          const modules = await fetchActiveOrgModules(userOrgId);
+          if (modules.length > 0) setActiveModules(modules);
+          else setActiveModules(['projects']);
       }
   };
 
@@ -316,18 +337,38 @@ const App: React.FC = () => {
   };
 
   // --- WHITELABEL LOGIC ---
-  // If plan is Enterprise OR isWhitelabelActive (via link), override branding
-  const isEnterprise = currentPlan === 'plan_enterprise';
-  const shouldUseWhitelabel = isEnterprise || orgDetails.isWhitelabelActive;
+  // Checks if 'whitelabel' (ID 20) is in active modules or URL param override
+  const shouldUseWhitelabel = activeModules.includes('whitelabel') || activeModules.includes('whitelable') || orgDetails.isWhitelabelActive;
   
   const appBrandName = shouldUseWhitelabel && orgDetails.name ? orgDetails.name : 'Shinkō OS';
   const appLogoUrl = shouldUseWhitelabel ? orgDetails.logoUrl : null;
   const appPrimaryColor = shouldUseWhitelabel ? orgDetails.primaryColor : '#F59E0B';
 
-  // Update Page Title
   useEffect(() => {
       document.title = appBrandName;
   }, [appBrandName]);
+
+  useEffect(() => {
+      const root = document.documentElement;
+      const hexToRgb = (hex: string) => {
+          const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+          return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '245, 158, 11';
+      };
+      if (appPrimaryColor) {
+          root.style.setProperty('--brand-primary', appPrimaryColor);
+          root.style.setProperty('--brand-primary-rgb', hexToRgb(appPrimaryColor));
+      }
+  }, [appPrimaryColor]);
+
+  // --- SEARCH FILTER ---
+  const filteredOpportunities = useMemo(() => {
+      if (!searchTerm) return opportunities;
+      const lower = searchTerm.toLowerCase();
+      return opportunities.filter(o => 
+          o.title.toLowerCase().includes(lower) || 
+          o.description?.toLowerCase().includes(lower)
+      );
+  }, [opportunities, searchTerm]);
 
   if (!user && !loading) {
       return (
@@ -357,36 +398,34 @@ const App: React.FC = () => {
       );
   }
 
-  // App Layout
   return (
     <div className={`flex h-screen w-full bg-slate-100 dark:bg-black text-slate-900 dark:text-slate-100 transition-colors duration-300 ${theme}`}>
         
-        {/* HIDE SIDEBAR IN SHARED MODE */}
         {!isSharedMode && (
-            <Sidebar 
-                currentView={view} 
-                onChangeView={setView} 
-                onOpenCreate={() => setShowCreate(true)}
-                onOpenCreateTask={() => setShowCreateTask(true)}
-                onToggleTheme={toggleTheme}
-                onLogout={handleLogout}
-                onSearch={(q) => console.log(q)}
-                // PASS FEEDBACK HANDLER
-                onOpenFeedback={() => setShowFeedback(true)}
-                theme={theme}
-                dbStatus={dbStatus}
-                isMobileOpen={isMobileOpen}
-                setIsMobileOpen={setIsMobileOpen}
-                userRole={userRole}
-                userData={userData || { name: 'Carregando...', avatar: null }}
-                currentPlan={currentPlan}
-                // WHITELABEL PROPS
-                customLogoUrl={appLogoUrl}
-                orgName={appBrandName}
-            />
+            <div className={''}>
+                <Sidebar 
+                    currentView={view} 
+                    onChangeView={setView} 
+                    onOpenCreate={() => setShowCreate(true)}
+                    onOpenCreateTask={() => setShowCreateTask(true)}
+                    onToggleTheme={toggleTheme}
+                    onLogout={handleLogout}
+                    onSearch={(q) => setSearchTerm(q)}
+                    onOpenFeedback={() => setShowFeedback(true)}
+                    theme={theme}
+                    dbStatus={dbStatus}
+                    isMobileOpen={isMobileOpen}
+                    setIsMobileOpen={setIsMobileOpen}
+                    userRole={userRole}
+                    userData={userData || { name: 'Carregando...', avatar: null }}
+                    currentPlan={currentPlan}
+                    customLogoUrl={appLogoUrl}
+                    orgName={appBrandName}
+                    activeModules={activeModules}
+                />
+            </div>
         )}
         
-        {/* HIDE MOBILE DRAWER IN SHARED MODE */}
         {!isSharedMode && (
             <MobileDrawer 
                 currentView={view} 
@@ -395,8 +434,7 @@ const App: React.FC = () => {
                 onOpenCreateTask={() => setShowCreateTask(true)}
                 onToggleTheme={toggleTheme}
                 onLogout={handleLogout}
-                onSearch={(q) => console.log(q)}
-                // PASS FEEDBACK HANDLER
+                onSearch={(q) => setSearchTerm(q)}
                 onOpenFeedback={() => setShowFeedback(true)}
                 theme={theme}
                 dbStatus={dbStatus}
@@ -405,20 +443,18 @@ const App: React.FC = () => {
                 userRole={userRole}
                 userData={userData || { name: 'Carregando...', avatar: null }}
                 currentPlan={currentPlan}
-                // WHITELABEL PROPS
                 customLogoUrl={appLogoUrl}
                 orgName={appBrandName}
+                activeModules={activeModules}
             />
         )}
 
-        {/* Adjust Main Padding if Shared Mode (Remove mobile header spacing) */}
         <main className={`flex-1 overflow-hidden relative ${!isSharedMode ? 'pt-16 xl:pt-0' : ''}`}>
             <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500"></div></div>}>
                 {selectedProject ? (
                     <ProjectWorkspace 
                         opportunity={selectedProject} 
                         onBack={() => {
-                            // If in shared mode, clicking back should exit shared mode and clear URL
                             if (isSharedMode) {
                                 window.history.replaceState(null, '', '/');
                                 setIsSharedMode(false);
@@ -426,21 +462,21 @@ const App: React.FC = () => {
                             setSelectedProject(null);
                         }}
                         onUpdate={(opp) => updateOpportunity(opp).then(() => loadOpportunities(userOrgId!))}
-                        onEdit={(opp) => { setShowCreate(true); /* Logic to populate wizard could be added here */ }}
+                        onEdit={(opp) => { setShowCreate(true); }}
                         onDelete={(id) => deleteOpportunity(id).then(() => { setSelectedProject(null); loadOpportunities(userOrgId!); })}
                         userRole={userRole}
                         currentPlan={currentPlan}
                         isSharedMode={isSharedMode}
+                        activeModules={activeModules}
                     />
                 ) : (
                     <>
                         {view === 'dashboard' && (
                             <div className="h-full p-4 md:p-8 overflow-y-auto custom-scrollbar">
                                 <Dashboard 
-                                    opportunities={opportunities} 
+                                    opportunities={filteredOpportunities} 
                                     onNavigate={(status) => {
                                         if (status === 'Active' || status === 'Negotiation' || status === 'Future') {
-                                            // Ideally filter the list, for now just stay on dashboard or move to kanban/list
                                             setView('kanban'); 
                                         }
                                     }}
@@ -449,37 +485,41 @@ const App: React.FC = () => {
                                     theme={theme}
                                     userRole={userRole}
                                     organizationId={userOrgId || undefined}
-                                    // WHITELABEL PROPS
                                     appBrandName={appBrandName}
-                                    whitelabel={isEnterprise}
+                                    whitelabel={shouldUseWhitelabel}
                                     onActivateWhitelabel={() => setView('settings')}
+                                    activeModules={activeModules}
                                 />
                             </div>
                         )}
-                        {view === 'list' && (
+                        {view === 'list' && activeModules.includes('projects') && (
                             <div className="h-full p-4 md:p-8 overflow-y-auto custom-scrollbar">
                                 <ProjectList 
-                                    opportunities={opportunities} 
+                                    opportunities={filteredOpportunities} 
                                     onOpenProject={setSelectedProject}
                                     userRole={userRole}
                                     organizationId={userOrgId || undefined}
+                                    activeModules={activeModules}
+                                    onOpenCreate={() => setShowCreate(true)}
                                 />
                             </div>
                         )}
-                        {view === 'kanban' && (
+                        {view === 'kanban' && activeModules.includes('kanban') && (
                             <div className="h-full p-4 md:p-8 overflow-hidden">
                                 <KanbanBoard 
                                     onSelectOpportunity={setSelectedProject} 
                                     userRole={userRole}
                                     organizationId={userOrgId || undefined}
                                     currentPlan={currentPlan}
+                                    activeModules={activeModules}
+                                    projectId={undefined}
                                 />
                             </div>
                         )}
-                        {view === 'gantt' && (
+                        {view === 'gantt' && activeModules.includes('gantt') && (
                             <div className="h-full p-4 md:p-8 overflow-hidden">
                                 <GanttView 
-                                    opportunities={opportunities} 
+                                    opportunities={filteredOpportunities} 
                                     onSelectOpportunity={setSelectedProject} 
                                     onTaskUpdate={() => {}} 
                                     userRole={userRole}
@@ -488,33 +528,39 @@ const App: React.FC = () => {
                                 />
                             </div>
                         )}
-                        {view === 'calendar' && (
+                        {view === 'calendar' && activeModules.includes('calendar') && (
                             <div className="h-full p-4 md:p-8 overflow-hidden">
                                 <CalendarView 
-                                    opportunities={opportunities} 
+                                    opportunities={filteredOpportunities} 
                                     onSelectOpportunity={setSelectedProject} 
                                     onTaskUpdate={() => {}} 
                                     userRole={userRole}
                                     organizationId={userOrgId || undefined}
+                                    activeModules={activeModules}
                                 />
                             </div>
                         )}
-                        {view === 'financial' && (
+                        {view === 'crm' && activeModules.includes('crm') && (
+                            <div className="h-full p-4 md:p-8 overflow-hidden">
+                                <CrmBoard organizationId={userOrgId || undefined} />
+                            </div>
+                        )}
+                        {view === 'financial' && activeModules.includes('financial') && (
                             <div className="h-full p-4 md:p-8 overflow-hidden">
                                 <FinancialScreen orgType={orgDetails.name} />
                             </div>
                         )}
-                        {view === 'clients' && (
+                        {view === 'clients' && activeModules.includes('clients') && (
                             <div className="h-full p-4 md:p-8 overflow-hidden">
                                 <ClientsScreen userRole={userRole} onlineUsers={onlineUsers} organizationId={userOrgId || undefined}/>
                             </div>
                         )}
-                        {view === 'product' && (
+                        {view === 'product' && activeModules.includes('product') && (
                             <div className="h-full p-4 md:p-8 overflow-hidden">
                                 <ProductIndicators />
                             </div>
                         )}
-                        {view === 'dev-metrics' && (
+                        {view === 'dev-metrics' && activeModules.includes('engineering') && (
                             <div className="h-full p-4 md:p-8 overflow-hidden">
                                 <DevIndicators organizationId={userOrgId || undefined} />
                             </div>
@@ -531,6 +577,8 @@ const App: React.FC = () => {
                                 userRole={userRole}
                                 userData={userData}
                                 currentPlan={currentPlan}
+                                activeModules={activeModules}
+                                onRefreshModules={handleRefreshModules}
                             />
                         )}
                         {view === 'profile' && (
@@ -557,6 +605,7 @@ const App: React.FC = () => {
                 }}
                 onCancel={() => setShowCreate(false)}
                 orgType={orgDetails.name}
+                activeModules={activeModules}
             />
         )}
 
@@ -569,7 +618,6 @@ const App: React.FC = () => {
             />
         )}
 
-        {/* FEEDBACK MODAL (NEW) */}
         {showFeedback && user && (
             <FeedbackModal 
                 userId={user.id} 
@@ -577,8 +625,7 @@ const App: React.FC = () => {
             />
         )}
 
-        {/* Global AI Assistant Button - Only Show if not in Shared Mode */}
-        {user && userRole !== 'cliente' && !isSharedMode && (
+        {user && userRole !== 'cliente' && !isSharedMode && activeModules.includes('ia') && (
             <GuruFab 
                 opportunities={opportunities} 
                 user={user} 

@@ -1,17 +1,16 @@
 
-
-
 import React, { useState, useEffect, Suspense } from 'react';
 import { supabase } from './services/supabaseClient';
 import { Opportunity, BpmnTask } from './types';
 import { fetchOpportunities, createOpportunity, updateOpportunity, deleteOpportunity, fetchOpportunityById } from './services/opportunityService';
 import { createTask } from './services/projectService';
-import { getPublicOrgDetails, updateOrgDetails, uploadLogo, fetchActiveOrgModules } from './services/organizationService';
+import { getPublicOrgDetails, updateOrgDetails, uploadLogo } from './services/organizationService';
 import { subscribeToPresence } from './services/presenceService';
 import { trackUserAccess } from './services/analyticsService';
 import { getCurrentUserPlan, mapDbPlanIdToString } from './services/asaasService';
 
 // Components
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { Sidebar, MobileDrawer } from './components/Navigation';
 import { Dashboard } from './components/Dashboard';
 import { ProjectList } from './components/ProjectList';
@@ -36,6 +35,8 @@ import { NpsSurvey } from './components/NpsSurvey';
 import { GuruFab } from './components/GuruFab';
 import { FeedbackModal } from './components/FeedbackModal';
 import { CrmBoard } from './components/CrmBoard';
+import { fetchActiveOrgModules, getPlanDefaultModules } from './services/organizationService';
+import { Loader2 } from 'lucide-react';
 
 const App: React.FC = () => {
   // State
@@ -49,15 +50,15 @@ const App: React.FC = () => {
   // App State for Org Plan ID (Source of Truth)
   const [orgPlanId, setOrgPlanId] = useState<number | null>(null);
 
-  // Trial State
-  const [trialDaysRemaining, setTrialDaysRemaining] = useState<number | null>(null);
+  // Search State
+  const [searchTerm, setSearchTerm] = useState('');
 
   const [view, setView] = useState<string>('dashboard');
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Active Modules State (default to core)
-  const [activeModules, setActiveModules] = useState<string[]>(['projects', 'kanban', 'ia']); // Default IA to visible unless fetched otherwise
+  // Active Modules State
+  const [activeModules, setActiveModules] = useState<string[]>(['projects', 'kanban']); 
 
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
@@ -214,27 +215,7 @@ const App: React.FC = () => {
   const loadOrganization = async (orgId: number) => {
       const { data } = await supabase.from('organizacoes').select('*').eq('id', orgId).single();
       if (data) {
-          let planId = data.plano || 4; 
-          
-          // TRIAL LOGIC Check (IDs 6 and 8)
-          if (planId === 6 || planId === 8) {
-              const createdAt = new Date(data.created_at);
-              const now = new Date();
-              const diffTime = Math.abs(now.getTime() - createdAt.getTime());
-              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-              const remaining = 15 - diffDays;
-
-              if (remaining < 0) {
-                  planId = 4;
-                  alert("Seu período de avaliação (Trial) de 15 dias expirou. Sua conta foi migrada para o plano Free. Faça um upgrade para continuar usando os recursos Enterprise.");
-                  setTrialDaysRemaining(null);
-              } else {
-                  setTrialDaysRemaining(remaining);
-              }
-          } else {
-              setTrialDaysRemaining(null);
-          }
-
+          const planId = data.plano || 4;
           setOrgPlanId(planId);
           
           const planString = mapDbPlanIdToString(planId);
@@ -248,12 +229,18 @@ const App: React.FC = () => {
               aiSector: data.setor || '',
               aiTone: data.tomdevoz || '',
               aiContext: data.dna || '',
-              isWhitelabelActive: planId === 10 || planId === 6 || planId === 8
+              isWhitelabelActive: false 
           });
 
-          // NEW: Load Active Modules via Relational Table
+          // LOAD ACTIVE MODULES (With Fallback)
           const modules = await fetchActiveOrgModules(orgId);
-          setActiveModules(modules);
+          if (modules.length > 0) {
+              setActiveModules(modules);
+          } else {
+              // Fallback logic if no modules are explicitly set
+              const defaultModules = getPlanDefaultModules(planId);
+              setActiveModules(defaultModules);
+          }
       }
   };
 
@@ -320,7 +307,6 @@ const App: React.FC = () => {
               aiSector: updates.aiSector,
               aiTone: updates.aiTone,
               aiContext: updates.aiContext
-              // Removed modulos from this call to avoid error
           });
           
           loadOrganization(userOrgId);
@@ -333,7 +319,8 @@ const App: React.FC = () => {
   const handleRefreshModules = async () => {
       if (userOrgId) {
           const modules = await fetchActiveOrgModules(userOrgId);
-          setActiveModules(modules);
+          if (modules.length > 0) setActiveModules(modules);
+          else setActiveModules(['projects']);
       }
   };
 
@@ -349,8 +336,8 @@ const App: React.FC = () => {
       }
   };
 
-  const isEnterprise = currentPlan === 'plan_enterprise';
-  const shouldUseWhitelabel = isEnterprise || orgDetails.isWhitelabelActive;
+  // --- WHITELABEL LOGIC ---
+  const shouldUseWhitelabel = activeModules.includes('whitelabel') || activeModules.includes('whitelable') || orgDetails.isWhitelabelActive;
   
   const appBrandName = shouldUseWhitelabel && orgDetails.name ? orgDetails.name : 'Shinkō OS';
   const appLogoUrl = shouldUseWhitelabel ? orgDetails.logoUrl : null;
@@ -362,19 +349,29 @@ const App: React.FC = () => {
 
   useEffect(() => {
       const root = document.documentElement;
-      
       const hexToRgb = (hex: string) => {
           const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
           return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '245, 158, 11';
       };
-      
       if (appPrimaryColor) {
           root.style.setProperty('--brand-primary', appPrimaryColor);
           root.style.setProperty('--brand-primary-rgb', hexToRgb(appPrimaryColor));
       }
   }, [appPrimaryColor]);
 
-  if (!user && !loading) {
+  // --- LOADING STATE ---
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-[#09090b] text-white">
+        <div className="flex flex-col items-center gap-4">
+            <div className="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+            <div className="text-sm font-mono text-slate-400">Iniciando Sistema...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
       return (
           <>
             <LandingPage 
@@ -402,17 +399,12 @@ const App: React.FC = () => {
       );
   }
 
+  // --- LOGGED IN APP ---
   return (
     <div className={`flex h-screen w-full bg-slate-100 dark:bg-black text-slate-900 dark:text-slate-100 transition-colors duration-300 ${theme}`}>
         
-        {trialDaysRemaining !== null && (
-            <div className="fixed top-0 left-0 right-0 z-[100] h-8 bg-gradient-to-r from-purple-600 to-pink-600 flex items-center justify-center text-white text-xs font-bold shadow-md">
-                <span>🔥 Modo Trial Enterprise Ativo: {trialDaysRemaining} dias restantes para testar tudo sem limites!</span>
-            </div>
-        )}
-
         {!isSharedMode && (
-            <div className={trialDaysRemaining !== null ? 'mt-8' : ''}>
+            <div className={''}>
                 <Sidebar 
                     currentView={view} 
                     onChangeView={setView} 
@@ -420,7 +412,7 @@ const App: React.FC = () => {
                     onOpenCreateTask={() => setShowCreateTask(true)}
                     onToggleTheme={toggleTheme}
                     onLogout={handleLogout}
-                    onSearch={(q) => console.log(q)}
+                    onSearch={(q) => setSearchTerm(q)}
                     onOpenFeedback={() => setShowFeedback(true)}
                     theme={theme}
                     dbStatus={dbStatus}
@@ -444,7 +436,7 @@ const App: React.FC = () => {
                 onOpenCreateTask={() => setShowCreateTask(true)}
                 onToggleTheme={toggleTheme}
                 onLogout={handleLogout}
-                onSearch={(q) => console.log(q)}
+                onSearch={(q) => setSearchTerm(q)}
                 onOpenFeedback={() => setShowFeedback(true)}
                 theme={theme}
                 dbStatus={dbStatus}
@@ -459,8 +451,9 @@ const App: React.FC = () => {
             />
         )}
 
-        <main className={`flex-1 overflow-hidden relative ${!isSharedMode ? 'pt-16 xl:pt-0' : ''} ${trialDaysRemaining !== null ? 'mt-8' : ''}`}>
+        <main className={`flex-1 overflow-hidden relative ${!isSharedMode ? 'pt-16 xl:pt-0' : ''}`}>
             <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500"></div></div>}>
+                <ErrorBoundary>
                 {selectedProject ? (
                     <ProjectWorkspace 
                         opportunity={selectedProject} 
@@ -496,7 +489,7 @@ const App: React.FC = () => {
                                     userRole={userRole}
                                     organizationId={userOrgId || undefined}
                                     appBrandName={appBrandName}
-                                    whitelabel={isEnterprise}
+                                    whitelabel={shouldUseWhitelabel}
                                     onActivateWhitelabel={() => setView('settings')}
                                     activeModules={activeModules}
                                 />
@@ -510,6 +503,7 @@ const App: React.FC = () => {
                                     userRole={userRole}
                                     organizationId={userOrgId || undefined}
                                     activeModules={activeModules}
+                                    onOpenCreate={() => setShowCreate(true)}
                                 />
                             </div>
                         )}
@@ -521,6 +515,7 @@ const App: React.FC = () => {
                                     organizationId={userOrgId || undefined}
                                     currentPlan={currentPlan}
                                     activeModules={activeModules}
+                                    projectId={undefined}
                                 />
                             </div>
                         )}
@@ -533,7 +528,6 @@ const App: React.FC = () => {
                                     userRole={userRole}
                                     organizationId={userOrgId || undefined}
                                     customPrimaryColor={appPrimaryColor}
-                                    activeModules={activeModules}
                                 />
                             </div>
                         )}
@@ -602,6 +596,7 @@ const App: React.FC = () => {
                         )}
                     </>
                 )}
+                </ErrorBoundary>
             </Suspense>
         </main>
 

@@ -1,10 +1,4 @@
 
-
-
-
-
-
-
 import React, { useEffect, useState } from 'react';
 import { 
     LayoutDashboard, List, Calendar, User, Settings, Search, 
@@ -40,8 +34,7 @@ interface Props {
 // Helper para definir grupos de menu
 const getMenuGroups = (userRole: string, isAdmin: boolean, currentPlan: string = 'plan_free', userEmail?: string, activeModules: string[] = []) => {
     const isClient = userRole === 'cliente';
-    const planFeatures = PLAN_LIMITS[currentPlan]?.features || PLAN_LIMITS['plan_free'].features;
-
+    
     const groups = [
         {
             title: 'Gestão',
@@ -65,20 +58,20 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, currentPlan: string =
     if (hasModule('kanban')) {
         groups[1].items.push({ id: 'kanban', label: 'Tarefas', icon: Briefcase });
     }
-    if (planFeatures.gantt && hasModule('calendar')) {
+    if (hasModule('calendar')) {
         groups[1].items.push({ id: 'calendar', label: 'Cronograma', icon: Calendar });
     }
 
     if (!isClient) {
         const businessItems = [];
-        // CRM Module - Check with helper and plan
-        if (planFeatures.crm && hasModule('crm')) {
+        // CRM Module
+        if (hasModule('crm')) {
             businessItems.push({ id: 'crm', label: 'CRM / Vendas', icon: TrendingUp });
         }
-        if (planFeatures.financial && hasModule('financial')) {
+        if (hasModule('financial')) {
             businessItems.push({ id: 'financial', label: 'Financeiro', icon: DollarSign });
         }
-        if (planFeatures.clients && hasModule('clients')) {
+        if (hasModule('clients')) {
             businessItems.push({ id: 'clients', label: 'Clientes', icon: Users });
         }
 
@@ -90,14 +83,12 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, currentPlan: string =
         }
 
         const intelItems = [];
-        if (planFeatures.metrics) {
-            // RESTRIÇÃO: Apenas peboorba@gmail.com vê Métricas Produto
-            if (userEmail === 'peboorba@gmail.com' && hasModule('product')) {
-                intelItems.push({ id: 'product', label: 'Métricas Produto', icon: BarChart3 });
-            }
-            if (hasModule('engineering')) {
-                intelItems.push({ id: 'dev-metrics', label: 'Engenharia', icon: Code2 });
-            }
+        // Metrics Modules
+        if (userEmail === 'peboorba@gmail.com' && hasModule('product')) {
+            intelItems.push({ id: 'product', label: 'Métricas Produto', icon: BarChart3 });
+        }
+        if (hasModule('engineering')) {
+            intelItems.push({ id: 'dev-metrics', label: 'Engenharia', icon: Code2 });
         }
 
         if (intelItems.length > 0) {
@@ -128,7 +119,8 @@ export const Sidebar: React.FC<Props> = (props) => {
   const isClient = props.userRole === 'cliente';
   const isAdmin = props.userData.name === 'Pedro Borba';
   const menuGroups = getMenuGroups(props.userRole, isAdmin, props.currentPlan, props.userData?.email, props.activeModules);
-  const planLimits = PLAN_LIMITS[props.currentPlan || 'plan_free'];
+  // Still use PLAN_LIMITS for AI usage display if needed, but primary logic is Modules
+  const planLimits = PLAN_LIMITS[props.currentPlan || 'plan_free']; 
   const [aiUsage, setAiUsage] = useState(0);
 
   useEffect(() => {
@@ -143,7 +135,7 @@ export const Sidebar: React.FC<Props> = (props) => {
           }
       }
       loadAiUsage();
-      const interval = setInterval(loadAiUsage, 10000); // Poll every 10s for updates
+      const interval = setInterval(loadAiUsage, 10000); 
       return () => clearInterval(interval);
   }, []);
 
@@ -165,17 +157,15 @@ export const Sidebar: React.FC<Props> = (props) => {
                 </div>
             )}
             
-            {/* Feedback Button (Desktop) */}
             <button 
                 type="button"
                 onClick={(e) => { 
                     e.preventDefault(); 
                     e.stopPropagation(); 
-                    console.log("Feedback clicked");
                     props.onOpenFeedback(); 
                 }}
                 className="p-2 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/20 text-amber-500 dark:text-amber-400 transition-colors relative z-50 cursor-pointer"
-                title="Reportar Problema / Sugerir Melhoria"
+                title="Reportar Problema"
             >
                 <Lightbulb className="w-5 h-5"/>
             </button>
@@ -246,7 +236,7 @@ export const Sidebar: React.FC<Props> = (props) => {
             ))}
         </div>
 
-        {/* AI Counter (Visible for Free/Basic Plans) */}
+        {/* AI Counter */}
         {!isClient && (
             <div className="px-4 pb-4">
                 <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl flex items-center justify-between">
@@ -300,119 +290,4 @@ export const Sidebar: React.FC<Props> = (props) => {
         </div>
     </div>
   );
-};
-
-export const MobileDrawer: React.FC<Props> = (props) => {
-    const isClient = props.userRole === 'cliente';
-    const isAdmin = props.userData.name === 'Pedro Borba';
-    const menuGroups = getMenuGroups(props.userRole, isAdmin, props.currentPlan, props.userData?.email, props.activeModules);
-
-    return (
-        <>
-            <div className="fixed top-0 left-0 right-0 h-16 bg-white dark:bg-[#0a0a0a] border-b border-slate-200 dark:border-white/10 flex items-center px-4 md:hidden z-50 gap-3 justify-between">
-                <div className="flex items-center gap-3">
-                    <button onClick={() => props.setIsMobileOpen(true)} className="p-2 -ml-2 text-slate-500 hover:text-slate-900 dark:hover:text-white">
-                        <Menu className="w-6 h-6"/>
-                    </button>
-                    <div className="font-bold text-lg text-slate-900 dark:text-white flex items-center gap-2">
-                        {props.customLogoUrl ? (
-                            <img src={props.customLogoUrl} alt="Logo" className="h-8 object-contain" />
-                        ) : (
-                            <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 bg-shinko-primary rounded-lg flex items-center justify-center text-white font-bold text-sm">
-                                    {props.orgName ? props.orgName.charAt(0).toUpperCase() : 'S'}
-                                </div>
-                                <span className="tracking-tight">{props.orgName || 'Shinkō'}</span>
-                            </div>
-                        )}
-                    </div>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                    {/* Feedback Button (Mobile) */}
-                    <button 
-                        onClick={(e) => { e.stopPropagation(); props.onOpenFeedback(); }}
-                        className="p-2 bg-amber-100 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 rounded-full relative z-50"
-                    >
-                        <Lightbulb className="w-5 h-5"/>
-                    </button>
-
-                    {/* Mobile Quick Add */}
-                    {!isClient && (
-                        <button onClick={props.onOpenCreateTask} className="w-8 h-8 bg-slate-100 dark:bg-white/10 rounded-full flex items-center justify-center text-slate-600 dark:text-white">
-                            <PlusCircle className="w-5 h-5"/>
-                        </button>
-                    )}
-                </div>
-            </div>
-
-            {props.isMobileOpen && (
-                <div className="fixed inset-0 z-[100] md:hidden">
-                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => props.setIsMobileOpen(false)}></div>
-                    <div className="absolute inset-y-0 left-0 w-[85%] max-w-xs bg-white dark:bg-[#0a0a0a] shadow-2xl flex flex-col animate-in slide-in-from-left duration-300 border-r border-slate-200 dark:border-white/10">
-                        
-                        <div className="p-6 pb-2 border-b border-slate-100 dark:border-white/5">
-                            <div className="flex justify-between items-center mb-6">
-                                <span className="font-black text-xl tracking-tight text-slate-900 dark:text-white">Menu</span>
-                                <button onClick={() => props.setIsMobileOpen(false)} className="text-slate-400 hover:text-slate-900 dark:hover:text-white p-2 bg-slate-100 dark:bg-white/5 rounded-full"><X className="w-5 h-5"/></button>
-                            </div>
-
-                            <div className="relative mb-4">
-                                <Search className="absolute left-3 top-3 w-4 h-4 text-slate-500" />
-                                <input 
-                                    type="text" 
-                                    placeholder="Buscar..." 
-                                    onChange={(e) => props.onSearch(e.target.value)}
-                                    className="w-full h-10 pl-9 pr-4 rounded-xl bg-slate-100 dark:bg-white/5 border-none text-sm font-medium text-slate-900 dark:text-white placeholder-slate-500 outline-none focus:ring-2 focus:ring-shinko-primary/50 transition-all"
-                                />
-                            </div>
-                        </div>
-                        
-                        <div className="flex-1 overflow-y-auto px-4 pb-4 custom-scrollbar space-y-6 pt-4">
-                            {menuGroups.map((group, idx) => (
-                                <div key={idx}>
-                                    {group.title && group.items.length > 0 && (
-                                        <h3 className="mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-                                            {group.title}
-                                        </h3>
-                                    )}
-                                    <div className="space-y-1">
-                                        {group.items.map(item => (
-                                            <button
-                                                key={item.id}
-                                                onClick={() => { props.onChangeView(item.id); props.setIsMobileOpen(false); }}
-                                                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
-                                                    props.currentView === item.id 
-                                                    ? 'bg-shinko-primary/10 text-shinko-primary border border-shinko-primary/20' 
-                                                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'
-                                                }`}
-                                            >
-                                                <item.icon className={`w-5 h-5 ${props.currentView === item.id ? 'text-shinko-primary' : 'text-slate-400'}`}/>
-                                                {item.label}
-                                                {props.currentView === item.id && <ChevronRight className="w-4 h-4 ml-auto opacity-50"/>}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        <div className="p-6 border-t border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-black/20 space-y-3">
-                            <button 
-                                onClick={props.onToggleTheme}
-                                className="w-full py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-300 flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-white/10 transition-colors"
-                            >
-                                {props.theme === 'dark' ? <Sun className="w-4 h-4"/> : <Moon className="w-4 h-4"/>}
-                                {props.theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}
-                            </button>
-                            
-                            <button onClick={props.onLogout} className="w-full py-3 text-red-500 font-bold flex items-center justify-center gap-2 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-xl transition-colors text-sm">
-                                <LogOut className="w-4 h-4"/> Sair do Sistema
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </>
-    );
 };

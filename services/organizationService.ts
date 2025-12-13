@@ -1,3 +1,4 @@
+
 import { supabase } from './supabaseClient';
 import { PLAN_LIMITS } from '../types';
 
@@ -177,6 +178,9 @@ export const fetchActiveOrgModules = async (orgId: number): Promise<string[]> =>
 export const updateOrgModules = async (orgId: number, moduleKeys: string[]) => {
     try {
         console.log(`Updating modules for Org ${orgId}. New active set:`, moduleKeys);
+
+        // ENSURE SEEDING HAPPENS BEFORE MAPPING
+        await seedSystemModules();
 
         // 1. Fetch Module IDs from 'modulos' table
         const { data: allModules } = await supabase.from('modulos').select('id, nome');
