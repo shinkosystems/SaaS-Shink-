@@ -33,9 +33,12 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
     const handleTaskSave = async (updatedTask: BpmnTask) => {
         if (!editingTask) return;
         
-        // Optimistic update
+        // 1. Update the Modal State immediately to reflect changes (Fixes "members not showing" issue)
+        setEditingTask(prev => prev ? { ...prev, task: updatedTask } : null);
+
+        // 2. Optimistic update of the main Node Tree
         const newNodes = nodes.map(n => {
-            if (n.label === editingTask.nodeLabel) { // Use ID in real scenario
+            if (n.label === editingTask.nodeLabel) { // Use ID in real scenario if available
                 return {
                     ...n,
                     checklist: n.checklist.map(t => t.id === updatedTask.id ? updatedTask : t)
@@ -45,7 +48,7 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
         });
         setNodes(newNodes);
 
-        // DB Update
+        // 3. DB Update
         if (updatedTask.id && !isNaN(Number(updatedTask.id))) {
             await updateTask(Number(updatedTask.id), {
                 titulo: updatedTask.text,
@@ -58,13 +61,10 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
                 gravidade: updatedTask.gut?.g,
                 urgencia: updatedTask.gut?.u,
                 tendencia: updatedTask.gut?.t,
-                membros: updatedTask.members, // Added persistence for members
-                etiquetas: updatedTask.tags   // Added persistence for tags
+                membros: updatedTask.members, // Persistence for members
+                etiquetas: updatedTask.tags   // Persistence for tags
             });
         }
-        
-        // Trigger parent update to refresh structure if needed
-        // onUpdate({ ...opportunity, bpmn: { ...opportunity.bpmn!, nodes: newNodes } });
     };
 
     const handleTaskDelete = async (id: string) => {

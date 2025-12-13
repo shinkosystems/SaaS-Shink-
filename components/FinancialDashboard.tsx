@@ -203,26 +203,28 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [], o
             </div>
 
             {/* Chart */}
-            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-white/5 h-80">
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-6">Evolução do Caixa</h3>
-                <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={snapshot.chartData}>
-                        <defs>
-                            <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
-                                <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                            </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.5}/>
-                        <XAxis dataKey="name" tick={{fontSize: 10, fill: '#94a3b8'}} axisLine={false} tickLine={false} />
-                        <YAxis tick={{fontSize: 10, fill: '#94a3b8'}} axisLine={false} tickLine={false} />
-                        <Tooltip 
-                            contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '8px', color: 'white', fontSize: '12px' }}
-                        />
-                        <Area type="monotone" dataKey="Receita" stroke="#10b981" fillOpacity={1} fill="url(#colorRev)" strokeWidth={2} />
-                        <Area type="monotone" dataKey="Despesas" stroke="#ef4444" fillOpacity={0} strokeWidth={2} strokeDasharray="5 5" />
-                    </AreaChart>
-                </ResponsiveContainer>
+            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-white/5 h-80 flex flex-col">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-6 shrink-0">Evolução do Caixa</h3>
+                <div className="flex-1 min-h-0 w-full">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                        <AreaChart data={snapshot.chartData}>
+                            <defs>
+                                <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
+                                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.5}/>
+                            <XAxis dataKey="name" tick={{fontSize: 10, fill: '#94a3b8'}} axisLine={false} tickLine={false} />
+                            <YAxis tick={{fontSize: 10, fill: '#94a3b8'}} axisLine={false} tickLine={false} />
+                            <Tooltip 
+                                contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '8px', color: 'white', fontSize: '12px' }}
+                            />
+                            <Area type="monotone" dataKey="Receita" stroke="#10b981" fillOpacity={1} fill="url(#colorRev)" strokeWidth={2} />
+                            <Area type="monotone" dataKey="Despesas" stroke="#ef4444" fillOpacity={0} strokeWidth={2} strokeDasharray="5 5" />
+                        </AreaChart>
+                    </ResponsiveContainer>
+                </div>
             </div>
         </div>
     );

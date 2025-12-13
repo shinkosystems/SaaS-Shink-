@@ -174,15 +174,26 @@ export const fetchAllTasks = async (organizationId?: number): Promise<DbTask[]> 
         if (error) throw error;
         if (!tasks || tasks.length === 0) return [];
 
+        // Collect from responsavel
         const userIds = [...new Set(tasks.map((t: any) => t.responsavel).filter(Boolean))];
+        
+        // Collect from membros array to ensure avatars load for secondary members too
+        tasks.forEach((t: any) => {
+            if (t.membros && Array.isArray(t.membros)) {
+                t.membros.forEach((mId: string) => userIds.push(mId));
+            }
+        });
 
         let userMap = new Map<string, any>();
         
-        if (userIds.length > 0) {
+        // Fetch unique users
+        const uniqueUserIds = [...new Set(userIds)];
+
+        if (uniqueUserIds.length > 0) {
             const { data: users } = await supabase
                 .from('users')
                 .select('id, nome, perfil, organizacao, desenvolvedor, avatar_url')
-                .in('id', userIds);
+                .in('id', uniqueUserIds);
             
             if (users) {
                 users.forEach(u => userMap.set(u.id, u));

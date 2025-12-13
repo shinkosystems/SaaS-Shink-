@@ -75,9 +75,10 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
               return;
           }
 
+          // Ensure email is selected
           let query = supabase.from('users')
-              .select('id, nome, perfil, avatar_url')
-              .eq('organizacao', organizationId) // Strict Filter
+              .select('id, nome, perfil, avatar_url, email')
+              .eq('organizacao', organizationId) 
               .order('nome');
           
           const { data } = await query;
@@ -114,9 +115,12 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
   // --- ACTIONS ---
 
   const handleToggleMember = (memberId: string) => {
-      const currentMembers = [...(formData.members || [])];
-      let newMembers;
+      if (!memberId) return;
+
+      const currentMembers = formData.members ? [...formData.members] : [];
+      let newMembers: string[];
       
+      // Toggle logic using strict ID comparison
       if (currentMembers.includes(memberId)) {
           newMembers = currentMembers.filter(id => id !== memberId);
       } else {
@@ -124,8 +128,8 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
       }
       
       const updatedData = { ...formData, members: newMembers };
-      setFormData(updatedData);
-      onSave(updatedData); // Save immediately
+      setFormData(updatedData); // Update Local State
+      onSave(updatedData); // Trigger Parent Update & DB Save
   };
 
   const handleAddLabel = () => {
@@ -291,13 +295,15 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                         )}
                         
                         {/* Other Members */}
-                        {formData.members?.filter(mid => mid !== formData.assigneeId).map(mid => {
+                        {formData.members?.map(mid => {
+                            // Find member by ID only
                             const mem = orgMembers.find(m => m.id === mid);
-                            // Fallback rendering if member data not yet loaded, so bubbles don't disappear
-                            const initial = mem?.nome?.charAt(0) || '?';
+                            if (!mem) return null;
+                            if (mem.id === formData.assigneeId) return null; // Skip duplicates of main assignee
+
                             return (
-                                <div key={mid} className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 text-xs font-bold shadow-sm ring-2 ring-white dark:ring-[#1a1a1a]" title={mem?.nome || 'Membro'}>
-                                    {initial}
+                                <div key={mid} className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 text-xs font-bold shadow-sm ring-2 ring-white dark:ring-[#1a1a1a]" title={mem.nome || 'Membro'}>
+                                    {mem.nome.charAt(0)}
                                 </div>
                             );
                         })}
@@ -319,7 +325,9 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                             <div className="max-h-48 overflow-y-auto p-1">
                                 {orgMembers.length === 0 && <div className="p-3 text-xs text-slate-500 text-center">Nenhum membro encontrado.</div>}
                                 {orgMembers.map(m => {
+                                    // Check if user ID is in array
                                     const isSelected = (formData.members || []).includes(m.id) || formData.assigneeId === m.id;
+                                    
                                     return (
                                         <button 
                                             key={m.id}
@@ -327,6 +335,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                                             onClick={(e) => {
                                                 e.preventDefault();
                                                 e.stopPropagation();
+                                                // STRICT ID USAGE
                                                 handleToggleMember(m.id);
                                             }}
                                             className="w-full text-left px-3 py-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg text-sm flex items-center justify-between group"
@@ -335,7 +344,10 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                                                 <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[10px] font-bold">
                                                     {m.nome.charAt(0)}
                                                 </div>
-                                                <span className="text-slate-700 dark:text-slate-200">{m.nome}</span>
+                                                <div className="flex flex-col">
+                                                    <span className="text-slate-700 dark:text-slate-200">{m.nome}</span>
+                                                    <span className="text-[10px] text-slate-400">{m.email}</span>
+                                                </div>
                                             </div>
                                             {isSelected && <Check className="w-4 h-4 text-emerald-500"/>}
                                         </button>
@@ -593,7 +605,9 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                             <div className="max-h-48 overflow-y-auto p-1">
                                 {orgMembers.length === 0 && <div className="p-3 text-xs text-slate-500 text-center">Nenhum membro disponível.</div>}
                                 {orgMembers.map(m => {
+                                    // Same Logic for Sidebar - STRICT ID
                                     const isSelected = (formData.members || []).includes(m.id) || formData.assigneeId === m.id;
+                                    
                                     return (
                                         <button 
                                             key={m.id}

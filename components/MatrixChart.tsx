@@ -63,7 +63,7 @@ const MatrixChart: React.FC<Props> = ({ data, onClick, theme = 'dark' }) => {
         <div className="absolute bottom-14 right-12 text-xs font-bold text-orange-600 dark:text-orange-400 text-right z-0 opacity-60 pointer-events-none">Veloz & Difícil<br/>(Parceria/MVP)</div>
         <div className="absolute bottom-14 left-16 text-xs font-bold text-red-600 dark:text-red-400 z-0 opacity-60 pointer-events-none">Lento & Difícil<br/>(Investigar)</div>
 
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
         <ScatterChart margin={{ top: 50, right: 40, bottom: 40, left: 40 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} vertical={false} horizontal={false} />
           {/* Custom Grid Lines */}
