@@ -3,7 +3,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Opportunity, TaskStatus, DbTask } from '../types';
 import { Trello, Filter, User, Hash, Clock, Briefcase, RefreshCw, Calendar as CalendarIcon, GitMerge, GanttChartSquare, Lock, MoreHorizontal } from 'lucide-react';
 import { TaskDetailModal } from './TaskDetailModal';
-import { fetchAllTasks, updateTask, fetchProjects, deleteTask } from '../services/projectService';
+import { fetchAllTasks, updateTask, fetchProjects, deleteTask, syncTaskChecklist } from '../services/projectService';
 import { logEvent } from '../services/analyticsService';
 import { GanttView } from './GanttView';
 
@@ -64,8 +64,8 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
         }
     }, [organizationId, viewMode]);
 
-    const loadData = async () => {
-        setLoading(true);
+    const loadData = async (silent = false) => {
+        if (!silent) setLoading(true);
         try {
             const [tasksData, projectsData] = await Promise.all([
                 fetchAllTasks(organizationId),
@@ -74,17 +74,15 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
             setTasks(tasksData);
             setProjectsList(projectsData.map(p => ({ id: p.id, nome: p.nome })));
             
-            // Sync editing context if open (prevents stale data)
+            // Sync open modal with fresh data from DB (Important for subtasks sync)
             if (editingTaskCtx) {
-                const freshTask = tasksData.find(t => t.id === editingTaskCtx.id);
-                if (freshTask) {
-                    setEditingTaskCtx(freshTask);
-                }
+                const fresh = tasksData.find(t => t.id === editingTaskCtx.id);
+                if (fresh) setEditingTaskCtx(fresh);
             }
         } catch (error) {
             console.error("Erro ao carregar Kanban:", error);
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     };
 
@@ -101,6 +99,9 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
         refDate.setHours(0,0,0,0);
 
         return tasks.filter(t => {
+            // HIDE SUBTASKS FROM MAIN BOARD
+            if (t.sutarefa) return false;
+
             if (filterProject !== 'all' && t.projeto?.toString() !== filterProject) return false;
             if (filterAssignee !== 'all' && t.responsavelData?.nome !== filterAssignee) return false;
 
@@ -138,6 +139,23 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
         });
         return cols;
     }, [filteredTasks]);
+
+    // Helper to get subtasks for a specific parent ID from the global tasks list
+    const getSubtasksForParent = (parentId: number) => {
+        return tasks
+            .filter(t => t.tarefamae === parentId || t.tarefa === parentId)
+            .map(t => ({
+                id: t.id.toString(),
+                text: t.titulo,
+                completed: t.status === 'done',
+                dbId: t.id,
+                dueDate: t.datafim,
+                startDate: t.datainicio,
+                assignee: t.responsavelData?.nome,
+                assigneeId: t.responsavel,
+                estimatedHours: t.duracaohoras
+            }));
+    };
 
     const handleStatusChange = async (task: DbTask, newStatus: string) => {
         setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t));
@@ -217,7 +235,7 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
 
                         {/* Loading State */}
                         <div className="ml-auto">
-                             <button onClick={loadData} className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 rounded-full transition-colors">
+                             <button onClick={() => loadData(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 rounded-full transition-colors">
                                 <RefreshCw className={`w-4 h-4 text-slate-400 ${loading ? 'animate-spin' : ''}`}/>
                             </button>
                         </div>
@@ -296,6 +314,12 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
                                                 ) : (
                                                     <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-white/10 flex items-center justify-center text-[10px] text-slate-400">?</div>
                                                 )}
+                                                {/* Members Indicator */}
+                                                {task.membros && task.membros.length > 0 && (
+                                                    <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-white/5 flex items-center justify-center text-[10px] text-slate-500 font-bold border border-white dark:border-slate-800 -ml-3">
+                                                        +{task.membros.length}
+                                                    </div>
+                                                )}
                                             </div>
                                             
                                             {task.datafim && (
@@ -329,9 +353,11 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
                         assigneeId: editingTaskCtx.responsavel,
                         assigneeIsDev: editingTaskCtx.responsavelData?.desenvolvedor,
                         gut: { g: editingTaskCtx.gravidade, u: editingTaskCtx.urgencia, t: editingTaskCtx.tendencia },
-                        subtasks: [],
+                        // FIX: Hydrate checklist from global tasks list instead of empty array
+                        subtasks: getSubtasksForParent(editingTaskCtx.id),
                         members: editingTaskCtx.membros || [],
                         tags: editingTaskCtx.etiquetas || [],
+                        attachments: editingTaskCtx.anexos || [],
                         projectId: editingTaskCtx.projeto || undefined,
                         dbId: editingTaskCtx.id
                     }}
@@ -342,12 +368,29 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
                     onDelete={async (id) => {
                         if (!isNaN(Number(id))) {
                             await deleteTask(Number(id));
-                            loadData();
+                            loadData(true);
                             setEditingTaskCtx(null);
                         }
                     }}
                     onSave={async (updatedTask) => {
-                        await updateTask(Number(updatedTask.id), {
+                        // OPTIMISTIC UPDATE: Update local state immediately to avoid revert flicker
+                        setEditingTaskCtx(prev => prev ? {
+                            ...prev,
+                            titulo: updatedTask.text,
+                            descricao: updatedTask.description,
+                            status: updatedTask.status,
+                            responsavel: updatedTask.assigneeId || prev.responsavel,
+                            duracaohoras: updatedTask.estimatedHours || 0,
+                            datafim: updatedTask.dueDate,
+                            datainicio: updatedTask.startDate,
+                            etiquetas: updatedTask.tags || [],
+                            membros: updatedTask.members || [],
+                            anexos: updatedTask.attachments || []
+                        } : null);
+
+                        const dbId = Number(updatedTask.id);
+                        
+                        await updateTask(dbId, {
                             titulo: updatedTask.text,
                             descricao: updatedTask.description,
                             status: updatedTask.status,
@@ -359,9 +402,16 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
                             urgencia: updatedTask.gut?.u,
                             tendencia: updatedTask.gut?.t,
                             etiquetas: updatedTask.tags,
-                            membros: updatedTask.members
+                            membros: updatedTask.members,
+                            anexos: updatedTask.attachments
                         });
-                        loadData();
+
+                        // Sync Checklist (Subtasks)
+                        if (updatedTask.subtasks && organizationId) {
+                            await syncTaskChecklist(dbId, updatedTask.subtasks, organizationId, editingTaskCtx.projeto || undefined);
+                        }
+
+                        loadData(true); // Silent reload
                     }}
                 />
             )}

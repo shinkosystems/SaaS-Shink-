@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { FinancialTransaction } from '../types';
 import { Plus, ArrowUpCircle, ArrowDownCircle, Trash2, Calendar, Tag, DollarSign, Filter, Search, RefreshCw, Lock, ChevronLeft, ChevronRight, XCircle, Edit, User, FileText, CheckCircle2, X } from 'lucide-react';
@@ -155,7 +154,11 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
                                 <td className="p-4">
                                     <div className="flex flex-col">
                                         <div className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
-                                            {t.isContract && <RefreshCw className="w-3 h-3 text-emerald-500" title="Assinatura Recorrente"/>}
+                                            {t.isContract && (
+                                                <span title="Assinatura Recorrente">
+                                                    <RefreshCw className="w-3 h-3 text-emerald-500" />
+                                                </span>
+                                            )}
                                             {extractClientInfo(t.description)}
                                         </div>
                                         {t.isContract && t.description !== extractClientInfo(t.description) && (

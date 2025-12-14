@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Opportunity, BpmnNode, BpmnTask } from '../types';
 import { TaskDetailModal } from './TaskDetailModal';
 import { Plus, Settings, MoreHorizontal, CheckCircle2, Circle, ArrowRight } from 'lucide-react';
-import { updateTask, deleteTask, syncBpmnTasks } from '../services/projectService';
+import { updateTask, deleteTask, syncTaskChecklist } from '../services/projectService';
 
 interface Props {
   opportunity: Opportunity;
@@ -50,7 +50,10 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
 
         // 3. DB Update
         if (updatedTask.id && !isNaN(Number(updatedTask.id))) {
-            await updateTask(Number(updatedTask.id), {
+            const dbId = Number(updatedTask.id);
+            
+            // Save Parent
+            await updateTask(dbId, {
                 titulo: updatedTask.text,
                 descricao: updatedTask.description,
                 status: updatedTask.status,
@@ -64,6 +67,11 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
                 membros: updatedTask.members, // Persistence for members
                 etiquetas: updatedTask.tags   // Persistence for tags
             });
+
+            // Save Subtasks (Checklist)
+            if (updatedTask.subtasks && opportunity.organizationId) {
+                await syncTaskChecklist(dbId, updatedTask.subtasks, opportunity.organizationId, opportunity.dbProjectId);
+            }
         }
     };
 

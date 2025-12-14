@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { Opportunity, DbTask } from '../types';
-import { fetchAllTasks, updateTask, deleteTask } from '../services/projectService';
+import { fetchAllTasks, updateTask, deleteTask, syncTaskChecklist } from '../services/projectService';
 import { TaskDetailModal } from './TaskDetailModal';
 import { ChevronLeft, ChevronRight, RefreshCw, Calendar as CalendarIcon, List, Clock } from 'lucide-react';
 
@@ -232,7 +231,9 @@ export const CalendarView: React.FC<Props> = ({
                                                     gut: { g: task.gravidade, u: task.urgencia, t: task.tendencia },
                                                     tags: task.etiquetas || [],
                                                     members: task.membros || [],
-                                                    dbId: task.id
+                                                    attachments: task.anexos || [],
+                                                    dbId: task.id,
+                                                    projectId: task.projeto || undefined // Added projectId for syncing subtasks
                                                 }, nodeLabel: task.projetoData?.nome || 'Tarefa' })}
                                                 className={`rounded border cursor-pointer shadow-sm transition-transform hover:scale-[1.01] ${
                                                     viewMode === 'day' ? 'p-3 border-l-4' : 'text-[10px] p-1.5 border-l-2 truncate'
@@ -240,29 +241,20 @@ export const CalendarView: React.FC<Props> = ({
                                                     task.status === 'done' ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 border-l-emerald-500 text-emerald-700 dark:text-emerald-300' :
                                                     task.status === 'doing' ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 border-l-blue-500 text-blue-700 dark:text-blue-300' :
                                                     new Date(task.datafim || '') < new Date() ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 border-l-red-500 text-red-700 dark:text-red-300' :
-                                                    'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 border-l-slate-400 text-slate-700 dark:text-slate-300'
+                                                    'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 border-l-slate-400 text-slate-700 dark:text-slate-300'
                                                 }`}
                                             >
-                                                <div className="flex justify-between items-start">
-                                                    <span className={viewMode === 'day' ? 'font-bold text-sm' : ''}>{task.titulo}</span>
-                                                    {viewMode === 'day' && task.responsavelData?.nome && (
-                                                        <span className="text-xs bg-black/5 dark:bg-white/10 px-2 py-0.5 rounded text-slate-500">{task.responsavelData.nome.split(' ')[0]}</span>
+                                                <div className="flex justify-between items-center gap-2">
+                                                    <span className="truncate font-medium">{task.titulo}</span>
+                                                    {viewMode === 'day' && task.datafim && (
+                                                        <span className="text-[10px] opacity-70 whitespace-nowrap">{new Date(task.datafim).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                                                     )}
                                                 </div>
                                                 {viewMode === 'day' && (
-                                                    <div className="mt-1 text-xs text-slate-500 flex items-center gap-2">
-                                                        <span className="uppercase font-bold tracking-wider text-[10px]">{task.projetoData?.nome}</span>
-                                                        {task.duracaohoras > 0 && <span>• {task.duracaohoras}h</span>}
-                                                    </div>
+                                                    <div className="text-xs opacity-70 mt-1 truncate">{task.projetoData?.nome || 'Sem projeto'}</div>
                                                 )}
                                             </div>
                                         ))}
-                                        {dayTasks.length === 0 && viewMode === 'day' && (
-                                            <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-                                                <List className="w-8 h-8 mb-2 opacity-50"/>
-                                                <p className="text-sm">Nenhuma tarefa para este dia.</p>
-                                            </div>
-                                        )}
                                     </div>
                                 </div>
                             );
@@ -276,33 +268,40 @@ export const CalendarView: React.FC<Props> = ({
                 <TaskDetailModal 
                     task={editingTaskCtx.task}
                     nodeTitle={editingTaskCtx.nodeLabel}
-                    opportunityTitle="Detalhes"
+                    opportunityTitle={editingTaskCtx.nodeLabel}
                     organizationId={organizationId}
                     onClose={() => setEditingTaskCtx(null)}
-                    onSave={async (updated) => {
-                        if (updated.id) {
-                            await updateTask(Number(updated.id), {
-                                titulo: updated.text,
-                                descricao: updated.description,
-                                status: updated.status,
-                                responsavel: updated.assigneeId,
-                                duracaohoras: updated.estimatedHours,
-                                datafim: updated.dueDate,
-                                datainicio: updated.startDate,
-                                etiquetas: updated.tags,
-                                membros: updated.members
-                            });
-                        }
-                        loadTasks();
-                    }}
                     onDelete={async (id) => {
                         if (!isNaN(Number(id))) {
-                            if (window.confirm("Excluir tarefa?")) {
-                                await deleteTask(Number(id));
-                                loadTasks();
-                                setEditingTaskCtx(null);
+                            await deleteTask(Number(id));
+                            loadTasks();
+                            setEditingTaskCtx(null);
+                        }
+                    }}
+                    onSave={async (updated) => {
+                        if (updated.id) {
+                            const dbId = Number(updated.id);
+                            if (!isNaN(dbId)) {
+                                await updateTask(dbId, {
+                                    titulo: updated.text,
+                                    descricao: updated.description,
+                                    status: updated.status,
+                                    responsavel: updated.assigneeId,
+                                    duracaohoras: updated.estimatedHours,
+                                    datafim: updated.dueDate,
+                                    datainicio: updated.startDate,
+                                    etiquetas: updated.tags,
+                                    membros: updated.members,
+                                    anexos: updated.attachments
+                                });
+
+                                // Sync Checklist (Subtasks)
+                                if (updated.subtasks && organizationId) {
+                                    await syncTaskChecklist(dbId, updated.subtasks, organizationId, updated.projectId);
+                                }
                             }
                         }
+                        loadTasks();
                     }}
                 />
             )}

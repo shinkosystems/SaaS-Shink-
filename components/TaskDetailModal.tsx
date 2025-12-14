@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { BpmnTask, BpmnSubTask, TaskStatus, Attachment } from '../types';
-import { X, User, Calendar as CalendarIcon, CheckSquare, Square, Plus, Trash2, AlignLeft, Clock, PlayCircle, CheckCircle, BarChart3, Timer, Sparkles, Loader2, ArrowLeft, Layers, Hash, Eye, ShieldCheck, CornerDownRight, ChevronDown, Check, Paperclip, UploadCloud, File as FileIcon, ExternalLink, ArrowUpRight, Save, CreditCard, Tag, Activity, Info, Send } from 'lucide-react';
+import { X, User, Calendar as CalendarIcon, CheckSquare, Square, Plus, Trash2, AlignLeft, Clock, PlayCircle, CheckCircle, BarChart3, Timer, Sparkles, Loader2, ArrowLeft, Layers, Hash, Eye, ShieldCheck, CornerDownRight, ChevronDown, Check, Paperclip, UploadCloud, File as FileIcon, ExternalLink, ArrowUpRight, Save, CreditCard, Tag, Activity, Info, Send, Image as ImageIcon } from 'lucide-react';
 import { generateSubtasksForTask } from '../services/geminiService';
 import { supabase } from '../services/supabaseClient';
 import { updateTask } from '../services/projectService';
@@ -35,13 +34,15 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
       gut: task.gut || { g: 1, u: 1, t: 1 },
       description: task.description || '',
       members: Array.isArray(task.members) ? task.members : [],
-      tags: Array.isArray(task.tags) ? task.tags : []
+      tags: Array.isArray(task.tags) ? task.tags : [],
+      attachments: Array.isArray(task.attachments) ? task.attachments : []
   });
   const [newSubtask, setNewSubtask] = useState('');
   const [newComment, setNewComment] = useState('');
   const [comments, setComments] = useState<{id: number, text: string, user: string, created_at: string}[]>([]);
   const [orgMembers, setOrgMembers] = useState<any[]>([]);
   const [isEditingDesc, setIsEditingDesc] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   
   // Popover State
   const [activePopover, setActivePopover] = useState<string | null>(null);
@@ -58,51 +59,93 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
       setFormData(prev => ({
           ...prev,
           ...task,
-          // Preserve local edits if keys are missing in update
+          // Preserve local edits if keys are missing in update, BUT update if props explicitly change (e.g. from optimistic update)
           members: Array.isArray(task.members) ? task.members : prev.members,
           tags: Array.isArray(task.tags) ? task.tags : prev.tags,
-          subtasks: task.subtasks || prev.subtasks
+          subtasks: task.subtasks || prev.subtasks,
+          attachments: Array.isArray(task.attachments) ? task.attachments : prev.attachments
       }));
-  }, [task.id, task.status, task.dueDate, JSON.stringify(task.members), JSON.stringify(task.tags)]);
+  }, [
+      task.id, 
+      task.status, 
+      task.dueDate, 
+      JSON.stringify(task.members), 
+      JSON.stringify(task.tags), 
+      JSON.stringify(task.attachments),
+      JSON.stringify(task.subtasks) // CRITICAL FIX: Watch subtasks for changes (DB IDs arriving)
+  ]);
+
+  // Close popover on click outside
+  useEffect(() => {
+      const handleClickOutside = () => {
+          if (activePopover) setActivePopover(null);
+      };
+      
+      if (activePopover) {
+          // Delay binding to avoid immediate close from the triggering click
+          const timer = setTimeout(() => {
+              document.addEventListener('click', handleClickOutside);
+          }, 0);
+          return () => {
+              clearTimeout(timer);
+              document.removeEventListener('click', handleClickOutside);
+          };
+      }
+  }, [activePopover]);
 
   // Fetch contextual data
   useEffect(() => {
       const loadData = async () => {
-          // STRICT FILTERING: Only fetch if organizationId is present
-          if (!organizationId) {
-              console.warn("TaskDetailModal: No Organization ID provided. Members list will be empty.");
-              setOrgMembers([]);
-              return;
-          }
+          try {
+              let currentOrgId = organizationId;
 
-          // Ensure email is selected
-          let query = supabase.from('users')
-              .select('id, nome, perfil, avatar_url, email')
-              .eq('organizacao', organizationId) 
-              .order('nome');
-          
-          const { data } = await query;
-          if (data) setOrgMembers(data);
-          
-          if (task.dbId) {
-              const { data: commentsData } = await supabase
-                  .from('comentarios')
-                  .select('id, mensagem, created_at, usuario')
-                  .eq('task', task.dbId)
-                  .order('created_at', { ascending: false });
+              // Fallback: If no organizationId prop, try to fetch from current user
+              if (!currentOrgId) {
+                  const { data: { user } } = await supabase.auth.getUser();
+                  if (user) {
+                      const { data: userData } = await supabase.from('users').select('organizacao').eq('id', user.id).single();
+                      if (userData) currentOrgId = userData.organizacao;
+                  }
+              }
+
+              if (currentOrgId) {
+                  // Ensure email is selected
+                  let query = supabase.from('users')
+                      .select('id, nome, perfil, avatar_url, email')
+                      .eq('organizacao', currentOrgId) 
+                      .order('nome');
+                  
+                  const { data, error } = await query;
+                  if (!error && data) setOrgMembers(data);
+              }
               
-              if(commentsData) {
-                  const mappedComments = await Promise.all(commentsData.map(async (c: any) => {
-                      const { data: u } = await supabase.from('users').select('nome').eq('id', c.usuario).single();
-                      return {
+              if (task.dbId) {
+                  const { data: commentsData, error: commentsError } = await supabase
+                      .from('comentarios')
+                      .select('id, mensagem, created_at, usuario')
+                      .eq('task', task.dbId)
+                      .order('created_at', { ascending: false });
+                  
+                  if (!commentsError && commentsData) {
+                      const userIds = [...new Set(commentsData.map((c: any) => c.usuario))];
+                      let userMap = new Map<string, string>();
+                      
+                      if (userIds.length > 0) {
+                          const { data: users } = await supabase.from('users').select('id, nome').in('id', userIds);
+                          users?.forEach((u: any) => userMap.set(u.id, u.nome));
+                      }
+
+                      const mappedComments = commentsData.map((c: any) => ({
                           id: c.id,
                           text: c.mensagem,
                           created_at: c.created_at,
-                          user: u?.nome || 'Usuário'
-                      };
-                  }));
-                  setComments(mappedComments);
+                          user: userMap.get(c.usuario) || 'Usuário'
+                      }));
+                      setComments(mappedComments);
+                  }
               }
+          } catch (err) {
+              console.error("TaskDetailModal Load Error:", err);
           }
       };
       loadData();
@@ -110,6 +153,15 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
 
   const handleSave = (dataToSave = formData) => {
       onSave(dataToSave);
+  };
+
+  const updateSubtask = (subId: string, updates: Partial<BpmnSubTask>) => {
+      const newSubtasks = (formData.subtasks || []).map(s => 
+          s.id === subId ? { ...s, ...updates } : s
+      );
+      const updatedData = { ...formData, subtasks: newSubtasks };
+      setFormData(updatedData);
+      handleSave(updatedData);
   };
 
   // --- ACTIONS ---
@@ -128,8 +180,36 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
       }
       
       const updatedData = { ...formData, members: newMembers };
-      setFormData(updatedData); // Update Local State
-      onSave(updatedData); // Trigger Parent Update & DB Save
+      setFormData(updatedData); // Update Local State immediately
+      onSave(updatedData); // Trigger Parent Update
+  };
+
+  const handleAddSubtask = (e?: React.KeyboardEvent) => {
+      if (e && e.key !== 'Enter') return;
+      
+      e?.preventDefault(); // Crucial to prevent default form submission
+      e?.stopPropagation();
+
+      if (!newSubtask.trim()) return;
+
+      const newItem: BpmnSubTask = { 
+          id: Date.now().toString(), 
+          text: newSubtask, 
+          completed: false 
+      };
+      
+      const updatedSubtasks = [...(formData.subtasks || []), newItem];
+      const updatedData = { ...formData, subtasks: updatedSubtasks };
+      
+      // Update State
+      setFormData(updatedData);
+      setNewSubtask('');
+      
+      // Save immediately
+      handleSave(updatedData);
+      
+      // Keep focus for rapid entry
+      setTimeout(() => checklistInputRef.current?.focus(), 10);
   };
 
   const handleAddLabel = () => {
@@ -146,7 +226,11 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
   const handleRemoveLabel = (e: React.MouseEvent, tag: string) => {
       e.preventDefault();
       e.stopPropagation();
-      const updatedData = { ...formData, tags: (formData.tags || []).filter(t => t !== tag) };
+      
+      const currentTags = formData.tags || [];
+      const newTags = currentTags.filter(t => t !== tag);
+      const updatedData = { ...formData, tags: newTags };
+      
       setFormData(updatedData);
       onSave(updatedData);
   };
@@ -189,14 +273,66 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
-      if (!file || !onAttach) return;
-      alert("Funcionalidade de upload será conectada ao storage em breve.");
+      if (!file) return;
+
+      setIsUploading(true);
+      try {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `tasks/${formData.id}/${Date.now()}.${fileExt}`;
+          
+          const { error: uploadError } = await supabase.storage
+              .from('documentos')
+              .upload(fileName, file);
+          
+          if (uploadError) throw new Error(uploadError.message);
+          
+          const { data } = supabase.storage.from('documentos').getPublicUrl(fileName);
+          
+          const newAttachment: Attachment = {
+              id: crypto.randomUUID(),
+              name: file.name,
+              size: (file.size / 1024).toFixed(2) + ' KB',
+              type: file.type,
+              uploadedAt: new Date().toISOString(),
+              url: data.publicUrl
+          };
+          
+          const updatedAttachments = [...(formData.attachments || []), newAttachment];
+          
+          // Update State
+          const updatedData = { ...formData, attachments: updatedAttachments };
+          setFormData(updatedData);
+          
+          // Trigger Save
+          onSave(updatedData);
+          
+          if (onAttach) onAttach(newAttachment);
+
+      } catch (error: any) {
+          console.error("Upload Error:", error);
+          alert("Erro no upload: " + error.message);
+      } finally {
+          setIsUploading(false);
+          // Reset input
+          if(attachmentInputRef.current) attachmentInputRef.current.value = '';
+      }
+  };
+
+  const handleDeleteAttachment = (attId: string) => {
+      if(!window.confirm("Remover este anexo?")) return;
+      
+      const updatedAttachments = (formData.attachments || []).filter(a => a.id !== attId);
+      const updatedData = { ...formData, attachments: updatedAttachments };
+      setFormData(updatedData);
+      onSave(updatedData);
   };
 
   const scrollToChecklist = () => {
       const el = document.getElementById('checklist-section');
-      if (el) el.scrollIntoView({ behavior: 'smooth' });
-      setTimeout(() => checklistInputRef.current?.focus(), 500);
+      if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setTimeout(() => checklistInputRef.current?.focus(), 500);
+      }
   };
 
   const getStatusColor = (status: string) => {
@@ -209,34 +345,29 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
       }
   };
 
-  const calcDuration = (start?: string, end?: string) => {
-      if (!start || !end) return '-';
-      const diff = new Date(end).getTime() - new Date(start).getTime();
-      const days = Math.floor(diff / (1000 * 3600 * 24));
-      const hours = Math.floor((diff % (1000 * 3600 * 24)) / (1000 * 3600));
-      if (days > 0) return `${days}d ${hours}h`;
-      return `${hours}h`;
+  // Helper for safe click handling
+  const handleSidebarClick = (e: React.MouseEvent, popoverName: string) => {
+      e.preventDefault();
+      e.stopPropagation(); // Critical to prevent bubbling
+      // If clicking same button, toggle off. If different, toggle on.
+      setActivePopover(prev => prev === popoverName ? null : popoverName);
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto" onClick={(e) => {
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-hidden" onClick={(e) => {
         if(e.target === e.currentTarget) onClose();
     }}>
-      
-      <div className="w-full max-w-4xl bg-transparent rounded-xl shadow-2xl relative flex flex-col md:flex-row min-h-[600px] text-slate-800 dark:text-slate-200 animate-in zoom-in-95 duration-200">
-        
-        {/* Invisible Backdrop for closing Popovers */}
-        {activePopover && (
-            <div 
-                className="fixed inset-0 z-[45]" 
-                onClick={(e) => {
-                    e.stopPropagation();
-                    setActivePopover(null);
-                }}
-            />
-        )}
+      {/* Hidden File Input for Global Use */}
+      <input 
+          type="file" 
+          hidden 
+          ref={attachmentInputRef}
+          onChange={handleFileUpload}
+      />
 
-        <button onClick={onClose} className="absolute top-4 right-4 p-2 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full transition-colors z-[60]">
+      <div className="w-full max-w-4xl bg-transparent rounded-xl shadow-2xl relative flex flex-col md:flex-row min-h-[600px] text-slate-800 dark:text-slate-200 animate-in zoom-in-95 duration-200 max-h-[90vh]">
+        
+        <button onClick={onClose} className="absolute top-4 right-4 p-2 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full transition-colors z-[250]">
             <X className="w-5 h-5"/>
         </button>
 
@@ -249,9 +380,10 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                 {formData.tags && formData.tags.length > 0 && (
                     <div className="flex flex-wrap gap-2 pl-9">
                         {formData.tags.map((tag, idx) => (
-                            <span key={idx} className="group relative px-3 py-1 rounded-full font-bold text-[10px] uppercase tracking-wide bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 flex items-center gap-1 cursor-default transition-all hover:pr-6">
+                            <span key={`${tag}-${idx}`} className="group relative px-3 py-1 rounded-full font-bold text-[10px] uppercase tracking-wide bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 flex items-center gap-1 cursor-default transition-all hover:pr-6">
                                 {tag}
                                 <button 
+                                    type="button"
                                     onClick={(e) => handleRemoveLabel(e, tag)}
                                     className="hidden group-hover:flex absolute right-1.5 top-1/2 -translate-y-1/2 text-amber-900 dark:text-amber-200 hover:text-red-500 p-0.5 rounded-full hover:bg-black/10 dark:hover:bg-white/10"
                                 >
@@ -309,20 +441,24 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                         })}
 
                         <button 
-                            onClick={(e) => { e.stopPropagation(); setActivePopover(activePopover === 'members-inline' ? null : 'members-inline'); }}
+                            type="button"
+                            onClick={(e) => handleSidebarClick(e, 'members-inline')}
                             className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-500 transition-colors"
                         >
                             <Plus className="w-4 h-4"/>
                         </button>
                     </div>
 
-                    {/* Members Popover Inline */}
+                    {/* Members Popover Inline - Higher Z-Index */}
                     {activePopover === 'members-inline' && (
-                        <div className="absolute top-10 left-0 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl z-50 animate-in fade-in zoom-in-95">
+                        <div 
+                            className="absolute top-10 left-0 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl z-[200] animate-in fade-in zoom-in-95"
+                            onClick={(e) => e.stopPropagation()}
+                        >
                             <div className="p-3 border-b border-slate-100 dark:border-white/5 font-bold text-xs text-slate-500 uppercase">
                                 Adicionar membros
                             </div>
-                            <div className="max-h-48 overflow-y-auto p-1">
+                            <div className="max-h-48 overflow-y-auto p-1 custom-scrollbar">
                                 {orgMembers.length === 0 && <div className="p-3 text-xs text-slate-500 text-center">Nenhum membro encontrado.</div>}
                                 {orgMembers.map(m => {
                                     // Check if user ID is in array
@@ -335,7 +471,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                                             onClick={(e) => {
                                                 e.preventDefault();
                                                 e.stopPropagation();
-                                                // STRICT ID USAGE
                                                 handleToggleMember(m.id);
                                             }}
                                             className="w-full text-left px-3 py-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg text-sm flex items-center justify-between group"
@@ -344,9 +479,9 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                                                 <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[10px] font-bold">
                                                     {m.nome.charAt(0)}
                                                 </div>
-                                                <div className="flex flex-col">
-                                                    <span className="text-slate-700 dark:text-slate-200">{m.nome}</span>
-                                                    <span className="text-[10px] text-slate-400">{m.email}</span>
+                                                <div className="flex flex-col overflow-hidden">
+                                                    <span className="text-slate-700 dark:text-slate-200 truncate">{m.nome}</span>
+                                                    <span className="text-[10px] text-slate-400 truncate">{m.email}</span>
                                                 </div>
                                             </div>
                                             {isSelected && <Check className="w-4 h-4 text-emerald-500"/>}
@@ -365,8 +500,9 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                         <select 
                             value={formData.status}
                             onChange={e => {
-                                setFormData({...formData, status: e.target.value as any});
-                                handleSave({...formData, status: e.target.value as any});
+                                const newStatus = e.target.value as any;
+                                setFormData({...formData, status: newStatus});
+                                handleSave({...formData, status: newStatus});
                             }}
                             className={`appearance-none px-3 py-1.5 rounded font-bold text-xs outline-none cursor-pointer ${getStatusColor(formData.status)}`}
                         >
@@ -431,6 +567,35 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                 </div>
             </div>
 
+            {/* Attachments Section - NEW VISUALIZATION */}
+            <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                    <Paperclip className="w-6 h-6 text-slate-600 dark:text-slate-400" />
+                    <h3 className="font-bold text-base text-slate-800 dark:text-white">Anexos</h3>
+                </div>
+                <div className="pl-9">
+                    {(!formData.attachments || formData.attachments.length === 0) ? (
+                        <div className="text-sm text-slate-400 italic">Nenhum anexo. Use o botão lateral para adicionar.</div>
+                    ) : (
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                            {formData.attachments.map((att, index) => (
+                                <div key={index} className="group relative p-3 border border-slate-200 dark:border-white/10 rounded-xl hover:bg-slate-50 dark:hover:bg-white/5 transition-colors flex items-center gap-3 bg-white/50 dark:bg-black/20">
+                                    <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-white/10 flex items-center justify-center shrink-0 overflow-hidden">
+                                        {att.type.startsWith('image/') ? <img src={att.url} className="w-full h-full object-cover"/> : <FileIcon className="w-5 h-5 text-slate-500"/>}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate" title={att.name}>{att.name}</div>
+                                        <div className="text-[10px] text-slate-400">{att.size}</div>
+                                    </div>
+                                    <a href={att.url} target="_blank" rel="noopener noreferrer" className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-blue-500 transition-opacity"><ExternalLink className="w-4 h-4"/></a>
+                                    <button onClick={() => handleDeleteAttachment(att.id)} className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-red-500 transition-opacity"><Trash2 className="w-4 h-4"/></button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+
             {/* Checklist */}
             <div className="space-y-3" id="checklist-section">
                 <div className="flex items-center justify-between">
@@ -467,58 +632,125 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                     <div className="space-y-2">
                         {formData.subtasks?.map(sub => (
                             <div key={sub.id} className="flex flex-col gap-1 group relative">
-                                <div className="flex items-start gap-3">
+                                <div className="flex items-center gap-3">
                                     <button 
+                                        type="button"
                                         onClick={() => {
                                             const newSubs = formData.subtasks?.map(s => s.id === sub.id ? { ...s, completed: !s.completed } : s);
-                                            setFormData({...formData, subtasks: newSubs});
-                                            handleSave();
+                                            const updatedData = {...formData, subtasks: newSubs};
+                                            setFormData(updatedData);
+                                            handleSave(updatedData);
                                         }}
-                                        className={`mt-0.5 w-5 h-5 rounded border flex items-center justify-center transition-all ${sub.completed ? 'bg-blue-500 border-blue-500 text-white' : 'bg-white dark:bg-black border-slate-300 dark:border-slate-600 hover:bg-slate-100'}`}
+                                        className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${sub.completed ? 'bg-blue-500 border-blue-500 text-white' : 'bg-white dark:bg-black border-slate-300 dark:border-slate-600 hover:bg-slate-100'}`}
                                     >
                                         {sub.completed && <Check className="w-3 h-3"/>}
                                     </button>
                                     
-                                    <div className="flex-1">
+                                    <div className="flex-1 flex items-center justify-between">
                                         <span className={`text-sm block ${sub.completed ? 'line-through text-slate-400' : 'text-slate-800 dark:text-slate-200'}`}>
                                             {sub.text}
                                         </span>
-                                    </div>
 
-                                    <button 
-                                        onClick={() => {
-                                            setFormData({...formData, subtasks: formData.subtasks?.filter(s => s.id !== sub.id)});
-                                            handleSave();
-                                        }}
-                                        className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 transition-opacity p-1"
-                                    >
-                                        <Trash2 className="w-4 h-4"/>
-                                    </button>
+                                        <div className="flex items-center gap-2">
+                                            {/* Subtask Date Picker - Ensure full visibility and pointer events */}
+                                            <div className="relative group/date">
+                                                {sub.dueDate ? (
+                                                    <div className="flex items-center gap-1 text-[10px] bg-slate-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-slate-600 dark:text-slate-300 cursor-pointer hover:bg-slate-200 dark:hover:bg-white/20 transition-colors">
+                                                        <CalendarIcon className="w-3 h-3" />
+                                                        <span>{new Date(sub.dueDate).toLocaleDateString(undefined, {month:'numeric', day:'numeric'})}</span>
+                                                    </div>
+                                                ) : (
+                                                    <div className="p-1 rounded hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer opacity-0 group-hover:opacity-100">
+                                                        <CalendarIcon className="w-4 h-4 text-slate-300 hover:text-slate-500" />
+                                                    </div>
+                                                )}
+                                                <input
+                                                    type="date"
+                                                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                                                    onChange={(e) => updateSubtask(sub.id, { dueDate: e.target.value })}
+                                                    value={sub.dueDate || ''}
+                                                />
+                                            </div>
+
+                                            {/* Subtask Assignee */}
+                                            <div className="relative">
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setActivePopover(activePopover === `sub-assignee-${sub.id}` ? null : `sub-assignee-${sub.id}`);
+                                                    }}
+                                                    className="flex items-center justify-center outline-none p-1 rounded hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
+                                                >
+                                                    {sub.assigneeId ? (
+                                                        <div className="w-5 h-5 rounded-full bg-blue-500 text-white text-[9px] flex items-center justify-center font-bold" title={sub.assignee || 'Responsável'}>
+                                                            {sub.assignee?.charAt(0) || orgMembers.find(m => m.id === sub.assigneeId)?.nome?.charAt(0) || 'U'}
+                                                        </div>
+                                                    ) : (
+                                                        <User className="w-4 h-4 text-slate-300 hover:text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                    )}
+                                                </button>
+
+                                                {/* Assignee Popover */}
+                                                {activePopover === `sub-assignee-${sub.id}` && (
+                                                    <div className="absolute right-0 top-8 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-lg shadow-xl z-50 p-1 animate-in fade-in zoom-in-95 origin-top-right">
+                                                        <div className="max-h-32 overflow-y-auto custom-scrollbar">
+                                                            {orgMembers.map(m => (
+                                                                <button 
+                                                                    key={m.id}
+                                                                    onClick={() => {
+                                                                        updateSubtask(sub.id, { assigneeId: m.id, assignee: m.nome });
+                                                                        setActivePopover(null);
+                                                                    }}
+                                                                    className="w-full text-left px-2 py-1.5 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 rounded flex items-center gap-2"
+                                                                >
+                                                                    <div className="w-4 h-4 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[8px] font-bold">
+                                                                        {m.nome.charAt(0)}
+                                                                    </div>
+                                                                    <span className="truncate">{m.nome}</span>
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <button 
+                                                type="button"
+                                                onClick={() => {
+                                                    const updatedSubtasks = formData.subtasks?.filter(s => s.id !== sub.id);
+                                                    const updatedData = {...formData, subtasks: updatedSubtasks};
+                                                    setFormData(updatedData);
+                                                    handleSave(updatedData);
+                                                }}
+                                                className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 transition-opacity p-1 hover:bg-slate-100 dark:hover:bg-white/10 rounded"
+                                            >
+                                                <Trash2 className="w-4 h-4"/>
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         ))}
                     </div>
 
-                    <div className="mt-2">
+                    <div className="mt-2 flex gap-2">
                         <input 
                             ref={checklistInputRef}
                             type="text" 
                             value={newSubtask}
                             onChange={e => setNewSubtask(e.target.value)}
-                            onKeyDown={e => {
-                                if (e.key === 'Enter' && newSubtask.trim()) {
-                                    setFormData(prev => ({
-                                        ...prev, 
-                                        subtasks: [...(prev.subtasks||[]), {id: Date.now().toString(), text: newSubtask, completed: false}]
-                                    }));
-                                    setNewSubtask('');
-                                    // Auto save on add
-                                    setTimeout(() => handleSave(), 100);
-                                }
-                            }}
-                            className="w-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 px-3 py-2 rounded text-sm outline-none transition-colors placeholder:text-slate-500"
+                            onKeyDown={handleAddSubtask}
+                            autoComplete="off"
+                            className="flex-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 px-3 py-2 rounded text-sm outline-none transition-colors placeholder:text-slate-500"
                             placeholder="Adicionar um item..."
                         />
+                        <button 
+                            onClick={() => handleAddSubtask()}
+                            className="px-3 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded text-slate-600 dark:text-slate-300 transition-colors"
+                        >
+                            <Plus className="w-4 h-4"/>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -549,12 +781,18 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                                 className="w-full px-3 py-2 bg-transparent outline-none text-sm"
                                 placeholder="Escrever um comentário..."
                             />
-                            {newComment && (
-                                <div className="p-2 flex justify-between items-center border-t border-slate-100 dark:border-slate-800">
-                                    <span className="text-[10px] text-slate-400">Pressione Enter para salvar</span>
-                                    <button onClick={handleAddComment} className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-bold transition-colors">Salvar</button>
-                                </div>
-                            )}
+                            <div className="p-2 flex justify-between items-center border-t border-slate-100 dark:border-slate-800">
+                                <button 
+                                    type="button" 
+                                    onClick={() => attachmentInputRef.current?.click()}
+                                    className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded hover:bg-slate-100 dark:hover:bg-white/5 transition-colors flex items-center gap-1"
+                                    title="Anexar arquivo"
+                                >
+                                    <Paperclip className="w-4 h-4"/> 
+                                    <span className="text-xs">Anexar</span>
+                                </button>
+                                <button onClick={handleAddComment} className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-bold transition-colors">Salvar</button>
+                            </div>
                         </div>
                     </div>
 
@@ -583,7 +821,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
         </div>
 
         {/* RIGHT COLUMN - SIDEBAR ACTIONS */}
-        <div className="w-full md:w-48 bg-slate-100 dark:bg-[#121212] p-4 pt-12 space-y-6 md:border-l border-slate-200 dark:border-slate-800 flex flex-col shrink-0 md:rounded-r-xl relative z-20">
+        <div className="w-full md:w-48 bg-slate-100 dark:bg-[#121212] p-4 pt-12 space-y-6 md:border-l border-slate-200 dark:border-slate-800 flex flex-col shrink-0 md:rounded-r-xl relative z-20 overflow-visible">
             
             <div className="space-y-2 relative">
                 <h5 className="text-xs font-bold text-slate-500 uppercase mb-2">Adicionar ao cartão</h5>
@@ -591,18 +829,22 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                 {/* Add Member Button */}
                 <div className="relative">
                     <button 
-                        onClick={(e) => { e.stopPropagation(); setActivePopover(activePopover === 'members-sidebar' ? null : 'members-sidebar'); }}
+                        type="button"
+                        onClick={(e) => handleSidebarClick(e, 'members-sidebar')}
                         className="w-full text-left px-3 py-1.5 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-sm text-slate-700 dark:text-slate-300 font-medium transition-colors flex items-center gap-2"
                     >
                         <User className="w-4 h-4"/> Membros
                     </button>
                     {activePopover === 'members-sidebar' && (
-                        <div className="absolute top-0 right-[110%] mr-2 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl z-50 animate-in fade-in zoom-in-95">
+                        <div 
+                            className="absolute top-0 right-full mr-2 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl z-[200] animate-in fade-in zoom-in-95"
+                            onClick={(e) => e.stopPropagation()}
+                        >
                             <div className="p-3 border-b border-slate-100 dark:border-white/5 font-bold text-xs text-slate-500 uppercase flex justify-between items-center">
                                 <span>Membros</span>
-                                <button onClick={() => setActivePopover(null)}><X className="w-3 h-3"/></button>
+                                <button type="button" onClick={() => setActivePopover(null)}><X className="w-3 h-3"/></button>
                             </div>
-                            <div className="max-h-48 overflow-y-auto p-1">
+                            <div className="max-h-48 overflow-y-auto p-1 custom-scrollbar">
                                 {orgMembers.length === 0 && <div className="p-3 text-xs text-slate-500 text-center">Nenhum membro disponível.</div>}
                                 {orgMembers.map(m => {
                                     // Same Logic for Sidebar - STRICT ID
@@ -637,16 +879,20 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                 {/* Add Labels Button - With CRUD */}
                 <div className="relative">
                     <button 
-                        onClick={(e) => { e.stopPropagation(); setActivePopover(activePopover === 'labels-sidebar' ? null : 'labels-sidebar'); }}
+                        type="button"
+                        onClick={(e) => handleSidebarClick(e, 'labels-sidebar')}
                         className="w-full text-left px-3 py-1.5 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-sm text-slate-700 dark:text-slate-300 font-medium transition-colors flex items-center gap-2"
                     >
                         <Tag className="w-4 h-4"/> Etiquetas
                     </button>
                     {activePopover === 'labels-sidebar' && (
-                        <div className="absolute top-0 right-[110%] mr-2 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl z-50 p-3 animate-in fade-in zoom-in-95">
+                        <div 
+                            className="absolute top-0 right-full mr-2 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl z-[200] p-3 animate-in fade-in zoom-in-95"
+                            onClick={(e) => e.stopPropagation()}
+                        >
                             <div className="font-bold text-xs text-slate-500 uppercase mb-2 flex justify-between items-center">
                                 <span>Etiquetas</span>
-                                <button onClick={() => setActivePopover(null)}><X className="w-3 h-3"/></button>
+                                <button type="button" onClick={() => setActivePopover(null)}><X className="w-3 h-3"/></button>
                             </div>
                             
                             <div className="mb-2">
@@ -666,16 +912,16 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                                 {(formData.tags || []).length === 0 && (
                                     <div className="text-[10px] text-slate-400 italic px-1">Nenhuma etiqueta.</div>
                                 )}
-                                {(formData.tags || []).map(tag => (
+                                {(formData.tags || []).map((tag, i) => (
                                     <div 
-                                        key={tag}
+                                        key={`${tag}-${i}`}
                                         className="w-full flex items-center justify-between px-2 py-1.5 rounded bg-slate-100 dark:bg-white/5 text-xs text-slate-700 dark:text-slate-300 group"
                                     >
                                         <span>{tag}</span>
                                         <button 
                                             type="button"
                                             onClick={(e) => handleRemoveLabel(e, tag)} 
-                                            className="text-slate-400 hover:text-red-500 p-1 rounded hover:bg-white dark:hover:bg-white/10 transition-colors"
+                                            className="text-slate-400 hover:text-red-500 p-1 rounded hover:bg-white dark:hover:bg-white/10 transition-colors z-10"
                                         >
                                             <X className="w-3 h-3"/>
                                         </button>
@@ -687,7 +933,12 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                 </div>
 
                 <button 
-                    onClick={scrollToChecklist}
+                    type="button"
+                    onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        scrollToChecklist();
+                    }}
                     className="w-full text-left px-3 py-1.5 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-sm text-slate-700 dark:text-slate-300 font-medium transition-colors flex items-center gap-2"
                 >
                     <CheckSquare className="w-4 h-4"/> Checklist
@@ -696,16 +947,20 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                 {/* Dates Button */}
                 <div className="relative">
                     <button 
-                        onClick={(e) => { e.stopPropagation(); setActivePopover(activePopover === 'dates-sidebar' ? null : 'dates-sidebar'); }}
+                        type="button"
+                        onClick={(e) => handleSidebarClick(e, 'dates-sidebar')}
                         className="w-full text-left px-3 py-1.5 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-sm text-slate-700 dark:text-slate-300 font-medium transition-colors flex items-center gap-2"
                     >
                         <Clock className="w-4 h-4"/> Datas
                     </button>
                     {activePopover === 'dates-sidebar' && (
-                        <div className="absolute top-0 right-[110%] mr-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl z-50 p-4 animate-in fade-in zoom-in-95">
+                        <div 
+                            className="absolute top-0 right-full mr-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl z-[200] p-4 animate-in fade-in zoom-in-95"
+                            onClick={(e) => e.stopPropagation()}
+                        >
                             <div className="font-bold text-xs text-slate-500 uppercase mb-3 flex justify-between items-center">
                                 <span>Definir Datas</span>
-                                <button onClick={() => setActivePopover(null)}><X className="w-3 h-3"/></button>
+                                <button type="button" onClick={() => setActivePopover(null)}><X className="w-3 h-3"/></button>
                             </div>
                             <div className="space-y-3">
                                 <div>
@@ -714,8 +969,9 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                                         type="date"
                                         value={formData.startDate || ''}
                                         onChange={(e) => {
-                                            setFormData({...formData, startDate: e.target.value});
-                                            handleSave();
+                                            const updatedData = {...formData, startDate: e.target.value};
+                                            setFormData(updatedData);
+                                            handleSave(updatedData);
                                         }}
                                         className="w-full p-2 bg-slate-100 dark:bg-black/20 rounded-lg text-xs outline-none focus:ring-1 focus:ring-blue-500"
                                     />
@@ -726,8 +982,9 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                                         type="date"
                                         value={formData.dueDate || ''}
                                         onChange={(e) => {
-                                            setFormData({...formData, dueDate: e.target.value});
-                                            handleSave();
+                                            const updatedData = {...formData, dueDate: e.target.value};
+                                            setFormData(updatedData);
+                                            handleSave(updatedData);
                                         }}
                                         className="w-full p-2 bg-slate-100 dark:bg-black/20 rounded-lg text-xs outline-none focus:ring-1 focus:ring-blue-500"
                                     />
@@ -738,16 +995,16 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                 </div>
                 
                 <button 
-                    onClick={() => attachmentInputRef.current?.click()}
+                    type="button"
+                    onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        attachmentInputRef.current?.click();
+                    }}
                     className="w-full text-left px-3 py-1.5 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-sm text-slate-700 dark:text-slate-300 font-medium transition-colors flex items-center gap-2"
                 >
-                    <Paperclip className="w-4 h-4"/> Anexo
-                    <input 
-                        type="file" 
-                        hidden 
-                        ref={attachmentInputRef}
-                        onChange={handleFileUpload}
-                    />
+                    {isUploading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Paperclip className="w-4 h-4"/>} 
+                    Anexo
                 </button>
             </div>
 
@@ -755,7 +1012,12 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                 <h5 className="text-xs font-bold text-slate-500 uppercase mb-2">Ações</h5>
                 {onDelete && (
                     <button 
-                        onClick={() => onDelete(task.id)}
+                        type="button"
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onDelete(task.id);
+                        }}
                         className="w-full text-left px-3 py-1.5 bg-red-100 dark:bg-red-900/20 hover:bg-red-200 dark:hover:bg-red-900/40 rounded text-sm text-red-600 dark:text-red-400 font-medium transition-colors flex items-center gap-2"
                     >
                         <Trash2 className="w-4 h-4"/> Arquivar
@@ -765,6 +1027,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
 
             <div className="mt-auto pt-4 border-t border-slate-200 dark:border-slate-700">
                 <button 
+                    type="button"
                     onClick={() => { handleSave(); onClose(); }}
                     className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-sm shadow-sm transition-colors flex items-center justify-center gap-2"
                 >

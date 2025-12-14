@@ -134,6 +134,7 @@ export const GanttView: React.FC<Props> = ({
                                         gut: { g: task.gravidade, u: task.urgencia, t: task.tendencia },
                                         tags: task.etiquetas || [],
                                         members: task.membros || [],
+                                        attachments: task.anexos || [],
                                         dbId: task.id
                                     }, nodeLabel: task.projetoData?.nome || 'Tarefa' })}>
                                         {task.titulo}
@@ -161,6 +162,7 @@ export const GanttView: React.FC<Props> = ({
                                                 gut: { g: task.gravidade, u: task.urgencia, t: task.tendencia },
                                                 tags: task.etiquetas || [],
                                                 members: task.membros || [],
+                                                attachments: task.anexos || [],
                                                 dbId: task.id
                                             }, nodeLabel: task.projetoData?.nome || 'Tarefa' })}
                                         >
@@ -204,7 +206,8 @@ export const GanttView: React.FC<Props> = ({
                                     datafim: updated.dueDate,
                                     datainicio: updated.startDate,
                                     etiquetas: updated.tags,
-                                    membros: updated.members
+                                    membros: updated.members,
+                                    anexos: updated.attachments
                                 });
                             }
                         }

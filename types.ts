@@ -167,6 +167,7 @@ export interface DbTask {
   // New Arrays
   membros: string[]; // UUID[]
   etiquetas: string[]; // text[]
+  anexos?: Attachment[]; // JSONB for attachments
 
   // GUT
   gravidade: number;

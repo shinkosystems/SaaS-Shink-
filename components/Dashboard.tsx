@@ -146,6 +146,7 @@ export const Dashboard: React.FC<Props> = ({
                         assigneeIsDev: selectedTask.assigneeIsDev,
                         tags: selectedTask.tags || [],
                         members: selectedTask.members || [],
+                        attachments: selectedTask.attachments || selectedTask.anexos || [],
                         dbId: selectedTask.id
                     }}
                     nodeTitle={selectedTask.projectTitle || 'Tarefa'}
@@ -163,7 +164,8 @@ export const Dashboard: React.FC<Props> = ({
                                 datainicio: updatedTask.startDate,
                                 datafim: updatedTask.dueDate,
                                 etiquetas: updatedTask.tags,
-                                membros: updatedTask.members
+                                membros: updatedTask.members,
+                                anexos: updatedTask.attachments
                             });
                         }
                         refreshTasks();

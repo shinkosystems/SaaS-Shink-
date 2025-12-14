@@ -1,31 +1,72 @@
 
 import { supabase } from './supabaseClient';
-import { DbProject, DbTask, AreaAtuacao, BpmnNode, Attachment } from '../types';
+import { DbProject, DbTask, AreaAtuacao, BpmnNode, Attachment, BpmnSubTask } from '../types';
 
 const TASKS_TABLE = 'tasks';
 const PROJECT_TABLE = 'projetos';
+
+// --- HELPERS PARA ANEXOS EM DESCRIÇÃO (WORKAROUND SEM ALTERAR SCHEMA) ---
+const ATTACHMENT_MARKER = "\n\n<!--_SHINKO_ATTACHMENTS_";
+const ATTACHMENT_END = "_-->";
+
+function packAttachments(desc: string, atts: Attachment[] | undefined): string {
+    if (!desc) desc = "";
+    // Remove existing marker first to avoid duplication
+    const cleanDesc = desc.split(ATTACHMENT_MARKER)[0];
+    
+    if (!atts || atts.length === 0) return cleanDesc;
+    
+    try {
+        const json = JSON.stringify(atts);
+        return `${cleanDesc}${ATTACHMENT_MARKER}${json}${ATTACHMENT_END}`;
+    } catch (e) {
+        console.error("Erro ao compactar anexos:", e);
+        return cleanDesc;
+    }
+}
+
+function unpackAttachments(rawDesc: string): { description: string, anexos: Attachment[] } {
+    if (!rawDesc) return { description: '', anexos: [] };
+    
+    const parts = rawDesc.split(ATTACHMENT_MARKER);
+    if (parts.length < 2) return { description: rawDesc, anexos: [] };
+    
+    try {
+        const jsonPart = parts[1].split(ATTACHMENT_END)[0];
+        const anexos = JSON.parse(jsonPart);
+        return { description: parts[0], anexos: Array.isArray(anexos) ? anexos : [] };
+    } catch (e) {
+        console.error("Erro ao descompactar anexos:", e);
+        return { description: parts[0], anexos: [] };
+    }
+}
 
 // --- PROJETOS ---
 
 export const fetchProjects = async (organizationId?: number): Promise<DbProject[]> => {
     if (!organizationId) return [];
 
-    let query = supabase
-        .from(PROJECT_TABLE)
-        .select(`
-            *,
-            clienteData:clientes(nome, logo_url)
-        `)
-        .eq('organizacao', organizationId)
-        .order('created_at', { ascending: false });
+    try {
+        let query = supabase
+            .from(PROJECT_TABLE)
+            .select(`
+                *,
+                clienteData:clientes(nome, logo_url)
+            `)
+            .eq('organizacao', organizationId)
+            .order('created_at', { ascending: false });
 
-    const { data, error } = await query;
+        const { data, error } = await query;
 
-    if (error) {
-        console.error('Erro ao buscar projetos:', error.message);
+        if (error) {
+            console.error('Erro ao buscar projetos:', error.message);
+            return [];
+        }
+        return data as any[];
+    } catch (error: any) {
+        console.error('Exceção ao buscar projetos:', error);
         return [];
     }
-    return data as any[];
 };
 
 export const fetchProjectsByClient = async (clientId: string): Promise<DbProject[]> => {
@@ -177,7 +218,7 @@ export const fetchAllTasks = async (organizationId?: number): Promise<DbTask[]> 
         // Collect from responsavel
         const userIds = [...new Set(tasks.map((t: any) => t.responsavel).filter(Boolean))];
         
-        // Collect from membros array to ensure avatars load for secondary members too
+        // Collect from membros array
         tasks.forEach((t: any) => {
             if (t.membros && Array.isArray(t.membros)) {
                 t.membros.forEach((mId: string) => userIds.push(mId));
@@ -200,10 +241,17 @@ export const fetchAllTasks = async (organizationId?: number): Promise<DbTask[]> 
             }
         }
 
-        const hydratedTasks: DbTask[] = tasks.map((t: any) => ({
-            ...t,
-            responsavelData: userMap.get(t.responsavel) || { nome: 'Desconhecido', desenvolvedor: false, organizacao: 0 }
-        }));
+        const hydratedTasks: DbTask[] = tasks.map((t: any) => {
+            // Unpack description and attachments
+            const { description, anexos } = unpackAttachments(t.descricao);
+            
+            return {
+                ...t,
+                descricao: description, // Clean description for UI
+                responsavelData: userMap.get(t.responsavel) || { nome: 'Desconhecido', desenvolvedor: false, organizacao: 0 },
+                anexos: anexos // Hydrated array
+            };
+        });
 
         return hydratedTasks;
 
@@ -228,25 +276,31 @@ export const fetchAssignableUsers = async (organizationId: number): Promise<{id:
 
 export const createTask = async (task: Partial<DbTask>): Promise<DbTask | null> => {
     try {
+        // Validation: If no responsavel is provided, try to fetch current user (fallback)
+        // But better to throw if not provided by caller.
         if (!task.responsavel) {
-            console.error("CREATE TASK FAILED: Missing responsavel (UUID)");
-            throw new Error("Responsável (UUID) é obrigatório para criar tarefa.");
+             const { data: user } = await supabase.auth.getUser();
+             if (user.user) task.responsavel = user.user.id;
+             else throw new Error("Responsável (UUID) é obrigatório para criar tarefa.");
         }
 
         if (!task.organizacao) {
-            console.error("CREATE TASK FAILED: Missing organizacao ID");
-            throw new Error("Erro de Segurança: ID da Organização não fornecido.");
+            // Fallback fetch org from responsavel
+            const { data: u } = await supabase.from('users').select('organizacao').eq('id', task.responsavel).single();
+            if (u) task.organizacao = u.organizacao;
+            else throw new Error("Erro de Segurança: ID da Organização não fornecido.");
         }
 
-        // Remover campos que não devem ir para o banco ou que podem estar undefined
-        const { projetoData, responsavelData, createdat, id, ...cleanTask } = task as any;
-
+        const { projetoData, responsavelData, createdat, id, anexos, ...cleanTask } = task as any;
         const prazo = cleanTask.datafim || new Date().toISOString();
+
+        // Pack attachments into description
+        const packedDescription = packAttachments(cleanTask.descricao || '', anexos || []);
 
         const payload = {
             projeto: cleanTask.projeto || null,
             titulo: cleanTask.titulo,
-            descricao: cleanTask.descricao || '',
+            descricao: packedDescription,
             status: cleanTask.status || 'todo',
             responsavel: cleanTask.responsavel,
             gravidade: cleanTask.gravidade || 1,
@@ -262,6 +316,7 @@ export const createTask = async (task: Partial<DbTask>): Promise<DbTask | null> 
             organizacao: cleanTask.organizacao,
             membros: cleanTask.membros || [],
             etiquetas: cleanTask.etiquetas || []
+            // NO 'anexos' COLUMN HERE
         };
 
         const { data, error } = await supabase
@@ -271,20 +326,29 @@ export const createTask = async (task: Partial<DbTask>): Promise<DbTask | null> 
             .single();
 
         if (error) throw error;
-        return data;
+        
+        // Return unwrapped
+        const { description, anexos: savedAnexos } = unpackAttachments(data.descricao);
+        return { ...data, descricao: description, anexos: savedAnexos };
+
     } catch (error: any) {
         console.error('Erro ao criar tarefa (tasks):', error.message || error);
-        throw error;
+        return null; // Return null gracefully on error so UI can handle it
     }
 };
 
 export const updateTask = async (id: number, updates: Partial<DbTask>): Promise<DbTask | null> => {
     // Explicitly clean payload
     const payload: any = {};
-    
+    let hasAttachmentsUpdate = false;
+    let newAttachments: Attachment[] = [];
+
     Object.entries(updates).forEach(([key, value]) => {
         // Filter out hydration and local-only fields
-        if (value !== undefined && key !== 'projetoData' && key !== 'responsavelData' && key !== 'createdat' && key !== 'id') {
+        if (key === 'anexos') {
+            hasAttachmentsUpdate = true;
+            newAttachments = value as Attachment[];
+        } else if (value !== undefined && key !== 'projetoData' && key !== 'responsavelData' && key !== 'createdat' && key !== 'id') {
             if (key === 'duracaohoras') {
                 payload[key] = Math.round(Number(value));
             } else {
@@ -297,6 +361,37 @@ export const updateTask = async (id: number, updates: Partial<DbTask>): Promise<
         delete payload.responsavel;
     }
 
+    // Handle Attachments packing
+    if (hasAttachmentsUpdate) {
+        let descriptionToPack = payload.descricao;
+        
+        // If description is not in updates, we must fetch it from DB to avoid losing it
+        if (descriptionToPack === undefined) {
+            const { data: currentTask } = await supabase.from(TASKS_TABLE).select('descricao').eq('id', id).single();
+            if (currentTask) {
+                // Unpack existing to get clean description, then repack with new attachments
+                const { description } = unpackAttachments(currentTask.descricao);
+                descriptionToPack = description;
+            } else {
+                descriptionToPack = "";
+            }
+        }
+        
+        // Pack
+        payload.descricao = packAttachments(descriptionToPack, newAttachments);
+    } 
+    // If we are updating description but NOT attachments, we must preserve existing attachments
+    else if (payload.descricao !== undefined) {
+         const { data: currentTask } = await supabase.from(TASKS_TABLE).select('descricao').eq('id', id).single();
+         if (currentTask) {
+             const { anexos } = unpackAttachments(currentTask.descricao);
+             payload.descricao = packAttachments(payload.descricao, anexos);
+         }
+    }
+
+    // REMOVE ANEXOS FROM PAYLOAD TO PREVENT DB ERROR
+    delete (payload as any).anexos;
+
     const { data, error } = await supabase
         .from(TASKS_TABLE)
         .update(payload)
@@ -308,7 +403,74 @@ export const updateTask = async (id: number, updates: Partial<DbTask>): Promise<
         console.error(`Erro ao atualizar tarefa (ID: ${id}):`, error.message);
         return null;
     }
-    return data;
+    
+    // Return unwrapped
+    const { description, anexos } = unpackAttachments(data.descricao);
+    return { ...data, descricao: description, anexos: anexos };
+};
+
+// --- SYNC CHECKLIST (SUBTASKS) ---
+export const syncTaskChecklist = async (parentId: number, subtasks: BpmnSubTask[], organizationId: number, projectId?: number): Promise<void> => {
+    try {
+        console.log(`Syncing checklist for Parent ${parentId}`, subtasks);
+
+        // 1. Fetch Existing Subtasks from DB
+        const { data: existing, error } = await supabase
+            .from(TASKS_TABLE)
+            .select('id')
+            .eq('tarefamae', parentId);
+
+        if (error) throw error;
+
+        const existingIds = new Set((existing as { id: number }[])?.map(t => t.id) || []);
+        const incomingIds = new Set(subtasks.filter(s => s.dbId).map(s => Number(s.dbId)));
+
+        // 2. Delete Orphans (In DB but not in new list)
+        const toDelete = [...existingIds].filter(id => !incomingIds.has(id));
+        if (toDelete.length > 0) {
+            await supabase.from(TASKS_TABLE).delete().in('id', toDelete);
+        }
+
+        // 3. Upsert (Update or Insert)
+        for (const sub of subtasks) {
+            // Default parent assignee if not set
+            let assignee = sub.assigneeId;
+            if (!assignee) {
+                // If no assignee on subtask, try to inherit from parent, but for now leave blank or default to current user if critically needed
+                // Ideally, UI provides assignee. If not, it might be unassigned.
+            }
+
+            if (sub.dbId) {
+                // Update
+                await updateTask(Number(sub.dbId), {
+                    titulo: sub.text,
+                    status: sub.completed ? 'done' : 'todo',
+                    responsavel: sub.assigneeId,
+                    datafim: sub.dueDate,
+                    datainicio: sub.startDate,
+                    duracaohoras: sub.estimatedHours
+                });
+            } else {
+                // Insert
+                await createTask({
+                    tarefamae: parentId,
+                    titulo: sub.text,
+                    descricao: 'Item de Checklist',
+                    status: sub.completed ? 'done' : 'todo',
+                    responsavel: sub.assigneeId, // Might be undefined, createTask handles it or throws
+                    datafim: sub.dueDate,
+                    datainicio: sub.startDate || new Date().toISOString(),
+                    duracaohoras: sub.estimatedHours || 1,
+                    sutarefa: true,
+                    projeto: projectId,
+                    organizacao: organizationId
+                });
+            }
+        }
+
+    } catch (e: any) {
+        console.error("Erro ao sincronizar checklist:", e.message);
+    }
 };
 
 export const deleteTask = async (id: number): Promise<boolean> => {
@@ -325,8 +487,11 @@ export const deleteTask = async (id: number): Promise<boolean> => {
     return true;
 };
 
-// ... existing sync functions kept as is ...
 export const syncBpmnTasks = async (projectId: number, organizationId: number, nodes: BpmnNode[]): Promise<BpmnNode[]> => {
+    // This function handles the main nodes sync, but for checklist inside nodes, it was only doing 1 level deep.
+    // If BpmnNode.checklist items are "Tasks", they are main tasks.
+    // Their `subtasks` property are the checklist items (level 2).
+    
     const updatedNodes = JSON.parse(JSON.stringify(nodes));
     
     for (const node of updatedNodes) {
@@ -342,6 +507,7 @@ export const syncBpmnTasks = async (projectId: number, organizationId: number, n
 
             let dbId = task.dbId;
 
+            // 1. Sync Parent Task
             if (dbId) {
                 await updateTask(dbId, {
                     titulo: task.text,
@@ -373,40 +539,9 @@ export const syncBpmnTasks = async (projectId: number, organizationId: number, n
                 }
             }
 
-            // Sync Subtasks
-            if (dbId && task.subtasks && task.subtasks.length > 0) {
-                for (let j = 0; j < task.subtasks.length; j++) {
-                    const sub = task.subtasks[j];
-                    let subDbId = sub.dbId;
-
-                    if (subDbId) {
-                        await updateTask(subDbId, {
-                            titulo: sub.text,
-                            status: sub.completed ? 'done' : 'todo',
-                            responsavel: sub.assigneeId || task.assigneeId,
-                            duracaohoras: sub.estimatedHours
-                        });
-                    } else {
-                        const createdSub = await createTask({
-                            projeto: projectId,
-                            titulo: sub.text,
-                            descricao: 'Subtarefa BPMN',
-                            status: sub.completed ? 'done' : 'todo',
-                            responsavel: sub.assigneeId || task.assigneeId,
-                            duracaohoras: sub.estimatedHours || 1,
-                            datainicio: sub.startDate || task.startDate,
-                            datafim: sub.dueDate || task.dueDate,
-                            organizacao: organizationId,
-                            sutarefa: true,
-                            tarefamae: dbId
-                        });
-
-                        if (createdSub) {
-                            sub.dbId = createdSub.id;
-                            sub.id = createdSub.id.toString();
-                        }
-                    }
-                }
+            // 2. Sync Subtasks (Checklist) using the new robust helper
+            if (dbId && task.subtasks) {
+                await syncTaskChecklist(dbId, task.subtasks, organizationId, projectId);
             }
         }
     }
