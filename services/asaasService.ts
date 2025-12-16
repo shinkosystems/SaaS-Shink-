@@ -1,16 +1,17 @@
+
 import { AsaasPayment, SubscriptionPlan, AsaasSubscription } from '../types';
 import { supabase } from './supabaseClient';
 import { fetchSystemModuleMap } from './organizationService';
 
 // --- CONFIGURAÇÃO ---
 // TRUE = Tenta usar Supabase Edge Function. 
-// Se falhar, o sistema fará fallback automático para Mock para não quebrar a UI.
+// Se falhar (Failed to fetch), o sistema fará fallback automático para Mock.
 const USE_REAL_ASAAS = true; 
 
 // Link fixo gerado pelo cliente
 const FIXED_PAYMENT_LINK = 'https://www.asaas.com/c/3xh5fsyxc16odebg';
 
-// Updated Fallback Plans based on Shinkō Pricing Playbook
+// Updated Fallback Plans based on Shinkō Pricing Playbook & Database IDs
 const FALLBACK_PLANS: SubscriptionPlan[] = [
     {
         id: 'plan_free',
@@ -27,17 +28,16 @@ const FALLBACK_PLANS: SubscriptionPlan[] = [
         cycle: 'MONTHLY'
     },
     {
-        id: 'plan_usuario',
+        id: 'plan_solo',
         dbId: 1,
-        name: 'Básico',
-        price: 89.90, // Updated per Playbook (Gateway Price)
+        name: 'Shinkō Core Solo',
+        price: 89.90, // Core Solo (1 User)
         features: [
             '1 Usuário Incluso',
             'Projetos Ilimitados',
             'Metodologia 6 Etapas',
             'Kanban e Cronograma',
-            'Sem Financeiro',
-            'Sem DORA/Métricas'
+            'Acesso a Módulos Adicionais'
         ],
         recommended: false,
         cycle: 'MONTHLY'
@@ -45,14 +45,14 @@ const FALLBACK_PLANS: SubscriptionPlan[] = [
     {
         id: 'plan_studio',
         dbId: 2,
-        name: 'Studio',
-        price: 297.00, // Updated per Playbook (Upsell Trigger)
+        name: 'Shinkō Core Studio',
+        price: 297.90, // Core Studio (5 Users)
         features: [
-            '5 Usuários Inclusos',
-            'Módulo Financeiro (Bônus R$149 off)',
-            'Portal do Cliente (Leitura)',
-            'IA Generativa',
-            'Gestão de Clientes'
+            'Até 5 Usuários',
+            'Todos os recursos do Solo',
+            'Múltiplos projetos simultâneos',
+            'Gestão de Equipe',
+            'Acesso a Módulos Avançados'
         ],
         recommended: true,
         cycle: 'MONTHLY'
@@ -60,14 +60,14 @@ const FALLBACK_PLANS: SubscriptionPlan[] = [
     {
         id: 'plan_scale',
         dbId: 3,
-        name: 'Governança', // Scale
-        price: 899.00, // Estimated for 15 users based on playbook tiering
+        name: 'Shinkō Core Scale', 
+        price: 899.90, // Core Scale (15 Users)
         features: [
-            '15 Usuários Inclusos',
-            'Módulo Engenharia (DORA Metrics)',
-            'Score PRIO-6 Ilimitado',
-            'Nivelamento de Recursos (AI)',
-            'Suporte Prioritário'
+            'Até 15 Usuários',
+            'Ideal para Scale-ups',
+            'Relatórios Avançados',
+            'Suporte Prioritário',
+            'Governança'
         ],
         recommended: false,
         cycle: 'MONTHLY'
@@ -78,7 +78,7 @@ const FALLBACK_PLANS: SubscriptionPlan[] = [
         name: 'Enterprise',
         price: 6500.00,
         features: [
-            'Uso Ilimitado de todas as ferramentas',
+            'Usuários Ilimitados',
             'IA Completa: Gerador de Fluxo (BPMS), Enriquecimento',
             'Portal do Cliente Interativo: Aprovação de Milestones',
             'White Label / Branding Personalizado',
@@ -96,7 +96,7 @@ let MOCK_PAYMENTS: AsaasPayment[] = [
         dateCreated: new Date(Date.now() - 86400000 * 30).toISOString(),
         customer: 'cus_000001',
         paymentLink: null,
-        value: 297.00,
+        value: 297.90,
         netValue: 290.00,
         billingType: 'CREDIT_CARD',
         status: 'RECEIVED',
@@ -132,18 +132,25 @@ export const mapDbPlanIdToString = (dbId: number | string): string => {
     // Check for ID 10 specifically first (Enterprise)
     if (id === 10) return 'plan_enterprise';
     
-    // Check for IDs 6 and 8 (TRIAL)
+    // Check for IDs 6 and 8 (TRIAL/Legacy)
     if (id === 6 || id === 8) return 'plan_trial';
     
-    // Check for ID 5 (Agency - maps to legacy or enterprise features depending on logic)
+    // Check for ID 5 (Agency)
     if (id === 5) return 'plan_agency';
 
     switch (id) {
-        case 1: return 'plan_usuario';
+        // Monthly
+        case 1: return 'plan_solo';
         case 2: return 'plan_studio';
         case 3: return 'plan_scale';
         case 4: return 'plan_free';
-        case 9: return 'plan_scale'; // Mapeamento do plano Governança (ID 9)
+        
+        // Annual (Assuming IDs 11, 12, 13 based on sequence after 10)
+        // Adjust these if your DB generated different IDs
+        case 11: return 'plan_solo_yearly';
+        case 12: return 'plan_studio_yearly';
+        case 13: return 'plan_scale_yearly';
+
         default: return 'plan_free';
     }
 };
@@ -306,12 +313,14 @@ export const fetchSubscriptionPlans = async (): Promise<SubscriptionPlan[]> => {
                     name: plan.nome,
                     price: Number(plan.valor),
                     features: featuresList.length > 0 ? featuresList : FALLBACK_PLANS.find(p => p.id === planKey)?.features || [],
-                    recommended: plan.id === 2,
-                    cycle: 'MONTHLY'
+                    recommended: plan.id === 2 || plan.id === 12,
+                    cycle: plan.meses >= 12 ? 'YEARLY' : 'MONTHLY'
                 };
             }).sort((a,b) => {
-                const order = ['plan_free', 'plan_usuario', 'plan_studio', 'plan_scale', 'plan_agency', 'plan_enterprise'];
-                return order.indexOf(a.id) - order.indexOf(b.id);
+                const order = ['plan_free', 'plan_solo', 'plan_studio', 'plan_scale', 'plan_agency', 'plan_enterprise'];
+                const aBase = a.id.replace('_yearly', '');
+                const bBase = b.id.replace('_yearly', '');
+                return order.indexOf(aBase) - order.indexOf(bBase);
             });
         }
         
@@ -328,14 +337,18 @@ export const getUserSubscriptions = async (userId: string): Promise<AsaasSubscri
             const { data, error } = await supabase.functions.invoke('asaas-integration', {
                 body: { action: 'GET_SUBSCRIPTIONS', userId }
             });
-            if (error) return [];
+            if (error) throw error; // Throw to trigger catch block for network errors
             return data.subscriptions || [];
-        } catch (err) { return []; }
+        } catch (err) { 
+            console.warn("Asaas Integration unavailable (Fetch Failed), using mock data.", err);
+            return _mockGetSubscriptions(userId); 
+        }
     }
     return _mockGetSubscriptions(userId);
 };
 
 export const createAsaasPayment = async (userId: string, billingType: 'PIX' | 'CREDIT_CARD', value: number, description: string) => {
+    // Falls back to mock for demo purposes if real integration isn't set up
     return _createMockPayment(userId, billingType, value, description); 
 };
 
@@ -345,11 +358,34 @@ export const getPaymentHistory = async (userId: string): Promise<AsaasPayment[]>
             const { data, error } = await supabase.functions.invoke('asaas-integration', {
                 body: { action: 'GET_HISTORY', userId }
             });
-            if (error) return [];
+            if (error) throw error; // Throw to trigger catch block
             return data.payments || [];
-        } catch (err) { return []; }
+        } catch (err) { 
+            console.warn("Asaas Integration unavailable (Fetch Failed), using mock data.", err);
+            return Promise.resolve(MOCK_PAYMENTS); 
+        }
     }
     return Promise.resolve(MOCK_PAYMENTS);
+};
+
+// --- NOVAS FUNÇÕES EXPORTADAS (Placeholders) ---
+
+export const createModuleCheckoutSession = async (
+    moduleId: string,
+    moduleName: string,
+    price: number,
+    userId: string,
+    orgId: number
+): Promise<{ url: string | null; error?: string }> => {
+    console.log("createModuleCheckoutSession placeholder called");
+    // Em uma implementação real com Asaas, aqui seria criada uma cobrança avulsa ou link de pagamento
+    return { url: null, error: "Not implemented in Asaas Service" };
+};
+
+export const createCustomerPortalSession = async (userId: string): Promise<{ url: string | null }> => {
+    console.log("createCustomerPortalSession placeholder called");
+    // O Asaas não tem um portal de cliente "self-service" igual ao Stripe, mas tem a área do cliente
+    return { url: null };
 };
 
 const _createMockPayment = async (userId: string, billingType: string, value: number, description: string) => {

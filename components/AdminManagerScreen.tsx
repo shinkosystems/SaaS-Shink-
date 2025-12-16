@@ -93,11 +93,19 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
         setCmsPosts(data);
     };
 
-    const handleApprove = async (transactionId: string | number, orgId: number) => {
+    const handleApprove = async (e: React.MouseEvent, transactionId: string | number, orgId: number) => {
+        e.preventDefault();
+        e.stopPropagation(); // Prevents click bubbling issues
+        
         console.log("Clique em Aprovar detectado:", transactionId, orgId);
 
         if (!orgId) {
             alert("Erro crítico: ID da Organização inválido/não encontrado na transação.");
+            return;
+        }
+
+        if (!transactionId) {
+            alert("Erro: ID da transação inválido.");
             return;
         }
 
@@ -608,8 +616,12 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                                     </div>
                                 </div>
                                 <div className="flex gap-3">
-                                    {trans.comprovante && <a href={trans.comprovante} target="_blank" className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-bold flex items-center justify-center gap-2">Ver Comprovante</a>}
-                                    <button onClick={() => handleApprove(String(trans.id), trans.organizationId)} disabled={approvingId === String(trans.id)} className="flex-1 py-3 bg-emerald-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 hover:bg-emerald-500">
+                                    {trans.comprovante && <a href={trans.comprovante} target="_blank" className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-bold flex items-center justify-center gap-2 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">Ver Comprovante</a>}
+                                    <button 
+                                        onClick={(e) => handleApprove(e, String(trans.id), trans.organizationId)} 
+                                        disabled={approvingId === String(trans.id)} 
+                                        className="flex-1 py-3 bg-emerald-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 hover:bg-emerald-500 disabled:opacity-50 transition-colors"
+                                    >
                                         {approvingId === String(trans.id) ? <Loader2 className="w-4 h-4 animate-spin"/> : <Check className="w-4 h-4"/>} Aprovar
                                     </button>
                                 </div>

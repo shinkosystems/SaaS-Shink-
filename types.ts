@@ -63,11 +63,17 @@ export const PLAN_LIMITS: Record<string, {
     } 
 }> = {
     'plan_free': { maxProjects: 1, maxUsers: 1, aiLimit: 0, features: { financial: false, clients: false, metrics: false, pdfUpload: false, gantt: false, kanban: true, whitelabel: false, aiAdvanced: false, crm: true } },
-    'plan_usuario': { maxProjects: 9999, maxUsers: 1, aiLimit: 50, features: { financial: false, clients: false, metrics: false, pdfUpload: false, gantt: true, kanban: true, whitelabel: false, aiAdvanced: false, crm: true } },
+    
+    // MONTHLY PLANS
+    'plan_solo': { maxProjects: 9999, maxUsers: 1, aiLimit: 50, features: { financial: false, clients: false, metrics: false, pdfUpload: false, gantt: true, kanban: true, whitelabel: false, aiAdvanced: false, crm: true } },
     'plan_studio': { maxProjects: 9999, maxUsers: 5, aiLimit: 500, features: { financial: true, clients: true, metrics: false, pdfUpload: true, gantt: true, kanban: true, whitelabel: false, aiAdvanced: true, crm: true } },
     'plan_scale': { maxProjects: 9999, maxUsers: 15, aiLimit: 9999, features: { financial: true, clients: true, metrics: true, pdfUpload: true, gantt: true, kanban: true, whitelabel: false, aiAdvanced: true, crm: true } },
-    'plan_agency': { maxProjects: 9999, maxUsers: 50, aiLimit: 9999, features: { financial: true, clients: true, metrics: true, pdfUpload: true, gantt: true, kanban: true, whitelabel: false, aiAdvanced: true, crm: true } },
-    'plan_trial': { maxProjects: 999999, maxUsers: 999999, aiLimit: 999999, features: { financial: true, clients: true, metrics: true, pdfUpload: true, gantt: true, kanban: true, whitelabel: true, aiAdvanced: true, crm: true } },
+    
+    // YEARLY PLANS (Mirror Monthly Features)
+    'plan_solo_yearly': { maxProjects: 9999, maxUsers: 1, aiLimit: 50, features: { financial: false, clients: false, metrics: false, pdfUpload: false, gantt: true, kanban: true, whitelabel: false, aiAdvanced: false, crm: true } },
+    'plan_studio_yearly': { maxProjects: 9999, maxUsers: 5, aiLimit: 500, features: { financial: true, clients: true, metrics: false, pdfUpload: true, gantt: true, kanban: true, whitelabel: false, aiAdvanced: true, crm: true } },
+    'plan_scale_yearly': { maxProjects: 9999, maxUsers: 15, aiLimit: 9999, features: { financial: true, clients: true, metrics: true, pdfUpload: true, gantt: true, kanban: true, whitelabel: false, aiAdvanced: true, crm: true } },
+
     'plan_enterprise': { maxProjects: 999999, maxUsers: 999999, aiLimit: 999999, features: { financial: true, clients: true, metrics: true, pdfUpload: true, gantt: true, kanban: true, whitelabel: true, aiAdvanced: true, crm: true } }
 };
 

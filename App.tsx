@@ -387,7 +387,10 @@ const App: React.FC = () => {
   if (!user && !loading) {
       if (showBlog) {
           return (
-              <BlogScreen onBack={() => setShowBlog(false)} />
+              <BlogScreen 
+                onBack={() => setShowBlog(false)} 
+                onEnter={() => setShowAuth(true)}
+              />
           );
       }
 
@@ -514,7 +517,6 @@ const App: React.FC = () => {
                                 />
                             </div>
                         )}
-                        {/* Other Views Render Logic (Identical to previous) */}
                         {view === 'list' && activeModules.includes('projects') && (
                             <div className="h-full p-4 md:p-8 overflow-y-auto custom-scrollbar">
                                 <ProjectList 
@@ -605,7 +607,7 @@ const App: React.FC = () => {
                             />
                         )}
                         {view === 'profile' && (
-                            <div className="h-full p-4 md:p-8 overflow-hidden">
+                            <div className="h-full p-4 md:p-8 overflow-y-auto custom-scrollbar">
                                 <ProfileScreen currentPlan={currentPlan} onRefresh={() => user && loadUserData(user.id)} />
                             </div>
                         )}

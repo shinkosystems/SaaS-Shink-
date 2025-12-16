@@ -2,15 +2,16 @@
 import React, { useState, useEffect } from 'react';
 import { CmsPost } from '../types';
 import { fetchCmsPosts, captureLead } from '../services/cmsService';
-import { ArrowLeft, Calendar, Tag, Download, CheckCircle, Loader2, Search, X, ChevronRight, FileText } from 'lucide-react';
+import { ArrowLeft, Calendar, Tag, Download, CheckCircle, Loader2, Search, X, ChevronRight, FileText, ArrowRight } from 'lucide-react';
 
 interface Props {
-    onBack?: () => void;
+    onBack: () => void;
+    onEnter?: () => void;
 }
 
 const LOGO_URL = "https://zjssfnbcboibqeoubeou.supabase.co/storage/v1/object/public/fotoperfil/fotoperfil/1%20(1).png";
 
-export const BlogScreen: React.FC<Props> = ({ onBack }) => {
+export const BlogScreen: React.FC<Props> = ({ onBack, onEnter }) => {
     const [posts, setPosts] = useState<CmsPost[]>([]);
     const [selectedPost, setSelectedPost] = useState<CmsPost | null>(null);
     const [loading, setLoading] = useState(true);
@@ -82,18 +83,21 @@ export const BlogScreen: React.FC<Props> = ({ onBack }) => {
                 </div>
                 
                 {/* Standard Header in Detail */}
-                <nav className="relative z-50 w-full px-6 py-6 sticky top-0 backdrop-blur-xl border-b border-white/5 bg-[#050505]/80">
-                    <div className="max-w-7xl mx-auto flex justify-between items-center">
+                <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md border-b border-white/5 bg-[#050505]/80">
+                    <div className="max-w-7xl mx-auto px-6 h-20 flex justify-between items-center">
                         <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setSelectedPost(null)}>
-                            <img src={LOGO_URL} alt="Shinkō OS" className="h-8 w-auto object-contain" />
+                            <img src={LOGO_URL} alt="Shinkō OS" className="h-8 w-auto object-contain relative z-10" />
                         </div>
-                        <button onClick={() => setSelectedPost(null)} className="group relative px-6 py-2.5 bg-white/10 text-white font-bold text-sm rounded-xl hover:bg-white/20 transition-all border border-white/10 flex items-center gap-2">
-                            <ArrowLeft className="w-4 h-4"/> Voltar
-                        </button>
+                        
+                        <div className="flex items-center gap-4">
+                            <button onClick={() => setSelectedPost(null)} className="group relative px-6 py-2.5 bg-white/10 text-white font-bold text-sm rounded-xl hover:bg-white/20 transition-all border border-white/10 flex items-center gap-2">
+                                <ArrowLeft className="w-4 h-4"/> Voltar
+                            </button>
+                        </div>
                     </div>
                 </nav>
 
-                <div className="relative z-10 max-w-4xl mx-auto px-6 py-12">
+                <div className="relative z-10 max-w-4xl mx-auto px-6 py-12 pt-32">
                     <div className="bg-[#0A0A0A] border border-white/10 rounded-3xl overflow-hidden shadow-2xl mb-20 relative">
                         {selectedPost.cover_image && (
                             <div className="relative h-64 md:h-96 w-full">
@@ -201,22 +205,29 @@ export const BlogScreen: React.FC<Props> = ({ onBack }) => {
             </div>
             
             {/* --- STANDARD HEADER (Consistent with Landing) --- */}
-            <nav className="relative z-50 w-full px-6 py-6 sticky top-0 backdrop-blur-xl border-b border-white/5 bg-[#050505]/80">
-                <div className="max-w-7xl mx-auto flex justify-between items-center">
+            <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md border-b border-white/5 bg-[#050505]/80">
+                <div className="max-w-7xl mx-auto px-6 h-20 flex justify-between items-center">
                     <div className="flex items-center gap-3 cursor-pointer group" onClick={onBack}>
-                        <img src={LOGO_URL} alt="Shinkō OS" className="h-8 w-auto object-contain" />
+                        <img src={LOGO_URL} alt="Shinkō OS" className="h-8 w-auto object-contain relative z-10" />
                     </div>
                     
-                    <div className="flex items-center gap-6">
-                        <button onClick={onBack} className="group relative px-6 py-2.5 bg-white/10 text-white font-bold text-sm rounded-xl hover:bg-white/20 transition-all border border-white/10 flex items-center gap-2">
-                            <ArrowLeft className="w-4 h-4"/> Voltar
-                        </button>
+                    <div className="flex items-center gap-4">
+                        <div className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-400 mr-4">
+                            <button onClick={onBack} className="hover:text-white transition-colors">Home</button>
+                            <button onClick={onBack} className="hover:text-white transition-colors">Cases</button>
+                            <button className="text-white font-bold cursor-default">Blog</button>
+                        </div>
+                        {onEnter && (
+                            <button onClick={onEnter} className="group relative px-6 py-2.5 bg-white text-black font-bold text-sm rounded-full hover:bg-slate-200 transition-all shadow-glow-white overflow-hidden">
+                                <span className="relative z-10 flex items-center gap-2">Entrar <ArrowRight className="w-4 h-4"/></span>
+                            </button>
+                        )}
                     </div>
                 </div>
             </nav>
 
             {/* Content */}
-            <div className="max-w-7xl mx-auto px-6 py-12 w-full relative z-10 flex-1">
+            <div className="max-w-7xl mx-auto px-6 py-12 pt-32 w-full relative z-10 flex-1">
                 
                 {/* Search & Tags */}
                 <div className="mb-12">

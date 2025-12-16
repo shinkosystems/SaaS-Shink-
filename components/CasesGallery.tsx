@@ -6,11 +6,13 @@ import { CmsCase } from '../types';
 
 interface Props {
   onClose: () => void;
+  onOpenBlog?: () => void;
+  onEnter?: () => void;
 }
 
 const LOGO_URL = "https://zjssfnbcboibqeoubeou.supabase.co/storage/v1/object/public/fotoperfil/fotoperfil/1%20(1).png";
 
-export const CasesGallery: React.FC<Props> = ({ onClose }) => {
+export const CasesGallery: React.FC<Props> = ({ onClose, onOpenBlog, onEnter }) => {
   const [cases, setCases] = useState<CmsCase[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -25,7 +27,7 @@ export const CasesGallery: React.FC<Props> = ({ onClose }) => {
   }, []);
 
   return (
-    <div className="fixed inset-0 z-[250] bg-[#050505] text-white overflow-y-auto animate-in fade-in duration-300">
+    <div className="fixed inset-0 z-[250] bg-[#050505] text-white overflow-y-auto animate-in fade-in duration-300 custom-scrollbar">
         
         {/* Background Effects (Shinkō Amber Identity) */}
         <div className="fixed inset-0 w-full h-full overflow-hidden pointer-events-none">
@@ -35,21 +37,28 @@ export const CasesGallery: React.FC<Props> = ({ onClose }) => {
         </div>
 
         {/* --- STANDARD HEADER (Consistent with Landing) --- */}
-        <nav className="relative z-50 w-full px-6 py-6 sticky top-0 backdrop-blur-xl border-b border-white/5 bg-[#050505]/80">
-            <div className="max-w-7xl mx-auto flex justify-between items-center">
+        <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md border-b border-white/5 bg-[#050505]/80">
+            <div className="max-w-7xl mx-auto px-6 h-20 flex justify-between items-center">
                 <div className="flex items-center gap-3 cursor-pointer group" onClick={onClose}>
-                    <img src={LOGO_URL} alt="Shinkō OS" className="h-8 w-auto object-contain" />
+                    <img src={LOGO_URL} alt="Shinkō OS" className="h-8 w-auto object-contain relative z-10" />
                 </div>
                 
-                <div className="flex items-center gap-6">
-                    <button onClick={onClose} className="group relative px-6 py-2.5 bg-white/10 text-white font-bold text-sm rounded-xl hover:bg-white/20 transition-all border border-white/10 flex items-center gap-2">
-                        <X className="w-4 h-4"/> Fechar
-                    </button>
+                <div className="flex items-center gap-4">
+                    <div className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-400 mr-4">
+                        <button onClick={onClose} className="hover:text-white transition-colors">Home</button>
+                        <button className="text-white font-bold cursor-default">Cases</button>
+                        {onOpenBlog && <button onClick={onOpenBlog} className="hover:text-white transition-colors">Blog</button>}
+                    </div>
+                    {onEnter && (
+                        <button onClick={onEnter} className="group relative px-6 py-2.5 bg-white text-black font-bold text-sm rounded-full hover:bg-slate-200 transition-all shadow-glow-white overflow-hidden">
+                            <span className="relative z-10 flex items-center gap-2">Entrar <ArrowRight className="w-4 h-4"/></span>
+                        </button>
+                    )}
                 </div>
             </div>
         </nav>
 
-        <div className="min-h-full p-6 md:p-12 relative z-10">
+        <div className="min-h-full p-6 md:p-12 relative z-10 pt-40">
             <div className="max-w-7xl mx-auto relative">
                 
                 <div className="mb-16 text-center">

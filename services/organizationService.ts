@@ -15,12 +15,20 @@ export const SYSTEM_MODULES_DEF = [
 const getPlanKeyFromId = (id: number): string => {
     switch (id) {
         case 4: return 'plan_free';
-        case 1: return 'plan_usuario';
+        case 1: return 'plan_solo';
         case 2: return 'plan_studio';
         case 3: return 'plan_scale';
-        case 9: return 'plan_scale'; // Mapeamento para Governança (ID 9)
-        case 5: return 'plan_agency';
+        
+        // Mapeamento para Governança (ID 9) e Agency (5)
+        case 9: return 'plan_scale'; 
+        case 5: return 'plan_agency'; 
         case 10: return 'plan_enterprise';
+
+        // ANNUAL PLANS (IDs 11, 12, 13)
+        case 11: return 'plan_solo_yearly';
+        case 12: return 'plan_studio_yearly';
+        case 13: return 'plan_scale_yearly';
+
         default: return 'plan_free';
     }
 };
@@ -58,7 +66,10 @@ export const fetchOrganizationDetails = async (orgId: number) => {
             .single();
 
         if (error) {
-            console.error(`Error fetching organization details for ID ${orgId}:`, error);
+            // Ignora erro PGRST116 (Row not found) para não poluir o console se for apenas um ID novo
+            if (error.code !== 'PGRST116') {
+                console.error(`Error fetching organization details for ID ${orgId}:`, JSON.stringify(error, null, 2));
+            }
             return null;
         }
         return data;
@@ -69,7 +80,6 @@ export const fetchOrganizationDetails = async (orgId: number) => {
 };
 
 // Updates all organization details in the database
-// REMOVED 'modulos' from this update to prevent "invalid input syntax for type bigint"
 export const updateOrgDetails = async (
     orgId: number, 
     { logoUrl, primaryColor, name, limit, aiSector, aiTone, aiContext }: 
@@ -155,18 +165,11 @@ export const fetchActiveOrgModules = async (orgId: number): Promise<string[]> =>
             .eq('organizacao', orgId);
 
         if (error) {
-            console.error("Error fetching active modules:", error);
-            // Return empty on error to avoid false positives. 
-            // If DB access fails, better to show nothing enabled than everything.
+            console.error("Error fetching active modules:", JSON.stringify(error));
             return []; 
         }
 
-        // Map data structure: [{ modulo: { nome: 'projects' } }, ...] -> ['projects', ...]
         const modules = data.map((item: any) => item.modulo?.nome).filter(Boolean);
-        
-        // STRICT BEHAVIOR: If no rows exist, return empty array.
-        // This ensures that switches are OFF if nothing is explicitly enabled in the DB.
-        
         return modules;
     } catch (e) {
         console.error("Exception active modules:", e);
@@ -178,17 +181,12 @@ export const fetchActiveOrgModules = async (orgId: number): Promise<string[]> =>
 export const updateOrgModules = async (orgId: number, moduleKeys: string[]) => {
     try {
         console.log(`Updating modules for Org ${orgId}. New active set:`, moduleKeys);
-
-        // ENSURE SEEDING HAPPENS BEFORE MAPPING
         await seedSystemModules();
 
-        // 1. Fetch Module IDs from 'modulos' table
         const { data: allModules } = await supabase.from('modulos').select('id, nome');
         if (!allModules) throw new Error("System modules not found.");
 
         const moduleMap = new Map(allModules.map(m => [m.nome, m.id]));
-
-        // 2. Map selected keys to IDs
         const idsToInsert = moduleKeys.map(k => moduleMap.get(k)).filter(Boolean) as number[];
 
         return updateOrgModulesByIds(orgId, idsToInsert);
@@ -224,6 +222,42 @@ export const updateOrgModulesByIds = async (orgId: number, moduleIds: number[]) 
     }
 };
 
+// Contract a specific module (Add to existing)
+export const contractModule = async (orgId: number, moduleKey: string) => {
+    try {
+        // 1. Get Module ID
+        const moduleMap = await fetchSystemModuleMap();
+        const moduleId = moduleMap[moduleKey];
+        
+        if (!moduleId) throw new Error("Módulo inválido.");
+
+        // 2. Check if already exists
+        const { data: existing } = await supabase
+            .from('organizacao_modulo')
+            .select('id')
+            .eq('organizacao', orgId)
+            .eq('modulo', moduleId)
+            .single();
+
+        if (existing) return { success: true, msg: "Já contratado" };
+
+        // 3. Insert new relation
+        const { error } = await supabase
+            .from('organizacao_modulo')
+            .insert({ organizacao: orgId, modulo: moduleId });
+
+        if (error) throw error;
+
+        // Optional: Create a financial transaction record for the purchase here
+        // await addTransaction({ ... }) 
+
+        return { success: true };
+    } catch (err: any) {
+        console.error("Erro ao contratar módulo:", err);
+        throw new Error(err.message);
+    }
+};
+
 // Fetches public organization details for White Label Login
 export const getPublicOrgDetails = async (orgId: number) => {
     try {
@@ -249,12 +283,11 @@ export const getPublicOrgDetails = async (orgId: number) => {
         return null;
 
     } catch (error) {
-        // console.error("Error fetching public org details:", error);
         return null;
     }
 };
 
-// --- ROLE MANAGEMENT (CARGOS - Table area_atuacao) ---
+// --- ROLE MANAGEMENT ---
 
 export const fetchRoles = async (organizationId: number) => {
     if (!organizationId) return [];
@@ -347,7 +380,6 @@ export const updateUserRole = async (userId: string, roleId: number | null) => {
 
 export const checkAndIncrementAiUsage = async (orgId: number): Promise<{ success: boolean; usage: number; limit: number }> => {
     try {
-        // 1. Get current usage and plan
         const { data: orgData, error } = await supabase
             .from(ORG_TABLE)
             .select('pedidoia, plano')
@@ -357,20 +389,12 @@ export const checkAndIncrementAiUsage = async (orgId: number): Promise<{ success
         if (error || !orgData) throw new Error("Erro ao verificar limite de IA.");
 
         const currentUsage = orgData.pedidoia || 0;
-        const planKey = getPlanKeyFromId(orgData.plano || 4); // Default to Free if null
+        const planKey = getPlanKeyFromId(orgData.plano || 4); 
         const limit = PLAN_LIMITS[planKey]?.aiLimit || 0;
 
-        // If limit is 0 (Free Plan), block immediately
-        if (limit === 0) {
-            return { success: false, usage: currentUsage, limit: 0 };
-        }
+        if (limit === 0) return { success: false, usage: currentUsage, limit: 0 };
+        if (limit < 9000 && currentUsage >= limit) return { success: false, usage: currentUsage, limit };
 
-        // If limit is practically infinite (9999), we skip check but still track
-        if (limit < 9000 && currentUsage >= limit) {
-            return { success: false, usage: currentUsage, limit };
-        }
-
-        // 2. Increment usage
         const { error: updateError } = await supabase
             .from(ORG_TABLE)
             .update({ pedidoia: currentUsage + 1 })
@@ -381,12 +405,10 @@ export const checkAndIncrementAiUsage = async (orgId: number): Promise<{ success
         return { success: true, usage: currentUsage + 1, limit };
     } catch (e: any) {
         console.error("Erro AI Usage:", e);
-        // Fail closed to prevent abuse if DB is down, but typically could fail open
         return { success: false, usage: 0, limit: 0 };
     }
 };
 
-// Helper for App.tsx fallback
 export const getPlanDefaultModules = (planId: number): string[] => {
     const planKey = getPlanKeyFromId(planId);
     const planConfig = PLAN_LIMITS[planKey];

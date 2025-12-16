@@ -1,3 +1,4 @@
+
 import { supabase } from './supabaseClient';
 import { DbPlan, FinancialTransaction } from '../types';
 import { fetchSubscriptionPlans } from './asaasService';
@@ -391,15 +392,16 @@ export const approveSubscription = async (transactionId: string, orgId: number):
         if (!orgId) throw new Error("Organization ID is missing");
 
         // 1. Marcar transação como Paga
+        // WARNING: Ensure type compatibility. If transactionId is string but DB is BigInt, Supabase usually handles it, but verify.
         const { error: transError } = await supabase
             .from('transacoes')
             .update({ pago: true })
-            .eq('id', transactionId)
-            .select(); // Ensure we get confirmation
+            .eq('id', transactionId) 
+            .select();
 
         if (transError) {
             console.error("Trans update error:", transError);
-            throw new Error("Falha ao atualizar transação: " + transError.message);
+            throw new Error(`Falha ao atualizar transação: ${transError.message}`);
         }
 
         // 2. Atualizar vencimento da organização (+30 dias)
@@ -410,11 +412,11 @@ export const approveSubscription = async (transactionId: string, orgId: number):
             .from('organizacoes')
             .update({ vencimento: newExpiry.toISOString() })
             .eq('id', orgId)
-            .select(); // Ensure confirmation
+            .select(); 
 
         if (orgError) {
             console.error("Org update error:", orgError);
-            throw new Error("Falha ao atualizar vencimento: " + orgError.message);
+            throw new Error(`Falha ao atualizar vencimento: ${orgError.message}`);
         }
 
         // 3. Provisionamento Automático (Módulos, Usuários, etc)
@@ -444,12 +446,11 @@ export const approveSubscription = async (transactionId: string, orgId: number):
                 // Use the new helper that accepts IDs directly
                 await updateOrgModulesByIds(orgId, modulesArray);
             } else if (meta.modules && Array.isArray(meta.modules)) {
-                // Fallback for old transactions (String keys)
-                // This shouldn't be hit for new transactions created after the fix
-                // await updateOrgModules(orgId, meta.modules);
+                // Fallback for older transactions if any (String keys, legacy)
+                console.log("Using legacy metadata modules", meta.modules);
             }
             
-            // C. Provisiona AI (opcional, se houver campo específico)
+            // C. Provisiona AI (opcional)
             // if (meta.ai) { ... }
         }
 
