@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Opportunity, BpmnNode, BpmnTask } from '../types';
 import { TaskDetailModal } from './TaskDetailModal';
@@ -70,7 +69,7 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
 
             // Save Subtasks (Checklist)
             if (updatedTask.subtasks && opportunity.organizationId) {
-                await syncTaskChecklist(dbId, updatedTask.subtasks, opportunity.organizationId, opportunity.dbProjectId);
+                await syncTaskChecklist(dbId, updatedTask.subtasks, opportunity.organizationId, opportunity.dbProjectId, updatedTask.assigneeId);
             }
         }
     };

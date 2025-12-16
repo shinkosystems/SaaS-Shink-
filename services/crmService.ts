@@ -34,29 +34,38 @@ const mapDbToOpp = (row: any): CrmOpportunity => ({
     activities: row.atividades || []
 });
 
-const mapOppToDb = (opp: CrmOpportunity) => ({
-    organizacao: opp.organizationId,
-    titulo: opp.title,
-    valor: opp.value,
-    probabilidade: opp.probability,
-    estagio: opp.stage,
-    data_fechamento_prevista: opp.expectedCloseDate,
-    responsavel: opp.owner === 'Eu' ? undefined : opp.owner,
-    
-    // Flattened Fields
-    contato_nome: opp.contact.name,
-    contato_email: opp.contact.email,
-    contato_cargo: opp.contact.role,
-    contato_telefone: opp.contact.phone,
-    origem: opp.contact.source,
-    
-    empresa_nome: opp.company.name,
-    empresa_cnpj: opp.company.cnpj,
-    empresa_setor: opp.company.sector,
-    empresa_endereco: opp.company.address,
-    
-    atividades: opp.activities
-});
+const mapOppToDb = (opp: CrmOpportunity) => {
+    // Helper to ensure we only send valid UUIDs to the 'responsavel' column
+    const isUuid = (str?: string) => str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
+    // If 'owner' is a name like "Sistema" or "Eu", we set it to NULL here.
+    // The save function will then attempt to fill it with currentUserId if available.
+    const safeOwner = (opp.owner && isUuid(opp.owner)) ? opp.owner : null;
+
+    return {
+        organizacao: opp.organizationId,
+        titulo: opp.title,
+        valor: opp.value,
+        probabilidade: opp.probability,
+        estagio: opp.stage,
+        data_fechamento_prevista: opp.expectedCloseDate,
+        responsavel: safeOwner,
+        
+        // Flattened Fields
+        contato_nome: opp.contact.name,
+        contato_email: opp.contact.email,
+        contato_cargo: opp.contact.role,
+        contato_telefone: opp.contact.phone,
+        origem: opp.contact.source,
+        
+        empresa_nome: opp.company.name,
+        empresa_cnpj: opp.company.cnpj,
+        empresa_setor: opp.company.sector,
+        empresa_endereco: opp.company.address,
+        
+        atividades: opp.activities
+    };
+};
 
 export const fetchCrmOpportunities = async (organizationId?: number): Promise<CrmOpportunity[]> => {
     if (!organizationId) return [];
@@ -118,8 +127,6 @@ export const finalizeDeal = async (payload: FinalizeDealPayload, organizationId:
         });
 
         // 3. Create Transaction (First Payment)
-        // If it's a contract, we assume the first payment happens now.
-        // The contract syncing logic handles future payments.
         await addTransaction({
             amount: payload.financialData.amount,
             description: payload.financialData.description,
@@ -138,7 +145,6 @@ export const finalizeDeal = async (payload: FinalizeDealPayload, organizationId:
 };
 
 export const updateCrmOpportunityStage = async (id: string, newStage: string): Promise<boolean> => {
-    // If it's a temp ID, we can't update in DB
     if (id === 'temp' || id.length < 10) return false;
 
     const { error } = await supabase
@@ -150,10 +156,6 @@ export const updateCrmOpportunityStage = async (id: string, newStage: string): P
         console.error('Erro ao atualizar estágio:', error.message);
         return false;
     }
-
-    // NOTE: Automatic trigger removed. 
-    // "Won" logic is now handled explicitly via finalizeDeal to allow user input.
-
     return true;
 };
 
@@ -163,19 +165,23 @@ export const saveCrmOpportunity = async (opp: CrmOpportunity): Promise<CrmOpport
         throw new Error("Organização não definida.");
     }
 
-    const payload = mapOppToDb(opp);
-    
-    // Get current user to set as owner if it's new
+    // AUTH CHECK: Ensure user is logged in before attempting RLS-protected insert
     const { data: userData } = await supabase.auth.getUser();
     const currentUserId = userData.user?.id;
 
-    if (currentUserId && (!payload.responsavel || payload.responsavel === 'Eu')) {
+    if (!currentUserId) {
+        throw new Error("Sessão expirada. Faça login novamente para salvar.");
+    }
+
+    const payload = mapOppToDb(opp);
+    
+    // Assign current user as owner if payload doesn't have a valid UUID owner
+    if (!payload.responsavel) {
         // @ts-ignore
         payload.responsavel = currentUserId; 
     }
 
     let query;
-    // Check if it's a new insertion (temp ID) or update
     if (opp.id === 'temp' || !opp.id) {
         // Insert
         query = supabase.from(TABLE).insert(payload).select().single();

@@ -33,6 +33,9 @@ export const CalendarView: React.FC<Props> = ({
         setLoading(true);
         if (organizationId) {
             const allTasks = await fetchAllTasks(organizationId);
+            
+            // Keep ALL tasks in state (including subtasks) so we can hydrate the modal correctly.
+            // Filtering for display happens in render.
             if (projectId) {
                 setTasks(allTasks.filter(t => t.projeto?.toString() === projectId));
             } else {
@@ -151,6 +154,8 @@ export const CalendarView: React.FC<Props> = ({
                                 const mDate = new Date(currentDate.getFullYear(), i, 1);
                                 const mName = mDate.toLocaleDateString('pt-BR', { month: 'long' });
                                 const mTasks = tasks.filter(t => {
+                                    // HIDE SUBTASKS
+                                    if (t.sutarefa) return false;
                                     const d = t.datafim ? new Date(t.datafim) : new Date(t.dataproposta);
                                     return d.getFullYear() === currentDate.getFullYear() && d.getMonth() === i;
                                 });
@@ -201,9 +206,10 @@ export const CalendarView: React.FC<Props> = ({
 
                         {/* Calendar Cells */}
                         {getDaysInView.map((date, i) => {
-                            if (!date) return <div key={`empty-${i}`} className="bg-slate-50 dark:bg-slate-950/50"></div>;
+                            if (!date) return <div key={`empty-${i}`} className="bg-slate-5 dark:bg-slate-950/50"></div>;
                             
-                            const dayTasks = getTasksForDate(date);
+                            // FILTER: Hide subtasks from calendar view
+                            const dayTasks = getTasksForDate(date).filter(t => !t.sutarefa);
                             const isToday = new Date().toDateString() === date.toDateString();
 
                             return (
@@ -218,23 +224,41 @@ export const CalendarView: React.FC<Props> = ({
                                         {dayTasks.map(task => (
                                             <div 
                                                 key={task.id} 
-                                                onClick={() => setEditingTaskCtx({ task: {
-                                                    id: task.id.toString(),
-                                                    text: task.titulo,
-                                                    description: task.descricao,
-                                                    status: task.status as any,
-                                                    startDate: task.datainicio,
-                                                    dueDate: task.datafim,
-                                                    assigneeId: task.responsavel,
-                                                    estimatedHours: task.duracaohoras,
-                                                    completed: task.status === 'done',
-                                                    gut: { g: task.gravidade, u: task.urgencia, t: task.tendencia },
-                                                    tags: task.etiquetas || [],
-                                                    members: task.membros || [],
-                                                    attachments: task.anexos || [],
-                                                    dbId: task.id,
-                                                    projectId: task.projeto || undefined // Added projectId for syncing subtasks
-                                                }, nodeLabel: task.projetoData?.nome || 'Tarefa' })}
+                                                onClick={() => {
+                                                    // HYDRATE SUBTASKS from the full 'tasks' state
+                                                    const subtasks = tasks
+                                                        .filter(t => (t.tarefamae === task.id || t.tarefa === task.id) && t.sutarefa)
+                                                        .map(t => ({
+                                                            id: t.id.toString(),
+                                                            text: t.titulo,
+                                                            completed: t.status === 'done',
+                                                            dbId: t.id,
+                                                            dueDate: t.datafim,
+                                                            startDate: t.datainicio,
+                                                            assignee: t.responsavelData?.nome,
+                                                            assigneeId: t.responsavel,
+                                                            estimatedHours: t.duracaohoras
+                                                        }));
+
+                                                    setEditingTaskCtx({ task: {
+                                                        id: task.id.toString(),
+                                                        text: task.titulo,
+                                                        description: task.descricao,
+                                                        status: task.status as any,
+                                                        startDate: task.datainicio,
+                                                        dueDate: task.datafim,
+                                                        assigneeId: task.responsavel,
+                                                        estimatedHours: task.duracaohoras,
+                                                        completed: task.status === 'done',
+                                                        gut: { g: task.gravidade, u: task.urgencia, t: task.tendencia },
+                                                        tags: task.etiquetas || [],
+                                                        members: task.membros || [],
+                                                        attachments: task.anexos || [],
+                                                        dbId: task.id,
+                                                        projectId: task.projeto || undefined,
+                                                        subtasks: subtasks // Pass Subtasks here
+                                                    }, nodeLabel: task.projetoData?.nome || 'Tarefa' });
+                                                }}
                                                 className={`rounded border cursor-pointer shadow-sm transition-transform hover:scale-[1.01] ${
                                                     viewMode === 'day' ? 'p-3 border-l-4' : 'text-[10px] p-1.5 border-l-2 truncate'
                                                 } ${
@@ -297,7 +321,7 @@ export const CalendarView: React.FC<Props> = ({
 
                                 // Sync Checklist (Subtasks)
                                 if (updated.subtasks && organizationId) {
-                                    await syncTaskChecklist(dbId, updated.subtasks, organizationId, updated.projectId);
+                                    await syncTaskChecklist(dbId, updated.subtasks, organizationId, updated.projectId, updated.assigneeId);
                                 }
                             }
                         }

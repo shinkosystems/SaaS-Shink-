@@ -19,16 +19,16 @@ interface Props {
   activeModules?: string[];
 }
 
-type Tab = 'overview' | 'kanban' | 'gantt' | 'calendar';
+type Tab = 'overview' | 'kanban' | 'calendar';
 
 export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdate, onEdit, onDelete, userRole, currentPlan, isSharedMode, activeModules }) => {
   const [activeTab, setActiveTab] = useState<Tab>('overview');
-  const canViewGantt = activeModules?.includes('gantt');
+  // const canViewGantt = activeModules?.includes('gantt'); // Removed Gantt explicit tab logic
 
   const tabs = [
       { id: 'overview', label: 'Visão Geral', icon: LayoutDashboard, moduleId: 'projects' },
-      { id: 'kanban', label: 'Kanban', icon: Trello, moduleId: 'kanban' },
-      { id: 'gantt', label: 'Gantt', icon: GanttChartSquare, locked: !canViewGantt, moduleId: 'gantt' },
+      { id: 'kanban', label: 'Tarefas', icon: Trello, moduleId: 'kanban' }, // Renamed
+      // { id: 'gantt', label: 'Gantt', icon: GanttChartSquare, locked: !canViewGantt, moduleId: 'gantt' }, // Removed
       { id: 'calendar', label: 'Agenda', icon: CalendarIcon, moduleId: 'calendar' },
   ].filter(tab => !activeModules || activeModules.includes(tab.moduleId) || tab.moduleId === 'projects'); 
 
@@ -51,11 +51,10 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
           {tabs.map(tab => (
               <button
                   key={tab.id}
-                  onClick={() => !tab.locked && setActiveTab(tab.id as Tab)}
+                  onClick={() => setActiveTab(tab.id as Tab)}
                   className={`h-12 flex items-center gap-2 text-sm font-medium border-b-2 transition-colors ${activeTab === tab.id ? 'border-slate-900 dark:border-white text-slate-900 dark:text-white' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
               >
                   <tab.icon className="w-4 h-4"/> {tab.label}
-                  {tab.locked && <Lock className="w-3 h-3 text-slate-400"/>}
               </button>
           ))}
       </div>
@@ -86,18 +85,7 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
                   />
               </div>
           )}
-          {activeTab === 'gantt' && canViewGantt && (
-              <div className="h-full p-6 overflow-y-auto custom-scrollbar">
-                  <GanttView 
-                      opportunities={[opportunity]} 
-                      onSelectOpportunity={() => {}} 
-                      onTaskUpdate={() => {}} 
-                      userRole={userRole}
-                      projectId={opportunity.dbProjectId?.toString() || opportunity.id}
-                      organizationId={opportunity.organizationId}
-                  />
-              </div>
-          )}
+          {/* Gantt removed from tabs, accessible via Kanban if needed */}
           {activeTab === 'calendar' && (
               <div className="h-full p-6 overflow-y-auto custom-scrollbar">
                   <CalendarView 

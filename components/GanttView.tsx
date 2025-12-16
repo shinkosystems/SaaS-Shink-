@@ -1,9 +1,9 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Opportunity, DbTask } from '../types';
-import { fetchAllTasks, updateTask, deleteTask } from '../services/projectService';
+import { fetchAllTasks, updateTask, deleteTask, fetchAssignableUsers } from '../services/projectService';
+import { optimizeSchedule } from '../services/geminiService';
 import { TaskDetailModal } from './TaskDetailModal';
-import { Calendar, ChevronLeft, ChevronRight, RefreshCw, ZoomIn, ZoomOut } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, RefreshCw, ZoomIn, ZoomOut, Zap, Loader2 } from 'lucide-react';
 
 interface Props {
   opportunities: Opportunity[];
@@ -21,6 +21,7 @@ export const GanttView: React.FC<Props> = ({
 }) => {
     const [tasks, setTasks] = useState<DbTask[]>([]);
     const [loading, setLoading] = useState(false);
+    const [isOptimizing, setIsOptimizing] = useState(false);
     const [viewDate, setViewDate] = useState(new Date());
     const [zoomLevel, setZoomLevel] = useState(1); // 1 = Day, 0.5 = Week
     const [editingTaskCtx, setEditingTaskCtx] = useState<any | null>(null);
@@ -40,6 +41,50 @@ export const GanttView: React.FC<Props> = ({
             }
         }
         setLoading(false);
+    };
+
+    const handleOptimize = async () => {
+        if (!organizationId) return;
+        setIsOptimizing(true);
+        try {
+            // 1. Fetch available developers
+            const devs = await fetchAssignableUsers(organizationId);
+            
+            // 2. Prepare tasks for optimization (Only pending ones)
+            const pendingTasks = tasks.filter(t => t.status !== 'done' && t.status !== 'approval');
+            
+            const tasksForAi = pendingTasks.map(t => ({
+                taskId: t.id,
+                taskText: t.titulo,
+                estimatedHours: t.duracaohoras,
+                assigneeId: t.responsavel,
+                gut: { g: t.gravidade, u: t.urgencia, t: t.tendencia }
+            }));
+
+            // 3. Call AI Service
+            const updates = await optimizeSchedule(tasksForAi, devs);
+
+            // 4. Apply Updates
+            if (updates && updates.length > 0) {
+                for (const update of updates) {
+                    await updateTask(update.id, {
+                        datainicio: update.startDate,
+                        datafim: update.dueDate,
+                        responsavel: update.assigneeId
+                    });
+                }
+                alert(`Otimização concluída! ${updates.length} tarefas reagendadas.`);
+                loadData();
+            } else {
+                alert("Nenhuma otimização necessária ou erro na IA.");
+            }
+
+        } catch (e: any) {
+            console.error("Erro na otimização:", e);
+            alert("Erro ao otimizar cronograma.");
+        } finally {
+            setIsOptimizing(false);
+        }
     };
 
     const daysInMonth = useMemo(() => {
@@ -98,6 +143,16 @@ export const GanttView: React.FC<Props> = ({
                     </div>
                     <button onClick={loadData} className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 rounded"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`}/></button>
                 </div>
+                
+                {/* Optimize Button */}
+                <button 
+                    onClick={handleOptimize} 
+                    disabled={isOptimizing}
+                    className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition-all shadow-md disabled:opacity-50"
+                >
+                    {isOptimizing ? <Loader2 className="w-4 h-4 animate-spin"/> : <Zap className="w-4 h-4"/>}
+                    {isOptimizing ? 'Balanceando...' : 'Nivelar Recursos (IA)'}
+                </button>
             </div>
 
             {/* Gantt Chart */}

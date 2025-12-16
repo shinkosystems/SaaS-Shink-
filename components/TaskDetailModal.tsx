@@ -43,6 +43,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
   const [orgMembers, setOrgMembers] = useState<any[]>([]);
   const [isEditingDesc, setIsEditingDesc] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   
   // Popover State
   const [activePopover, setActivePopover] = useState<string | null>(null);
@@ -72,7 +73,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
       JSON.stringify(task.members), 
       JSON.stringify(task.tags), 
       JSON.stringify(task.attachments),
-      JSON.stringify(task.subtasks) // CRITICAL FIX: Watch subtasks for changes (DB IDs arriving)
+      JSON.stringify(task.subtasks)
   ]);
 
   // Close popover on click outside
@@ -82,7 +83,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
       };
       
       if (activePopover) {
-          // Delay binding to avoid immediate close from the triggering click
           const timer = setTimeout(() => {
               document.addEventListener('click', handleClickOutside);
           }, 0);
@@ -99,7 +99,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
           try {
               let currentOrgId = organizationId;
 
-              // Fallback: If no organizationId prop, try to fetch from current user
               if (!currentOrgId) {
                   const { data: { user } } = await supabase.auth.getUser();
                   if (user) {
@@ -109,7 +108,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
               }
 
               if (currentOrgId) {
-                  // Ensure email is selected
                   let query = supabase.from('users')
                       .select('id, nome, perfil, avatar_url, email')
                       .eq('organizacao', currentOrgId) 
@@ -172,7 +170,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
       const currentMembers = formData.members ? [...formData.members] : [];
       let newMembers: string[];
       
-      // Toggle logic using strict ID comparison
       if (currentMembers.includes(memberId)) {
           newMembers = currentMembers.filter(id => id !== memberId);
       } else {
@@ -180,14 +177,14 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
       }
       
       const updatedData = { ...formData, members: newMembers };
-      setFormData(updatedData); // Update Local State immediately
-      onSave(updatedData); // Trigger Parent Update
+      setFormData(updatedData);
+      onSave(updatedData);
   };
 
-  const handleAddSubtask = (e?: React.KeyboardEvent) => {
-      if (e && e.key !== 'Enter') return;
+  const handleAddSubtask = (e?: React.KeyboardEvent | React.MouseEvent) => {
+      if (e && e.type === 'keydown' && (e as React.KeyboardEvent).key !== 'Enter') return;
       
-      e?.preventDefault(); // Crucial to prevent default form submission
+      e?.preventDefault(); 
       e?.stopPropagation();
 
       if (!newSubtask.trim()) return;
@@ -201,15 +198,42 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
       const updatedSubtasks = [...(formData.subtasks || []), newItem];
       const updatedData = { ...formData, subtasks: updatedSubtasks };
       
-      // Update State
       setFormData(updatedData);
       setNewSubtask('');
-      
-      // Save immediately
       handleSave(updatedData);
       
-      // Keep focus for rapid entry
       setTimeout(() => checklistInputRef.current?.focus(), 10);
+  };
+
+  // --- AI GENERATION ---
+  const handleGenerateSubtasks = async () => {
+      setIsGeneratingAI(true);
+      try {
+          const suggestions = await generateSubtasksForTask(
+              formData.text,
+              `Projeto: ${opportunityTitle || 'Geral'}. Descrição: ${formData.description}`,
+              orgType
+          );
+
+          if (suggestions && suggestions.length > 0) {
+              const newItems: BpmnSubTask[] = suggestions.map(s => ({
+                  id: crypto.randomUUID(),
+                  text: s.title,
+                  completed: false,
+                  estimatedHours: s.hours
+              }));
+
+              const updatedSubtasks = [...(formData.subtasks || []), ...newItems];
+              const updatedData = { ...formData, subtasks: updatedSubtasks };
+              setFormData(updatedData);
+              handleSave(updatedData);
+          }
+      } catch (error) {
+          console.error("Erro AI:", error);
+          alert("Erro ao gerar subtarefas com IA.");
+      } finally {
+          setIsGeneratingAI(false);
+      }
   };
 
   const handleAddLabel = () => {
@@ -299,11 +323,8 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
           
           const updatedAttachments = [...(formData.attachments || []), newAttachment];
           
-          // Update State
           const updatedData = { ...formData, attachments: updatedAttachments };
           setFormData(updatedData);
-          
-          // Trigger Save
           onSave(updatedData);
           
           if (onAttach) onAttach(newAttachment);
@@ -313,7 +334,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
           alert("Erro no upload: " + error.message);
       } finally {
           setIsUploading(false);
-          // Reset input
           if(attachmentInputRef.current) attachmentInputRef.current.value = '';
       }
   };
@@ -345,11 +365,9 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
       }
   };
 
-  // Helper for safe click handling
   const handleSidebarClick = (e: React.MouseEvent, popoverName: string) => {
       e.preventDefault();
-      e.stopPropagation(); // Critical to prevent bubbling
-      // If clicking same button, toggle off. If different, toggle on.
+      e.stopPropagation();
       setActivePopover(prev => prev === popoverName ? null : popoverName);
   };
 
@@ -357,7 +375,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-hidden" onClick={(e) => {
         if(e.target === e.currentTarget) onClose();
     }}>
-      {/* Hidden File Input for Global Use */}
       <input 
           type="file" 
           hidden 
@@ -371,12 +388,9 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
             <X className="w-5 h-5"/>
         </button>
 
-        {/* LEFT COLUMN - MAIN CONTENT */}
         <div className="flex-1 p-6 md:p-8 space-y-8 overflow-y-auto custom-scrollbar bg-white dark:bg-[#1a1a1a] md:rounded-l-xl relative z-10">
             
-            {/* Header Area */}
             <div className="space-y-4">
-                {/* Labels Display */}
                 {formData.tags && formData.tags.length > 0 && (
                     <div className="flex flex-wrap gap-2 pl-9">
                         {formData.tags.map((tag, idx) => (
@@ -410,13 +424,10 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                 </div>
             </div>
 
-            {/* Meta Data Row (Members, Status, Dates) */}
             <div className="pl-9 flex flex-wrap gap-6">
-                {/* Members */}
                 <div className="space-y-1.5 relative">
                     <h4 className="text-xs font-bold text-slate-500 uppercase">Membros</h4>
                     <div className="flex items-center gap-2 flex-wrap">
-                        {/* Main Assignee */}
                         {formData.assigneeId && (
                             <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 pr-3 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer transition-colors" title="Responsável Principal">
                                 <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold shadow-sm ring-2 ring-white dark:ring-[#1a1a1a]">
@@ -426,12 +437,10 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                             </div>
                         )}
                         
-                        {/* Other Members */}
                         {formData.members?.map(mid => {
-                            // Find member by ID only
                             const mem = orgMembers.find(m => m.id === mid);
                             if (!mem) return null;
-                            if (mem.id === formData.assigneeId) return null; // Skip duplicates of main assignee
+                            if (mem.id === formData.assigneeId) return null;
 
                             return (
                                 <div key={mid} className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 text-xs font-bold shadow-sm ring-2 ring-white dark:ring-[#1a1a1a]" title={mem.nome || 'Membro'}>
@@ -449,7 +458,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                         </button>
                     </div>
 
-                    {/* Members Popover Inline - Higher Z-Index */}
                     {activePopover === 'members-inline' && (
                         <div 
                             className="absolute top-10 left-0 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl z-[200] animate-in fade-in zoom-in-95"
@@ -461,7 +469,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                             <div className="max-h-48 overflow-y-auto p-1 custom-scrollbar">
                                 {orgMembers.length === 0 && <div className="p-3 text-xs text-slate-500 text-center">Nenhum membro encontrado.</div>}
                                 {orgMembers.map(m => {
-                                    // Check if user ID is in array
                                     const isSelected = (formData.members || []).includes(m.id) || formData.assigneeId === m.id;
                                     
                                     return (
@@ -493,7 +500,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                     )}
                 </div>
 
-                {/* Status / Labels */}
                 <div className="space-y-1.5">
                     <h4 className="text-xs font-bold text-slate-500 uppercase">Status</h4>
                     <div className="flex items-center gap-2">
@@ -515,7 +521,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                     </div>
                 </div>
 
-                {/* Dates */}
                 {(formData.dueDate || formData.startDate) && (
                     <div className="space-y-1.5">
                         <h4 className="text-xs font-bold text-slate-500 uppercase">Datas</h4>
@@ -531,7 +536,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                 )}
             </div>
 
-            {/* Description */}
             <div className="space-y-2">
                 <div className="flex items-center gap-3">
                     <AlignLeft className="w-6 h-6 text-slate-600 dark:text-slate-400" />
@@ -567,7 +571,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                 </div>
             </div>
 
-            {/* Attachments Section - NEW VISUALIZATION */}
             <div className="space-y-3">
                 <div className="flex items-center gap-3">
                     <Paperclip className="w-6 h-6 text-slate-600 dark:text-slate-400" />
@@ -596,25 +599,34 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                 </div>
             </div>
 
-            {/* Checklist */}
             <div className="space-y-3" id="checklist-section">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <CheckSquare className="w-6 h-6 text-slate-600 dark:text-slate-400" />
                         <h3 className="font-bold text-base text-slate-800 dark:text-white">Checklist</h3>
                     </div>
-                    {formData.subtasks && formData.subtasks.length > 0 && (
+                    {/* Botão de IA restaurado */}
+                    <div className="flex gap-2">
+                        {formData.subtasks && formData.subtasks.length > 0 && (
+                            <button 
+                                onClick={() => setFormData({...formData, subtasks: formData.subtasks?.filter(s => !s.completed)})}
+                                className="px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded text-xs font-medium transition-colors"
+                            >
+                                Ocultar concluídos
+                            </button>
+                        )}
                         <button 
-                            onClick={() => setFormData({...formData, subtasks: formData.subtasks?.filter(s => !s.completed)})}
-                            className="px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded text-xs font-medium transition-colors"
+                            onClick={handleGenerateSubtasks} 
+                            disabled={isGeneratingAI}
+                            className="px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/50 rounded-full text-xs font-bold flex items-center gap-2 transition-colors disabled:opacity-50"
                         >
-                            Ocultar concluídos
+                            {isGeneratingAI ? <Loader2 className="w-3 h-3 animate-spin"/> : <Sparkles className="w-3 h-3"/>}
+                            Gerar com IA
                         </button>
-                    )}
+                    </div>
                 </div>
                 
                 <div className="pl-9 space-y-3">
-                    {/* Progress Bar */}
                     {formData.subtasks && formData.subtasks.length > 0 && (
                         <div className="flex items-center gap-3 mb-4">
                             <span className="text-xs text-slate-500 font-bold w-8 text-right">
@@ -652,7 +664,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                                         </span>
 
                                         <div className="flex items-center gap-2">
-                                            {/* Subtask Date Picker - Ensure full visibility and pointer events */}
                                             <div className="relative group/date">
                                                 {sub.dueDate ? (
                                                     <div className="flex items-center gap-1 text-[10px] bg-slate-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-slate-600 dark:text-slate-300 cursor-pointer hover:bg-slate-200 dark:hover:bg-white/20 transition-colors">
@@ -672,7 +683,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                                                 />
                                             </div>
 
-                                            {/* Subtask Assignee */}
                                             <div className="relative">
                                                 <button
                                                     type="button"
@@ -691,7 +701,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                                                     )}
                                                 </button>
 
-                                                {/* Assignee Popover */}
                                                 {activePopover === `sub-assignee-${sub.id}` && (
                                                     <div className="absolute right-0 top-8 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-lg shadow-xl z-50 p-1 animate-in fade-in zoom-in-95 origin-top-right">
                                                         <div className="max-h-32 overflow-y-auto custom-scrollbar">
@@ -746,7 +755,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                             placeholder="Adicionar um item..."
                         />
                         <button 
-                            onClick={() => handleAddSubtask()}
+                            onClick={(e) => handleAddSubtask(e)}
                             className="px-3 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded text-slate-600 dark:text-slate-300 transition-colors"
                         >
                             <Plus className="w-4 h-4"/>
@@ -755,7 +764,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                 </div>
             </div>
 
-            {/* Activity / Comments */}
             <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-800">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -768,7 +776,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                 </div>
 
                 <div className="pl-9 space-y-4">
-                    {/* Input */}
                     <div className="flex gap-3">
                         <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-xs shrink-0">
                             EU
@@ -796,7 +803,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                         </div>
                     </div>
 
-                    {/* List */}
                     <div className="space-y-4">
                         {comments.map(c => (
                             <div key={c.id} className="flex gap-3 animate-in fade-in slide-in-from-bottom-2">
@@ -820,13 +826,11 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
 
         </div>
 
-        {/* RIGHT COLUMN - SIDEBAR ACTIONS */}
         <div className="w-full md:w-48 bg-slate-100 dark:bg-[#121212] p-4 pt-12 space-y-6 md:border-l border-slate-200 dark:border-slate-800 flex flex-col shrink-0 md:rounded-r-xl relative z-20 overflow-visible">
             
             <div className="space-y-2 relative">
                 <h5 className="text-xs font-bold text-slate-500 uppercase mb-2">Adicionar ao cartão</h5>
                 
-                {/* Add Member Button */}
                 <div className="relative">
                     <button 
                         type="button"
@@ -847,7 +851,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                             <div className="max-h-48 overflow-y-auto p-1 custom-scrollbar">
                                 {orgMembers.length === 0 && <div className="p-3 text-xs text-slate-500 text-center">Nenhum membro disponível.</div>}
                                 {orgMembers.map(m => {
-                                    // Same Logic for Sidebar - STRICT ID
                                     const isSelected = (formData.members || []).includes(m.id) || formData.assigneeId === m.id;
                                     
                                     return (
@@ -876,7 +879,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                     )}
                 </div>
 
-                {/* Add Labels Button - With CRUD */}
                 <div className="relative">
                     <button 
                         type="button"
@@ -944,7 +946,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                     <CheckSquare className="w-4 h-4"/> Checklist
                 </button>
                 
-                {/* Dates Button */}
                 <div className="relative">
                     <button 
                         type="button"

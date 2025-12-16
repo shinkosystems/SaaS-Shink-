@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, useMemo } from 'react';
 import { supabase } from './services/supabaseClient';
 import { Opportunity, BpmnTask } from './types';
 import { fetchOpportunities, createOpportunity, updateOpportunity, deleteOpportunity, fetchOpportunityById } from './services/opportunityService';
@@ -10,7 +10,6 @@ import { trackUserAccess } from './services/analyticsService';
 import { getCurrentUserPlan, mapDbPlanIdToString } from './services/asaasService';
 
 // Components
-import { ErrorBoundary } from './components/ErrorBoundary';
 import { Sidebar, MobileDrawer } from './components/Navigation';
 import { Dashboard } from './components/Dashboard';
 import { ProjectList } from './components/ProjectList';
@@ -22,6 +21,7 @@ import { ClientsScreen } from './components/ClientsScreen';
 import { SettingsScreen } from './components/SettingsScreen';
 import { ProfileScreen } from './components/ProfileScreen';
 import { LandingPage } from './components/LandingPage';
+import { BlogScreen } from './components/BlogScreen'; // Added
 import AuthScreen from './components/AuthScreen';
 import OpportunityWizard from './components/OpportunityWizard';
 import { QuickTaskModal } from './components/QuickTaskModal';
@@ -36,7 +36,6 @@ import { GuruFab } from './components/GuruFab';
 import { FeedbackModal } from './components/FeedbackModal';
 import { CrmBoard } from './components/CrmBoard';
 import { fetchActiveOrgModules, getPlanDefaultModules } from './services/organizationService';
-import { Loader2 } from 'lucide-react';
 
 const App: React.FC = () => {
   // State
@@ -63,10 +62,16 @@ const App: React.FC = () => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
+  // NEW: State to hold the opportunity being edited
+  const [editingOpportunity, setEditingOpportunity] = useState<Opportunity | null>(null);
+
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   
+  // Public Routes
+  const [showBlog, setShowBlog] = useState(false); // Added for Blog routing
+
   // New State for Feedback Modal
   const [showFeedback, setShowFeedback] = useState(false);
 
@@ -96,11 +101,17 @@ const App: React.FC = () => {
   });
   const [dbStatus, setDbStatus] = useState<'connected'|'disconnected'>('connected');
 
-  // Check URL for White Label or Password Reset
+  // Check URL for White Label, Password Reset or Blog
   useEffect(() => {
       const hash = window.location.hash;
+      const path = window.location.pathname;
+
       if (hash && hash.includes('type=recovery')) {
           setShowResetPassword(true);
+      }
+      
+      if (path === '/blog') {
+          setShowBlog(true);
       }
 
       const params = new URLSearchParams(window.location.search);
@@ -229,6 +240,8 @@ const App: React.FC = () => {
               aiSector: data.setor || '',
               aiTone: data.tomdevoz || '',
               aiContext: data.dna || '',
+              // For initial load, we don't rely on isWhitelabelActive from plan anymore in UI logic,
+              // but we keep the state for URL params override.
               isWhitelabelActive: false 
           });
 
@@ -329,7 +342,7 @@ const App: React.FC = () => {
       else if (actionId === 'nav_calendar') setView('calendar');
       else if (actionId === 'nav_financial') setView('financial');
       else if (actionId === 'nav_matrix') setView('dashboard');
-      else if (actionId === 'create_project') setShowCreate(true);
+      else if (actionId === 'create_project') { setEditingOpportunity(null); setShowCreate(true); }
       else if (actionId === 'create_task') setShowCreateTask(true);
       else {
           console.warn("Action ID not handled:", actionId);
@@ -337,6 +350,7 @@ const App: React.FC = () => {
   };
 
   // --- WHITELABEL LOGIC ---
+  // Checks if 'whitelabel' (ID 20) is in active modules or URL param override
   const shouldUseWhitelabel = activeModules.includes('whitelabel') || activeModules.includes('whitelable') || orgDetails.isWhitelabelActive;
   
   const appBrandName = shouldUseWhitelabel && orgDetails.name ? orgDetails.name : 'Shinkō OS';
@@ -359,23 +373,29 @@ const App: React.FC = () => {
       }
   }, [appPrimaryColor]);
 
-  // --- LOADING STATE ---
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-[#09090b] text-white">
-        <div className="flex flex-col items-center gap-4">
-            <div className="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
-            <div className="text-sm font-mono text-slate-400">Iniciando Sistema...</div>
-        </div>
-      </div>
-    );
-  }
+  // --- SEARCH FILTER ---
+  const filteredOpportunities = useMemo(() => {
+      if (!searchTerm) return opportunities;
+      const lower = searchTerm.toLowerCase();
+      return opportunities.filter(o => 
+          o.title.toLowerCase().includes(lower) || 
+          o.description?.toLowerCase().includes(lower)
+      );
+  }, [opportunities, searchTerm]);
 
-  if (!user) {
+  // PUBLIC ACCESS ROUTES
+  if (!user && !loading) {
+      if (showBlog) {
+          return (
+              <BlogScreen onBack={() => setShowBlog(false)} />
+          );
+      }
+
       return (
           <>
             <LandingPage 
-                onEnter={() => setShowAuth(true)} 
+                onEnter={() => setShowAuth(true)}
+                onOpenBlog={() => setShowBlog(true)} // Pass this prop
                 customName={shouldUseWhitelabel ? orgDetails.name : undefined}
                 customLogo={shouldUseWhitelabel ? orgDetails.logoUrl : undefined}
                 customColor={shouldUseWhitelabel ? orgDetails.primaryColor : undefined}
@@ -399,7 +419,7 @@ const App: React.FC = () => {
       );
   }
 
-  // --- LOGGED IN APP ---
+  // LOGGED IN USER
   return (
     <div className={`flex h-screen w-full bg-slate-100 dark:bg-black text-slate-900 dark:text-slate-100 transition-colors duration-300 ${theme}`}>
         
@@ -408,7 +428,7 @@ const App: React.FC = () => {
                 <Sidebar 
                     currentView={view} 
                     onChangeView={setView} 
-                    onOpenCreate={() => setShowCreate(true)}
+                    onOpenCreate={() => { setEditingOpportunity(null); setShowCreate(true); }}
                     onOpenCreateTask={() => setShowCreateTask(true)}
                     onToggleTheme={toggleTheme}
                     onLogout={handleLogout}
@@ -432,7 +452,7 @@ const App: React.FC = () => {
             <MobileDrawer 
                 currentView={view} 
                 onChangeView={setView} 
-                onOpenCreate={() => setShowCreate(true)}
+                onOpenCreate={() => { setEditingOpportunity(null); setShowCreate(true); }}
                 onOpenCreateTask={() => setShowCreateTask(true)}
                 onToggleTheme={toggleTheme}
                 onLogout={handleLogout}
@@ -453,7 +473,6 @@ const App: React.FC = () => {
 
         <main className={`flex-1 overflow-hidden relative ${!isSharedMode ? 'pt-16 xl:pt-0' : ''}`}>
             <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500"></div></div>}>
-                <ErrorBoundary>
                 {selectedProject ? (
                     <ProjectWorkspace 
                         opportunity={selectedProject} 
@@ -465,7 +484,7 @@ const App: React.FC = () => {
                             setSelectedProject(null);
                         }}
                         onUpdate={(opp) => updateOpportunity(opp).then(() => loadOpportunities(userOrgId!))}
-                        onEdit={(opp) => { setShowCreate(true); }}
+                        onEdit={(opp) => { setEditingOpportunity(opp); setShowCreate(true); }}
                         onDelete={(id) => deleteOpportunity(id).then(() => { setSelectedProject(null); loadOpportunities(userOrgId!); })}
                         userRole={userRole}
                         currentPlan={currentPlan}
@@ -477,7 +496,7 @@ const App: React.FC = () => {
                         {view === 'dashboard' && (
                             <div className="h-full p-4 md:p-8 overflow-y-auto custom-scrollbar">
                                 <Dashboard 
-                                    opportunities={opportunities} 
+                                    opportunities={filteredOpportunities} 
                                     onNavigate={(status) => {
                                         if (status === 'Active' || status === 'Negotiation' || status === 'Future') {
                                             setView('kanban'); 
@@ -495,15 +514,16 @@ const App: React.FC = () => {
                                 />
                             </div>
                         )}
+                        {/* Other Views Render Logic (Identical to previous) */}
                         {view === 'list' && activeModules.includes('projects') && (
                             <div className="h-full p-4 md:p-8 overflow-y-auto custom-scrollbar">
                                 <ProjectList 
-                                    opportunities={opportunities} 
+                                    opportunities={filteredOpportunities} 
                                     onOpenProject={setSelectedProject}
                                     userRole={userRole}
                                     organizationId={userOrgId || undefined}
                                     activeModules={activeModules}
-                                    onOpenCreate={() => setShowCreate(true)}
+                                    onOpenCreate={() => { setEditingOpportunity(null); setShowCreate(true); }}
                                 />
                             </div>
                         )}
@@ -522,7 +542,7 @@ const App: React.FC = () => {
                         {view === 'gantt' && activeModules.includes('gantt') && (
                             <div className="h-full p-4 md:p-8 overflow-hidden">
                                 <GanttView 
-                                    opportunities={opportunities} 
+                                    opportunities={filteredOpportunities} 
                                     onSelectOpportunity={setSelectedProject} 
                                     onTaskUpdate={() => {}} 
                                     userRole={userRole}
@@ -534,7 +554,7 @@ const App: React.FC = () => {
                         {view === 'calendar' && activeModules.includes('calendar') && (
                             <div className="h-full p-4 md:p-8 overflow-hidden">
                                 <CalendarView 
-                                    opportunities={opportunities} 
+                                    opportunities={filteredOpportunities} 
                                     onSelectOpportunity={setSelectedProject} 
                                     onTaskUpdate={() => {}} 
                                     userRole={userRole}
@@ -596,18 +616,23 @@ const App: React.FC = () => {
                         )}
                     </>
                 )}
-                </ErrorBoundary>
             </Suspense>
         </main>
 
         {showCreate && (
             <OpportunityWizard 
+                initialData={editingOpportunity || undefined}
                 onSave={async (opp) => {
-                    await createOpportunity({ ...opp, organizationId: userOrgId });
+                    if (editingOpportunity) {
+                        await updateOpportunity(opp);
+                    } else {
+                        await createOpportunity({ ...opp, organizationId: userOrgId });
+                    }
                     if(userOrgId) loadOpportunities(userOrgId);
                     setShowCreate(false);
+                    setEditingOpportunity(null);
                 }}
-                onCancel={() => setShowCreate(false)}
+                onCancel={() => { setShowCreate(false); setEditingOpportunity(null); }}
                 orgType={orgDetails.name}
                 activeModules={activeModules}
             />

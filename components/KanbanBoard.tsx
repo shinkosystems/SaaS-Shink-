@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Opportunity, TaskStatus, DbTask } from '../types';
 import { Trello, Filter, User, Hash, Clock, Briefcase, RefreshCw, Calendar as CalendarIcon, GitMerge, GanttChartSquare, Lock, MoreHorizontal } from 'lucide-react';
@@ -408,7 +407,7 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
 
                         // Sync Checklist (Subtasks)
                         if (updatedTask.subtasks && organizationId) {
-                            await syncTaskChecklist(dbId, updatedTask.subtasks, organizationId, editingTaskCtx.projeto || undefined);
+                            await syncTaskChecklist(dbId, updatedTask.subtasks, organizationId, editingTaskCtx.projeto || undefined, updatedTask.assigneeId);
                         }
 
                         loadData(true); // Silent reload

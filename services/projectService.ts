@@ -1,4 +1,3 @@
-
 import { supabase } from './supabaseClient';
 import { DbProject, DbTask, AreaAtuacao, BpmnNode, Attachment, BpmnSubTask } from '../types';
 
@@ -410,7 +409,13 @@ export const updateTask = async (id: number, updates: Partial<DbTask>): Promise<
 };
 
 // --- SYNC CHECKLIST (SUBTASKS) ---
-export const syncTaskChecklist = async (parentId: number, subtasks: BpmnSubTask[], organizationId: number, projectId?: number): Promise<void> => {
+export const syncTaskChecklist = async (
+    parentId: number, 
+    subtasks: BpmnSubTask[], 
+    organizationId: number, 
+    projectId?: number, 
+    defaultAssigneeId?: string
+): Promise<void> => {
     try {
         console.log(`Syncing checklist for Parent ${parentId}`, subtasks);
 
@@ -433,19 +438,13 @@ export const syncTaskChecklist = async (parentId: number, subtasks: BpmnSubTask[
 
         // 3. Upsert (Update or Insert)
         for (const sub of subtasks) {
-            // Default parent assignee if not set
-            let assignee = sub.assigneeId;
-            if (!assignee) {
-                // If no assignee on subtask, try to inherit from parent, but for now leave blank or default to current user if critically needed
-                // Ideally, UI provides assignee. If not, it might be unassigned.
-            }
-
+            
             if (sub.dbId) {
                 // Update
                 await updateTask(Number(sub.dbId), {
                     titulo: sub.text,
                     status: sub.completed ? 'done' : 'todo',
-                    responsavel: sub.assigneeId,
+                    responsavel: sub.assigneeId, // Only update if explicitly set
                     datafim: sub.dueDate,
                     datainicio: sub.startDate,
                     duracaohoras: sub.estimatedHours
@@ -457,7 +456,7 @@ export const syncTaskChecklist = async (parentId: number, subtasks: BpmnSubTask[
                     titulo: sub.text,
                     descricao: 'Item de Checklist',
                     status: sub.completed ? 'done' : 'todo',
-                    responsavel: sub.assigneeId, // Might be undefined, createTask handles it or throws
+                    responsavel: sub.assigneeId || defaultAssigneeId, // Use fallback if not set
                     datafim: sub.dueDate,
                     datainicio: sub.startDate || new Date().toISOString(),
                     duracaohoras: sub.estimatedHours || 1,
@@ -541,7 +540,7 @@ export const syncBpmnTasks = async (projectId: number, organizationId: number, n
 
             // 2. Sync Subtasks (Checklist) using the new robust helper
             if (dbId && task.subtasks) {
-                await syncTaskChecklist(dbId, task.subtasks, organizationId, projectId);
+                await syncTaskChecklist(dbId, task.subtasks, organizationId, projectId, task.assigneeId);
             }
         }
     }

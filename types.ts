@@ -20,6 +20,31 @@ export enum IntensityLevel {
   L4 = 4
 }
 
+// --- CMS TYPES ---
+export interface CmsCase {
+    id: string;
+    title: string;
+    category: string;
+    description: string;
+    metric: string;
+    image_url: string;
+    link_url?: string;
+    created_at?: string;
+}
+
+export interface CmsPost {
+    id: string;
+    title: string;
+    slug?: string;
+    cover_image: string;
+    content: string; // HTML
+    tags: string[];
+    download_url?: string;
+    download_title?: string;
+    published: boolean;
+    created_at: string;
+}
+
 // --- PLAN CONFIGURATION ---
 export const PLAN_LIMITS: Record<string, { 
     maxProjects: number; 
