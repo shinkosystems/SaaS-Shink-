@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { BpmnTask, BpmnSubTask, TaskStatus, Attachment } from '../types';
 import { X, User, Calendar as CalendarIcon, CheckSquare, Square, Plus, Trash2, AlignLeft, Clock, PlayCircle, CheckCircle, BarChart3, Timer, Sparkles, Loader2, ArrowLeft, Layers, Hash, Eye, ShieldCheck, CornerDownRight, ChevronDown, Check, Paperclip, UploadCloud, File as FileIcon, ExternalLink, ArrowUpRight, Save, CreditCard, Tag, Activity, Info, Send, Image as ImageIcon } from 'lucide-react';
@@ -47,8 +48,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
   
   // Popover State
   const [activePopover, setActivePopover] = useState<string | null>(null);
-  const [editingSubtask, setEditingSubtask] = useState<string | null>(null); // Subtask ID being edited for date/assignee
-
+  
   // Label State
   const [newLabelText, setNewLabelText] = useState('');
 
