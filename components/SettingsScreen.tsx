@@ -1,5 +1,6 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { Settings, Sun, Moon, Palette, Building2, UploadCloud, Save, Monitor, Users, Briefcase, Plus, Trash2, Check, User, BrainCircuit, Sparkles, BookOpen, Fingerprint, Loader2, AlertTriangle, Lock, Copy, CheckCircle, LayoutGrid, DollarSign, Code2, BarChart3, Calendar, TrendingUp, ShieldCheck, ShoppingCart, CreditCard, ExternalLink, Receipt, X, Image as ImageIcon, FileText } from 'lucide-react';
+import { Settings, Sun, Moon, Palette, Building2, UploadCloud, Save, Monitor, Users, Briefcase, Plus, Trash2, Check, User, BrainCircuit, Sparkles, BookOpen, Fingerprint, Loader2, AlertTriangle, Lock, Copy, CheckCircle, LayoutGrid, DollarSign, Code2, BarChart3, Calendar, TrendingUp, ShieldCheck, ShoppingCart, CreditCard, ExternalLink, Receipt, X, Image as ImageIcon, FileText, ArrowRight } from 'lucide-react';
 import { fetchRoles, createRole, deleteRole, fetchOrganizationMembersWithRoles, updateUserRole, updateOrgModules } from '../services/organizationService';
 import { createModuleCheckoutSession, createCustomerPortalSession, uploadReceiptAndNotify } from '../services/asaasService';
 
@@ -54,7 +55,11 @@ export const SettingsScreen: React.FC<Props> = ({
   const [newRoleName, setNewRoleName] = useState('');
   const [loadingTeam, setLoadingTeam] = useState(false);
   const [localModules, setLocalModules] = useState<string[]>(activeModules || []);
+  
+  // Modal States
   const [moduleToBuy, setModuleToBuy] = useState<any | null>(null);
+  const [showSubModal, setShowSubModal] = useState(false);
+  
   const [isProcessingPurchase, setIsProcessingPurchase] = useState(false);
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
@@ -111,13 +116,8 @@ export const SettingsScreen: React.FC<Props> = ({
       finally { setIsProcessingPurchase(false); }
   };
 
-  const handleOpenBillingPortal = async () => {
-      setIsOpeningPortal(true);
-      try {
-          const { url } = await createCustomerPortalSession(userData.id);
-          if (url) window.open(url, '_blank');
-      } catch (e) { alert("Erro ao abrir portal de faturamento."); } 
-      finally { setIsOpeningPortal(false); }
+  const handleManageSubscription = () => {
+      setShowSubModal(true);
   };
 
   const handleModuleClick = (mod: any) => {
@@ -159,6 +159,18 @@ export const SettingsScreen: React.FC<Props> = ({
       finally { setIsSavingAi(false); }
   };
 
+  const formatPlanName = (planKey?: string) => {
+      if (!planKey) return 'Gratuito';
+      let name = planKey.replace('plan_', '');
+      if (name === 'free') return 'Gratuito';
+      if (name === 'solo') return 'Core Solo';
+      if (name === 'studio') return 'Core Studio';
+      if (name === 'scale') return 'Core Scale';
+      if (name === 'enterprise') return 'Enterprise';
+      if (name.includes('yearly')) name = name.replace('_yearly', ' (Anual)');
+      return name.charAt(0).toUpperCase() + name.slice(1);
+  };
+
   const visibleTabs = [
       { id: 'general', label: 'Geral', icon: Monitor },
       { id: 'modules', label: 'Marketplace', icon: ShoppingCart },
@@ -174,8 +186,11 @@ export const SettingsScreen: React.FC<Props> = ({
                 <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Gerencie sua organização e preferências.</p>
             </div>
             {isAdmin && (
-                <button onClick={handleOpenBillingPortal} disabled={isOpeningPortal} className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 text-slate-700 dark:text-white rounded-lg text-xs font-bold transition-all">
-                    {isOpeningPortal ? <Loader2 className="w-3 h-3 animate-spin"/> : <Receipt className="w-3 h-3"/>}
+                <button 
+                    onClick={handleManageSubscription} 
+                    className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 text-slate-700 dark:text-white rounded-lg text-xs font-bold transition-all"
+                >
+                    <Receipt className="w-3 h-3"/>
                     Gerenciar Assinatura
                 </button>
             )}
@@ -351,7 +366,62 @@ export const SettingsScreen: React.FC<Props> = ({
             )}
         </div>
 
-        {/* Modal de Pagamento */}
+        {/* Modal: SUBSCRIPTION MANAGER */}
+        {showSubModal && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
+                <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl p-0 shadow-2xl relative border border-white/10 animate-in zoom-in-95 overflow-hidden">
+                    <div className="p-6 bg-gradient-to-br from-indigo-900 to-slate-900 border-b border-white/10 text-white relative">
+                        <button onClick={() => setShowSubModal(false)} className="absolute top-4 right-4 text-white/50 hover:text-white"><X className="w-5 h-5"/></button>
+                        <h2 className="text-xl font-bold flex items-center gap-2 mb-1">
+                            <CreditCard className="w-5 h-5 text-emerald-400"/> Assinatura
+                        </h2>
+                        <p className="text-indigo-200 text-xs">Detalhes do seu plano atual.</p>
+                    </div>
+                    
+                    <div className="p-6 space-y-6">
+                        <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10">
+                            <div>
+                                <span className="text-[10px] text-slate-500 uppercase font-bold block mb-1">Plano Atual</span>
+                                <span className="text-lg font-bold text-slate-900 dark:text-white">{formatPlanName(currentPlan)}</span>
+                            </div>
+                            <span className="px-3 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold rounded-full border border-emerald-200 dark:border-emerald-800">
+                                Ativo
+                            </span>
+                        </div>
+
+                        <div className="space-y-3">
+                            <div className="flex justify-between items-center text-sm border-b border-slate-100 dark:border-white/5 pb-3">
+                                <span className="text-slate-500">Próxima Cobrança</span>
+                                <span className="font-mono text-slate-700 dark:text-slate-300">
+                                    {new Date(new Date().setDate(new Date().getDate() + 15)).toLocaleDateString()}
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center text-sm">
+                                <span className="text-slate-500">Módulos Extras</span>
+                                <span className="font-mono text-slate-700 dark:text-slate-300">{localModules.length - 2} ativos</span>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 pt-2">
+                            <button 
+                                onClick={() => { setShowSubModal(false); setView('financial'); }} 
+                                className="py-3 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-2"
+                            >
+                                <Receipt className="w-3 h-3"/> Histórico
+                            </button>
+                            <button 
+                                onClick={() => { setShowSubModal(false); setActiveTab('modules'); }} 
+                                className="py-3 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl text-xs font-bold transition-colors shadow-lg flex items-center justify-center gap-2"
+                            >
+                                <ArrowRight className="w-3 h-3"/> Alterar Plano
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* Modal: BUY MODULE (Existing) */}
         {moduleToBuy && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
                 <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-3xl p-8 shadow-2xl relative border border-white/10 animate-in zoom-in-95">

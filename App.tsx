@@ -21,7 +21,7 @@ import { ClientsScreen } from './components/ClientsScreen';
 import { SettingsScreen } from './components/SettingsScreen';
 import { ProfileScreen } from './components/ProfileScreen';
 import { LandingPage } from './components/LandingPage';
-import { BlogScreen } from './components/BlogScreen'; // Added
+import { BlogScreen } from './components/BlogScreen';
 import AuthScreen from './components/AuthScreen';
 import OpportunityWizard from './components/OpportunityWizard';
 import { QuickTaskModal } from './components/QuickTaskModal';
@@ -36,6 +36,28 @@ import { GuruFab } from './components/GuruFab';
 import { FeedbackModal } from './components/FeedbackModal';
 import { CrmBoard } from './components/CrmBoard';
 import { fetchActiveOrgModules, getPlanDefaultModules } from './services/organizationService';
+
+// --- ROUTING CONFIGURATION ---
+const ROUTES: Record<string, string> = {
+    'dashboard': '/',
+    'list': '/projects',
+    'kanban': '/kanban',
+    'gantt': '/gantt',
+    'calendar': '/calendar',
+    'crm': '/crm',
+    'financial': '/finance',
+    'clients': '/clients',
+    'product': '/metrics/product',
+    'dev-metrics': '/metrics/engineering',
+    'settings': '/settings',
+    'profile': '/profile',
+    'admin-manager': '/admin'
+};
+
+const REVERSE_ROUTES: Record<string, string> = Object.entries(ROUTES).reduce((acc, [key, value]) => {
+    acc[value] = key;
+    return acc;
+}, {} as Record<string, string>);
 
 const App: React.FC = () => {
   // State
@@ -52,7 +74,8 @@ const App: React.FC = () => {
   // Search State
   const [searchTerm, setSearchTerm] = useState('');
 
-  const [view, setView] = useState<string>('dashboard');
+  // View State (Routing)
+  const [view, setViewState] = useState<string>('dashboard');
   
   // New state to control which tab Settings opens on
   const [settingsStartTab, setSettingsStartTab] = useState<'general' | 'team' | 'ai' | 'modules'>('general');
@@ -74,12 +97,12 @@ const App: React.FC = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
   
   // Public Routes
-  const [showBlog, setShowBlog] = useState(false); // Added for Blog routing
+  const [showBlog, setShowBlog] = useState(false);
 
   // New State for Feedback Modal
   const [showFeedback, setShowFeedback] = useState(false);
 
-  const [selectedProject, setSelectedProject] = useState<Opportunity | null>(null);
+  const [selectedProject, setSelectedProjectState] = useState<Opportunity | null>(null);
   const [isSharedMode, setIsSharedMode] = useState(false); // Controls focused view
   const [theme, setTheme] = useState<'light'|'dark'>('dark');
 
@@ -105,19 +128,97 @@ const App: React.FC = () => {
   });
   const [dbStatus, setDbStatus] = useState<'connected'|'disconnected'>('connected');
 
-  // Check URL for White Label, Password Reset or Blog
+  // --- ROUTING LOGIC ---
+
+  // Helper to change URL without reloading
+  const navigateTo = (path: string) => {
+      window.history.pushState({}, '', path);
+  };
+
+  // 1. Handle Navigation (Change View)
+  const setView = (newView: string) => {
+      setViewState(newView);
+      setSelectedProjectState(null); // Close project if navigating away
+      const path = ROUTES[newView] || '/';
+      navigateTo(path);
+  };
+
+  // 2. Handle Project Opening (Deep Link)
+  const onOpenProject = (opp: Opportunity) => {
+      setSelectedProjectState(opp);
+      navigateTo(`/project/${opp.id}`);
+  };
+
+  // 3. Handle Back from Project
+  const closeProject = () => {
+      setSelectedProjectState(null);
+      // Return to the URL of the current view
+      const path = ROUTES[view] || '/';
+      navigateTo(path);
+  };
+
+  // 4. Initial Load & PopState (Browser Back/Forward)
+  useEffect(() => {
+      const handleRouting = async () => {
+          const path = window.location.pathname;
+          
+          // Blog Route
+          if (path === '/blog') {
+              setShowBlog(true);
+              return;
+          }
+
+          // Project Route
+          if (path.startsWith('/project/')) {
+              const projectId = path.split('/')[2];
+              if (projectId) {
+                  const opp = await fetchOpportunityById(projectId);
+                  if (opp) {
+                      setSelectedProjectState(opp);
+                      // Don't change 'view' state, keep it underneath
+                  } else {
+                      // Project not found, redirect to dashboard
+                      setView('dashboard');
+                  }
+              }
+              return;
+          }
+
+          // View Route
+          const mappedView = REVERSE_ROUTES[path];
+          if (mappedView) {
+              setViewState(mappedView);
+              setSelectedProjectState(null);
+          } else {
+              // Default/Unknown -> Dashboard
+              if (path !== '/' && !path.includes('type=recovery')) {
+                  // If unknown path, redirect to root
+                  navigateTo('/'); 
+              }
+              setViewState('dashboard');
+          }
+      };
+
+      // Handle initial load
+      handleRouting();
+
+      // Handle Browser Back/Forward
+      const onPopState = () => {
+          handleRouting();
+      };
+      window.addEventListener('popstate', onPopState);
+
+      return () => window.removeEventListener('popstate', onPopState);
+  }, []); // Run once on mount
+
+  // Check URL for White Label, Password Reset or Blog (Legacy Checks + New Routing)
   useEffect(() => {
       const hash = window.location.hash;
-      const path = window.location.pathname;
-
+      
       if (hash && hash.includes('type=recovery')) {
           setShowResetPassword(true);
       }
       
-      if (path === '/blog') {
-          setShowBlog(true);
-      }
-
       const params = new URLSearchParams(window.location.search);
       const orgIdParam = params.get('org');
       
@@ -164,29 +265,6 @@ const App: React.FC = () => {
 
     return () => subscription.unsubscribe();
   }, []);
-
-  // DEEP LINKING HANDLER (Run when user is authenticated)
-  useEffect(() => {
-      const handleDeepLink = async () => {
-          if (!user) return;
-          const params = new URLSearchParams(window.location.search);
-          const projectId = params.get('project');
-          
-          if (projectId) {
-              console.log("Deep Link detectado para o projeto:", projectId);
-              setIsSharedMode(true);
-              
-              const opp = await fetchOpportunityById(projectId);
-              if (opp) {
-                  setSelectedProject(opp);
-              } else {
-                  console.warn("Projeto não encontrado ou usuário sem permissão.");
-                  setIsSharedMode(false); 
-              }
-          }
-      };
-      handleDeepLink();
-  }, [user]);
 
   // Determine Plan & Org
   const loadUserData = async (userId: string) => {
@@ -392,7 +470,10 @@ const App: React.FC = () => {
       if (showBlog) {
           return (
               <BlogScreen 
-                onBack={() => setShowBlog(false)} 
+                onBack={() => {
+                    setShowBlog(false);
+                    navigateTo('/');
+                }} 
                 onEnter={() => setShowAuth(true)}
               />
           );
@@ -402,7 +483,10 @@ const App: React.FC = () => {
           <>
             <LandingPage 
                 onEnter={() => setShowAuth(true)}
-                onOpenBlog={() => setShowBlog(true)} // Pass this prop
+                onOpenBlog={() => {
+                    setShowBlog(true);
+                    navigateTo('/blog');
+                }}
                 customName={shouldUseWhitelabel ? orgDetails.name : undefined}
                 customLogo={shouldUseWhitelabel ? orgDetails.logoUrl : undefined}
                 customColor={shouldUseWhitelabel ? orgDetails.primaryColor : undefined}
@@ -483,16 +567,10 @@ const App: React.FC = () => {
                 {selectedProject ? (
                     <ProjectWorkspace 
                         opportunity={selectedProject} 
-                        onBack={() => {
-                            if (isSharedMode) {
-                                window.history.replaceState(null, '', '/');
-                                setIsSharedMode(false);
-                            }
-                            setSelectedProject(null);
-                        }}
+                        onBack={closeProject}
                         onUpdate={(opp) => updateOpportunity(opp).then(() => loadOpportunities(userOrgId!))}
                         onEdit={(opp) => { setEditingOpportunity(opp); setShowCreate(true); }}
-                        onDelete={(id) => deleteOpportunity(id).then(() => { setSelectedProject(null); loadOpportunities(userOrgId!); })}
+                        onDelete={(id) => deleteOpportunity(id).then(() => { closeProject(); loadOpportunities(userOrgId!); })}
                         userRole={userRole}
                         currentPlan={currentPlan}
                         isSharedMode={isSharedMode}
@@ -509,7 +587,7 @@ const App: React.FC = () => {
                                             setView('kanban'); 
                                         }
                                     }}
-                                    onOpenProject={setSelectedProject}
+                                    onOpenProject={onOpenProject}
                                     user={{ user_metadata: { full_name: userData?.name } }} 
                                     theme={theme}
                                     userRole={userRole}
@@ -528,7 +606,7 @@ const App: React.FC = () => {
                             <div className="h-full p-4 md:p-8 overflow-y-auto custom-scrollbar">
                                 <ProjectList 
                                     opportunities={filteredOpportunities} 
-                                    onOpenProject={setSelectedProject}
+                                    onOpenProject={onOpenProject}
                                     userRole={userRole}
                                     organizationId={userOrgId || undefined}
                                     activeModules={activeModules}
@@ -539,7 +617,7 @@ const App: React.FC = () => {
                         {view === 'kanban' && activeModules.includes('kanban') && (
                             <div className="h-full p-4 md:p-8 overflow-hidden">
                                 <KanbanBoard 
-                                    onSelectOpportunity={setSelectedProject} 
+                                    onSelectOpportunity={onOpenProject} 
                                     userRole={userRole}
                                     organizationId={userOrgId || undefined}
                                     currentPlan={currentPlan}
@@ -552,7 +630,7 @@ const App: React.FC = () => {
                             <div className="h-full p-4 md:p-8 overflow-hidden">
                                 <GanttView 
                                     opportunities={filteredOpportunities} 
-                                    onSelectOpportunity={setSelectedProject} 
+                                    onSelectOpportunity={onOpenProject} 
                                     onTaskUpdate={() => {}} 
                                     userRole={userRole}
                                     organizationId={userOrgId || undefined}
@@ -564,7 +642,7 @@ const App: React.FC = () => {
                             <div className="h-full p-4 md:p-8 overflow-hidden">
                                 <CalendarView 
                                     opportunities={filteredOpportunities} 
-                                    onSelectOpportunity={setSelectedProject} 
+                                    onSelectOpportunity={onOpenProject} 
                                     onTaskUpdate={() => {}} 
                                     userRole={userRole}
                                     organizationId={userOrgId || undefined}
@@ -584,7 +662,7 @@ const App: React.FC = () => {
                         )}
                         {view === 'clients' && activeModules.includes('clients') && (
                             <div className="h-full p-4 md:p-8 overflow-hidden">
-                                <ClientsScreen userRole={userRole} onlineUsers={onlineUsers} organizationId={userOrgId || undefined}/>
+                                <ClientsScreen userRole={userRole} onlineUsers={onlineUsers} organizationId={userOrgId || undefined} onOpenProject={onOpenProject} />
                             </div>
                         )}
                         {view === 'product' && activeModules.includes('product') && (
