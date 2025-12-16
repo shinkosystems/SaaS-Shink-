@@ -95,7 +95,7 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
 
     const handleApprove = async (e: React.MouseEvent, transactionId: string | number, orgId: number) => {
         e.preventDefault();
-        e.stopPropagation(); // Prevents click bubbling issues
+        e.stopPropagation(); 
         
         console.log("Clique em Aprovar detectado:", transactionId, orgId);
 
@@ -119,7 +119,6 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
             const res = await approveSubscription(safeId, orgId);
             
             if (res.success) {
-                // UI Feedback: Remove immediately
                 setApprovals(prev => prev.filter(t => String(t.id) !== safeId));
                 alert("✅ Pagamento aprovado e plano liberado com sucesso!");
             } else {
@@ -336,7 +335,7 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                 </div>
             </div>
 
-            {/* DASHBOARD TAB (Unchanged) */}
+            {/* DASHBOARD TAB */}
             {activeTab === 'dashboard' && metrics && (
                 <div className="animate-in fade-in slide-in-from-left-4">
                     {/* Control Bar */}
@@ -559,12 +558,9 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                 </div>
             )}
 
-            {/* Approvals and Clients tabs remain unchanged from original logic (just rendered if active) */}
-            {/* ... Existing Approvals & Clients render code ... */}
+            {/* Clients List */}
             {activeTab === 'clients' && filteredUsers.length >= 0 && (
                 <div className="animate-in fade-in slide-in-from-right-4">
-                    {/* User Table Code Here (Simplified for brevity as it was provided before) */}
-                    {/* Reusing existing User Table logic */}
                     <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden">
                          <table className="w-full text-left text-sm">
                             <thead className="bg-slate-50 dark:bg-slate-950 text-slate-500 sticky top-0 z-10 border-b border-slate-200 dark:border-slate-800">
@@ -597,6 +593,7 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                 </div>
             )}
             
+            {/* Approvals */}
             {activeTab === 'approvals' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-right-4">
                     {approvals.map((trans) => (
