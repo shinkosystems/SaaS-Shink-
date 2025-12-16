@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Settings, Sun, Moon, Palette, Building2, UploadCloud, Save, Monitor, Users, Briefcase, Plus, Trash2, Check, User, BrainCircuit, Sparkles, BookOpen, Fingerprint, Loader2, AlertTriangle, Lock, Copy, CheckCircle, LayoutGrid, DollarSign, Code2, BarChart3, Calendar, TrendingUp, ShieldCheck, ShoppingCart, CreditCard, ExternalLink, Receipt, X, Image as ImageIcon, FileText } from 'lucide-react';
 import { fetchRoles, createRole, deleteRole, fetchOrganizationMembersWithRoles, updateUserRole, updateOrgModules } from '../services/organizationService';
 import { createModuleCheckoutSession, createCustomerPortalSession, uploadReceiptAndNotify } from '../services/asaasService';
-import { ElasticSwitch } from './ElasticSwitch';
 
 interface Props {
   theme: 'dark' | 'light';
@@ -70,7 +69,7 @@ export const SettingsScreen: React.FC<Props> = ({
 
   useEffect(() => { setLocalModules(activeModules); }, [activeModules]);
   useEffect(() => { if (initialTab) setActiveTab(initialTab); }, [initialTab]);
-  useEffect(() => { if (activeTab === 'team' && userOrgId && isAdmin) loadTeamData(); }, [activeTab, userOrgId]);
+  useEffect(() => { if (activeTab === 'team' && userOrgId && isAdmin) loadTeamData(); }, [activeTab, userOrgId, isAdmin]);
 
   const loadTeamData = async () => {
       if (!userOrgId) return;
@@ -104,7 +103,7 @@ export const SettingsScreen: React.FC<Props> = ({
               { modules: [moduleToBuy.id], moduleName: moduleToBuy.label, type: 'module_purchase' }
           );
           if (result.success) {
-              alert("Enviado! Aguarde a ativação pelo administrador.");
+              alert("Enviado com sucesso! Aguarde a ativação.");
               setModuleToBuy(null);
               setReceiptFile(null);
           }
@@ -117,7 +116,7 @@ export const SettingsScreen: React.FC<Props> = ({
       try {
           const { url } = await createCustomerPortalSession(userData.id);
           if (url) window.open(url, '_blank');
-      } catch (e) { alert("Erro ao abrir portal."); } 
+      } catch (e) { alert("Erro ao abrir portal de faturamento."); } 
       finally { setIsOpeningPortal(false); }
   };
 
@@ -141,14 +140,14 @@ export const SettingsScreen: React.FC<Props> = ({
       try {
           await deleteRole(id);
           loadTeamData();
-      } catch (e) { alert("Erro ao excluir."); }
+      } catch (e) { alert("Erro ao excluir cargo."); }
   };
 
   const handleUpdateMemberRole = async (userId: string, roleId: string) => {
       try {
           await updateUserRole(userId, roleId ? Number(roleId) : null);
           loadTeamData();
-      } catch (e) { alert("Erro ao atualizar."); }
+      } catch (e) { alert("Erro ao atualizar cargo do membro."); }
   };
 
   const handleSaveAiSettings = async () => {
@@ -172,19 +171,26 @@ export const SettingsScreen: React.FC<Props> = ({
         <div className="mb-8 flex justify-between items-start">
             <div>
                 <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Configurações</h1>
-                <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Gerencie sua organização.</p>
+                <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Gerencie sua organização e preferências.</p>
             </div>
             {isAdmin && (
-                <button onClick={handleOpenBillingPortal} disabled={isOpeningPortal} className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 text-slate-700 dark:text-white rounded-lg text-xs font-bold">
-                    {isOpeningPortal ? <Loader2 className="w-3 h-3 animate-spin"/> : <Receipt className="w-3 h-3"/>} Gerenciar Assinatura
+                <button onClick={handleOpenBillingPortal} disabled={isOpeningPortal} className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 text-slate-700 dark:text-white rounded-lg text-xs font-bold transition-all">
+                    {isOpeningPortal ? <Loader2 className="w-3 h-3 animate-spin"/> : <Receipt className="w-3 h-3"/>}
+                    Gerenciar Assinatura
                 </button>
             )}
         </div>
 
         <div className="flex gap-2 mb-8 border-b border-slate-200 dark:border-white/10 pb-1 overflow-x-auto">
             {visibleTabs.map(tab => (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex items-center gap-2 px-4 py-2 text-sm font-bold transition-colors border-b-2 whitespace-nowrap ${activeTab === tab.id ? 'border-slate-900 dark:border-white text-slate-900 dark:text-white' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
-                    <tab.icon className="w-4 h-4"/> {tab.label} {tab.locked && <Lock className="w-3 h-3 text-slate-400 ml-1"/>}
+                <button 
+                    key={tab.id} 
+                    onClick={() => setActiveTab(tab.id as any)} 
+                    className={`flex items-center gap-2 px-4 py-2 text-sm font-bold transition-colors border-b-2 whitespace-nowrap ${activeTab === tab.id ? 'border-slate-900 dark:border-white text-slate-900 dark:text-white' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                >
+                    <tab.icon className="w-4 h-4"/> 
+                    {tab.label} 
+                    {tab.locked && <Lock className="w-3 h-3 text-slate-400 ml-1"/>}
                 </button>
             ))}
         </div>
@@ -193,20 +199,28 @@ export const SettingsScreen: React.FC<Props> = ({
             {activeTab === 'general' && (
                 <div className="space-y-8 max-w-2xl animate-in slide-in-from-left-4">
                     <div className="space-y-4">
-                        <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase">Aparência</h3>
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">Aparência</h3>
                         <div className="flex gap-4">
-                            <button onClick={onToggleTheme} className={`flex-1 p-4 rounded-xl border flex items-center justify-center gap-3 ${theme === 'light' ? 'bg-white border-slate-300 shadow-sm' : 'bg-slate-50 border-transparent text-slate-400'}`}><Sun className="w-5 h-5"/> Claro</button>
-                            <button onClick={onToggleTheme} className={`flex-1 p-4 rounded-xl border flex items-center justify-center gap-3 ${theme === 'dark' ? 'bg-slate-900 border-slate-700 text-white shadow-sm' : 'bg-slate-100 border-transparent text-slate-400'}`}><Moon className="w-5 h-5"/> Escuro</button>
+                            <button onClick={onToggleTheme} className={`flex-1 p-4 rounded-xl border flex items-center justify-center gap-3 transition-all ${theme === 'light' ? 'bg-white border-slate-300 shadow-sm' : 'bg-slate-50 border-transparent text-slate-400'}`}>
+                                <Sun className="w-5 h-5"/> Claro
+                            </button>
+                            <button onClick={onToggleTheme} className={`flex-1 p-4 rounded-xl border flex items-center justify-center gap-3 transition-all ${theme === 'dark' ? 'bg-slate-900 border-slate-700 text-white shadow-sm' : 'bg-slate-100 border-transparent text-slate-400'}`}>
+                                <Moon className="w-5 h-5"/> Escuro
+                            </button>
                         </div>
                     </div>
                     <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-white/10">
-                        <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase">Organização</h3>
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">Organização</h3>
                         <div className="space-y-4">
                             <div>
                                 <label className="text-xs font-bold text-slate-500 mb-1 block">Nome da Empresa</label>
                                 <input type="text" value={orgName} onChange={e => setOrgName(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 outline-none text-sm" disabled={!isAdmin}/>
                             </div>
-                            {isAdmin && <button onClick={() => onUpdateOrgDetails({ name: orgName })} className="px-6 py-2 bg-slate-900 dark:bg-white text-white dark:text-black rounded-lg text-sm font-bold shadow-sm">Salvar</button>}
+                            {isAdmin && (
+                                <button onClick={() => onUpdateOrgDetails({ name: orgName })} className="px-6 py-2 bg-slate-900 dark:bg-white text-white dark:text-black rounded-lg text-sm font-bold shadow-sm hover:opacity-90">
+                                    Salvar Alterações
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -217,14 +231,31 @@ export const SettingsScreen: React.FC<Props> = ({
                     {AVAILABLE_MODULES.map(mod => {
                         const isOwned = localModules.includes(mod.id);
                         return (
-                            <div key={mod.id} onClick={() => handleModuleClick(mod)} className={`p-5 rounded-2xl border transition-all group ${isOwned ? 'bg-white dark:bg-slate-900 border-emerald-500/30 shadow-sm' : 'bg-slate-50 dark:bg-white/5 border-transparent hover:border-slate-300 cursor-pointer'}`}>
+                            <div key={mod.id} onClick={() => handleModuleClick(mod)} className={`p-5 rounded-2xl border transition-all group ${isOwned ? 'bg-white dark:bg-slate-900 border-emerald-500/30 shadow-sm' : 'bg-slate-50 dark:bg-white/5 border-transparent hover:border-slate-300 dark:hover:border-slate-600 cursor-pointer'}`}>
                                 <div className="flex justify-between items-start mb-4">
-                                    <div className={`p-3 rounded-xl ${isOwned ? 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600' : 'bg-slate-200 dark:bg-white/10 text-slate-500'}`}><mod.icon className="w-6 h-6"/></div>
-                                    {isOwned ? <div className="text-[10px] font-bold text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30 px-2 py-1 rounded-full uppercase"><Check className="w-3 h-3"/> Ativo</div> : <div className="text-[10px] font-bold text-slate-400 border border-slate-200 dark:border-white/10 px-2 py-1 rounded-full uppercase">+Comprar</div>}
+                                    <div className={`p-3 rounded-xl ${isOwned ? 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600' : 'bg-slate-200 dark:bg-white/10 text-slate-500'}`}>
+                                        <mod.icon className="w-6 h-6"/>
+                                    </div>
+                                    {isOwned ? (
+                                        <div className="text-[10px] font-bold text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30 px-2 py-1 rounded-full uppercase flex items-center gap-1">
+                                            <Check className="w-3 h-3"/> Ativo
+                                        </div>
+                                    ) : (
+                                        <div className="text-[10px] font-bold text-slate-400 border border-slate-200 dark:border-white/10 px-2 py-1 rounded-full uppercase">
+                                            + Comprar
+                                        </div>
+                                    )}
                                 </div>
                                 <h4 className="font-bold text-slate-900 dark:text-white mb-1">{mod.label}</h4>
-                                <p className="text-xs text-slate-500 line-clamp-2">{mod.desc}</p>
-                                {!isOwned && <div className="mt-4 pt-3 border-t border-slate-200 dark:border-white/10 flex justify-between items-center"><span className="text-sm font-bold text-slate-900 dark:text-white">R$ {mod.price.toFixed(2)}</span></div>}
+                                <p className="text-xs text-slate-500 h-8 line-clamp-2">{mod.desc}</p>
+                                {!isOwned && (
+                                    <div className="mt-4 pt-3 border-t border-slate-200 dark:border-white/10 flex justify-between items-center">
+                                        <span className="text-sm font-bold text-slate-900 dark:text-white">R$ {mod.price.toFixed(2)}</span>
+                                        <button className="text-xs bg-slate-900 dark:bg-white text-white dark:text-black px-3 py-1.5 rounded-lg font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                                            Adicionar
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         );
                     })}
@@ -234,37 +265,43 @@ export const SettingsScreen: React.FC<Props> = ({
             {activeTab === 'team' && (
                 <div className="animate-in slide-in-from-right-4 space-y-8">
                     <div>
-                        <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase mb-4">Cargos</h3>
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-4">Cargos & Permissões</h3>
                         <div className="flex gap-2 mb-4">
                             <input value={newRoleName} onChange={e => setNewRoleName(e.target.value)} placeholder="Novo Cargo" className="flex-1 p-2 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg text-sm outline-none"/>
                             <button onClick={handleCreateRole} className="px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-black rounded-lg text-xs font-bold">Adicionar</button>
                         </div>
                         <div className="flex flex-wrap gap-2">
                             {roles.map(role => (
-                                <div key={role.id} className="px-3 py-1.5 bg-slate-100 dark:bg-white/5 rounded-lg border flex items-center gap-2 text-xs font-bold group">
+                                <div key={role.id} className="px-3 py-1.5 bg-slate-100 dark:bg-white/5 rounded-lg border border-slate-200 dark:border-white/10 flex items-center gap-2 text-xs font-bold group">
                                     {role.nome}
-                                    <button onClick={() => handleDeleteRole(role.id)} className="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3 h-3"/></button>
+                                    <button onClick={() => handleDeleteRole(role.id)} className="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Trash2 className="w-3 h-3"/>
+                                    </button>
                                 </div>
                             ))}
                         </div>
                     </div>
                     <div>
-                        <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase mb-4">Membros</h3>
-                        {loadingTeam ? <Loader2 className="w-6 h-6 animate-spin text-slate-400 mx-auto"/> : members.map(member => (
-                            <div key={member.id} className="flex items-center justify-between p-3 bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/5 rounded-xl mb-2">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden">{member.avatar_url ? <img src={member.avatar_url} className="w-full h-full object-cover"/> : <User className="w-4 h-4 m-2 text-slate-500"/>}</div>
-                                    <div>
-                                        <div className="text-sm font-bold text-slate-900 dark:text-white">{member.nome}</div>
-                                        <div className="text-xs text-slate-500">{member.email}</div>
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-4">Membros do Time</h3>
+                        <div className="space-y-2">
+                            {loadingTeam ? <Loader2 className="w-6 h-6 animate-spin text-slate-400 mx-auto"/> : members.map(member => (
+                                <div key={member.id} className="flex items-center justify-between p-3 bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/5 rounded-xl">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden">
+                                            {member.avatar_url ? <img src={member.avatar_url} alt="avatar" className="w-full h-full object-cover"/> : <User className="w-4 h-4 m-2 text-slate-500"/>}
+                                        </div>
+                                        <div>
+                                            <div className="text-sm font-bold text-slate-900 dark:text-white">{member.nome}</div>
+                                            <div className="text-xs text-slate-500">{member.email}</div>
+                                        </div>
                                     </div>
+                                    <select value={member.cargo || ''} onChange={(e) => handleUpdateMemberRole(member.id, e.target.value)} className="bg-slate-50 dark:bg-white/5 border-transparent rounded-lg text-xs p-2 outline-none">
+                                        <option value="">Sem Cargo</option>
+                                        {roles.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}
+                                    </select>
                                 </div>
-                                <select value={member.cargo || ''} onChange={(e) => handleUpdateMemberRole(member.id, e.target.value)} className="bg-slate-50 dark:bg-white/5 rounded-lg text-xs p-2 outline-none">
-                                    <option value="">Sem Cargo</option>
-                                    {roles.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}
-                                </select>
-                            </div>
-                        ))}
+                            ))}
+                        </div>
                     </div>
                 </div>
             )}
@@ -274,13 +311,15 @@ export const SettingsScreen: React.FC<Props> = ({
                     {!hasGuruAi ? (
                         <div className="flex flex-col items-center justify-center p-12 border border-dashed border-slate-300 dark:border-white/10 rounded-3xl bg-slate-50 dark:bg-white/5 text-center">
                             <Lock className="w-16 h-16 text-slate-400 mb-6"/>
-                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">Shinkō Guru AI Bloqueado</h3>
-                            <p className="text-slate-500 mb-8 text-sm">Contrate o módulo Guru AI para personalizar sua inteligência.</p>
-                            <button onClick={() => handleModuleClick(AVAILABLE_MODULES.find(m => m.id === 'ia'))} className="px-8 py-3 bg-purple-600 text-white font-bold rounded-xl text-sm flex items-center gap-2"><Sparkles className="w-4 h-4"/> Adicionar Módulo AI</button>
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Guru AI Bloqueado</h3>
+                            <p className="text-slate-500 text-sm mb-8">Personalize o DNA da IA contratando este módulo.</p>
+                            <button onClick={() => handleModuleClick(AVAILABLE_MODULES.find(m => m.id === 'ia'))} className="px-8 py-3 bg-purple-600 text-white font-bold rounded-xl text-sm flex items-center gap-2">
+                                <Sparkles className="w-4 h-4"/> Adicionar Módulo AI
+                            </button>
                         </div>
                     ) : (
                         <>
-                            <div className="p-4 bg-purple-500/5 border border-purple-500/20 rounded-xl">
+                            <div className="p-4 bg-purple-500/5 border border-purple-500/20 rounded-xl mb-6">
                                 <h3 className="text-sm font-bold text-purple-600 flex items-center gap-2"><Sparkles className="w-4 h-4"/> Personalidade do Guru</h3>
                             </div>
                             <div className="space-y-4">
@@ -299,10 +338,11 @@ export const SettingsScreen: React.FC<Props> = ({
                                 </div>
                                 <div>
                                     <label className="text-xs font-bold text-slate-500 uppercase block mb-1">DNA da Empresa</label>
-                                    <textarea value={aiContext} onChange={e => setAiContext(e.target.value)} placeholder="Descreva sua empresa..." className="w-full h-32 p-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-sm outline-none resize-none"/>
+                                    <textarea value={aiContext} onChange={e => setAiContext(e.target.value)} placeholder="Descreva brevemente o que sua empresa faz..." className="w-full h-32 p-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-sm outline-none resize-none"/>
                                 </div>
                                 <button onClick={handleSaveAiSettings} disabled={isSavingAi} className="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl text-sm font-bold flex items-center justify-center gap-2">
-                                    {isSavingAi ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4"/>} Salvar Configurações
+                                    {isSavingAi ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4"/>}
+                                    Salvar Configurações
                                 </button>
                             </div>
                         </>
@@ -311,26 +351,28 @@ export const SettingsScreen: React.FC<Props> = ({
             )}
         </div>
 
+        {/* Modal de Pagamento */}
         {moduleToBuy && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-3xl p-8 relative border border-white/10">
-                    <button onClick={() => setModuleToBuy(null)} className="absolute top-4 right-4 text-slate-400"><X className="w-5 h-5"/></button>
-                    <div className="flex flex-col items-center mb-6">
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
+                <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-3xl p-8 shadow-2xl relative border border-white/10 animate-in zoom-in-95">
+                    <button onClick={() => setModuleToBuy(null)} className="absolute top-4 right-4 text-slate-400 hover:text-white"><X className="w-5 h-5"/></button>
+                    <div className="flex flex-col items-center text-center mb-6">
                         <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-blue-500 rounded-2xl flex items-center justify-center text-white mb-4"><moduleToBuy.icon className="w-8 h-8"/></div>
-                        <h3 className="text-xl font-bold dark:text-white">Ativar {moduleToBuy.label}</h3>
+                        <h3 className="text-xl font-bold text-slate-900 dark:text-white">Ativar {moduleToBuy.label}</h3>
                     </div>
                     <div className="space-y-4 mb-6">
-                        <div className="bg-slate-50 dark:bg-black/30 p-4 rounded-xl border border-slate-200 dark:border-white/5">
-                            <div className="flex justify-between items-center text-sm mb-2"><span className="text-slate-500">Valor</span><span className="font-bold dark:text-white">R$ {moduleToBuy.price.toFixed(2)}</span></div>
-                            <div className="flex justify-between items-center text-sm"><span className="text-slate-500">PIX</span><div className="flex items-center gap-2"><span className="font-mono text-xs">{PIX_KEY}</span><button onClick={handleCopyPix} className="text-slate-400 hover:text-emerald-500"><Copy className="w-4 h-4"/></button></div></div>
+                        <div className="bg-slate-50 dark:bg-black/30 p-4 rounded-xl border border-slate-200 dark:border-white/5 text-sm">
+                            <div className="flex justify-between mb-2"><span className="text-slate-500">Valor</span><span className="font-bold dark:text-white">R$ {moduleToBuy.price.toFixed(2)}</span></div>
+                            <div className="flex justify-between items-center"><span className="text-slate-500">PIX</span><div className="flex items-center gap-2"><span className="font-mono text-[10px]">{PIX_KEY}</span><button onClick={handleCopyPix} className="text-slate-400 hover:text-emerald-500"><Copy className="w-4 h-4"/></button></div></div>
                         </div>
                         <div className="border-2 border-dashed border-slate-300 dark:border-white/10 rounded-xl p-4 text-center cursor-pointer" onClick={() => receiptInputRef.current?.click()}>
-                            {receiptFile ? <div className="text-emerald-500 text-xs font-bold">{receiptFile.name}</div> : <div className="text-slate-400 text-xs font-bold">Anexar Comprovante</div>}
+                            {receiptFile ? <div className="text-emerald-500 text-xs font-bold">{receiptFile.name}</div> : <div className="text-slate-400 text-xs">Anexar Comprovante</div>}
                             <input ref={receiptInputRef} type="file" className="hidden" onChange={(e) => e.target.files && setReceiptFile(e.target.files[0])}/>
                         </div>
                     </div>
                     <button onClick={handleSendReceipt} disabled={isProcessingPurchase || !receiptFile} className="w-full py-4 bg-emerald-500 text-white font-bold rounded-xl flex items-center justify-center gap-2">
-                        {isProcessingPurchase ? <Loader2 className="w-5 h-5 animate-spin"/> : <CheckCircle className="w-5 h-5"/>} Enviar Comprovante
+                        {isProcessingPurchase ? <Loader2 className="w-5 h-5 animate-spin"/> : <CheckCircle className="w-5 h-5"/>}
+                        Enviar Comprovante
                     </button>
                 </div>
             </div>
