@@ -132,7 +132,12 @@ const App: React.FC = () => {
 
   // Helper to change URL without reloading
   const navigateTo = (path: string) => {
-      window.history.pushState({}, '', path);
+      try {
+          window.history.pushState({}, '', path);
+      } catch (e) {
+          // Ignore routing errors in restricted environments (e.g. sandboxes, blobs)
+          console.warn("Routing state update blocked by environment:", e);
+      }
   };
 
   // 1. Handle Navigation (Change View)
@@ -160,8 +165,13 @@ const App: React.FC = () => {
   // 4. Initial Load & PopState (Browser Back/Forward)
   useEffect(() => {
       const handleRouting = async () => {
-          const path = window.location.pathname;
+          let path = window.location.pathname;
           
+          // Fallback for blob URLs or empty paths
+          if (!path || path.startsWith('blob:')) {
+              path = '/';
+          }
+
           // Blog Route
           if (path === '/blog') {
               setShowBlog(true);
