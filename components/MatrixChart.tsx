@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine, ZAxis } from 'recharts';
+import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine, ZAxis, ReferenceArea, Label } from 'recharts';
 import { Opportunity } from '../types';
 
 interface Props {
@@ -55,23 +55,46 @@ const MatrixChart: React.FC<Props> = ({ data, onClick, theme = 'dark' }) => {
   };
 
   return (
-    <div id="matrix-chart-container" className="w-full h-full relative">
-        <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 absolute top-6 left-6 z-10 drop-shadow-md pointer-events-none">Matriz RDE (Portfólio)</h3>
+    <div id="matrix-chart-container" className="w-full h-full relative font-sans">
+        <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 absolute top-6 left-6 z-10 drop-shadow-md pointer-events-none">Matriz RDE (Priorização)</h3>
         
-        <div className="absolute top-14 right-12 text-xs font-bold text-emerald-600 dark:text-emerald-400 text-right z-0 opacity-60 pointer-events-none">Veloz & Viável<br/>(Atacar)</div>
-        <div className="absolute top-14 left-16 text-xs font-bold text-yellow-600 dark:text-yellow-400 z-0 opacity-60 pointer-events-none">Lento & Viável<br/>(Estratégico)</div>
-        <div className="absolute bottom-14 right-12 text-xs font-bold text-orange-600 dark:text-orange-400 text-right z-0 opacity-60 pointer-events-none">Veloz & Difícil<br/>(Parceria/MVP)</div>
-        <div className="absolute bottom-14 left-16 text-xs font-bold text-red-600 dark:text-red-400 z-0 opacity-60 pointer-events-none">Lento & Difícil<br/>(Investigar)</div>
+        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+        <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+          {/* Quadrant Backgrounds */}
+          {/* Top Right: High Velocity, High Viability (SPRINT) */}
+          <ReferenceArea x1={3} x2={6} y1={3} y2={6} fill="#10b981" fillOpacity={isDark ? 0.05 : 0.1} stroke="none" />
+          
+          {/* Top Left: Low Velocity, High Viability (STRATEGY) */}
+          <ReferenceArea x1={0} x2={3} y1={3} y2={6} fill="#eab308" fillOpacity={isDark ? 0.05 : 0.1} stroke="none" />
+          
+          {/* Bottom Right: High Velocity, Low Viability (MVP) */}
+          <ReferenceArea x1={3} x2={6} y1={0} y2={3} fill="#f97316" fillOpacity={isDark ? 0.05 : 0.1} stroke="none" />
+          
+          {/* Bottom Left: Low Velocity, Low Viability (DISCARD) */}
+          <ReferenceArea x1={0} x2={3} y1={0} y2={3} fill="#ef4444" fillOpacity={isDark ? 0.05 : 0.1} stroke="none" />
 
-      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-        <ScatterChart margin={{ top: 50, right: 40, bottom: 40, left: 40 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} vertical={false} horizontal={false} />
-          {/* Custom Grid Lines */}
-          <ReferenceLine x={3} stroke={colors.referenceLine} strokeDasharray="5 5" />
-          <ReferenceLine y={3} stroke={colors.referenceLine} strokeDasharray="5 5" />
+          
+          {/* Center Lines */}
+          <ReferenceLine x={3} stroke={colors.referenceLine} strokeWidth={2} />
+          <ReferenceLine y={3} stroke={colors.referenceLine} strokeWidth={2} />
 
-          <XAxis type="number" dataKey="x" name="Velocidade" domain={[0, 6]} stroke={colors.text} tickCount={6} axisLine={false} tickLine={false} />
-          <YAxis type="number" dataKey="y" name="Viabilidade" domain={[0, 6]} stroke={colors.text} tickCount={6} axisLine={false} tickLine={false} />
+          {/* Quadrant Labels */}
+          <ReferenceArea x1={4.5} x2={4.5} y1={5.5} y2={5.5} strokeOpacity={0}>
+             <Label value="SPRINT / ATACAR" position="center" fill="#10b981" fontWeight="900" fontSize={10} opacity={0.6} />
+          </ReferenceArea>
+          <ReferenceArea x1={1.5} x2={1.5} y1={5.5} y2={5.5} strokeOpacity={0}>
+             <Label value="ESTRATÉGICO / PLAN" position="center" fill="#eab308" fontWeight="900" fontSize={10} opacity={0.6} />
+          </ReferenceArea>
+          <ReferenceArea x1={4.5} x2={4.5} y1={0.5} y2={0.5} strokeOpacity={0}>
+             <Label value="MVP / PARCERIA" position="center" fill="#f97316" fontWeight="900" fontSize={10} opacity={0.6} />
+          </ReferenceArea>
+          <ReferenceArea x1={1.5} x2={1.5} y1={0.5} y2={0.5} strokeOpacity={0}>
+             <Label value="DESCARTAR / HOLD" position="center" fill="#ef4444" fontWeight="900" fontSize={10} opacity={0.6} />
+          </ReferenceArea>
+
+          <XAxis type="number" dataKey="x" name="Velocidade" domain={[0, 6]} stroke={colors.text} tickCount={7} tick={{fontSize: 10}} label={{ value: 'Velocidade (Esforço Inverso)', position: 'bottom', fill: colors.text, fontSize: 10 }} />
+          <YAxis type="number" dataKey="y" name="Viabilidade" domain={[0, 6]} stroke={colors.text} tickCount={7} tick={{fontSize: 10}} label={{ value: 'Viabilidade Técnica', angle: -90, position: 'left', fill: colors.text, fontSize: 10 }} />
           <ZAxis type="number" dataKey="z" range={[100, 1000]} name="Score" />
           
           <Tooltip 
@@ -86,7 +109,7 @@ const MatrixChart: React.FC<Props> = ({ data, onClick, theme = 'dark' }) => {
                 entry.x >= 3 && entry.y >= 3 ? '#10b981' : 
                 entry.x < 3 && entry.y >= 3 ? '#f59e0b' : 
                 entry.x >= 3 && entry.y < 3 ? '#f97316' : '#ef4444'
-              } stroke="rgba(255,255,255,0.4)" strokeWidth={2} className="cursor-pointer hover:opacity-80 transition-all duration-300" />
+              } stroke="rgba(255,255,255,0.6)" strokeWidth={2} className="cursor-pointer hover:opacity-100 transition-all duration-300 filter drop-shadow-lg" />
             ))}
           </Scatter>
         </ScatterChart>

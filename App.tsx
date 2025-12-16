@@ -53,6 +53,10 @@ const App: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
 
   const [view, setView] = useState<string>('dashboard');
+  
+  // New state to control which tab Settings opens on
+  const [settingsStartTab, setSettingsStartTab] = useState<'general' | 'team' | 'ai' | 'modules'>('general');
+
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -512,7 +516,10 @@ const App: React.FC = () => {
                                     organizationId={userOrgId || undefined}
                                     appBrandName={appBrandName}
                                     whitelabel={shouldUseWhitelabel}
-                                    onActivateWhitelabel={() => setView('settings')}
+                                    onActivateWhitelabel={() => {
+                                        setSettingsStartTab('modules');
+                                        setView('settings');
+                                    }}
                                     activeModules={activeModules}
                                 />
                             </div>
@@ -604,6 +611,7 @@ const App: React.FC = () => {
                                 currentPlan={currentPlan}
                                 activeModules={activeModules}
                                 onRefreshModules={handleRefreshModules}
+                                initialTab={settingsStartTab}
                             />
                         )}
                         {view === 'profile' && (

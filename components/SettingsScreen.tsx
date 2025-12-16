@@ -27,6 +27,7 @@ interface Props {
   currentPlan?: string;
   activeModules: string[];
   onRefreshModules: () => void;
+  initialTab?: 'general' | 'team' | 'ai' | 'modules';
 }
 
 // Módulos com Preços
@@ -50,9 +51,9 @@ const AVAILABLE_MODULES = [
 const PIX_KEY = "60.428.589/0001-55"; // Chave PIX da Empresa (CNPJ)
 
 export const SettingsScreen: React.FC<Props> = ({ 
-    theme, onToggleTheme, onlineUsers, userOrgId, orgDetails, onUpdateOrgDetails, setView, userRole, userData, currentPlan, activeModules, onRefreshModules
+    theme, onToggleTheme, onlineUsers, userOrgId, orgDetails, onUpdateOrgDetails, setView, userRole, userData, currentPlan, activeModules, onRefreshModules, initialTab = 'general'
 }) => {
-  const [activeTab, setActiveTab] = useState<'general' | 'team' | 'ai' | 'modules'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'team' | 'ai' | 'modules'>(initialTab);
   const [orgName, setOrgName] = useState(orgDetails.name);
   
   // Team
@@ -81,6 +82,11 @@ export const SettingsScreen: React.FC<Props> = ({
   useEffect(() => {
       setLocalModules(activeModules);
   }, [activeModules]);
+
+  // Update active tab if initialTab changes (e.g. from external navigation)
+  useEffect(() => {
+      if (initialTab) setActiveTab(initialTab);
+  }, [initialTab]);
 
   useEffect(() => {
       if (activeTab === 'team' && userOrgId && isAdmin) {
@@ -180,7 +186,6 @@ export const SettingsScreen: React.FC<Props> = ({
       }
   };
 
-  // ... (Rest of existing functions: handleCreateRole, handleDeleteRole, etc. UNCHANGED)
   const handleCreateRole = async () => {
       if (!userOrgId || !newRoleName.trim()) return;
       try {
