@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Opportunity, TaskStatus, DbTask } from '../types';
 import { Trello, Filter, User, Hash, Clock, Briefcase, RefreshCw, Calendar as CalendarIcon, GitMerge, GanttChartSquare, Lock, MoreHorizontal } from 'lucide-react';
@@ -306,9 +307,14 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
 
                                         <div className="flex items-center justify-between border-t border-slate-100 dark:border-white/5 pt-3 mt-2">
                                             <div className="flex items-center gap-2">
+                                                {/* AVATAR FIX: Use DB avatar_url first, fallback to UI Avatars */}
                                                 {task.responsavelData?.nome ? (
-                                                     <div className="w-6 h-6 rounded-full overflow-hidden bg-slate-100 dark:bg-white/10" title={task.responsavelData.nome}>
-                                                         <img src={getAvatarUrl(task.responsavelData.nome)} alt={task.responsavelData.nome} className="w-full h-full object-cover"/>
+                                                     <div className="w-6 h-6 rounded-full overflow-hidden bg-slate-100 dark:bg-white/10 ring-1 ring-white/10" title={task.responsavelData.nome}>
+                                                         <img 
+                                                            src={task.responsavelData.avatar_url || getAvatarUrl(task.responsavelData.nome)} 
+                                                            alt={task.responsavelData.nome} 
+                                                            className="w-full h-full object-cover"
+                                                         />
                                                      </div>
                                                 ) : (
                                                     <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-white/10 flex items-center justify-center text-[10px] text-slate-400">?</div>
@@ -384,7 +390,10 @@ export const KanbanBoard: React.FC<Props> = ({ onSelectOpportunity, userRole, pr
                             datainicio: updatedTask.startDate,
                             etiquetas: updatedTask.tags || [],
                             membros: updatedTask.members || [],
-                            anexos: updatedTask.attachments || []
+                            anexos: updatedTask.attachments || [],
+                            gravidade: updatedTask.gut?.g || 1,
+                            urgencia: updatedTask.gut?.u || 1,
+                            tendencia: updatedTask.gut?.t || 1,
                         } : null);
 
                         const dbId = Number(updatedTask.id);

@@ -1,8 +1,11 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Opportunity, DbTask } from '../types';
 import { fetchAllTasks, updateTask, deleteTask, syncTaskChecklist } from '../services/projectService';
+import { fetchOrganizationDetails } from '../services/organizationService';
+import { optimizeSchedule } from '../services/geminiService';
 import { TaskDetailModal } from './TaskDetailModal';
-import { ChevronLeft, ChevronRight, RefreshCw, Calendar as CalendarIcon, List, Clock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RefreshCw, Calendar as CalendarIcon, List, Clock, Sparkles, Loader2, Lock, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 interface Props {
   opportunities: Opportunity[];
@@ -21,12 +24,29 @@ export const CalendarView: React.FC<Props> = ({
 }) => {
     const [tasks, setTasks] = useState<DbTask[]>([]);
     const [loading, setLoading] = useState(false);
+    
+    // AI & Optimization State
+    const [isOptimizing, setIsOptimizing] = useState(false);
+    const [optimizationStep, setOptimizationStep] = useState<string>('');
+    const [orgCapacity, setOrgCapacity] = useState(8); // Default 8h (1 dev)
+
     const [currentDate, setCurrentDate] = useState(new Date());
     const [viewMode, setViewMode] = useState<ViewMode>('month');
     const [editingTaskCtx, setEditingTaskCtx] = useState<any | null>(null);
 
+    const hasAiModule = activeModules?.includes('ia');
+
     useEffect(() => {
         loadTasks();
+        if (organizationId) {
+            fetchOrganizationDetails(organizationId).then(org => {
+                if (org) {
+                    // Calculate Total Daily Capacity: Collaborators * 8h
+                    const capacity = (org.colaboradores || 1) * 8;
+                    setOrgCapacity(capacity);
+                }
+            });
+        }
     }, [organizationId, projectId]);
 
     const loadTasks = async () => {
@@ -34,8 +54,6 @@ export const CalendarView: React.FC<Props> = ({
         if (organizationId) {
             const allTasks = await fetchAllTasks(organizationId);
             
-            // Keep ALL tasks in state (including subtasks) so we can hydrate the modal correctly.
-            // Filtering for display happens in render.
             if (projectId) {
                 setTasks(allTasks.filter(t => t.projeto?.toString() === projectId));
             } else {
@@ -43,6 +61,69 @@ export const CalendarView: React.FC<Props> = ({
             }
         }
         setLoading(false);
+    };
+
+    const handleOptimizeWorkload = async () => {
+        if (!organizationId) return;
+        
+        // UI Feedback: Start immediately
+        setIsOptimizing(true);
+        setOptimizationStep('Analisando tarefas pendentes...');
+
+        try {
+            // Formula: 8h * collaborators * 0.7 (Safety Factor)
+            const dailyCapacityLimit = Math.floor(orgCapacity * 0.7);
+
+            // 1. Filter Tasks (Only Todo/Doing/Review)
+            const pendingTasks = tasks.filter(t => 
+                !t.sutarefa && 
+                t.status !== 'done' && 
+                t.status !== 'approval'
+            );
+
+            if (pendingTasks.length === 0) {
+                setOptimizationStep('Nenhuma tarefa pendente para otimizar.');
+                setTimeout(() => setIsOptimizing(false), 2000);
+                return;
+            }
+
+            setOptimizationStep('Consultando Shinkō Guru AI...');
+            
+            // 2. Call AI Service
+            // Pass empty developers array as the logic is mainly capacity based for now
+            const optimizedSchedule = await optimizeSchedule(pendingTasks, [], dailyCapacityLimit);
+
+            if (optimizedSchedule && optimizedSchedule.length > 0) {
+                setOptimizationStep(`Aplicando ${optimizedSchedule.length} mudanças...`);
+                
+                let updatedCount = 0;
+                for (const item of optimizedSchedule) {
+                    // Only update if dates changed
+                    const original = pendingTasks.find(t => t.id === item.id);
+                    if (original && (original.datainicio !== item.startDate || original.datafim !== item.dueDate)) {
+                        await updateTask(item.id, {
+                            datainicio: item.startDate,
+                            datafim: item.dueDate
+                        });
+                        updatedCount++;
+                    }
+                }
+                
+                await loadTasks();
+                setOptimizationStep(`Sucesso! ${updatedCount} tarefas reagendadas.`);
+            } else {
+                setOptimizationStep("O cronograma já está otimizado.");
+            }
+
+        } catch (error: any) {
+            console.error("Optimization error:", error);
+            setOptimizationStep("Erro ao conectar com a IA.");
+        } finally {
+            setTimeout(() => {
+                setIsOptimizing(false);
+                setOptimizationStep('');
+            }, 3000);
+        }
     };
 
     const handleNavigate = (direction: 'prev' | 'next') => {
@@ -58,7 +139,7 @@ export const CalendarView: React.FC<Props> = ({
     };
 
     const getDaysInView = useMemo(() => {
-        if (viewMode === 'year') return []; // Handled separately
+        if (viewMode === 'year') return []; 
 
         const year = currentDate.getFullYear();
         const month = currentDate.getMonth();
@@ -67,19 +148,17 @@ export const CalendarView: React.FC<Props> = ({
         if (viewMode === 'month') {
             const firstDay = new Date(year, month, 1);
             const lastDay = new Date(year, month + 1, 0);
-            const startPad = firstDay.getDay(); // 0 = Sunday
+            const startPad = firstDay.getDay(); 
             
-            // Previous month padding
             for (let i = 0; i < startPad; i++) {
                 days.push(null);
             }
-            // Days
             for (let i = 1; i <= lastDay.getDate(); i++) {
                 days.push(new Date(year, month, i));
             }
         } else if (viewMode === 'week') {
             const curr = new Date(currentDate);
-            const first = curr.getDate() - curr.getDay(); // First day is the day of the month - the day of the week
+            const first = curr.getDate() - curr.getDay(); 
             
             for (let i = 0; i < 7; i++) {
                 const d = new Date(curr);
@@ -102,6 +181,20 @@ export const CalendarView: React.FC<Props> = ({
         });
     };
 
+    // Calculate daily metrics
+    const getDailyMetrics = (date: Date) => {
+        const dayTasks = getTasksForDate(date).filter(t => !t.sutarefa);
+        const totalHours = dayTasks.reduce((acc, t) => acc + (t.duracaohoras || 0), 0);
+        const percent = Math.min(100, (totalHours / orgCapacity) * 100);
+        
+        let color = 'bg-emerald-500';
+        if (percent > 100) color = 'bg-red-500';
+        else if (percent > 75) color = 'bg-amber-500';
+        else if (percent > 0) color = 'bg-blue-500';
+
+        return { totalHours, percent, color, count: dayTasks.length };
+    };
+
     const getTitle = () => {
         if (viewMode === 'day') return currentDate.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
         if (viewMode === 'week') {
@@ -119,7 +212,16 @@ export const CalendarView: React.FC<Props> = ({
     };
 
     return (
-        <div className="flex flex-col h-full bg-white dark:bg-slate-900 rounded-xl overflow-hidden shadow-sm border border-slate-200 dark:border-white/5">
+        <div className="flex flex-col h-full bg-white dark:bg-slate-900 rounded-xl overflow-hidden shadow-sm border border-slate-200 dark:border-white/5 relative">
+            
+            {/* Optimization Status Overlay Bar */}
+            {isOptimizing && (
+                <div className="absolute top-0 left-0 right-0 z-50 bg-purple-600 text-white px-4 py-2 text-xs font-bold flex items-center justify-center gap-3 animate-in slide-in-from-top-full shadow-lg">
+                    {optimizationStep.includes('Sucesso') ? <CheckCircle2 className="w-4 h-4"/> : <Loader2 className="w-4 h-4 animate-spin"/>}
+                    {optimizationStep}
+                </div>
+            )}
+
             {/* Header */}
             <div className="flex flex-col md:flex-row items-center justify-between p-4 border-b border-slate-200 dark:border-white/5 gap-4">
                 <div className="flex items-center gap-4">
@@ -132,6 +234,23 @@ export const CalendarView: React.FC<Props> = ({
                 </div>
 
                 <div className="flex items-center gap-4">
+                    {/* Optimization Button */}
+                    <button 
+                        onClick={hasAiModule ? handleOptimizeWorkload : undefined}
+                        disabled={isOptimizing || !hasAiModule}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                            hasAiModule 
+                            ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-300 border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/40' 
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-transparent cursor-not-allowed opacity-60'
+                        }`}
+                        title={hasAiModule ? "Reajustar datas baseado na capacidade do time" : "Módulo IA necessário"}
+                    >
+                        {isOptimizing ? <Loader2 className="w-3 h-3 animate-spin"/> : hasAiModule ? <Sparkles className="w-3 h-3"/> : <Lock className="w-3 h-3"/>}
+                        {isOptimizing ? 'Guru Trabalhando...' : 'Otimizar Carga (IA)'}
+                    </button>
+
+                    <div className="h-6 w-px bg-slate-200 dark:bg-white/10"></div>
+
                     <div className="flex items-center gap-2">
                         <button onClick={() => handleNavigate('prev')} className="p-1.5 hover:bg-slate-100 dark:hover:bg-white/10 rounded-lg text-slate-500"><ChevronLeft className="w-5 h-5"/></button>
                         <h2 className="text-sm font-bold text-slate-900 dark:text-white capitalize w-48 text-center truncate">
@@ -210,14 +329,27 @@ export const CalendarView: React.FC<Props> = ({
                             
                             // FILTER: Hide subtasks from calendar view
                             const dayTasks = getTasksForDate(date).filter(t => !t.sutarefa);
+                            const metrics = getDailyMetrics(date);
                             const isToday = new Date().toDateString() === date.toDateString();
 
                             return (
                                 <div key={date.toISOString()} className={`bg-white dark:bg-slate-900 p-2 flex flex-col gap-1 transition-colors ${isToday ? 'bg-blue-50/30 dark:bg-blue-900/10' : ''} ${viewMode === 'day' ? 'p-4 overflow-y-auto' : 'min-h-[100px] overflow-hidden hover:bg-slate-50 dark:hover:bg-white/5'}`}>
                                     {viewMode !== 'day' && (
-                                        <span className={`text-xs font-bold mb-1 w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-700 dark:text-slate-300'}`}>
-                                            {date.getDate()}
-                                        </span>
+                                        <div className="flex justify-between items-start mb-1">
+                                            <span className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-700 dark:text-slate-300'}`}>
+                                                {date.getDate()}
+                                            </span>
+                                            {metrics.totalHours > 0 && (
+                                                <div className="flex flex-col items-end w-12">
+                                                    <span className={`text-[9px] font-bold ${metrics.percent > 100 ? 'text-red-500' : 'text-slate-400'}`}>
+                                                        {metrics.totalHours}h / {orgCapacity}h
+                                                    </span>
+                                                    <div className="w-full h-1 bg-slate-100 dark:bg-white/10 rounded-full overflow-hidden mt-0.5">
+                                                        <div className={`h-full ${metrics.color}`} style={{ width: `${Math.min(100, metrics.percent)}%` }}></div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                     )}
                                     
                                     <div className={`flex-1 ${viewMode === 'day' ? 'space-y-3' : 'overflow-y-auto custom-scrollbar space-y-1'}`}>
@@ -225,7 +357,6 @@ export const CalendarView: React.FC<Props> = ({
                                             <div 
                                                 key={task.id} 
                                                 onClick={() => {
-                                                    // HYDRATE SUBTASKS from the full 'tasks' state
                                                     const subtasks = tasks
                                                         .filter(t => (t.tarefamae === task.id || t.tarefa === task.id) && t.sutarefa)
                                                         .map(t => ({
@@ -256,7 +387,7 @@ export const CalendarView: React.FC<Props> = ({
                                                         attachments: task.anexos || [],
                                                         dbId: task.id,
                                                         projectId: task.projeto || undefined,
-                                                        subtasks: subtasks // Pass Subtasks here
+                                                        subtasks: subtasks 
                                                     }, nodeLabel: task.projetoData?.nome || 'Tarefa' });
                                                 }}
                                                 className={`rounded border cursor-pointer shadow-sm transition-transform hover:scale-[1.01] ${
@@ -276,6 +407,9 @@ export const CalendarView: React.FC<Props> = ({
                                                 </div>
                                                 {viewMode === 'day' && (
                                                     <div className="text-xs opacity-70 mt-1 truncate">{task.projetoData?.nome || 'Sem projeto'}</div>
+                                                )}
+                                                {viewMode !== 'day' && task.duracaohoras > 0 && (
+                                                    <div className="text-[9px] opacity-60 mt-0.5">{task.duracaohoras}h</div>
                                                 )}
                                             </div>
                                         ))}

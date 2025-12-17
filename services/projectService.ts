@@ -1,3 +1,4 @@
+
 import { supabase } from './supabaseClient';
 import { DbProject, DbTask, AreaAtuacao, BpmnNode, Attachment, BpmnSubTask } from '../types';
 
@@ -433,6 +434,8 @@ export const syncTaskChecklist = async (
         // 2. Delete Orphans (In DB but not in new list)
         const toDelete = [...existingIds].filter(id => !incomingIds.has(id));
         if (toDelete.length > 0) {
+            // Must delete comments for these subtasks first to avoid FK error
+            await supabase.from('comentarios').delete().in('task', toDelete);
             await supabase.from(TASKS_TABLE).delete().in('id', toDelete);
         }
 
@@ -473,11 +476,29 @@ export const syncTaskChecklist = async (
 };
 
 export const deleteTask = async (id: number): Promise<boolean> => {
-    const { error: subError } = await supabase.from(TASKS_TABLE).delete().eq('tarefamae', id);
-    if (subError) {
-        console.error('Erro ao deletar subtarefas:', subError.message);
+    // 1. Buscar subtarefas para limpar dependências
+    const { data: subtasks } = await supabase.from(TASKS_TABLE).select('id').eq('tarefamae', id);
+    
+    if (subtasks && subtasks.length > 0) {
+        const subIds = subtasks.map(s => s.id);
+        
+        // 2. Deletar comentários das subtarefas
+        await supabase.from('comentarios').delete().in('task', subIds);
+        
+        // 3. Deletar subtarefas
+        const { error: subError } = await supabase.from(TASKS_TABLE).delete().in('id', subIds);
+        if (subError) {
+            console.error('Erro ao deletar subtarefas:', subError.message);
+        }
     }
 
+    // 4. Deletar comentários da tarefa principal
+    const { error: commentError } = await supabase.from('comentarios').delete().eq('task', id);
+    if (commentError) {
+        console.error('Erro ao deletar comentários da tarefa:', commentError.message);
+    }
+
+    // 5. Deletar tarefa principal
     const { error } = await supabase.from(TASKS_TABLE).delete().eq('id', id);
     if (error) {
         console.error('Erro ao deletar tarefa:', error.message);

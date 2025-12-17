@@ -41,6 +41,7 @@ import { fetchActiveOrgModules, getPlanDefaultModules } from './services/organiz
 const ROUTES: Record<string, string> = {
     'dashboard': '/',
     'list': '/projects',
+    'create-project': '/project/new',
     'kanban': '/kanban',
     'gantt': '/gantt',
     'calendar': '/calendar',
@@ -88,8 +89,7 @@ const App: React.FC = () => {
 
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
-  const [showCreate, setShowCreate] = useState(false);
-  // NEW: State to hold the opportunity being edited
+  // 'showCreate' deprecated in favor of routing
   const [editingOpportunity, setEditingOpportunity] = useState<Opportunity | null>(null);
 
   const [showCreateTask, setShowCreateTask] = useState(false);
@@ -144,6 +144,7 @@ const App: React.FC = () => {
   const setView = (newView: string) => {
       setViewState(newView);
       setSelectedProjectState(null); // Close project if navigating away
+      setEditingOpportunity(null);
       const path = ROUTES[newView] || '/';
       navigateTo(path);
   };
@@ -157,12 +158,18 @@ const App: React.FC = () => {
   // 3. Handle Back from Project
   const closeProject = () => {
       setSelectedProjectState(null);
-      // Return to the URL of the current view
-      const path = ROUTES[view] || '/';
-      navigateTo(path);
+      // Return to the URL of the current view (dashboard usually)
+      setView('dashboard');
   };
 
-  // 4. Initial Load & PopState (Browser Back/Forward)
+  // 4. Handle Edit Project (New Route)
+  const onEditProject = (opp: Opportunity) => {
+      setEditingOpportunity(opp);
+      setViewState('edit-project');
+      navigateTo(`/project/${opp.id}/edit`);
+  };
+
+  // 5. Initial Load & PopState (Browser Back/Forward)
   useEffect(() => {
       const handleRouting = async () => {
           let path = window.location.pathname;
@@ -178,14 +185,31 @@ const App: React.FC = () => {
               return;
           }
 
-          // Project Route
+          // Create Project Route
+          if (path === '/project/new') {
+              setViewState('create-project');
+              setEditingOpportunity(null);
+              setSelectedProjectState(null);
+              return;
+          }
+
+          // Project Specific Routes
           if (path.startsWith('/project/')) {
-              const projectId = path.split('/')[2];
+              const parts = path.split('/');
+              const projectId = parts[2];
+              const subAction = parts[3]; // e.g., 'edit'
+
               if (projectId) {
                   const opp = await fetchOpportunityById(projectId);
                   if (opp) {
-                      setSelectedProjectState(opp);
-                      // Don't change 'view' state, keep it underneath
+                      if (subAction === 'edit') {
+                          setEditingOpportunity(opp);
+                          setViewState('edit-project');
+                          setSelectedProjectState(null);
+                      } else {
+                          setSelectedProjectState(opp);
+                          setViewState('project-view'); // Internal view state for ProjectWorkspace
+                      }
                   } else {
                       // Project not found, redirect to dashboard
                       setView('dashboard');
@@ -199,6 +223,7 @@ const App: React.FC = () => {
           if (mappedView) {
               setViewState(mappedView);
               setSelectedProjectState(null);
+              setEditingOpportunity(null);
           } else {
               // Default/Unknown -> Dashboard
               if (path !== '/' && !path.includes('type=recovery')) {
@@ -219,7 +244,7 @@ const App: React.FC = () => {
       window.addEventListener('popstate', onPopState);
 
       return () => window.removeEventListener('popstate', onPopState);
-  }, []); // Run once on mount
+  }, []); 
 
   // Check URL for White Label, Password Reset or Blog (Legacy Checks + New Routing)
   useEffect(() => {
@@ -245,7 +270,7 @@ const App: React.FC = () => {
       }
   }, []);
 
-  // Sync Plan from Org State (Redundant safety check)
+  // Sync Plan from Org State
   useEffect(() => {
       if (orgPlanId !== null) {
           const planString = mapDbPlanIdToString(orgPlanId);
@@ -332,17 +357,13 @@ const App: React.FC = () => {
               aiSector: data.setor || '',
               aiTone: data.tomdevoz || '',
               aiContext: data.dna || '',
-              // For initial load, we don't rely on isWhitelabelActive from plan anymore in UI logic,
-              // but we keep the state for URL params override.
               isWhitelabelActive: false 
           });
 
-          // LOAD ACTIVE MODULES (With Fallback)
           const modules = await fetchActiveOrgModules(orgId);
           if (modules.length > 0) {
               setActiveModules(modules);
           } else {
-              // Fallback logic if no modules are explicitly set
               const defaultModules = getPlanDefaultModules(planId);
               setActiveModules(defaultModules);
           }
@@ -368,7 +389,6 @@ const App: React.FC = () => {
       });
   };
 
-  // Initialize Theme
   useEffect(() => {
       if (theme === 'dark') document.documentElement.classList.add('dark');
   }, []);
@@ -434,7 +454,7 @@ const App: React.FC = () => {
       else if (actionId === 'nav_calendar') setView('calendar');
       else if (actionId === 'nav_financial') setView('financial');
       else if (actionId === 'nav_matrix') setView('dashboard');
-      else if (actionId === 'create_project') { setEditingOpportunity(null); setShowCreate(true); }
+      else if (actionId === 'create_project') setView('create-project');
       else if (actionId === 'create_task') setShowCreateTask(true);
       else {
           console.warn("Action ID not handled:", actionId);
@@ -442,7 +462,6 @@ const App: React.FC = () => {
   };
 
   // --- WHITELABEL LOGIC ---
-  // Checks if 'whitelabel' (ID 20) is in active modules or URL param override
   const shouldUseWhitelabel = activeModules.includes('whitelabel') || activeModules.includes('whitelable') || orgDetails.isWhitelabelActive;
   
   const appBrandName = shouldUseWhitelabel && orgDetails.name ? orgDetails.name : 'Shinkō OS';
@@ -524,12 +543,13 @@ const App: React.FC = () => {
   return (
     <div className={`flex h-screen w-full bg-slate-100 dark:bg-black text-slate-900 dark:text-slate-100 transition-colors duration-300 ${theme}`}>
         
-        {!isSharedMode && (
+        {/* Hide Sidebar for Full Page Views only for Wizard */}
+        {!isSharedMode && view !== 'create-project' && view !== 'edit-project' && (
             <div className={''}>
                 <Sidebar 
                     currentView={view} 
                     onChangeView={setView} 
-                    onOpenCreate={() => { setEditingOpportunity(null); setShowCreate(true); }}
+                    onOpenCreate={() => setView('create-project')}
                     onOpenCreateTask={() => setShowCreateTask(true)}
                     onToggleTheme={toggleTheme}
                     onLogout={handleLogout}
@@ -549,11 +569,12 @@ const App: React.FC = () => {
             </div>
         )}
         
-        {!isSharedMode && (
+        {/* Mobile Drawer (Only if not in focused mode) */}
+        {!isSharedMode && view !== 'create-project' && view !== 'edit-project' && (
             <MobileDrawer 
                 currentView={view} 
                 onChangeView={setView} 
-                onOpenCreate={() => { setEditingOpportunity(null); setShowCreate(true); }}
+                onOpenCreate={() => setView('create-project')}
                 onOpenCreateTask={() => setShowCreateTask(true)}
                 onToggleTheme={toggleTheme}
                 onLogout={handleLogout}
@@ -574,19 +595,51 @@ const App: React.FC = () => {
 
         <main className={`flex-1 overflow-hidden relative ${!isSharedMode ? 'pt-16 xl:pt-0' : ''}`}>
             <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500"></div></div>}>
+                
+                {/* 1. PROJECT VIEW (Workspace) */}
                 {selectedProject ? (
                     <ProjectWorkspace 
                         opportunity={selectedProject} 
                         onBack={closeProject}
                         onUpdate={(opp) => updateOpportunity(opp).then(() => loadOpportunities(userOrgId!))}
-                        onEdit={(opp) => { setEditingOpportunity(opp); setShowCreate(true); }}
+                        onEdit={onEditProject}
                         onDelete={(id) => deleteOpportunity(id).then(() => { closeProject(); loadOpportunities(userOrgId!); })}
                         userRole={userRole}
                         currentPlan={currentPlan}
                         isSharedMode={isSharedMode}
                         activeModules={activeModules}
                     />
-                ) : (
+                ) : 
+                
+                /* 2. CREATE/EDIT PROJECT (Wizard as Full Page) */
+                (view === 'create-project' || view === 'edit-project') ? (
+                    <OpportunityWizard 
+                        initialData={editingOpportunity || undefined}
+                        onSave={async (opp) => {
+                            if (editingOpportunity) {
+                                await updateOpportunity(opp);
+                                if(userOrgId) loadOpportunities(userOrgId);
+                                // Return to project view
+                                onOpenProject(opp);
+                            } else {
+                                const newOpp = await createOpportunity({ ...opp, organizationId: userOrgId });
+                                if(userOrgId) loadOpportunities(userOrgId);
+                                // Open new project
+                                if(newOpp) onOpenProject(newOpp);
+                                else setView('dashboard');
+                            }
+                        }}
+                        onCancel={() => {
+                            if (editingOpportunity) onOpenProject(editingOpportunity);
+                            else setView('dashboard');
+                        }}
+                        orgType={orgDetails.name}
+                        activeModules={activeModules}
+                    />
+                ) :
+
+                /* 3. MAIN DASHBOARD & LISTS */
+                (
                     <>
                         {view === 'dashboard' && (
                             <div className="h-full p-4 md:p-8 overflow-y-auto custom-scrollbar">
@@ -620,7 +673,7 @@ const App: React.FC = () => {
                                     userRole={userRole}
                                     organizationId={userOrgId || undefined}
                                     activeModules={activeModules}
-                                    onOpenCreate={() => { setEditingOpportunity(null); setShowCreate(true); }}
+                                    onOpenCreate={() => setView('create-project')}
                                 />
                             </div>
                         )}
@@ -672,7 +725,12 @@ const App: React.FC = () => {
                         )}
                         {view === 'clients' && activeModules.includes('clients') && (
                             <div className="h-full p-4 md:p-8 overflow-hidden">
-                                <ClientsScreen userRole={userRole} onlineUsers={onlineUsers} organizationId={userOrgId || undefined} onOpenProject={onOpenProject} />
+                                <ClientsScreen 
+                                    userRole={userRole} 
+                                    onlineUsers={onlineUsers} 
+                                    organizationId={userOrgId || undefined} 
+                                    onOpenProject={onOpenProject} 
+                                />
                             </div>
                         )}
                         {view === 'product' && activeModules.includes('product') && (
@@ -716,25 +774,6 @@ const App: React.FC = () => {
                 )}
             </Suspense>
         </main>
-
-        {showCreate && (
-            <OpportunityWizard 
-                initialData={editingOpportunity || undefined}
-                onSave={async (opp) => {
-                    if (editingOpportunity) {
-                        await updateOpportunity(opp);
-                    } else {
-                        await createOpportunity({ ...opp, organizationId: userOrgId });
-                    }
-                    if(userOrgId) loadOpportunities(userOrgId);
-                    setShowCreate(false);
-                    setEditingOpportunity(null);
-                }}
-                onCancel={() => { setShowCreate(false); setEditingOpportunity(null); }}
-                orgType={orgDetails.name}
-                activeModules={activeModules}
-            />
-        )}
 
         {showCreateTask && (
             <QuickTaskModal 

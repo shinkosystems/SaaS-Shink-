@@ -156,16 +156,36 @@ export const suggestEvidence = async (title: string, description: string, orgTyp
     }
 };
 
-export const generateSubtasksForTask = async (taskTitle: string, context: string, orgType?: string): Promise<{title: string, hours: number}[]> => {
+export const generateSubtasksForTask = async (
+    taskTitle: string, 
+    context: string, 
+    orgType?: string,
+    teamMembers?: { id: string, name: string, role: string }[]
+): Promise<{title: string, hours: number, assigneeId?: string}[]> => {
     const ai = getAiClient();
     if (!ai) return [];
 
     const role = orgType && orgType !== 'Startup' ? `Gerente de Projetos de ${orgType}` : "Project Manager Técnico Sênior";
+    
+    let teamContext = "";
+    if (teamMembers && teamMembers.length > 0) {
+        const membersList = teamMembers.map(m => `ID: "${m.id}", Nome: "${m.name}", Cargo: "${m.role}"`).join("\n");
+        teamContext = `
+        Abaixo está a lista de membros da equipe disponíveis.
+        Para CADA subtarefa, você DEVE atribuir o 'assigneeId' (ID do membro) mais qualificado baseando-se no Cargo dele.
+        Se a tarefa for genérica ou ninguém se encaixar, deixe 'assigneeId' em branco.
+        
+        Lista de Membros:
+        ${membersList}
+        `;
+    }
+
     const prompt = `
       Atue como um ${role}.
       Crie um checklist técnico detalhado para a tarefa: "${taskTitle}".
       Contexto do Projeto: ${context}.
       Estime o tempo em horas (números inteiros) para cada item.
+      ${teamContext}
     `;
 
     try {
@@ -180,7 +200,8 @@ export const generateSubtasksForTask = async (taskTitle: string, context: string
                         type: Type.OBJECT,
                         properties: {
                             title: { type: Type.STRING },
-                            hours: { type: Type.NUMBER }
+                            hours: { type: Type.NUMBER },
+                            assigneeId: { type: Type.STRING, description: "O ID exato do membro da equipe selecionado, ou string vazia." }
                         }
                     }
                 }
@@ -266,7 +287,6 @@ export const generateBpmn = async (
     }
 };
 
-// --- RE-EXPORTING UNTOUCHED HELPERS FOR COMPATIBILITY ---
 export const extractPdfContext = async (base64Pdf: string): Promise<string> => {
     // Basic implementation without retry for now as it's heavy
     const ai = getAiClient();
@@ -280,9 +300,70 @@ export const extractPdfContext = async (base64Pdf: string): Promise<string> => {
     } catch (e) { return "Erro processamento"; }
 };
 
-export const optimizeSchedule = async (tasks: any[], availableDevelopers: any[]): Promise<any[]> => {
-    // Placeholder to maintain export interface. Logic moved to retry block if needed.
-    return []; 
+export const optimizeSchedule = async (tasks: any[], availableDevelopers: any[], globalCapacity: number = 8): Promise<any[]> => {
+    const ai = getAiClient();
+    if (!ai) return [];
+
+    // Filter minimal info to save tokens
+    const taskList = tasks.map(t => ({
+        id: t.id,
+        title: t.titulo || t.taskText,
+        hours: t.duracaohoras || t.estimatedHours || 1,
+    }));
+
+    const prompt = `
+    You are a Production Scheduler AI.
+    
+    OBJECTIVE:
+    Reschedule the following TASKS starting from TOMORROW.
+    
+    CONSTRAINT:
+    The sum of hours for all tasks scheduled on any single day MUST NOT exceed ${globalCapacity} hours.
+    This represents the total organization capacity per day.
+    
+    INPUT:
+    ${JSON.stringify(taskList)}
+    
+    INSTRUCTIONS:
+    1. Distribute tasks sequentially or in parallel as long as the Daily Sum <= ${globalCapacity}.
+    2. Ensure no task is left unscheduled.
+    3. Return a JSON array with the new dates.
+    
+    OUTPUT JSON FORMAT:
+    [
+        { "id": 123, "startDate": "YYYY-MM-DD", "dueDate": "YYYY-MM-DD" }
+    ]
+    `;
+
+    try {
+        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: { 
+                responseMimeType: 'application/json',
+                responseSchema: {
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            id: { type: Type.NUMBER },
+                            startDate: { type: Type.STRING },
+                            dueDate: { type: Type.STRING }
+                        }
+                    }
+                }
+            }
+        }));
+        
+        if (response.text) {
+            const result = JSON.parse(response.text);
+            return result;
+        }
+        return [];
+    } catch (e) {
+        console.error("Schedule Optimization Error:", e);
+        return [];
+    }
 };
 
 export const askGuru = async (question: string, context: string): Promise<string> => {

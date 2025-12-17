@@ -151,7 +151,20 @@ export const updateOpportunity = async (opp: Opportunity): Promise<Opportunity |
 export const deleteOpportunity = async (id: string): Promise<boolean> => {
     if (!supabase) return false;
     try {
-        await supabase.from('tasks').delete().eq('projeto', id);
+        // 1. Fetch all tasks for project
+        const { data: tasks } = await supabase.from('tasks').select('id').eq('projeto', id);
+        
+        if (tasks && tasks.length > 0) {
+            const taskIds = tasks.map((t: any) => t.id);
+            
+            // 2. Delete comments for these tasks (and subtasks comments if handled properly, but usually cascade works if configured)
+            // But here we do manual to be safe
+            await supabase.from('comentarios').delete().in('task', taskIds);
+            
+            // 3. Delete tasks
+            await supabase.from('tasks').delete().eq('projeto', id);
+        }
+
         const { error } = await supabase.from(TABLE_NAME).delete().eq('id', id);
         return !error;
     } catch (err) { return false; }
