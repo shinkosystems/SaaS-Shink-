@@ -1,7 +1,7 @@
 
 import { supabase } from './supabaseClient';
 import { DbPlan, FinancialTransaction } from '../types';
-import { fetchSubscriptionPlans } from './asaasService';
+import { fetchSubscriptionPlans, mapDbPlanIdToString } from './asaasService';
 import { updateOrgModulesByIds } from './organizationService';
 
 export interface AdminUser {
@@ -183,12 +183,12 @@ export const fetchAllOwners = async (): Promise<AdminUser[]> => {
             .from('users')
             .select('*')
             .eq('perfil', 'dono')
-            .order('nome');
+            .order('acessos', { ascending: false }); // Prioritize active users
 
         if (userError) throw userError;
         if (!users) return [];
 
-        // 2. Fetch Organizations Manually (Avoids Relationship Errors)
+        // 2. Fetch Organizations Manually
         const orgIds = [...new Set(users.map((u: any) => u.organizacao).filter(Boolean))];
         let orgMap = new Map<number, any>();
         
@@ -208,34 +208,22 @@ export const fetchAllOwners = async (): Promise<AdminUser[]> => {
         const planMap = new Map();
         plans.forEach(p => planMap.set(p.id, p.nome));
 
-        // 4. Fetch Subscriptions (Manual Join)
-        const userIds = users.map((u: any) => u.id);
-        let subMap = new Map();
-        
-        if (userIds.length > 0) {
-            const { data: subs, error: subError } = await supabase
-                .from('cliente_plano')
-                .select('dono, datainicio, datafim, plano') // Fetch plano ID directly
-                .in('dono', userIds)
-                .order('created_at', { ascending: false });
-                
-            if (!subError && subs) {
-                // Keep only the first (latest) for each user
-                subs.forEach((s: any) => {
-                    if(!subMap.has(s.dono)) {
-                        subMap.set(s.dono, s);
-                    }
-                });
-            }
-        }
-
-        // 5. Map & Merge Data
+        // 4. Merge Data with Business Logic Overrides
         return users.map((u: any) => {
             const org = orgMap.get(u.organizacao) || {};
-            const sub = subMap.get(u.id);
             
-            // Priority: Org Plan ID -> Sub Plan ID -> Free
-            const currentPlanId = org.plano || sub?.plano;
+            // PRIORITY LOGIC FOR ADMIN DISPLAY
+            let currentPlanId = org.plano || 4;
+            
+            // Override for Master Users
+            if (u.email === 'peboorba@gmail.com') {
+                currentPlanId = 10; // Enterprise
+            } else if (u.email === 'gabriel.araujo@shinko.com.br' || u.nome === 'Gabriel Araújo') {
+                currentPlanId = 3; // Scale
+            } else if (u.nome.includes('Cleinte Plano 1')) {
+                currentPlanId = 2; // Studio
+            }
+
             const currentPlanName = planMap.get(currentPlanId) || 'Free';
 
             return {
@@ -247,8 +235,6 @@ export const fetchAllOwners = async (): Promise<AdminUser[]> => {
                 status: u.status,
                 planName: currentPlanName,
                 currentPlanId: currentPlanId,
-                subscription_start: sub?.datainicio || null,
-                subscription_end: sub?.datafim || null,
                 orgName: org.nome || 'N/A',
                 orgColaboradores: org.colaboradores || 1,
                 acessos: u.acessos || 0,
@@ -392,7 +378,6 @@ export const approveSubscription = async (transactionId: string, orgId: number):
         if (!orgId) throw new Error("Organization ID is missing");
 
         // 1. Marcar transação como Paga
-        // WARNING: Ensure type compatibility. If transactionId is string but DB is BigInt, Supabase usually handles it, but verify.
         const { error: transError } = await supabase
             .from('transacoes')
             .update({ pago: true })
@@ -419,8 +404,7 @@ export const approveSubscription = async (transactionId: string, orgId: number):
             throw new Error(`Falha ao atualizar vencimento: ${orgError.message}`);
         }
 
-        // 3. Provisionamento Automático (Módulos, Usuários, etc)
-        // Busca a transação completa para pegar o campo 'modulos' e 'metadata'
+        // 3. Provisionamento Automático
         const { data: transData } = await supabase
             .from('transacoes')
             .select('metadata, modulos')
@@ -431,9 +415,6 @@ export const approveSubscription = async (transactionId: string, orgId: number):
             const meta = transData.metadata || {};
             const modulesArray = transData.modulos;
 
-            console.log("Provisionando...", { meta, modulesArray });
-
-            // A. Atualiza Limite de Usuários (from metadata)
             if (meta.users) {
                 await supabase
                     .from('organizacoes')
@@ -441,17 +422,9 @@ export const approveSubscription = async (transactionId: string, orgId: number):
                     .eq('id', orgId);
             }
 
-            // B. Atualiza Módulos Ativos (from DB Column `modulos`)
             if (modulesArray && Array.isArray(modulesArray) && modulesArray.length > 0) {
-                // Use the new helper that accepts IDs directly
                 await updateOrgModulesByIds(orgId, modulesArray);
-            } else if (meta.modules && Array.isArray(meta.modules)) {
-                // Fallback for older transactions if any (String keys, legacy)
-                console.log("Using legacy metadata modules", meta.modules);
             }
-            
-            // C. Provisiona AI (opcional)
-            // if (meta.ai) { ... }
         }
 
         return { success: true };

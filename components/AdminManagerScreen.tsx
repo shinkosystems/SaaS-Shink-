@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { fetchAllOwners, updateGlobalClientData, fetchPlans, fetchGlobalMetrics, AdminUser, GlobalMetrics, updateUserStatus, fetchPendingApprovals, approveSubscription } from '../services/adminService';
 import { fetchCmsCases, saveCmsCase, deleteCmsCase, fetchCmsPosts, saveCmsPost, deleteCmsPost, uploadCmsFile } from '../services/cmsService';
 import { DbPlan, FinancialTransaction, CmsCase, CmsPost } from '../types';
-import { Shield, Search, CreditCard, Loader2, Edit, CheckCircle, AlertTriangle, User, Zap, Building2, Users, DollarSign, TrendingUp, Activity, Filter, Calendar, Heart, UserMinus, Gem, MousePointer2, X, Clock, BarChart3, Wifi, Lock, ExternalLink, Check, Briefcase, FileText, Image as ImageIcon, Link as LinkIcon, Download, Save, Plus, Trash2, ArrowLeft, Globe, Tag, Eye, UploadCloud, ChevronRight, Settings } from 'lucide-react';
+import { Shield, Search, CreditCard, Loader2, Edit, CheckCircle, AlertTriangle, User, Zap, Building2, Users, DollarSign, TrendingUp, Activity, Filter, Calendar, Heart, UserMinus, Gem, MousePointer2, X, Clock, BarChart3, Wifi, Lock, ExternalLink, Check, Briefcase, FileText, Image as ImageIcon, Link as LinkIcon, Download, Save, Plus, Trash2, ArrowLeft, Globe, Tag, Eye, UploadCloud, ChevronRight, Settings, ArrowUpRight } from 'lucide-react';
 import { RichTextEditor } from './RichTextEditor';
 
 interface Props {
@@ -33,23 +33,33 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
 
     const loadData = async () => {
         setIsLoading(true);
-        if (activeTab === 'dashboard') {
-            const m = await fetchGlobalMetrics(dashStart, dashEnd);
-            setMetrics(m);
-        } else if (activeTab === 'clients') {
-            const [u, p] = await Promise.all([fetchAllOwners(), fetchPlans()]);
-            setUsers(u); setPlans(p);
-        } else if (activeTab === 'approvals') {
-            const a = await fetchPendingApprovals();
-            setApprovals(a);
-        } else if (activeTab === 'cms_cases') {
-            const c = await fetchCmsCases();
-            setCmsCases(c);
-        } else if (activeTab === 'cms_blog') {
-            const p = await fetchCmsPosts(false);
-            setCmsPosts(p);
+        try {
+            if (activeTab === 'dashboard') {
+                const [m, u] = await Promise.all([
+                    fetchGlobalMetrics(dashStart, dashEnd),
+                    fetchAllOwners()
+                ]);
+                setMetrics(m);
+                setUsers(u);
+            } else if (activeTab === 'clients') {
+                const [u, p] = await Promise.all([fetchAllOwners(), fetchPlans()]);
+                setUsers(u); 
+                setPlans(p);
+            } else if (activeTab === 'approvals') {
+                const a = await fetchPendingApprovals();
+                setApprovals(a);
+            } else if (activeTab === 'cms_cases') {
+                const c = await fetchCmsCases();
+                setCmsCases(c);
+            } else if (activeTab === 'cms_blog') {
+                const p = await fetchCmsPosts(false);
+                setCmsPosts(p);
+            }
+        } catch (e) {
+            console.error("Admin Load Error:", e);
+        } finally {
+            setIsLoading(false);
         }
-        setIsLoading(false);
     };
 
     const handleSaveUserChanges = async (updated: AdminUser) => {
@@ -129,19 +139,48 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
         return text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').replace(/--+/g, '-').trim();
     };
 
-    return (
-        <div className="h-full flex flex-col p-6 overflow-y-auto custom-scrollbar">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
-                <div>
-                    <h1 className="text-3xl font-black text-slate-900 dark:text-white flex items-center gap-3">
-                        <Shield className="w-8 h-8 text-amber-500"/> Painel Super Admin
-                    </h1>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-[0.2em] mt-2">Controle de Ecossistema Shinkō</p>
+    const getPlanBadgeStyle = (planName?: string) => {
+        const name = planName?.toLowerCase() || '';
+        if (name.includes('enterprise')) return 'bg-purple-500/10 text-purple-500 border-purple-500/20';
+        if (name.includes('scale')) return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
+        if (name.includes('studio')) return 'bg-amber-500/10 text-amber-500 border-amber-500/20';
+        if (name.includes('solo')) return 'bg-slate-500/10 text-slate-500 border-slate-500/20';
+        return 'bg-white/5 text-slate-400 border-white/10';
+    };
+
+    const KpiCard = ({ label, value, icon: Icon, color, subValue }: any) => (
+        <div className="glass-card p-8 flex flex-col justify-between h-44 relative group overflow-hidden border-slate-200 dark:border-white/5">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-current opacity-[0.03] rounded-full -mr-16 -mt-16 blur-3xl group-hover:opacity-[0.07] transition-opacity"></div>
+            <div className="flex justify-between items-start relative z-10">
+                <div className={`p-4 rounded-2xl ${color} bg-opacity-10 text-white dark:text-white border border-white/5 shadow-sm`}>
+                    <Icon className={`w-5 h-5 ${color.replace('bg-', 'text-')}`} />
                 </div>
-                <div className="flex bg-white dark:bg-white/5 p-1 rounded-2xl shadow-xl border border-slate-200 dark:border-white/10 backdrop-blur-md overflow-x-auto max-w-full">
+                <div className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{label}</div>
+            </div>
+            <div className="relative z-10">
+                <div className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter leading-none mb-1">{value}</div>
+                {subValue && <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{subValue}</div>}
+            </div>
+        </div>
+    );
+
+    return (
+        <div className="h-full flex flex-col p-6 lg:p-10 overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-[#020203]">
+            {/* Header */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
+                <div>
+                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full text-[9px] font-black text-amber-600 dark:text-amber-500 uppercase tracking-widest mb-4">
+                        <Shield className="w-3 h-3"/> Acesso Root Ativado
+                    </div>
+                    <h1 className="text-5xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">
+                        Super <span className="text-amber-500">Admin</span>.
+                    </h1>
+                </div>
+
+                <div className="flex bg-white dark:bg-white/5 p-1.5 rounded-[1.5rem] shadow-xl border border-slate-200 dark:border-white/10 backdrop-blur-3xl overflow-x-auto max-w-full no-scrollbar">
                     {[
                         { id: 'dashboard', label: 'Overview', icon: BarChart3 },
-                        { id: 'clients', label: 'Clientes', icon: Users },
+                        { id: 'clients', label: 'Contas', icon: Users },
                         { id: 'approvals', label: 'Aprovações', icon: CreditCard },
                         { id: 'cms_cases', label: 'Cases', icon: Briefcase },
                         { id: 'cms_blog', label: 'Blog', icon: FileText }
@@ -149,9 +188,9 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                         <button 
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id as any)}
-                            className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-slate-900 dark:bg-white shadow-lg text-white dark:text-slate-900 scale-105' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}
+                            className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2.5 transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-slate-900 dark:bg-white shadow-lg text-white dark:text-slate-900 scale-105' : 'text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
                         >
-                            <tab.icon className="w-3.5 h-3.5"/>
+                            <tab.icon className="w-4 h-4"/>
                             {tab.label}
                         </button>
                     ))}
@@ -167,29 +206,130 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
 
             {/* DASHBOARD VIEW */}
             {!isLoading && activeTab === 'dashboard' && metrics && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-in fade-in duration-700">
-                    <div className="glass-card-kpi p-8 rounded-[2rem] border border-slate-200 dark:border-white/5 flex flex-col justify-between h-44 relative group overflow-hidden">
-                        <div className="relative z-10">
-                            <div className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
-                                <DollarSign className="w-3 h-3 text-emerald-500"/> MRR Estimado
+                <div className="space-y-10 animate-in fade-in duration-700">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <KpiCard label="MRR Consolidado" value={`R$ ${metrics.totalMrr.toLocaleString('pt-BR')}`} icon={DollarSign} color="bg-emerald-500" subValue="Receita Recorrente" />
+                        <KpiCard label="Contas Ativas" value={metrics.activeClients} icon={Building2} color="bg-blue-500" subValue="Organizações Pagantes" />
+                        <KpiCard label="Total de Usuários" value={metrics.totalUsers} icon={Users} color="bg-purple-500" subValue="Base Cadastrada" />
+                        <KpiCard label="Ticket Médio" value={`R$ ${metrics.avgTicket.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`} icon={Zap} color="bg-amber-500" subValue="LTV Projetado" />
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div className="lg:col-span-2 glass-panel p-8 rounded-[2.5rem] border-slate-200 dark:border-white/5 space-y-6">
+                            <div className="flex justify-between items-center">
+                                <h3 className="text-sm font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em] flex items-center gap-2">
+                                    <Clock className="w-4 h-4 text-amber-500"/> Logins Recentes
+                                </h3>
+                                <button onClick={() => setActiveTab('clients')} className="text-[10px] font-black uppercase text-amber-500 hover:underline">Ver Todos</button>
                             </div>
-                            <div className="text-4xl font-black text-slate-900 dark:text-white group-hover:text-emerald-500 transition-colors">
-                                R$ {metrics.totalMrr.toLocaleString('pt-BR')}
+                            
+                            <div className="overflow-x-auto no-scrollbar">
+                                <table className="w-full text-left">
+                                    <thead>
+                                        <tr className="border-b border-slate-100 dark:border-white/5">
+                                            <th className="pb-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Usuário</th>
+                                            <th className="pb-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Plano</th>
+                                            <th className="pb-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Acessos</th>
+                                            <th className="pb-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Último Acesso</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                                        {users.slice(0, 10).map(u => (
+                                            <tr key={u.id} className="group hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors cursor-pointer" onClick={() => setEditingUser(u)}>
+                                                <td className="py-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-black text-xs text-slate-500 dark:text-white border border-slate-200 dark:border-white/10 group-hover:border-amber-500/30 transition-all">
+                                                            {u.nome.charAt(0)}
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-[13px] font-black text-slate-900 dark:text-white leading-tight">{u.nome}</div>
+                                                            <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mt-0.5 truncate max-w-[140px]">{u.orgName}</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="py-4 text-center">
+                                                    <span className={`px-2.5 py-1 rounded-[6px] text-[8px] font-black uppercase tracking-tighter border ${getPlanBadgeStyle(u.planName)}`}>
+                                                        {u.planName}
+                                                    </span>
+                                                </td>
+                                                <td className="py-4 text-center">
+                                                    <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 font-black">{u.acessos}</span>
+                                                </td>
+                                                <td className="py-4 text-right">
+                                                    <div className="text-[10px] font-black text-slate-900 dark:text-slate-300">
+                                                        {u.ultimo_acesso ? new Date(u.ultimo_acesso).toLocaleDateString('pt-BR') : '---'}
+                                                    </div>
+                                                    <div className="text-[8px] text-slate-500 uppercase font-black tracking-widest mt-0.5">
+                                                        {u.ultimo_acesso ? new Date(u.ultimo_acesso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'NUNCA'}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
-                        <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                            <TrendingUp className="w-32 h-32 text-white" />
+
+                        <div className="space-y-6">
+                            <div className="glass-card p-8 rounded-[2.5rem] bg-gradient-to-br from-purple-500/5 to-transparent border-purple-500/10">
+                                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
+                                    <Activity className="w-4 h-4 text-purple-500"/> Engajamento
+                                </h3>
+                                <div className="space-y-6">
+                                    <div>
+                                        <div className="flex justify-between items-end mb-2">
+                                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Atividade (DAU/MAU)</span>
+                                            <span className="text-xl font-black text-slate-900 dark:text-white">42%</span>
+                                        </div>
+                                        <div className="w-full h-1.5 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
+                                            <div className="h-full bg-purple-500 shadow-glow-purple" style={{ width: '42%' }}></div>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
+                                            <div className="text-2xl font-black text-white">{metrics.dau}</div>
+                                            <div className="text-[8px] text-slate-500 uppercase font-bold">Ativos Hoje</div>
+                                        </div>
+                                        <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
+                                            <div className="text-2xl font-black text-white">{metrics.mau}</div>
+                                            <div className="text-[8px] text-slate-500 uppercase font-bold">Ativos Mês</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="glass-card p-8 rounded-[2.5rem] bg-gradient-to-br from-emerald-500/5 to-transparent border-emerald-500/10">
+                                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
+                                    <Heart className="w-4 h-4 text-emerald-500"/> Satisfação
+                                </h3>
+                                <div className="flex items-center gap-6">
+                                    <div className="text-5xl font-black text-slate-900 dark:text-white">{metrics.npsScore}</div>
+                                    <div>
+                                        <div className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">NPS Global</div>
+                                        <div className="text-[8px] text-slate-500 font-bold uppercase mt-1 leading-tight">Baseado em feedback do sistema</div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    {/* Outros KPIs... */}
                 </div>
             )}
 
             {/* CLIENTS LIST */}
             {!isLoading && activeTab === 'clients' && (
                 <div className="space-y-4 animate-in fade-in duration-500">
+                    <div className="flex justify-between items-center mb-8 bg-white dark:bg-white/5 p-4 rounded-[1.8rem] border border-slate-200 dark:border-white/5">
+                        <div className="relative flex-1 max-w-md">
+                            <Search className="absolute left-4 top-3.5 w-4 h-4 text-slate-400"/>
+                            <input placeholder="Buscar conta ou domínio..." className="w-full pl-12 pr-4 py-3 bg-transparent text-sm font-bold outline-none"/>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <button className="p-2.5 hover:bg-slate-100 dark:hover:bg-white/10 rounded-xl text-slate-400 transition-all"><Filter className="w-4 h-4"/></button>
+                        </div>
+                    </div>
+                    
                     {users.map(u => (
-                        <div key={u.id} className="flex flex-col md:flex-row justify-between items-center p-6 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-3xl hover:border-amber-500/30 transition-all hover:shadow-2xl hover:shadow-black/20 group">
+                        <div key={u.id} className="flex flex-col md:flex-row justify-between items-center p-6 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-3xl hover:border-amber-500/30 transition-all hover:shadow-2xl group">
                             <div className="flex items-center gap-6 w-full md:w-auto">
                                 <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 flex items-center justify-center font-black text-2xl text-slate-500 dark:text-white group-hover:scale-110 transition-transform shadow-inner">
                                     {u.nome.charAt(0)}
@@ -203,13 +343,17 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                                     </div>
                                     <div className="text-xs text-slate-500 font-bold uppercase tracking-wider mt-2 flex flex-wrap gap-x-4 gap-y-1">
                                         <span className="flex items-center gap-1.5"><Building2 className="w-3 h-3"/> {u.orgName}</span>
-                                        <span className="flex items-center gap-1.5 text-amber-500"><Gem className="w-3 h-3"/> {u.planName}</span>
+                                        <span className={`flex items-center gap-1.5 font-black ${u.planName === 'Free' ? 'text-slate-400' : 'text-amber-500'}`}><Gem className="w-3 h-3"/> {u.planName}</span>
                                         <span className="flex items-center gap-1.5"><Users className="w-3 h-3"/> {u.orgColaboradores} usuários</span>
                                     </div>
                                 </div>
                             </div>
                             
                             <div className="flex items-center gap-8 mt-6 md:mt-0 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 pt-4 md:pt-0 border-slate-100 dark:border-white/5">
+                                <div className="text-right">
+                                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Último Acesso</div>
+                                    <div className="text-xs font-bold text-slate-900 dark:text-white mt-1">{u.ultimo_acesso ? new Date(u.ultimo_acesso).toLocaleDateString() : 'Nunca'}</div>
+                                </div>
                                 <button 
                                     onClick={() => setEditingUser({ ...u })} 
                                     className="px-8 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:scale-105 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-xl active:scale-95 flex items-center gap-2"
@@ -219,6 +363,54 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                             </div>
                         </div>
                     ))}
+                </div>
+            )}
+
+            {/* APROVALS VIEW */}
+            {!isLoading && activeTab === 'approvals' && (
+                <div className="animate-in fade-in duration-500 space-y-6">
+                    {approvals.length === 0 ? (
+                        <div className="py-20 flex flex-col items-center justify-center text-center opacity-50">
+                            <CheckCircle className="w-16 h-16 text-slate-300 mb-4"/>
+                            <h3 className="text-xl font-black text-slate-400">Tudo em dia!</h3>
+                            <p className="text-sm font-bold">Nenhuma assinatura aguardando aprovação.</p>
+                        </div>
+                    ) : (
+                        approvals.map(app => (
+                            <div key={app.id} className="glass-panel p-8 rounded-[2.5rem] border-slate-200 dark:border-white/10 flex flex-col md:flex-row justify-between items-center gap-8 group">
+                                <div className="flex items-center gap-6">
+                                    <div className="w-16 h-16 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-500 border border-amber-500/20">
+                                        <CreditCard className="w-8 h-8"/>
+                                    </div>
+                                    <div>
+                                        <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tighter">{app.orgName}</h3>
+                                        <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">{app.description} • <span className="text-emerald-500 font-black">R$ {app.amount.toLocaleString('pt-BR')}</span></p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-4 w-full md:w-auto">
+                                    <a href={app.comprovante} target="_blank" className="flex-1 md:flex-none px-6 py-4 bg-slate-100 dark:bg-white/5 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2">
+                                        <ImageIcon className="w-4 h-4"/> Ver Comprovante
+                                    </a>
+                                    <button 
+                                        onClick={async () => {
+                                            if(confirm("Confirmar recebimento e liberar módulos?")) {
+                                                setApprovingId(app.id);
+                                                const res = await approveSubscription(app.id, app.organizationId);
+                                                if(res.success) { alert("Assinatura liberada!"); loadData(); }
+                                                else alert(res.msg);
+                                                setApprovingId(null);
+                                            }
+                                        }}
+                                        disabled={approvingId === app.id}
+                                        className="flex-[2] md:flex-none px-10 py-4 bg-emerald-500 text-black rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-glow-emerald flex items-center justify-center gap-2 disabled:opacity-50"
+                                    >
+                                        {approvingId === app.id ? <Loader2 className="animate-spin w-4 h-4"/> : <Check className="w-4 h-4"/>}
+                                        Aprovar Agora
+                                    </button>
+                                </div>
+                            </div>
+                        ))
+                    )}
                 </div>
             )}
 
@@ -260,7 +452,7 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                 </div>
             )}
 
-            {/* CMS BLOG VIEW - RESTAURADO AO MODELO MARAVILHOSO */}
+            {/* CMS BLOG VIEW */}
             {!isLoading && activeTab === 'cms_blog' && (
                 <div className="space-y-6 animate-in fade-in duration-500">
                     <button 
@@ -418,7 +610,7 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                 </div>
             )}
 
-            {/* CMS BLOG MODAL - RESTAURADO AO MODELO MARAVILHOSO */}
+            {/* CMS BLOG MODAL */}
             {editingPost && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl animate-in fade-in">
                     <div className="bg-[#0c0c0e] w-full max-w-4xl h-[90vh] rounded-[2.5rem] border border-white/10 overflow-hidden animate-ios-pop flex flex-col">

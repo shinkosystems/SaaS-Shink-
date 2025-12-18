@@ -145,7 +145,6 @@ const App: React.FC = () => {
           let path = window.location.pathname;
           if (!path || path.startsWith('blob:')) path = '/';
 
-          // Blog Route with Slug
           if (path.startsWith('/blog')) {
               const parts = path.split('/');
               const slug = parts[2];
@@ -245,7 +244,7 @@ const App: React.FC = () => {
               setUserRole(data.perfil || 'colaborador');
               setUserOrgId(data.organizacao);
               if (data.organizacao) {
-                  await loadOrganization(data.organizacao);
+                  await loadOrganization(data.organizacao, data.email);
                   loadOpportunities(data.organizacao);
               }
               trackUserAccess(userId);
@@ -260,10 +259,15 @@ const App: React.FC = () => {
       }
   };
 
-  const loadOrganization = async (orgId: number) => {
+  const loadOrganization = async (orgId: number, currentUserEmail?: string) => {
       const { data } = await supabase.from('organizacoes').select('*').eq('id', orgId).single();
       if (data) {
-          const planId = data.plano || 4;
+          // MASTER OVERRIDE FOR UI
+          let planId = data.plano || 4;
+          if (currentUserEmail === 'peboorba@gmail.com') {
+              planId = 10; // Enterprise
+          }
+          
           setOrgPlanId(planId);
           setCurrentPlan(mapDbPlanIdToString(planId));
           setOrgDetails({
@@ -315,7 +319,7 @@ const App: React.FC = () => {
       try {
           let logoUrl = updates.logoFile ? await uploadLogo(userOrgId, updates.logoFile) : undefined;
           await updateOrgDetails(userOrgId, { ...updates, logoUrl });
-          loadOrganization(userOrgId);
+          if (userData?.email) loadOrganization(userOrgId, userData.email);
           alert('Configurações atualizadas!');
       } catch (e: any) { alert('Erro ao atualizar: ' + e.message); }
   };
@@ -412,7 +416,7 @@ const App: React.FC = () => {
         {!isSharedMode && view !== 'create-project' && view !== 'edit-project' && (
             <Sidebar 
                 currentView={view} onChangeView={setView} 
-                onOpenCreate={() => setView('create-project')} onOpenCreateTask={() => setShowCreateTask(true)}
+                onOpenCreate={() => setViewState('create-project')} onOpenCreateTask={() => setShowCreateTask(true)}
                 onToggleTheme={toggleTheme} onLogout={handleLogout} onSearch={(q) => setSearchTerm(q)}
                 onOpenFeedback={() => setShowFeedback(true)} theme={theme} dbStatus={dbStatus}
                 isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} userRole={userRole}
@@ -422,7 +426,7 @@ const App: React.FC = () => {
         )}
         {!isSharedMode && view !== 'create-project' && view !== 'edit-project' && (
             <MobileDrawer 
-                currentView={view} onChangeView={setView} onOpenCreate={() => setView('create-project')}
+                currentView={view} onChangeView={setView} onOpenCreate={() => setViewState('create-project')}
                 onOpenCreateTask={() => setShowCreateTask(true)} onToggleTheme={toggleTheme} onLogout={handleLogout}
                 onSearch={(q) => setSearchTerm(q)} onOpenFeedback={() => setShowFeedback(true)} theme={theme}
                 dbStatus={dbStatus} isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} userRole={userRole}
@@ -430,7 +434,7 @@ const App: React.FC = () => {
                 customLogoUrl={appLogoUrl} orgName={appBrandName} activeModules={activeModules}
             />
         )}
-        <main className={`flex-1 overflow-hidden relative ${!isSharedMode ? 'pt-16 xl:pt-0' : ''}`}>
+        <main className={`flex-1 overflow-hidden relative ${!isSharedMode && view !== 'create-project' && view !== 'edit-project' ? 'pt-20 lg:pt-0' : ''}`}>
             <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500"></div></div>}>
                 {selectedProject ? (
                     <ProjectWorkspace 
@@ -482,7 +486,7 @@ const App: React.FC = () => {
                                 <ProjectList 
                                     opportunities={filteredOpportunities} onOpenProject={onOpenProject}
                                     userRole={userRole} organizationId={userOrgId || undefined}
-                                    activeModules={activeModules} onOpenCreate={() => setView('create-project')}
+                                    activeModules={activeModules} onOpenCreate={() => setViewState('create-project')}
                                 />
                             </div>
                         )}
@@ -527,12 +531,14 @@ const App: React.FC = () => {
                             </div>
                         )}
                         {view === 'settings' && (
-                            <SettingsScreen 
-                                theme={theme} onToggleTheme={toggleTheme} onlineUsers={onlineUsers} userOrgId={userOrgId}
-                                orgDetails={orgDetails} onUpdateOrgDetails={handleUpdateOrgDetails} setView={setView}
-                                userRole={userRole} userData={userData} currentPlan={currentPlan} activeModules={activeModules}
-                                onRefreshModules={handleRefreshModules} initialTab={settingsStartTab}
-                            />
+                            <div className="h-full overflow-y-auto custom-scrollbar">
+                                <SettingsScreen 
+                                    theme={theme} onToggleTheme={toggleTheme} onlineUsers={onlineUsers} userOrgId={userOrgId}
+                                    orgDetails={orgDetails} onUpdateOrgDetails={handleUpdateOrgDetails} setView={setView}
+                                    userRole={userRole} userData={userData} currentPlan={currentPlan} activeModules={activeModules}
+                                    onRefreshModules={handleRefreshModules} initialTab={settingsStartTab}
+                                />
+                            </div>
                         )}
                         {view === 'profile' && (
                             <div className="h-full p-4 md:p-8 overflow-y-auto custom-scrollbar">

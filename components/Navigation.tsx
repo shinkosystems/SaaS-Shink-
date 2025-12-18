@@ -79,6 +79,11 @@ const Logo = ({ customLogoUrl, orgName }: { customLogoUrl?: string | null, orgNa
     )
 );
 
+const getPlanLabel = (plan?: string) => {
+    if (!plan) return 'FREE';
+    return plan.replace('plan_', '').replace('_yearly', '').toUpperCase();
+};
+
 export const Sidebar: React.FC<Props> = (props) => {
   const isClient = props.userRole === 'cliente';
   const isAdmin = props.userData.email === 'peboorba@gmail.com';
@@ -141,7 +146,7 @@ export const Sidebar: React.FC<Props> = (props) => {
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className="text-sm font-black text-slate-900 dark:text-white truncate">{props.userData.name}</div>
-                    <div className="text-[9px] font-bold text-amber-600 dark:text-amber-500/60 uppercase tracking-widest">{props.currentPlan?.replace('plan_', '') || 'Free'}</div>
+                    <div className="text-[9px] font-bold text-amber-600 dark:text-amber-500/60 uppercase tracking-widest">PLANO {getPlanLabel(props.currentPlan)}</div>
                 </div>
                 <button onClick={(e) => { e.stopPropagation(); props.onLogout(); }} className="p-2.5 text-slate-400 hover:text-red-500 transition-all">
                     <LogOut className="w-4 h-4"/>
@@ -259,7 +264,7 @@ export const MobileDrawer: React.FC<Props> = (props) => {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="text-xs font-black text-slate-900 dark:text-white truncate">{props.userData.name}</div>
-                                    <div className="text-[8px] font-bold text-amber-600 dark:text-amber-500 uppercase tracking-widest">Plano {props.currentPlan?.split('_')[1] || 'Free'}</div>
+                                    <div className="text-[8px] font-bold text-amber-600 dark:text-amber-500 uppercase tracking-widest">PLANO {getPlanLabel(props.currentPlan)}</div>
                                 </div>
                                 <button onClick={props.onLogout} className="p-2 text-slate-400 hover:text-red-500 transition-all">
                                     <LogOut className="w-4 h-4"/>
