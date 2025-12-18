@@ -68,6 +68,18 @@ export const fetchCmsPostById = async (id: string): Promise<CmsPost | null> => {
     return data as CmsPost;
 };
 
+export const fetchCmsPostBySlug = async (slug: string): Promise<CmsPost | null> => {
+    const { data, error } = await supabase
+        .from(POSTS_TABLE)
+        .select('*')
+        .eq('slug', slug)
+        .eq('published', true)
+        .maybeSingle();
+        
+    if (error) return null;
+    return data as CmsPost;
+};
+
 export const saveCmsPost = async (postData: Partial<CmsPost>): Promise<CmsPost | null> => {
     let query;
     if (postData.id) {

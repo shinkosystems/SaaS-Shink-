@@ -4,7 +4,7 @@ import { supabase } from './services/supabaseClient';
 import { Opportunity, BpmnTask } from './types';
 import { fetchOpportunities, createOpportunity, updateOpportunity, deleteOpportunity, fetchOpportunityById } from './services/opportunityService';
 import { createTask } from './services/projectService';
-import { getPublicOrgDetails, updateOrgDetails, uploadLogo } from './services/organizationService';
+import { getPublicOrgDetails, updateOrgDetails, uploadLogo, fetchActiveOrgModules, getPlanDefaultModules } from './services/organizationService';
 import { subscribeToPresence } from './services/presenceService';
 import { trackUserAccess } from './services/analyticsService';
 import { getCurrentUserPlan, mapDbPlanIdToString } from './services/asaasService';
@@ -35,7 +35,6 @@ import { NpsSurvey } from './components/NpsSurvey';
 import { GuruFab } from './components/GuruFab';
 import { FeedbackModal } from './components/FeedbackModal';
 import { CrmBoard } from './components/CrmBoard';
-import { fetchActiveOrgModules, getPlanDefaultModules } from './services/organizationService';
 
 // --- ROUTING CONFIGURATION ---
 const ROUTES: Record<string, string> = {
@@ -68,44 +67,25 @@ const App: React.FC = () => {
   const [userRole, setUserRole] = useState<string>('visitante');
   const [userOrgId, setUserOrgId] = useState<number | null>(null);
   const [currentPlan, setCurrentPlan] = useState<string>('plan_free');
-  
-  // App State for Org Plan ID (Source of Truth)
   const [orgPlanId, setOrgPlanId] = useState<number | null>(null);
-
-  // Search State
   const [searchTerm, setSearchTerm] = useState('');
-
-  // View State (Routing)
   const [view, setViewState] = useState<string>('dashboard');
-  
-  // New state to control which tab Settings opens on
   const [settingsStartTab, setSettingsStartTab] = useState<'general' | 'team' | 'ai' | 'modules'>('general');
-
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Active Modules State
   const [activeModules, setActiveModules] = useState<string[]>(['projects', 'kanban']); 
-
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [editingOpportunity, setEditingOpportunity] = useState<Opportunity | null>(null);
-
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  
-  // Public Routes
   const [showBlog, setShowBlog] = useState(false);
-  const [blogPostId, setBlogPostId] = useState<string | null>(null);
-
-  // New State for Feedback Modal
+  const [blogPostSlug, setBlogPostSlug] = useState<string | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
-
   const [selectedProject, setSelectedProjectState] = useState<Opportunity | null>(null);
   const [isSharedMode, setIsSharedMode] = useState(false); 
   const [theme, setTheme] = useState<'light'|'dark'>('dark');
-
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [orgDetails, setOrgDetails] = useState<{ 
       name: string, 
@@ -128,7 +108,6 @@ const App: React.FC = () => {
   });
   const [dbStatus, setDbStatus] = useState<'connected'|'disconnected'>('connected');
 
-  // Helper to change URL without reloading
   const navigateTo = (path: string) => {
       try {
           window.history.pushState({}, '', path);
@@ -137,7 +116,6 @@ const App: React.FC = () => {
       }
   };
 
-  // 1. Handle Navigation (Change View)
   const setView = (newView: string) => {
       setViewState(newView);
       setSelectedProjectState(null); 
@@ -146,47 +124,39 @@ const App: React.FC = () => {
       navigateTo(path);
   };
 
-  // 2. Handle Project Opening (Deep Link)
   const onOpenProject = (opp: Opportunity) => {
       setSelectedProjectState(opp);
       navigateTo(`/project/${opp.id}`);
   };
 
-  // 3. Handle Back from Project
   const closeProject = () => {
       setSelectedProjectState(null);
       setView('dashboard');
   };
 
-  // 4. Handle Edit Project (New Route)
   const onEditProject = (opp: Opportunity) => {
       setEditingOpportunity(opp);
       setViewState('edit-project');
       navigateTo(`/project/${opp.id}/edit`);
   };
 
-  // 5. Initial Load & PopState (Browser Back/Forward)
   useEffect(() => {
       const handleRouting = async () => {
           let path = window.location.pathname;
-          
-          if (!path || path.startsWith('blob:')) {
-              path = '/';
-          }
+          if (!path || path.startsWith('blob:')) path = '/';
 
-          // Blog Route with Deep Link
+          // Blog Route with Slug
           if (path.startsWith('/blog')) {
               const parts = path.split('/');
-              const id = parts[2];
+              const slug = parts[2];
               setShowBlog(true);
-              setBlogPostId(id || null);
+              setBlogPostSlug(slug || null);
               return;
           } else {
               setShowBlog(false);
-              setBlogPostId(null);
+              setBlogPostSlug(null);
           }
 
-          // Create Project Route
           if (path === '/project/new') {
               setViewState('create-project');
               setEditingOpportunity(null);
@@ -194,7 +164,6 @@ const App: React.FC = () => {
               return;
           }
 
-          // Project Specific Routes
           if (path.startsWith('/project/')) {
               const parts = path.split('/');
               const projectId = parts[2];
@@ -218,54 +187,35 @@ const App: React.FC = () => {
               return;
           }
 
-          // View Route
           const mappedView = REVERSE_ROUTES[path];
           if (mappedView) {
               setViewState(mappedView);
               setSelectedProjectState(null);
               setEditingOpportunity(null);
           } else {
-              if (path !== '/' && !path.includes('type=recovery')) {
-                  navigateTo('/'); 
-              }
+              if (path !== '/' && !path.includes('type=recovery')) navigateTo('/'); 
               setViewState('dashboard');
           }
       };
 
       handleRouting();
-
-      const onPopState = () => {
-          handleRouting();
-      };
+      const onPopState = () => handleRouting();
       window.addEventListener('popstate', onPopState);
-
       return () => window.removeEventListener('popstate', onPopState);
   }, []); 
 
-  // Check URL for White Label or Password Recovery
   useEffect(() => {
       const hash = window.location.hash;
-      if (hash && hash.includes('type=recovery')) {
-          setShowResetPassword(true);
-      }
-      
+      if (hash && hash.includes('type=recovery')) setShowResetPassword(true);
       const params = new URLSearchParams(window.location.search);
       const orgIdParam = params.get('org');
-      
       if (orgIdParam) {
           getPublicOrgDetails(Number(orgIdParam)).then(details => {
-              if (details) {
-                  setOrgDetails(prev => ({ 
-                      ...prev, 
-                      ...details,
-                      isWhitelabelActive: true 
-                  }));
-              }
+              if (details) setOrgDetails(prev => ({ ...prev, ...details, isWhitelabelActive: true }));
           });
       }
   }, []);
 
-  // Auth & Session
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -273,7 +223,6 @@ const App: React.FC = () => {
       if (session?.user) loadUserData(session.user.id);
       else setLoading(false);
     });
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
@@ -284,7 +233,6 @@ const App: React.FC = () => {
           setLoading(false);
       }
     });
-
     return () => subscription.unsubscribe();
   }, []);
 
@@ -388,7 +336,6 @@ const App: React.FC = () => {
       else if (actionId === 'create_task') setShowCreateTask(true);
   };
 
-  // --- WHITELABEL LOGIC ---
   const shouldUseWhitelabel = activeModules.includes('whitelabel') || activeModules.includes('whitelable') || orgDetails.isWhitelabelActive;
   const appBrandName = shouldUseWhitelabel && orgDetails.name ? orgDetails.name : 'Shinkō OS';
   const appLogoUrl = shouldUseWhitelabel ? orgDetails.logoUrl : null;
@@ -416,12 +363,11 @@ const App: React.FC = () => {
       );
   }, [opportunities, searchTerm]);
 
-  // PUBLIC ACCESS ROUTES
   if (!user && !loading) {
       if (showBlog) {
           return (
               <BlogScreen 
-                initialPostId={blogPostId}
+                initialPostSlug={blogPostSlug}
                 onBack={() => {
                     setShowBlog(false);
                     navigateTo('/');
@@ -430,7 +376,6 @@ const App: React.FC = () => {
               />
           );
       }
-
       return (
           <>
             <LandingPage 
@@ -462,7 +407,6 @@ const App: React.FC = () => {
       );
   }
 
-  // LOGGED IN USER
   return (
     <div className={`flex h-screen w-full bg-slate-100 dark:bg-black text-slate-900 dark:text-slate-100 transition-colors duration-300 ${theme}`}>
         {!isSharedMode && view !== 'create-project' && view !== 'edit-project' && (
@@ -476,7 +420,6 @@ const App: React.FC = () => {
                 customLogoUrl={appLogoUrl} orgName={appBrandName} activeModules={activeModules}
             />
         )}
-        
         {!isSharedMode && view !== 'create-project' && view !== 'edit-project' && (
             <MobileDrawer 
                 currentView={view} onChangeView={setView} onOpenCreate={() => setView('create-project')}
@@ -487,7 +430,6 @@ const App: React.FC = () => {
                 customLogoUrl={appLogoUrl} orgName={appBrandName} activeModules={activeModules}
             />
         )}
-
         <main className={`flex-1 overflow-hidden relative ${!isSharedMode ? 'pt-16 xl:pt-0' : ''}`}>
             <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500"></div></div>}>
                 {selectedProject ? (
@@ -606,14 +548,7 @@ const App: React.FC = () => {
                 )}
             </Suspense>
         </main>
-
-        {showCreateTask && (
-            <QuickTaskModal 
-                opportunities={opportunities} onClose={() => setShowCreateTask(false)}
-                onSave={handleCreateTask} userRole={userRole}
-            />
-        )}
-
+        {showCreateTask && <QuickTaskModal opportunities={opportunities} onClose={() => setShowCreateTask(false)} onSave={handleCreateTask} userRole={userRole} />}
         {showFeedback && user && <FeedbackModal userId={user.id} onClose={() => setShowFeedback(false)} />}
         {user && userRole !== 'cliente' && !isSharedMode && activeModules.includes('ia') && <GuruFab opportunities={opportunities} user={user} organizationId={userOrgId || undefined} onAction={handleGuruAction} />}
         {showOnboarding && <OnboardingGuide run={showOnboarding} onFinish={() => setShowOnboarding(false)} />}

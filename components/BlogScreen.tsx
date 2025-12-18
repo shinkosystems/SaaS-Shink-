@@ -1,70 +1,63 @@
 
 import React, { useState, useEffect } from 'react';
 import { CmsPost } from '../types';
-import { fetchCmsPosts, captureLead, fetchCmsPostById } from '../services/cmsService';
+import { fetchCmsPosts, captureLead, fetchCmsPostBySlug } from '../services/cmsService';
 import { ArrowLeft, Calendar, Tag, Download, CheckCircle, Loader2, Search, X, ChevronRight, FileText, ArrowRight } from 'lucide-react';
 
 interface Props {
     onBack: () => void;
     onEnter?: () => void;
-    initialPostId?: string | null;
+    initialPostSlug?: string | null;
 }
 
 const LOGO_URL = "https://zjssfnbcboibqeoubeou.supabase.co/storage/v1/object/public/fotoperfil/fotoperfil/1%20(1).png";
 
-export const BlogScreen: React.FC<Props> = ({ onBack, onEnter, initialPostId }) => {
+export const BlogScreen: React.FC<Props> = ({ onBack, onEnter, initialPostSlug }) => {
     const [posts, setPosts] = useState<CmsPost[]>([]);
     const [selectedPost, setSelectedPost] = useState<CmsPost | null>(null);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [activeTag, setActiveTag] = useState<string | null>(null);
     
-    // Lead Capture State
     const [showLeadModal, setShowLeadModal] = useState(false);
     const [leadName, setLeadName] = useState('');
     const [leadEmail, setLeadEmail] = useState('');
     const [leadPhone, setLeadPhone] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Initial Load & Post Sync
     useEffect(() => {
         const init = async () => {
             setLoading(true);
             const data = await fetchCmsPosts(true);
             setPosts(data);
             
-            // If we have an initial ID, try to load it
-            if (initialPostId) {
-                const post = await fetchCmsPostById(initialPostId);
-                if (post && post.published) {
-                    setSelectedPost(post);
-                }
+            if (initialPostSlug) {
+                const post = await fetchCmsPostBySlug(initialPostSlug);
+                if (post) setSelectedPost(post);
             }
             setLoading(false);
         };
         init();
     }, []);
 
-    // Sync on prop change (Browser Back/Forward)
     useEffect(() => {
-        if (!initialPostId) {
+        if (!initialPostSlug) {
             setSelectedPost(null);
-        } else if (initialPostId && (!selectedPost || selectedPost.id !== initialPostId)) {
-            const found = posts.find(p => p.id === initialPostId);
+        } else if (initialPostSlug && (!selectedPost || selectedPost.slug !== initialPostSlug)) {
+            const found = posts.find(p => p.slug === initialPostSlug);
             if (found) setSelectedPost(found);
             else {
-                // Fetch individually if not in cache
-                fetchCmsPostById(initialPostId).then(p => {
-                    if (p && p.published) setSelectedPost(p);
+                fetchCmsPostBySlug(initialPostSlug).then(p => {
+                    if (p) setSelectedPost(p);
                 });
             }
         }
-    }, [initialPostId, posts]);
+    }, [initialPostSlug, posts]);
 
     const handleSelectPost = (post: CmsPost | null) => {
         setSelectedPost(post);
         if (post) {
-            window.history.pushState({}, '', `/blog/${post.id}`);
+            window.history.pushState({}, '', `/blog/${post.slug || post.id}`);
         } else {
             window.history.pushState({}, '', '/blog');
         }
@@ -104,7 +97,6 @@ export const BlogScreen: React.FC<Props> = ({ onBack, onEnter, initialPostId }) 
 
     const allTags = Array.from(new Set(posts.flatMap(p => p.tags || [])));
 
-    // --- DETAIL VIEW ---
     if (selectedPost) {
         return (
             <div className="fixed inset-0 z-[250] bg-[#050505] text-white animate-in fade-in slide-in-from-right-8 overflow-y-auto custom-scrollbar">
@@ -118,7 +110,6 @@ export const BlogScreen: React.FC<Props> = ({ onBack, onEnter, initialPostId }) 
                         <div className="flex items-center gap-3 cursor-pointer group" onClick={() => handleSelectPost(null)}>
                             <img src={LOGO_URL} alt="Shinkō OS" className="h-8 w-auto object-contain relative z-10" />
                         </div>
-                        
                         <div className="flex items-center gap-4">
                             <button onClick={() => handleSelectPost(null)} className="group relative px-6 py-2.5 bg-white/10 text-white font-bold text-sm rounded-xl hover:bg-white/20 transition-all border border-white/10 flex items-center gap-2">
                                 <ArrowLeft className="w-4 h-4"/> Voltar
@@ -135,7 +126,6 @@ export const BlogScreen: React.FC<Props> = ({ onBack, onEnter, initialPostId }) 
                                 <img src={selectedPost.cover_image} alt={selectedPost.title} className="w-full h-full object-cover"/>
                             </div>
                         )}
-                        
                         <div className="p-8 md:p-12 -mt-32 relative z-20">
                             <div className="flex flex-wrap gap-2 mb-6">
                                 {selectedPost.tags?.map(tag => (
@@ -144,22 +134,18 @@ export const BlogScreen: React.FC<Props> = ({ onBack, onEnter, initialPostId }) 
                                     </span>
                                 ))}
                             </div>
-
                             <h1 className="text-3xl md:text-5xl font-black text-white mb-6 leading-tight tracking-tight drop-shadow-xl">
                                 {selectedPost.title}
                             </h1>
-
                             <div className="flex items-center gap-4 text-xs font-bold text-slate-300 uppercase tracking-wider mb-10 pb-8 border-b border-white/10">
                                 <span className="flex items-center gap-2"><Calendar className="w-4 h-4 text-amber-500"/> {new Date(selectedPost.created_at).toLocaleDateString()}</span>
                                 <span>•</span>
                                 <span>Por Shinkō Team</span>
                             </div>
-
                             <div 
                                 className="prose prose-invert max-w-none text-slate-300 leading-relaxed prose-headings:font-bold prose-headings:text-white prose-a:text-amber-400 prose-img:rounded-xl prose-strong:text-white"
                                 dangerouslySetInnerHTML={{ __html: selectedPost.content || '' }}
                             />
-
                             {selectedPost.download_url && (
                                 <div className="mt-16 p-1 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 shadow-2xl animate-pulse-slow">
                                     <div className="bg-[#0A0A0A] rounded-xl p-8 relative overflow-hidden group">
@@ -218,7 +204,6 @@ export const BlogScreen: React.FC<Props> = ({ onBack, onEnter, initialPostId }) 
         );
     }
 
-    // --- LIST VIEW ---
     return (
         <div className="fixed inset-0 z-[200] bg-[#050505] text-white flex flex-col overflow-y-auto custom-scrollbar">
             <div className="fixed inset-0 w-full h-full overflow-hidden pointer-events-none">
