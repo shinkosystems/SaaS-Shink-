@@ -20,7 +20,106 @@ export enum IntensityLevel {
   L4 = 4
 }
 
-// --- CMS TYPES ---
+// --- TERMINOLOGY ENGINE ---
+export interface SectorTerminology {
+    mrrLabel: string;
+    integrationLabel: string;
+    scalabilityLabel: string;
+    mvpLabel: string;
+    painPointLabel: string;
+    recurringLabel: string;
+    assetLabel: string;
+    viabilityLabel: string;
+    revenueLabel: string;
+    // Dynamic Archetypes
+    archetypes: Record<Archetype, { label: string, desc: string }>;
+    intensities: Record<number, string>;
+}
+
+export const SECTOR_MAP: Record<string, SectorTerminology> = {
+    'SaaS': {
+        mrrLabel: 'MRR (Recorrência)',
+        integrationLabel: 'Integração de Sistemas',
+        scalabilityLabel: 'Escalabilidade Linear',
+        mvpLabel: 'Velocidade de MVP',
+        painPointLabel: 'Dor Real Detectada',
+        recurringLabel: 'Potencial de Recorrência',
+        assetLabel: 'Ativo de Software',
+        viabilityLabel: 'Viabilidade Técnica',
+        revenueLabel: 'Impacto Comercial',
+        archetypes: {
+            [Archetype.SAAS_ENTRY]: { label: 'SaaS de Entrada', desc: 'Software pronto para escala com baixo toque humano.' },
+            [Archetype.SAAS_VERTICAL]: { label: 'SaaS Verticalizado', desc: 'Solução profunda para um nicho de mercado específico.' },
+            [Archetype.SERVICE_TECH]: { label: 'Serviço + Tecnologia', desc: 'Consultoria potencializada por ferramentas internas.' },
+            [Archetype.PLATFORM]: { label: 'Plataforma', desc: 'Ecosistema que conecta múltiplos stakeholders.' },
+            [Archetype.INTERNAL]: { label: 'Interno', desc: 'Otimização de processos, governança ou marketing.' }
+        },
+        intensities: {
+            1: 'Baixa: Projeto simples, execução rápida.',
+            2: 'Média: Requer planejamento estruturado.',
+            3: 'Alta: Impacto direto no core business.',
+            4: 'Crítica: Missão crítica, alto risco.'
+        }
+    },
+    'Arquitetura': {
+        mrrLabel: 'Fee de Manutenção',
+        integrationLabel: 'Compatibilização Técnica',
+        scalabilityLabel: 'Produtividade de Escopo',
+        mvpLabel: 'Prazo Estudo Preliminar',
+        painPointLabel: 'Necessidade do Espaço',
+        recurringLabel: 'Fee / Acompanhamento',
+        assetLabel: 'Projeto / Obra',
+        viabilityLabel: 'Viabilidade Construtiva',
+        revenueLabel: 'VGV / Honorários',
+        archetypes: {
+            [Archetype.SAAS_ENTRY]: { label: 'Projeto Padrão', desc: 'Baixa complexidade, alta repetição e entrega rápida.' },
+            [Archetype.SAAS_VERTICAL]: { label: 'Projeto de Nicho', desc: 'Especialização técnica (ex: Clínicas, Hospitais, Indústrias).' },
+            [Archetype.SERVICE_TECH]: { label: 'Design-Build', desc: 'Projeto arquitetônico integrado à gestão técnica da obra.' },
+            [Archetype.PLATFORM]: { label: 'Design System Urbano', desc: 'Diretrizes para franquias ou redes de varejo escaláveis.' },
+            [Archetype.INTERNAL]: { label: 'P&D / Visualização', desc: 'Novas tecnologias (VR/AR) ou melhoria de processos internos.' }
+        },
+        intensities: {
+            1: 'L1: Reformas leves ou consultorias de interiores rápidas.',
+            2: 'L2: Projetos residenciais ou comerciais de médio porte.',
+            3: 'L3: Edificações complexas com múltiplos complementares.',
+            4: 'L4: Grandes obras, infraestrutura ou intervenções urbanas.'
+        }
+    },
+    'default': {
+        mrrLabel: 'Receita Recorrente',
+        integrationLabel: 'Conectividade',
+        scalabilityLabel: 'Escalabilidade',
+        mvpLabel: 'Velocidade de Entrega',
+        painPointLabel: 'Valor Percebido',
+        recurringLabel: 'Continuidade',
+        assetLabel: 'Iniciativa',
+        viabilityLabel: 'Viabilidade de Execução',
+        revenueLabel: 'Retorno Financeiro',
+        archetypes: {
+            [Archetype.SAAS_ENTRY]: { label: 'Modelo Escalonável', desc: 'Foco em volume e baixo custo marginal.' },
+            [Archetype.SAAS_VERTICAL]: { label: 'Modelo Especializado', desc: 'Foco em autoridade e margem alta.' },
+            [Archetype.SERVICE_TECH]: { label: 'Híbrido Serviço/Produto', desc: 'Entrega consultiva com suporte tecnológico.' },
+            [Archetype.PLATFORM]: { label: 'Hub / Ecossistema', desc: 'Criação de rede entre pontas distintas.' },
+            [Archetype.INTERNAL]: { label: 'Infraestrutura', desc: 'Melhoria de fundamentos operacionais.' }
+        },
+        intensities: {
+            1: 'Nível 1: Baixo risco e esforço.',
+            2: 'Nível 2: Requer governança padrão.',
+            3: 'Nível 3: Alta complexidade e stakeholders.',
+            4: 'Nível 4: Crítico para a sobrevivência da operação.'
+        }
+    }
+};
+
+export const getTerminology = (sector?: string): SectorTerminology => {
+    if (!sector) return SECTOR_MAP.default;
+    const s = sector.toLowerCase();
+    if (s.includes('arq')) return SECTOR_MAP.Arquitetura;
+    if (s.includes('saas') || s.includes('tech') || s.includes('shinko')) return SECTOR_MAP.SaaS;
+    return SECTOR_MAP.default;
+};
+
+// ... restante dos tipos mantidos ...
 export interface CmsCase {
     id: string;
     title: string;
@@ -37,16 +136,15 @@ export interface CmsPost {
     title: string;
     slug?: string;
     cover_image: string;
-    content: string; // HTML
+    content: string; 
     tags: string[];
     download_url?: string;
     download_title?: string;
-    download_image_url?: string; // Novo: Imagem do Material Rico
+    download_image_url?: string;
     published: boolean;
     created_at: string;
 }
 
-// --- PLAN CONFIGURATION ---
 export const PLAN_LIMITS: Record<string, { 
     maxProjects: number; 
     maxUsers: number;
@@ -64,21 +162,12 @@ export const PLAN_LIMITS: Record<string, {
     } 
 }> = {
     'plan_free': { maxProjects: 1, maxUsers: 1, aiLimit: 0, features: { financial: false, clients: false, metrics: false, pdfUpload: false, gantt: false, kanban: true, whitelabel: false, aiAdvanced: false, crm: true } },
-    
-    // MONTHLY PLANS
     'plan_solo': { maxProjects: 9999, maxUsers: 1, aiLimit: 50, features: { financial: false, clients: false, metrics: false, pdfUpload: false, gantt: true, kanban: true, whitelabel: false, aiAdvanced: false, crm: true } },
     'plan_studio': { maxProjects: 9999, maxUsers: 5, aiLimit: 500, features: { financial: true, clients: true, metrics: false, pdfUpload: true, gantt: true, kanban: true, whitelabel: false, aiAdvanced: true, crm: true } },
     'plan_scale': { maxProjects: 9999, maxUsers: 15, aiLimit: 9999, features: { financial: true, clients: true, metrics: true, pdfUpload: true, gantt: true, kanban: true, whitelabel: false, aiAdvanced: true, crm: true } },
-    
-    // YEARLY PLANS (Mirror Monthly Features)
-    'plan_solo_yearly': { maxProjects: 9999, maxUsers: 1, aiLimit: 50, features: { financial: false, clients: false, metrics: false, pdfUpload: false, gantt: true, kanban: true, whitelabel: false, aiAdvanced: false, crm: true } },
-    'plan_studio_yearly': { maxProjects: 9999, maxUsers: 5, aiLimit: 500, features: { financial: true, clients: true, metrics: false, pdfUpload: true, gantt: true, kanban: true, whitelabel: false, aiAdvanced: true, crm: true } },
-    'plan_scale_yearly': { maxProjects: 9999, maxUsers: 15, aiLimit: 9999, features: { financial: true, clients: true, metrics: true, pdfUpload: true, gantt: true, kanban: true, whitelabel: false, aiAdvanced: true, crm: true } },
-
     'plan_enterprise': { maxProjects: 999999, maxUsers: 999999, aiLimit: 999999, features: { financial: true, clients: true, metrics: true, pdfUpload: true, gantt: true, kanban: true, whitelabel: true, aiAdvanced: true, crm: true } }
 };
 
-// --- CRM TYPES ---
 export type CrmStage = 'qualification' | 'proposal' | 'negotiation' | 'won' | 'lost';
 
 export interface CrmActivity {
@@ -124,8 +213,6 @@ export interface CrmOpportunity {
     createdAt: string;
     lastInteraction: string;
 }
-
-// --- DB SCHEMA TYPES (POSTGRESQL) ---
 
 export interface AreaAtuacao {
     id: number;
@@ -187,55 +274,38 @@ export interface DbProject {
   tasks?: DbTask[];
 }
 
-// Mapped to table 'tasks'
 export interface DbTask {
-  id: number; // BigInt
+  id: number;
   projeto: number | null; 
   titulo: string;
   descricao: string;
   status: string;
-  responsavel: string; // UUID FK
-  
-  // New Arrays
-  membros: string[]; // UUID[]
-  etiquetas: string[]; // text[]
-  anexos?: Attachment[]; // JSONB for attachments
-
-  // GUT
+  responsavel: string; 
+  membros: string[]; 
+  etiquetas: string[]; 
+  anexos?: Attachment[]; 
   gravidade: number;
   urgencia: number;
   tendencia: number;
-  
-  // Dates & Time
   dataproposta: string;
   deadline?: string;
   datainicio?: string;
   datafim?: string;
-  
-  // Lifecycle Dates
   dataafazer?: string;
   datafazendo?: string;
   datarealizando?: string;
   datarevisao?: string;
   dataaprovacao?: string;
   dataconclusao?: string;
-
   duracaohoras: number;
-  
-  // Structure
   sutarefa: boolean;
   tarefa?: number | null;
   tarefamae?: number | null;
-  
   organizacao: number;
   createdat: string;
-
-  // Relations
   projetoData?: { nome: string, cor?: string }; 
   responsavelData?: { nome: string, desenvolvedor: boolean, organizacao: number, avatar_url?: string };
 }
-
-// --- FRONTEND ADAPTERS ---
 
 export type TaskStatus = 'todo' | 'doing' | 'review' | 'approval' | 'done' | 'backlog';
 
@@ -262,14 +332,12 @@ export interface BpmnTask {
   dueDate?: string;
   deadline?: string;
   assignee?: string;
-  assigneeId?: string; // Main Assignee
-  members?: string[]; // Multiple Assignees (UUIDs)
-  tags?: string[]; // Labels
-  
+  assigneeId?: string;
+  members?: string[]; 
+  tags?: string[]; 
   subtasks?: BpmnSubTask[];
   gut?: { g: number, u: number, t: number };
   estimatedHours?: number;
-  
   dbId?: number;
   projectId?: number;
   projectTitle?: string;
@@ -278,8 +346,6 @@ export interface BpmnTask {
   assigneeIsDev?: boolean; 
   suggestedRoleId?: number;
   attachments?: Attachment[];
-
-  // Lifecycle for Timeline
   lifecycle?: {
       created: string;
       todo?: string;

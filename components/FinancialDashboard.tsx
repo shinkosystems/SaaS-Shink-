@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { TrendingUp, Activity, Calendar, ArrowUpRight, ArrowDownRight, ChevronLeft, ChevronRight, Info, DollarSign, Target, PieChart } from 'lucide-react';
-import { FinancialRecord, FinancialTransaction } from '../types';
+import { FinancialRecord, FinancialTransaction, getTerminology } from '../types';
 import { ResponsiveContainer, AreaChart, Area, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { supabase } from '../services/supabaseClient';
 
@@ -11,13 +11,6 @@ interface Props {
     manualTransactions?: FinancialTransaction[];
     orgType?: string;
 }
-
-const METRIC_TOOLTIPS: Record<string, string> = {
-    "Faturamento Bruto": "Soma total de todas as receitas recebidas no período.",
-    "Despesas Totais": "Soma de todos os custos operacionais.",
-    "Lucro Líquido": "O que sobra no caixa.",
-    "Margem Bruta": "Eficiência da operação.",
-};
 
 const InfoTooltip = ({ text }: { text: string }) => (
     <div className="group relative flex items-center ml-1 cursor-help z-50">
@@ -34,7 +27,8 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [], o
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
     const [financialHistory, setFinancialHistory] = useState<FinancialRecord[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-
+    
+    const terms = getTerminology(orgType);
     const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
     useEffect(() => {
@@ -58,7 +52,6 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [], o
                         let monthMrr = 0;
                         safeClients.forEach(c => {
                             if (c.data_inicio && c.meses && c.status !== 'Bloqueado') {
-                                // Simple logic for MRR estimation
                                 monthMrr += Number(c.valormensal || 0);
                             }
                         });
@@ -92,8 +85,8 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [], o
 
     const snapshot = useMemo(() => {
         if (financialHistory.length === 0) return null;
-        let currentData = { revenue: 0, expenses: 0, profit: 0, margin: 0 };
-        let previousData = { revenue: 0, expenses: 0, profit: 0, margin: 0 };
+        let currentData = { revenue: 0, expenses: 0, profit: 0, margin: 0, mrr: 0 };
+        let previousData = { revenue: 0, expenses: 0, profit: 0, margin: 0, mrr: 0 };
         let chartData: any[] = [];
         let label = '';
 
@@ -102,10 +95,12 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [], o
             const currentRecords = financialHistory.filter(h => new Date(h.date).getFullYear() === selectedYear);
             currentData.revenue = currentRecords.reduce((acc, r) => acc + r.gross_revenue, 0);
             currentData.expenses = currentRecords.reduce((acc, r) => acc + r.total_expenses, 0);
+            currentData.mrr = currentRecords[currentRecords.length - 1]?.mrr || 0;
             
             const prevRecords = financialHistory.filter(h => new Date(h.date).getFullYear() === selectedYear - 1);
             previousData.revenue = prevRecords.reduce((acc, r) => acc + r.gross_revenue, 0);
             previousData.expenses = prevRecords.reduce((acc, r) => acc + r.total_expenses, 0);
+            previousData.mrr = prevRecords[prevRecords.length - 1]?.mrr || 0;
 
             chartData = currentRecords.map(r => ({
                 name: monthNames[new Date(r.date).getMonth()].substring(0, 3),
@@ -118,8 +113,14 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [], o
             if (curr) {
                 currentData.revenue = curr.gross_revenue;
                 currentData.expenses = curr.total_expenses;
+                currentData.mrr = curr.mrr;
             }
-            // Chart shows year context for trend
+            const prev = financialHistory.find(h => new Date(h.date).getMonth() === selectedMonth && new Date(h.date).getFullYear() === selectedYear - 1);
+            if (prev) {
+                previousData.revenue = prev.gross_revenue;
+                previousData.expenses = prev.total_expenses;
+                previousData.mrr = prev.mrr;
+            }
             chartData = financialHistory.filter(h => new Date(h.date).getFullYear() === selectedYear).map(r => ({
                 name: monthNames[new Date(r.date).getMonth()].substring(0, 3),
                 Receita: r.gross_revenue,
@@ -134,7 +135,7 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [], o
         return { current: currentData, previous: previousData, chartData, label };
     }, [financialHistory, timeRange, selectedYear, selectedMonth]);
 
-    const StatCard = ({ title, value, isCurrency = true, delta, inverse = false }: any) => {
+    const StatCard = ({ title, value, isCurrency = true, delta, inverse = false, tooltip }: any) => {
         const isPositive = delta >= 0;
         const isGood = inverse ? !isPositive : isPositive;
         
@@ -143,7 +144,7 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [], o
                 <div className="flex justify-between items-start">
                     <span className="text-xs font-bold text-slate-400 uppercase flex items-center gap-1">
                         {title}
-                        {METRIC_TOOLTIPS[title] && <InfoTooltip text={METRIC_TOOLTIPS[title]} />}
+                        {tooltip && <InfoTooltip text={tooltip} />}
                     </span>
                     {delta !== 0 && (
                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${isGood ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20' : 'text-red-600 bg-red-50 dark:bg-red-900/20'}`}>
@@ -169,8 +170,8 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [], o
             {/* Header / Controls */}
             <div className="flex justify-between items-center">
                 <div>
-                    <h2 className="text-xl font-bold text-slate-900 dark:text-white">Visão Financeira</h2>
-                    <p className="text-slate-500 text-sm mt-1">Fluxo de caixa e lucratividade.</p>
+                    <h2 className="text-xl font-bold text-slate-900 dark:text-white">Visão Financeira ({orgType})</h2>
+                    <p className="text-slate-500 text-sm mt-1">Análise de saúde do caixa e rentabilidade.</p>
                 </div>
                 
                 <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
@@ -196,15 +197,15 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [], o
 
             {/* Stats */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard title="Faturamento Bruto" value={snapshot.current.revenue} delta={calcDelta(snapshot.current.revenue, snapshot.previous.revenue)} />
-                <StatCard title="Despesas Totais" value={snapshot.current.expenses} delta={calcDelta(snapshot.current.expenses, snapshot.previous.expenses)} inverse />
-                <StatCard title="Lucro Líquido" value={snapshot.current.profit} delta={calcDelta(snapshot.current.profit, snapshot.previous.profit)} />
-                <StatCard title="Margem Bruta" value={snapshot.current.margin} isCurrency={false} delta={snapshot.current.margin - snapshot.previous.margin} />
+                <StatCard title="Faturamento Bruto" value={snapshot.current.revenue} delta={calcDelta(snapshot.current.revenue, snapshot.previous.revenue)} tooltip="Receita total consolidada no período." />
+                <StatCard title={terms.mrrLabel} value={snapshot.current.mrr} delta={calcDelta(snapshot.current.mrr, snapshot.previous.mrr)} tooltip="Base estável de faturamento recorrente mensal." />
+                <StatCard title="Lucro Líquido" value={snapshot.current.profit} delta={calcDelta(snapshot.current.profit, snapshot.previous.profit)} tooltip="Valor final após todas as deduções operacionais." />
+                <StatCard title="Margem Bruta" value={snapshot.current.margin} isCurrency={false} delta={snapshot.current.margin - snapshot.previous.margin} tooltip="Eficiência financeira da operação." />
             </div>
 
             {/* Chart */}
             <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-white/5 h-80 flex flex-col">
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-6 shrink-0">Evolução do Caixa</h3>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-6 shrink-0">Tendência de Receita x Despesa</h3>
                 <div className="flex-1 min-h-0 w-full">
                     <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                         <AreaChart data={snapshot.chartData}>

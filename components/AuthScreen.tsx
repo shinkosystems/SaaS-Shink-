@@ -11,11 +11,16 @@ interface Props {
   customColor?: string;
 }
 
-const AuthScreen: React.FC<Props> = ({ onClose }) => {
+const LOGO_URL = "https://zjssfnbcboibqeoubeou.supabase.co/storage/v1/object/public/fotoperfil/fotoperfil/1%20(1).png";
+
+const AuthScreen: React.FC<Props> = ({ onClose, customLogoUrl, customOrgName }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<'login' | 'register'>('login');
+
+  const displayLogo = customLogoUrl || LOGO_URL;
+  const brandName = customOrgName || "Shinkō OS";
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,16 +38,17 @@ const AuthScreen: React.FC<Props> = ({ onClose }) => {
     <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/95 backdrop-blur-2xl animate-in fade-in">
       <div className="w-full max-w-md bg-[#0A0A0C] rounded-[3rem] shadow-glass border border-white/10 overflow-hidden relative animate-ios-pop">
         
-        <button onClick={onClose} className="absolute top-8 right-8 text-slate-600 hover:text-white transition-colors">
+        <button onClick={onClose} className="absolute top-8 right-8 text-slate-600 hover:text-white transition-colors z-20">
             <X className="w-6 h-6"/>
         </button>
 
         <div className="p-12 pb-8 flex flex-col items-center text-center">
-            <div className="w-16 h-16 rounded-[1.5rem] bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white mb-8 shadow-glow-amber">
-                <Sparkles className="w-8 h-8"/>
+            <div className="mb-8 relative">
+                <div className="absolute inset-0 bg-amber-500/20 blur-2xl rounded-full scale-150"></div>
+                <img src={displayLogo} alt={brandName} className="h-20 w-auto object-contain relative z-10 animate-in zoom-in duration-700" />
             </div>
             <h2 className="text-4xl font-black text-white tracking-tighter leading-none">
-                Bem-vindo ao <br/><span className="text-amber-500">Shinkō OS</span>.
+                Bem-vindo ao <br/><span className="text-amber-500">{brandName}</span>.
             </h2>
             <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px] mt-4">Sistema de Inovação Industrial</p>
         </div>
@@ -56,6 +62,7 @@ const AuthScreen: React.FC<Props> = ({ onClose }) => {
                     onChange={e => setEmail(e.target.value)}
                     className="w-full p-4 rounded-2xl bg-white/5 border border-white/10 text-white outline-none focus:border-amber-500/50 transition-all"
                     required
+                    placeholder="seu@email.com"
                 />
             </div>
             <div className="space-y-1">
@@ -66,13 +73,14 @@ const AuthScreen: React.FC<Props> = ({ onClose }) => {
                     onChange={e => setPassword(e.target.value)}
                     className="w-full p-4 rounded-2xl bg-white/5 border border-white/10 text-white outline-none focus:border-amber-500/50 transition-all"
                     required
+                    placeholder="••••••••"
                 />
             </div>
 
             <button 
                 type="submit" 
                 disabled={loading}
-                className="w-full py-5 bg-white text-black rounded-2xl font-black text-xs uppercase tracking-widest shinko-button flex items-center justify-center gap-2 mt-4 hover:bg-amber-500"
+                className="w-full py-5 bg-white text-black rounded-2xl font-black text-xs uppercase tracking-widest shinko-button flex items-center justify-center gap-2 mt-4 hover:bg-amber-500 transition-all shadow-xl"
             >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin"/> : mode === 'login' ? 'Entrar no Sistema' : 'Criar minha Conta'}
                 <ArrowRight className="w-4 h-4"/>

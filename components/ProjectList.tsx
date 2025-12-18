@@ -1,8 +1,8 @@
 
 import React, { useState } from 'react';
 import { Opportunity } from '../types';
-import { Search, Filter, LayoutGrid, Zap, Target, ArrowRight, Briefcase, GanttChartSquare, Plus } from 'lucide-react';
-import { GanttView } from './GanttView';
+import { Search, Filter, LayoutGrid, Zap, Target, ArrowRight, Briefcase, GanttChartSquare, Plus, Trash2 } from 'lucide-react';
+import { deleteOpportunity } from '../services/opportunityService';
 
 interface Props {
   opportunities: Opportunity[];
@@ -12,9 +12,10 @@ interface Props {
   onOpenCreate?: () => void;
   initialFilterStatus?: string;
   activeModules?: string[];
+  onRefresh?: () => void;
 }
 
-export const ProjectList: React.FC<Props> = ({ opportunities, onOpenProject, userRole, onOpenCreate, initialFilterStatus, activeModules }) => {
+export const ProjectList: React.FC<Props> = ({ opportunities, onOpenProject, userRole, onOpenCreate, initialFilterStatus, activeModules, onRefresh }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>(initialFilterStatus || 'All');
 
@@ -23,6 +24,14 @@ export const ProjectList: React.FC<Props> = ({ opportunities, onOpenProject, use
       const matchesStatus = filterStatus === 'All' || opp.status === filterStatus;
       return matchesSearch && matchesStatus;
   });
+
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+      e.stopPropagation();
+      if (confirm("Deseja realmente excluir este ativo? Esta ação é irreversível e apagará todas as tarefas vinculadas.")) {
+          const success = await deleteOpportunity(id);
+          if (success && onRefresh) onRefresh();
+      }
+  };
 
   const getStatusColor = (status: string) => {
       switch(status) {
@@ -70,15 +79,24 @@ export const ProjectList: React.FC<Props> = ({ opportunities, onOpenProject, use
                 <div 
                     key={opp.id}
                     onClick={() => onOpenProject(opp)}
-                    className="glass-card p-10 flex flex-col justify-between min-h-[300px] cursor-pointer group"
+                    className="glass-card p-10 flex flex-col justify-between min-h-[300px] cursor-pointer group relative"
                 >
+                    {userRole !== 'cliente' && (
+                        <button 
+                            onClick={(e) => handleDelete(e, opp.id)}
+                            className="absolute top-6 right-6 p-3 bg-red-500/10 text-red-500 rounded-2xl opacity-0 group-hover:opacity-100 hover:bg-red-500 hover:text-white transition-all duration-300 z-10"
+                        >
+                            <Trash2 className="w-4 h-4"/>
+                        </button>
+                    )}
+
                     <div>
                         <div className="flex justify-between items-start mb-8">
                             <div className="flex items-center gap-3">
                                 <div className={`w-2.5 h-2.5 rounded-full ${getStatusColor(opp.status)} shadow-[0_0_10px] shadow-current`}></div>
                                 <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">{opp.status}</span>
                             </div>
-                            <div className="text-[10px] font-black text-amber-500 bg-amber-500/10 px-3 py-1.5 rounded-xl border border-amber-500/20">
+                            <div className="text-[10px] font-black text-amber-500 bg-amber-500/10 px-3 py-1.5 rounded-xl border border-amber-500/20 mr-10">
                                 {opp.prioScore.toFixed(1)}
                             </div>
                         </div>
