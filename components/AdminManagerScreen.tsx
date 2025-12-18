@@ -3,7 +3,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { fetchAllOwners, updateGlobalClientData, fetchPlans, fetchGlobalMetrics, AdminUser, GlobalMetrics, updateUserStatus, fetchPendingApprovals, approveSubscription } from '../services/adminService';
 import { fetchCmsCases, saveCmsCase, deleteCmsCase, fetchCmsPosts, saveCmsPost, deleteCmsPost, uploadCmsFile } from '../services/cmsService';
 import { DbPlan, FinancialTransaction, CmsCase, CmsPost } from '../types';
-// Added UploadCloud to imports to fix the missing name error
 import { Shield, Search, CreditCard, Loader2, Edit, CheckCircle, AlertTriangle, User, Zap, Building2, Users, DollarSign, TrendingUp, Activity, Filter, Calendar, Heart, UserMinus, Gem, MousePointer2, X, Clock, BarChart3, Wifi, Lock, ExternalLink, Check, Briefcase, FileText, Image as ImageIcon, Link as LinkIcon, Download, Save, Plus, Trash2, ArrowLeft, Globe, Tag, Eye, UploadCloud } from 'lucide-react';
 import { RichTextEditor } from './RichTextEditor';
 
@@ -124,12 +123,13 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
         const file = e.target.files?.[0];
         if (!file) return;
         
-        // Show indicator if possible or just rely on async
+        setIsLoading(true);
         const url = await uploadCmsFile(file, 'fotoperfil');
         if (url) {
             if (isPost && editingPost) setEditingPost({ ...editingPost, [field]: url });
             else if (!isPost && editingCase) setEditingCase({ ...editingCase, [field as keyof CmsCase]: url });
         }
+        setIsLoading(false);
     };
 
     const addTag = () => {
@@ -178,9 +178,9 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                 </div>
             </div>
 
-            {isLoading && <div className="flex flex-col items-center justify-center py-40 gap-4">
+            {isLoading && !editingPost && <div className="flex flex-col items-center justify-center py-40 gap-4">
                 <Loader2 className="w-10 h-10 animate-spin text-purple-500"/>
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Sincronizando Banco de Dados...</span>
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Sincronizando...</span>
             </div>}
 
             {/* DASHBOARD VIEW */}
@@ -264,37 +264,6 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                 </div>
             )}
 
-            {/* CMS CASES */}
-            {!isLoading && activeTab === 'cms_cases' && (
-                <div className="space-y-6 animate-in fade-in duration-500">
-                    <button onClick={() => setEditingCase({ title: '', category: 'Case Study' })} className="w-full py-4 border-2 border-dashed border-slate-300 dark:border-white/10 rounded-2xl text-slate-400 font-black uppercase tracking-widest hover:border-purple-500/50 hover:bg-purple-500/5 transition-all flex items-center justify-center gap-2 group">
-                        <Plus className="w-5 h-5 group-hover:scale-110 transition-transform"/> Criar Novo Estudo de Caso
-                    </button>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {cmsCases.map(c => (
-                            <div key={c.id} className="bg-white dark:bg-slate-900 rounded-2xl overflow-hidden border border-slate-200 dark:border-white/5 group relative hover:shadow-xl transition-all">
-                                <div className="h-40 bg-slate-100 dark:bg-black relative overflow-hidden">
-                                    {c.image_url ? (
-                                        <img src={c.image_url} className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-700"/>
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center text-slate-300"><ImageIcon className="w-10 h-10"/></div>
-                                    )}
-                                    <div className="absolute top-3 left-3 px-2 py-1 bg-purple-600 text-white text-[10px] font-bold rounded uppercase tracking-wider">{c.category}</div>
-                                </div>
-                                <div className="p-5">
-                                    <div className="font-bold text-slate-900 dark:text-white mb-2 leading-tight">{c.title}</div>
-                                    <div className="text-xs text-emerald-600 font-bold flex items-center gap-1"><TrendingUp className="w-3 h-3"/> {c.metric}</div>
-                                </div>
-                                <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onClick={() => setEditingCase(c)} className="p-2 bg-white rounded-lg shadow-lg text-blue-600 hover:scale-110 transition-transform"><Edit className="w-4 h-4"/></button>
-                                    <button onClick={() => { if(confirm("Excluir?")) deleteCmsCase(c.id).then(loadData); }} className="p-2 bg-white rounded-lg shadow-lg text-red-600 hover:scale-110 transition-transform"><Trash2 className="w-4 h-4"/></button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
             {/* CMS BLOG */}
             {!isLoading && activeTab === 'cms_blog' && (
                 <div className="space-y-6 animate-in fade-in duration-500">
@@ -325,47 +294,6 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                                 </div>
                             </div>
                         ))}
-                    </div>
-                </div>
-            )}
-
-            {/* MODAL: EDIT USER */}
-            {editingUser && (
-                <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-                    <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl w-full max-w-lg shadow-2xl border border-white/10 ring-1 ring-white/5">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">Gerenciar Assinante</h3>
-                            <button onClick={() => setEditingUser(null)}><X className="w-5 h-5 text-slate-400 hover:text-white"/></button>
-                        </div>
-                        <div className="space-y-5">
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Nome da Empresa</label>
-                                <input value={editingUser.orgName} onChange={e => setEditingUser({...editingUser, orgName: e.target.value})} className="w-full p-3 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:border-purple-500 text-sm font-bold"/>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Limite Colab.</label>
-                                    <input type="number" value={editingUser.orgColaboradores} onChange={e => setEditingUser({...editingUser, orgColaboradores: Number(e.target.value)})} className="w-full p-3 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:border-purple-500 text-sm"/>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Plano Atual</label>
-                                    <select value={editingUser.currentPlanId} onChange={e => setEditingUser({...editingUser, currentPlanId: Number(e.target.value)})} className="w-full p-3 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:border-purple-500 text-sm">
-                                        {plans.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
-                                    </select>
-                                </div>
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Status da Conta</label>
-                                <select value={editingUser.status} onChange={e => setEditingUser({...editingUser, status: e.target.value})} className="w-full p-3 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:border-purple-500 text-sm">
-                                    <option value="Ativo">✅ Ativo / Em Dia</option>
-                                    <option value="Pendente">⏳ Aguardando Pgto</option>
-                                    <option value="Bloqueado">🚫 Bloqueado / Inativo</option>
-                                </select>
-                            </div>
-                            <button onClick={() => handleSaveUser(editingUser)} className="w-full bg-slate-900 dark:bg-white text-white dark:text-black py-4 rounded-xl font-bold text-sm shadow-xl hover:scale-[1.02] active:scale-95 transition-all mt-4 flex items-center justify-center gap-2">
-                                <Save className="w-4 h-4"/> Atualizar Cadastro
-                            </button>
-                        </div>
                     </div>
                 </div>
             )}
@@ -419,7 +347,6 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                                         onChange={e => {
                                             const val = e.target.value;
                                             const updates: any = { title: val };
-                                            // Auto-generate slug if it's a new post or slug is empty
                                             if (!editingPost.id || !editingPost.slug) {
                                                 updates.slug = generateSlug(val);
                                             }
@@ -439,7 +366,7 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                                         value={editingPost.content || ''} 
                                         onChange={html => setEditingPost({...editingPost, content: html})} 
                                         className="min-h-[600px] border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-black/20"
-                                        placeholder="Comece a escrever seu insight técnico ou estratégia..."
+                                        placeholder="Comece a escrever seu insight..."
                                     />
                                 </div>
                             </div>
@@ -464,7 +391,7 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                                             placeholder="url-amigavel-aqui"
                                         />
                                     </div>
-                                    <p className="text-[9px] text-slate-500 italic px-1">O slug define o link final do post. Use apenas letras, números e hífens.</p>
+                                    <p className="text-[9px] text-slate-500 italic px-1">O slug define o link final. Use apenas letras, números e hífens.</p>
                                 </div>
                             </div>
 
@@ -486,7 +413,6 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                                         <div className="text-center p-6 cursor-pointer">
                                             <UploadCloud className="w-8 h-8 text-slate-400 mx-auto mb-2 group-hover:text-purple-500 transition-colors"/>
                                             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Upload Capa</span>
-                                            <span className="text-[9px] text-slate-400 block mt-1">16:9 Recomendado</span>
                                         </div>
                                     )}
                                     <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleFileUpload(e, 'cover_image', true)}/>
@@ -515,7 +441,6 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                                             <button onClick={() => removeTag(tag)} className="hover:text-red-500"><X className="w-3 h-3"/></button>
                                         </span>
                                     ))}
-                                    {(!editingPost.tags || editingPost.tags.length === 0) && <span className="text-[10px] text-slate-500 italic">Sem tags definidas.</span>}
                                 </div>
                             </div>
 
@@ -538,10 +463,15 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                                         <label className="text-[9px] font-black text-slate-500 uppercase ml-1">Arquivo PDF/DOC</label>
                                         <div className="flex flex-col gap-2">
                                             {editingPost.download_url ? (
-                                                <div className="flex items-center gap-2 p-2 bg-emerald-500/20 rounded-lg border border-emerald-500/30 overflow-hidden">
-                                                    <FileText className="w-4 h-4 text-emerald-500 shrink-0"/>
-                                                    <span className="text-[9px] font-mono text-emerald-600 dark:text-emerald-400 truncate flex-1">{editingPost.download_url}</span>
-                                                    <button onClick={() => setEditingPost({...editingPost, download_url: ''})} className="text-red-500 hover:scale-110 transition-transform shrink-0"><Trash2 className="w-3.5 h-3.5"/></button>
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center gap-2 p-2 bg-emerald-500/20 rounded-lg border border-emerald-500/30 overflow-hidden">
+                                                        <FileText className="w-4 h-4 text-emerald-500 shrink-0"/>
+                                                        <span className="text-[9px] font-mono text-emerald-600 dark:text-emerald-400 truncate flex-1">{editingPost.download_url}</span>
+                                                        <button onClick={() => setEditingPost({...editingPost, download_url: ''})} className="text-red-500 hover:scale-110 transition-transform shrink-0"><Trash2 className="w-3.5 h-3.5"/></button>
+                                                    </div>
+                                                    <a href={editingPost.download_url} target="_blank" className="w-full py-2 bg-white/10 hover:bg-white/20 rounded-lg text-[10px] font-black text-white uppercase tracking-widest text-center flex items-center justify-center gap-2 transition-all">
+                                                        <Eye className="w-3 h-3"/> Visualizar Documento
+                                                    </a>
                                                 </div>
                                             ) : (
                                                 <div className="relative group">
@@ -557,56 +487,6 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                             </div>
 
                         </aside>
-                    </div>
-                </div>
-            )}
-
-            {/* MODAL: EDIT CASE */}
-            {editingCase && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-                    <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl w-full max-w-lg shadow-2xl border border-white/10 ring-1 ring-white/5">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">Gerenciar Estudo de Caso</h3>
-                            <button onClick={() => setEditingCase(null)}><X className="w-5 h-5 text-slate-400 hover:text-white"/></button>
-                        </div>
-                        <div className="space-y-4">
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Título do Case</label>
-                                <input value={editingCase.title || ''} onChange={e => setEditingCase({...editingCase, title: e.target.value})} className="w-full p-3 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:border-purple-500 text-sm font-bold text-slate-900 dark:text-white" placeholder="Título"/>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Métrica de Impacto</label>
-                                    <input value={editingCase.metric || ''} onChange={e => setEditingCase({...editingCase, metric: e.target.value})} className="w-full p-3 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:border-emerald-500 text-sm font-black text-emerald-600" placeholder="+200% ROI"/>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Categoria</label>
-                                    <input value={editingCase.category || ''} onChange={e => setEditingCase({...editingCase, category: e.target.value})} className="w-full p-3 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:border-purple-500 text-sm" placeholder="Ex: FinTech"/>
-                                </div>
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Descrição Curta</label>
-                                <textarea value={editingCase.description || ''} onChange={e => setEditingCase({...editingCase, description: e.target.value})} className="w-full p-3 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:border-purple-500 text-sm h-24 resize-none" placeholder="Breve resumo da transformação..."/>
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Link Externo</label>
-                                <input value={editingCase.link_url || ''} onChange={e => setEditingCase({...editingCase, link_url: e.target.value})} className="w-full p-3 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:border-blue-500 text-xs font-mono text-blue-500" placeholder="https://..."/>
-                            </div>
-                            <div className="border border-slate-200 dark:border-white/10 p-4 rounded-xl relative bg-slate-50 dark:bg-black/20 overflow-hidden group">
-                                <div className="flex justify-between items-center relative z-10">
-                                    <div className="flex items-center gap-2">
-                                        <ImageIcon className="w-4 h-4 text-slate-400"/>
-                                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Capa do Case</span>
-                                    </div>
-                                    <input type="file" className="absolute inset-0 opacity-0 cursor-pointer z-20" onChange={(e) => handleFileUpload(e, 'image_url')}/>
-                                    {editingCase.image_url && <div className="text-[9px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded">Alterar</div>}
-                                </div>
-                                {editingCase.image_url && <img src={editingCase.image_url} className="mt-3 w-full h-24 object-cover rounded-lg opacity-60"/>}
-                            </div>
-                            <button onClick={handleSaveCase} className="w-full bg-slate-900 dark:bg-white text-white dark:text-black py-4 rounded-xl font-bold text-sm shadow-xl hover:scale-[1.02] active:scale-95 transition-all mt-4 flex items-center justify-center gap-2">
-                                <Save className="w-4 h-4"/> Salvar Case
-                            </button>
-                        </div>
                     </div>
                 </div>
             )}

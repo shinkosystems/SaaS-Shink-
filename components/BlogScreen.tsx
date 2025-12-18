@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { CmsPost } from '../types';
 import { fetchCmsPosts, captureLead, fetchCmsPostBySlug } from '../services/cmsService';
@@ -95,7 +96,6 @@ export const BlogScreen: React.FC<Props> = ({ onBack, onEnter, initialPostSlug }
         return matchesSearch && matchesTag;
     });
 
-    // Fix: Explicitly type allTags as string[] to avoid 'unknown' inference from Array.from and Set
     const allTags: string[] = Array.from(new Set(posts.flatMap(p => p.tags || [])));
 
     return (
@@ -171,7 +171,6 @@ export const BlogScreen: React.FC<Props> = ({ onBack, onEnter, initialPostSlug }
                                         onClick={() => setActiveTag(tag)}
                                         className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${activeTag === tag ? 'bg-amber-500 text-black border-amber-500 shadow-lg shadow-amber-500/20' : 'bg-white/5 border-white/10 text-slate-400 hover:border-white/30'}`}
                                     >
-                                        {/* Fix: Property 'toUpperCase' does not exist on type 'unknown'. tag is cast to string */}
                                         {tag.toUpperCase()}
                                     </button>
                                 ))}
@@ -198,9 +197,6 @@ export const BlogScreen: React.FC<Props> = ({ onBack, onEnter, initialPostSlug }
                                         </span>
                                     </button>
                                 ))}
-                                {filteredPosts.length === 0 && (
-                                    <p className="text-[10px] text-slate-600 italic px-3">Nenhum artigo encontrado.</p>
-                                )}
                             </div>
                         </div>
                     </div>
@@ -276,12 +272,12 @@ export const BlogScreen: React.FC<Props> = ({ onBack, onEnter, initialPostSlug }
                                 <h1 className="text-5xl md:text-7xl font-black text-white mb-6 tracking-tight leading-none">
                                     Engenharia de <br/><span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-600">Insights</span>.
                                 </h1>
-                                <p className="text-slate-400 text-lg md:text-xl max-w-2xl leading-relaxed">Frameworks, estratégias e deep-dives técnicos sobre inovação e construção de produtos digitais de alta performance.</p>
+                                <p className="text-slate-400 text-lg md:text-xl max-w-2xl leading-relaxed">Frameworks e estratégias sobre inovação e construção de produtos digitais de alta performance.</p>
                             </div>
 
                             {filteredPosts.length === 0 ? (
                                 <div className="text-center py-40 text-slate-500 border border-dashed border-white/10 rounded-[3rem] bg-white/5">
-                                    Nenhum artigo encontrado para os critérios selecionados.
+                                    Nenhum artigo encontrado.
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
@@ -289,27 +285,14 @@ export const BlogScreen: React.FC<Props> = ({ onBack, onEnter, initialPostSlug }
                                         <div key={post.id} onClick={() => handleSelectPost(post)} className="group bg-[#0A0A0A] border border-white/10 rounded-[2.5rem] overflow-hidden hover:border-amber-500/30 transition-all duration-500 cursor-pointer flex flex-col h-full hover:-translate-y-2 hover:shadow-2xl hover:shadow-amber-500/5 relative">
                                             <div className="h-64 overflow-hidden relative bg-white/5">
                                                 {post.cover_image && (
-                                                    <>
-                                                        <div className="absolute inset-0 bg-black/30 group-hover:bg-transparent transition-colors z-10"></div>
-                                                        <img src={post.cover_image} alt={post.title} className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"/>
-                                                    </>
-                                                )}
-                                                {post.download_url && (
-                                                    <div className="absolute top-6 right-6 bg-amber-500 text-black text-[10px] font-black px-4 py-2 rounded-full shadow-lg flex items-center gap-2 z-20 border border-amber-400 shadow-amber-500/40 uppercase tracking-widest">
-                                                        <Download className="w-3 h-3"/> Material Rico
-                                                    </div>
+                                                    <img src={post.cover_image} alt={post.title} className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"/>
                                                 )}
                                             </div>
-                                            <div className="p-8 flex-1 flex flex-col relative bg-[#0A0A0A] group-hover:bg-white/[0.02] transition-colors">
-                                                <div className="flex gap-2 mb-6">
-                                                    {post.tags?.slice(0, 2).map(tag => (
-                                                        <span key={tag} className="text-[9px] font-black uppercase tracking-widest text-amber-500 bg-amber-500/10 px-3 py-1 rounded-lg border border-amber-500/20">{tag}</span>
-                                                    ))}
-                                                </div>
+                                            <div className="p-8 flex-1 flex flex-col">
                                                 <h3 className="text-2xl font-bold text-white mb-6 line-clamp-2 leading-tight group-hover:text-amber-400 transition-colors">
                                                     {post.title}
                                                 </h3>
-                                                <div className="mt-auto pt-6 flex items-center justify-between text-slate-500 text-[10px] font-black uppercase tracking-widest border-t border-white/5 group-hover:border-white/10 transition-colors">
+                                                <div className="mt-auto pt-6 flex items-center justify-between text-slate-500 text-[10px] font-black uppercase tracking-widest border-t border-white/5">
                                                     <span className="flex items-center gap-2"><Calendar className="w-3 h-3 text-amber-500/50"/> {new Date(post.created_at).toLocaleDateString()}</span>
                                                     <span className="group-hover:text-amber-500 transition-colors flex items-center gap-2">Ler Artigo <ArrowRight className="w-3 h-3"/></span>
                                                 </div>
@@ -328,29 +311,18 @@ export const BlogScreen: React.FC<Props> = ({ onBack, onEnter, initialPostSlug }
                 <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-in fade-in duration-300">
                     <div className="w-full max-w-md bg-slate-900 rounded-[2.5rem] p-10 shadow-2xl relative border border-white/10 ring-1 ring-white/5">
                         <button onClick={() => setShowLeadModal(false)} className="absolute top-6 right-6 text-slate-500 hover:text-white transition-colors p-2"><X className="w-6 h-6"/></button>
-                        
                         <div className="text-center mb-10">
-                            <div className="w-16 h-16 bg-amber-500/20 text-amber-500 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-amber-500/30 animate-pulse">
+                            <div className="w-16 h-16 bg-amber-500/20 text-amber-500 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-amber-500/30">
                                 <Download className="w-8 h-8"/>
                             </div>
                             <h3 className="text-2xl font-black text-white mb-3">Quase lá!</h3>
                             <p className="text-slate-400 text-sm leading-relaxed">Informe seus dados corporativos para liberar o acesso ao download imediatamente.</p>
                         </div>
-
                         <form onSubmit={handleLeadSubmit} className="space-y-5">
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Nome Completo</label>
-                                <input required value={leadName} onChange={e => setLeadName(e.target.value)} className="w-full p-4 bg-black/40 border border-white/10 rounded-2xl outline-none focus:border-amber-500 text-white transition-all text-sm placeholder:text-slate-700" placeholder="Ex: Pedro Borba"/>
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Email Profissional</label>
-                                <input required type="email" value={leadEmail} onChange={e => setLeadEmail(e.target.value)} className="w-full p-4 bg-black/40 border border-white/10 rounded-2xl outline-none focus:border-amber-500 text-white transition-all text-sm placeholder:text-slate-700" placeholder="nome@empresa.com"/>
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">WhatsApp</label>
-                                <input required type="tel" value={leadPhone} onChange={e => setLeadPhone(e.target.value)} className="w-full p-4 bg-black/40 border border-white/10 rounded-2xl outline-none focus:border-amber-500 text-white transition-all text-sm placeholder:text-slate-700" placeholder="(00) 00000-0000"/>
-                            </div>
-                            <button disabled={isSubmitting} className="w-full py-5 bg-amber-500 hover:bg-amber-400 text-black font-black uppercase tracking-widest text-xs rounded-2xl shadow-[0_0_30px_rgba(245,158,11,0.2)] transition-all flex items-center justify-center gap-3 mt-8 hover:scale-[1.02] active:scale-95 disabled:opacity-50">
+                            <input required value={leadName} onChange={e => setLeadName(e.target.value)} className="w-full p-4 bg-black/40 border border-white/10 rounded-2xl outline-none focus:border-amber-500 text-white transition-all text-sm" placeholder="Nome Completo"/>
+                            <input required type="email" value={leadEmail} onChange={e => setLeadEmail(e.target.value)} className="w-full p-4 bg-black/40 border border-white/10 rounded-2xl outline-none focus:border-amber-500 text-white transition-all text-sm" placeholder="Email Profissional"/>
+                            <input required type="tel" value={leadPhone} onChange={e => setLeadPhone(e.target.value)} className="w-full p-4 bg-black/40 border border-white/10 rounded-2xl outline-none focus:border-amber-500 text-white transition-all text-sm" placeholder="WhatsApp"/>
+                            <button disabled={isSubmitting} className="w-full py-5 bg-amber-500 hover:bg-amber-400 text-black font-black uppercase tracking-widest text-xs rounded-2xl shadow-xl transition-all flex items-center justify-center gap-3">
                                 {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin"/> : <CheckCircle className="w-5 h-5"/>}
                                 Liberar Conteúdo
                             </button>
