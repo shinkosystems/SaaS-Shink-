@@ -41,6 +41,7 @@ export interface CmsPost {
     tags: string[];
     download_url?: string;
     download_title?: string;
+    download_image_url?: string; // Novo: Imagem do Material Rico
     published: boolean;
     created_at: string;
 }

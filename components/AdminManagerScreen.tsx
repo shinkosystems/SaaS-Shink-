@@ -398,7 +398,7 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                             {/* Cover Image */}
                             <div className="space-y-4">
                                 <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 dark:border-white/5 pb-2">
-                                    <ImageIcon className="w-4 h-4 text-purple-500"/> Imagem de Capa
+                                    <ImageIcon className="w-4 h-4 text-purple-500"/> Imagem de Capa (Post)
                                 </h3>
                                 <div className="aspect-video border-2 border-dashed border-slate-200 dark:border-white/10 rounded-2xl flex flex-col items-center justify-center relative overflow-hidden group bg-slate-50 dark:bg-black/40 hover:border-purple-500/50 transition-colors">
                                     {editingPost.cover_image ? (
@@ -459,6 +459,28 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                                             className="w-full p-2.5 bg-white dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:border-emerald-500 text-xs text-slate-700 dark:text-slate-300 font-bold"
                                         />
                                     </div>
+
+                                    {/* Download Item Image */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-[9px] font-black text-slate-500 uppercase ml-1">Capa do Material (Ebook/PDF)</label>
+                                        <div className="aspect-[4/3] border-2 border-dashed border-emerald-500/20 rounded-xl overflow-hidden relative group bg-black/40 hover:border-emerald-500/50 transition-colors">
+                                            {editingPost.download_image_url ? (
+                                                <>
+                                                    <img src={editingPost.download_image_url} className="w-full h-full object-cover"/>
+                                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                        <button onClick={() => setEditingPost({...editingPost, download_image_url: ''})} className="p-2 bg-red-600 rounded-lg text-white"><Trash2 className="w-4 h-4"/></button>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <div className="h-full flex flex-col items-center justify-center p-4 text-center cursor-pointer">
+                                                    <ImageIcon className="w-6 h-6 text-emerald-500/40 mb-2"/>
+                                                    <span className="text-[8px] font-black text-emerald-500/60 uppercase">Add Capa Material</span>
+                                                </div>
+                                            )}
+                                            <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleFileUpload(e, 'download_image_url', true)}/>
+                                        </div>
+                                    </div>
+
                                     <div className="space-y-1.5">
                                         <label className="text-[9px] font-black text-slate-500 uppercase ml-1">Arquivo PDF/DOC</label>
                                         <div className="flex flex-col gap-2">

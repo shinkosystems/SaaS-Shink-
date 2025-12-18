@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { CmsPost } from '../types';
 import { fetchCmsPosts, captureLead, fetchCmsPostBySlug } from '../services/cmsService';
-import { ArrowLeft, Calendar, Tag, Download, CheckCircle, Loader2, Search, X, ChevronRight, FileText, ArrowRight, BookOpen, Layers } from 'lucide-react';
+import { ArrowLeft, Calendar, Tag, Download, CheckCircle, Loader2, Search, X, ChevronRight, FileText, ArrowRight, BookOpen, Layers, Image as ImageIcon } from 'lucide-react';
 
 interface Props {
     onBack: () => void;
@@ -248,16 +248,27 @@ export const BlogScreen: React.FC<Props> = ({ onBack, onEnter, initialPostSlug }
                                         <div className="mt-20 p-1 rounded-[2rem] bg-gradient-to-br from-amber-500 via-orange-600 to-amber-700 shadow-2xl">
                                             <div className="bg-[#0A0A0A] rounded-[1.8rem] p-8 md:p-12 relative overflow-hidden">
                                                 <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none"></div>
-                                                <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
-                                                    <div className="text-center md:text-left">
+                                                <div className="relative z-10 flex flex-col md:flex-row items-center gap-8 md:gap-12">
+                                                    
+                                                    {/* Material Thumbnail */}
+                                                    {selectedPost.download_image_url && (
+                                                        <div className="w-full md:w-48 shrink-0 animate-in zoom-in duration-700 delay-300">
+                                                            <div className="aspect-[3/4] bg-white rounded-xl shadow-2xl overflow-hidden ring-4 ring-white/10 group">
+                                                                <img src={selectedPost.download_image_url} alt="Material Rico" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    <div className="flex-1 text-center md:text-left">
                                                         <h3 className="text-3xl font-black text-white mb-3 flex items-center justify-center md:justify-start gap-4">
                                                             <FileText className="w-8 h-8 text-amber-500"/> Material Rico
                                                         </h3>
-                                                        <p className="text-slate-400 text-base max-w-md">Acesse o checklist completo e o framework técnico detalhado: {selectedPost.download_title || 'material'}.</p>
+                                                        <p className="text-slate-400 text-base max-w-md mb-8">Acesse o checklist completo e o framework técnico detalhado: <strong>{selectedPost.download_title || 'material'}</strong>.</p>
+                                                        
+                                                        <button onClick={handleDownloadClick} className="w-full md:w-auto px-10 py-5 bg-white text-black font-black uppercase tracking-widest text-xs rounded-2xl shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3">
+                                                            <Download className="w-5 h-5"/> Baixar Agora
+                                                        </button>
                                                     </div>
-                                                    <button onClick={handleDownloadClick} className="px-10 py-5 bg-white text-black font-black uppercase tracking-widest text-xs rounded-2xl shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-3 shrink-0">
-                                                        <Download className="w-5 h-5"/> Baixar Agora
-                                                    </button>
                                                 </div>
                                             </div>
                                         </div>
@@ -323,7 +334,7 @@ export const BlogScreen: React.FC<Props> = ({ onBack, onEnter, initialPostSlug }
                             <input required type="email" value={leadEmail} onChange={e => setLeadEmail(e.target.value)} className="w-full p-4 bg-black/40 border border-white/10 rounded-2xl outline-none focus:border-amber-500 text-white transition-all text-sm" placeholder="Email Profissional"/>
                             <input required type="tel" value={leadPhone} onChange={e => setLeadPhone(e.target.value)} className="w-full p-4 bg-black/40 border border-white/10 rounded-2xl outline-none focus:border-amber-500 text-white transition-all text-sm" placeholder="WhatsApp"/>
                             <button disabled={isSubmitting} className="w-full py-5 bg-amber-500 hover:bg-amber-400 text-black font-black uppercase tracking-widest text-xs rounded-2xl shadow-xl transition-all flex items-center justify-center gap-3">
-                                {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin"/> : <CheckCircle className="w-5 h-5"/>}
+                                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin"/> : <CheckCircle className="w-5 h-5"/>}
                                 Liberar Conteúdo
                             </button>
                         </form>
