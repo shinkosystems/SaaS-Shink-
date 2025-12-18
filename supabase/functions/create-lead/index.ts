@@ -22,12 +22,10 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Hardcoded Organization ID for Leads (as per requirement)
+    // Hardcoded Organization ID for Shinkō OS Leads
     const ORG_ID = 3;
 
-    // Optional: Try to find a default owner in this organization to assign the lead to
-    // If not found, we might need to leave it null or assign to a system user if known.
-    // For now, we try to find the first 'dono' or 'admin' of org 3.
+    // Try to find the default 'dono' of org 3 to assign the lead
     const { data: users } = await supabaseAdmin
         .from('users')
         .select('id')
@@ -37,33 +35,43 @@ Deno.serve(async (req) => {
     
     const ownerId = users && users.length > 0 ? users[0].id : null;
 
+    // Build Payload matching the provided DB Schema for crm_opportunities
+    // Populating both naming conventions found in typical CRM schemas to ensure persistence
     const newLead = {
         organizacao: ORG_ID,
         titulo: `Download: ${assetName}`,
         valor: 0,
         probabilidade: 20,
         estagio: 'qualification',
-        data_fechamento_prevista: new Date().toISOString(),
-        responsavel: ownerId, // Can be null if DB allows, otherwise might fail if constraint exists
+        data_fechamento_prevista: new Date(new Date().setDate(new Date().getDate() + 15)).toISOString().split('T')[0],
+        responsavel: ownerId,
         
-        // Contact Info
+        // standard naming
+        nome: name,
+        email: email,
+        whatsapp: phone,
+
+        // contato naming (from crm_opportunities schema provided)
         contato_nome: name,
         contato_email: email,
         contato_telefone: phone,
         contato_cargo: 'Lead Site',
-        origem: 'Blog Download',
         
-        empresa_nome: name + ' (Pessoa)',
+        origem: 'Download Material Blog',
+        empresa_nome: `${name} (Lead Individual)`,
         
-        atividades: [{
+        // Initial activity as JSONB
+        atividades: JSON.stringify([{
             id: crypto.randomUUID(),
             type: 'task',
             status: 'pending',
-            subject: 'Novo Lead de Material Rico',
+            subject: 'Novo Lead de Material Rico: ' + assetName,
             date: new Date().toISOString().split('T')[0],
             owner: 'Sistema'
-        }]
+        }])
     };
+
+    console.log("Iniciando inserção de lead no CRM...", newLead);
 
     const { data, error } = await supabaseAdmin
         .from('crm_opportunities')
@@ -72,9 +80,11 @@ Deno.serve(async (req) => {
         .single();
 
     if (error) {
-        console.error("Db Insert Error:", error);
-        throw new Error(error.message);
+        console.error("Erro Crítico na Inserção DB:", error);
+        throw new Error(`Falha ao salvar no CRM: ${error.message}`);
     }
+
+    console.log("Lead registrado com sucesso ID:", data.id);
 
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -82,6 +92,7 @@ Deno.serve(async (req) => {
     })
 
   } catch (error) {
+    console.error("Lead Function Error:", error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,

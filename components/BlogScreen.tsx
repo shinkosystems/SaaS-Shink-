@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { CmsPost } from '../types';
 import { fetchCmsPosts, captureLead, fetchCmsPostBySlug } from '../services/cmsService';
-import { ArrowLeft, Calendar, Tag, Download, CheckCircle, Loader2, Search, X, ChevronRight, FileText, ArrowRight } from 'lucide-react';
+import { ArrowLeft, Calendar, Tag, Download, CheckCircle, Loader2, Search, X, ChevronRight, FileText, ArrowRight, BookOpen, Layers } from 'lucide-react';
 
 interface Props {
     onBack: () => void;
@@ -58,6 +57,7 @@ export const BlogScreen: React.FC<Props> = ({ onBack, onEnter, initialPostSlug }
         setSelectedPost(post);
         if (post) {
             window.history.pushState({}, '', `/blog/${post.slug || post.id}`);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         } else {
             window.history.pushState({}, '', '/blog');
         }
@@ -95,196 +95,269 @@ export const BlogScreen: React.FC<Props> = ({ onBack, onEnter, initialPostSlug }
         return matchesSearch && matchesTag;
     });
 
-    const allTags = Array.from(new Set(posts.flatMap(p => p.tags || [])));
-
-    if (selectedPost) {
-        return (
-            <div className="fixed inset-0 z-[250] bg-[#050505] text-white animate-in fade-in slide-in-from-right-8 overflow-y-auto custom-scrollbar">
-                <div className="fixed inset-0 w-full h-full overflow-hidden pointer-events-none">
-                    <div className="absolute top-[-20%] left-[-10%] w-[800px] h-[800px] bg-amber-600/10 rounded-full blur-[120px] mix-blend-screen"></div>
-                    <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
-                </div>
-                
-                <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md border-b border-white/5 bg-[#050505]/80">
-                    <div className="max-w-7xl mx-auto px-6 h-20 flex justify-between items-center">
-                        <div className="flex items-center gap-3 cursor-pointer group" onClick={() => handleSelectPost(null)}>
-                            <img src={LOGO_URL} alt="Shinkō OS" className="h-8 w-auto object-contain relative z-10" />
-                        </div>
-                        <div className="flex items-center gap-4">
-                            <button onClick={() => handleSelectPost(null)} className="group relative px-6 py-2.5 bg-white/10 text-white font-bold text-sm rounded-xl hover:bg-white/20 transition-all border border-white/10 flex items-center gap-2">
-                                <ArrowLeft className="w-4 h-4"/> Voltar
-                            </button>
-                        </div>
-                    </div>
-                </nav>
-
-                <div className="relative z-10 max-w-4xl mx-auto px-6 py-12 pt-32">
-                    <div className="bg-[#0A0A0A] border border-white/10 rounded-3xl overflow-hidden shadow-2xl mb-20 relative">
-                        {selectedPost.cover_image && (
-                            <div className="relative h-64 md:h-96 w-full">
-                                <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/50 to-transparent opacity-90 z-10"></div>
-                                <img src={selectedPost.cover_image} alt={selectedPost.title} className="w-full h-full object-cover"/>
-                            </div>
-                        )}
-                        <div className="p-8 md:p-12 -mt-32 relative z-20">
-                            <div className="flex flex-wrap gap-2 mb-6">
-                                {selectedPost.tags?.map(tag => (
-                                    <span key={tag} className="px-3 py-1 bg-amber-500 text-black rounded-full text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-amber-500/20 border border-amber-400">
-                                        {tag}
-                                    </span>
-                                ))}
-                            </div>
-                            <h1 className="text-3xl md:text-5xl font-black text-white mb-6 leading-tight tracking-tight drop-shadow-xl">
-                                {selectedPost.title}
-                            </h1>
-                            <div className="flex items-center gap-4 text-xs font-bold text-slate-300 uppercase tracking-wider mb-10 pb-8 border-b border-white/10">
-                                <span className="flex items-center gap-2"><Calendar className="w-4 h-4 text-amber-500"/> {new Date(selectedPost.created_at).toLocaleDateString()}</span>
-                                <span>•</span>
-                                <span>Por Shinkō Team</span>
-                            </div>
-                            <div 
-                                className="prose prose-invert max-w-none text-slate-300 leading-relaxed prose-headings:font-bold prose-headings:text-white prose-a:text-amber-400 prose-img:rounded-xl prose-strong:text-white"
-                                dangerouslySetInnerHTML={{ __html: selectedPost.content || '' }}
-                            />
-                            {selectedPost.download_url && (
-                                <div className="mt-16 p-1 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 shadow-2xl animate-pulse-slow">
-                                    <div className="bg-[#0A0A0A] rounded-xl p-8 relative overflow-hidden group">
-                                        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
-                                        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-                                            <div>
-                                                <h3 className="text-2xl font-bold text-white mb-2 flex items-center gap-3">
-                                                    <FileText className="w-6 h-6 text-amber-500"/> Material Exclusivo
-                                                </h3>
-                                                <p className="text-slate-400 text-sm">Acesse o conteúdo completo: {selectedPost.download_title || 'material'}.</p>
-                                            </div>
-                                            <button onClick={handleDownloadClick} className="px-8 py-4 bg-white text-black font-bold rounded-xl shadow-lg hover:scale-105 transition-transform flex items-center gap-2">
-                                                <Download className="w-5 h-5"/> Baixar Agora
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {showLeadModal && (
-                    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
-                        <div className="glass-panel w-full max-w-md rounded-3xl p-8 shadow-2xl relative border border-white/10 bg-slate-900/90">
-                            <button onClick={() => setShowLeadModal(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors"><X className="w-5 h-5"/></button>
-                            <div className="text-center mb-8">
-                                <div className="w-12 h-12 bg-amber-500/20 text-amber-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-500/30">
-                                    <Download className="w-6 h-6"/>
-                                </div>
-                                <h3 className="text-xl font-bold text-white mb-2">Quase lá!</h3>
-                                <p className="text-slate-400 text-xs">Preencha seus dados para liberar o download imediatamente.</p>
-                            </div>
-                            <form onSubmit={handleLeadSubmit} className="space-y-4">
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Nome</label>
-                                    <input required value={leadName} onChange={e => setLeadName(e.target.value)} className="w-full p-3 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-amber-500 text-white transition-colors text-sm"/>
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Email Profissional</label>
-                                    <input required type="email" value={leadEmail} onChange={e => setLeadEmail(e.target.value)} className="w-full p-3 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-amber-500 text-white transition-colors text-sm"/>
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Telefone / WhatsApp</label>
-                                    <input required type="tel" value={leadPhone} onChange={e => setLeadPhone(e.target.value)} className="w-full p-3 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-amber-500 text-white transition-colors text-sm"/>
-                                </div>
-                                <button disabled={isSubmitting} className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-black font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 mt-4">
-                                    {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin"/> : <CheckCircle className="w-5 h-5"/>}
-                                    Liberar Download
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-                )}
-            </div>
-        );
-    }
+    // Fix: Explicitly type allTags as string[] to avoid 'unknown' inference from Array.from and Set
+    const allTags: string[] = Array.from(new Set(posts.flatMap(p => p.tags || [])));
 
     return (
-        <div className="fixed inset-0 z-[200] bg-[#050505] text-white flex flex-col overflow-y-auto custom-scrollbar">
+        <div className="fixed inset-0 z-[200] bg-[#050505] text-white flex flex-col overflow-hidden font-sans">
+            {/* Background Effects */}
             <div className="fixed inset-0 w-full h-full overflow-hidden pointer-events-none">
-                <div className="absolute top-[-20%] left-[-10%] w-[800px] h-[800px] bg-amber-600/10 rounded-full blur-[120px] mix-blend-screen"></div>
-                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
+                <div className="absolute top-[-10%] left-[-5%] w-[600px] h-[600px] bg-amber-600/5 rounded-full blur-[100px] mix-blend-screen"></div>
+                <div className="absolute bottom-[-10%] right-[-5%] w-[600px] h-[600px] bg-purple-900/5 rounded-full blur-[100px] mix-blend-screen"></div>
+                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03]"></div>
             </div>
             
-            <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md border-b border-white/5 bg-[#050505]/80">
-                <div className="max-w-7xl mx-auto px-6 h-20 flex justify-between items-center">
-                    <div className="flex items-center gap-3 cursor-pointer group" onClick={onBack}>
-                        <img src={LOGO_URL} alt="Shinkō OS" className="h-8 w-auto object-contain relative z-10" />
+            {/* Header - Back button on Left */}
+            <nav className="h-20 shrink-0 backdrop-blur-md border-b border-white/5 bg-[#050505]/80 z-50 px-6">
+                <div className="max-w-[1600px] mx-auto h-full flex justify-between items-center">
+                    <div className="flex items-center gap-6">
+                        <button 
+                            onClick={selectedPost ? () => handleSelectPost(null) : onBack} 
+                            className="group flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 rounded-xl transition-all border border-white/10 text-slate-300 hover:text-white"
+                        >
+                            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform"/>
+                            <span className="text-xs font-bold uppercase tracking-wider">Voltar</span>
+                        </button>
+                        <div className="w-px h-6 bg-white/10 hidden sm:block"></div>
+                        <img src={LOGO_URL} alt="Shinkō OS" className="h-7 w-auto object-contain hidden sm:block" />
                     </div>
-                    <div className="flex items-center gap-4">
-                        <div className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-400 mr-4">
+
+                    <div className="flex items-center gap-6">
+                        <div className="hidden lg:flex items-center gap-6 text-xs font-bold uppercase tracking-widest text-slate-500">
                             <button onClick={onBack} className="hover:text-white transition-colors">Home</button>
                             <button onClick={onBack} className="hover:text-white transition-colors">Cases</button>
-                            <button className="text-white font-bold cursor-default">Blog</button>
+                            <button className="text-amber-500 cursor-default">Insights</button>
                         </div>
                         {onEnter && (
-                            <button onClick={onEnter} className="group relative px-6 py-2.5 bg-white text-black font-bold text-sm rounded-full hover:bg-slate-200 transition-all shadow-glow-white overflow-hidden">
-                                <span className="relative z-10 flex items-center gap-2">Entrar <ArrowRight className="w-4 h-4"/></span>
+                            <button onClick={onEnter} className="px-6 py-2.5 bg-white text-black font-black text-xs uppercase tracking-widest rounded-full hover:bg-slate-200 transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)] flex items-center gap-2">
+                                Entrar <ArrowRight className="w-4 h-4"/>
                             </button>
                         )}
                     </div>
                 </div>
             </nav>
 
-            <div className="max-w-7xl mx-auto px-6 py-12 pt-32 w-full relative z-10 flex-1">
-                <div className="mb-12">
-                    <h1 className="text-4xl md:text-6xl font-black text-white mb-2 tracking-tight">Blog & Insights</h1>
-                    <p className="text-slate-400 text-sm md:text-base max-w-lg mb-8">Estratégias, frameworks e deep-dives sobre inovação, engenharia de software e modelos de negócio.</p>
-                    <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-                        <div className="relative w-full md:w-96">
-                            <Search className="absolute left-4 top-3.5 w-4 h-4 text-slate-500"/>
-                            <input type="text" placeholder="Buscar artigos..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-amber-500/50 focus:bg-white/10 text-sm text-white transition-all placeholder:text-slate-500 focus:ring-1 focus:ring-amber-500/50"/>
+            <div className="flex-1 flex overflow-hidden relative z-10">
+                {/* Sidebar Navigation */}
+                <aside className="w-80 shrink-0 border-r border-white/5 bg-black/20 hidden md:flex flex-col overflow-y-auto custom-scrollbar">
+                    <div className="p-6 space-y-8">
+                        {/* Search in Sidebar */}
+                        <div className="relative group">
+                            <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500 group-focus-within:text-amber-500 transition-colors"/>
+                            <input 
+                                type="text" 
+                                placeholder="Buscar insights..." 
+                                value={searchTerm}
+                                onChange={e => setSearchTerm(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-amber-500/50 text-xs text-white placeholder:text-slate-600 transition-all"
+                            />
                         </div>
-                        <div className="flex gap-2 overflow-x-auto max-w-full pb-2 md:pb-0 scrollbar-hide">
-                            <button onClick={() => setActiveTag(null)} className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all border ${!activeTag ? 'bg-amber-500 text-black border-amber-500 shadow-lg shadow-amber-500/20' : 'bg-transparent border-white/10 text-slate-400 hover:border-white/30 hover:text-white'}`}>Todos</button>
-                            {allTags.map(tag => (
-                                <button key={tag} onClick={() => setActiveTag(tag)} className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all border ${activeTag === tag ? 'bg-amber-500 text-black border-amber-500 shadow-lg shadow-amber-500/20' : 'bg-transparent border-white/10 text-slate-400 hover:border-white/30 hover:text-white'}`}>{tag}</button>
-                            ))}
+
+                        {/* Categories */}
+                        <div>
+                            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-4 flex items-center gap-2">
+                                <Layers className="w-3 h-3"/> Categorias
+                            </h3>
+                            <div className="flex flex-wrap gap-2">
+                                <button 
+                                    onClick={() => setActiveTag(null)}
+                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${!activeTag ? 'bg-amber-500 text-black border-amber-500 shadow-lg shadow-amber-500/20' : 'bg-white/5 border-white/10 text-slate-400 hover:border-white/30'}`}
+                                >
+                                    TODOS
+                                </button>
+                                {allTags.map((tag: string) => (
+                                    <button 
+                                        key={tag} 
+                                        onClick={() => setActiveTag(tag)}
+                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${activeTag === tag ? 'bg-amber-500 text-black border-amber-500 shadow-lg shadow-amber-500/20' : 'bg-white/5 border-white/10 text-slate-400 hover:border-white/30'}`}
+                                    >
+                                        {/* Fix: Property 'toUpperCase' does not exist on type 'unknown'. tag is cast to string */}
+                                        {tag.toUpperCase()}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Article List */}
+                        <div>
+                            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-4 flex items-center gap-2">
+                                <BookOpen className="w-3 h-3"/> Publicações Recentes
+                            </h3>
+                            <div className="space-y-1">
+                                {filteredPosts.map(post => (
+                                    <button 
+                                        key={post.id}
+                                        onClick={() => handleSelectPost(post)}
+                                        className={`w-full text-left p-3 rounded-xl transition-all border flex flex-col gap-1 group ${selectedPost?.id === post.id ? 'bg-amber-500/10 border-amber-500/30 shadow-inner' : 'bg-transparent border-transparent hover:bg-white/5'}`}
+                                    >
+                                        <span className={`text-xs font-bold leading-snug transition-colors ${selectedPost?.id === post.id ? 'text-amber-400' : 'text-slate-300 group-hover:text-white'}`}>
+                                            {post.title}
+                                        </span>
+                                        <span className="text-[9px] text-slate-600 font-bold uppercase tracking-wider">
+                                            {new Date(post.created_at).toLocaleDateString()}
+                                        </span>
+                                    </button>
+                                ))}
+                                {filteredPosts.length === 0 && (
+                                    <p className="text-[10px] text-slate-600 italic px-3">Nenhum artigo encontrado.</p>
+                                )}
+                            </div>
                         </div>
                     </div>
-                </div>
+                </aside>
 
-                {loading ? (
-                    <div className="flex justify-center py-40"><Loader2 className="w-10 h-10 animate-spin text-amber-500 opacity-50"/></div>
-                ) : filteredPosts.length === 0 ? (
-                    <div className="text-center py-40 text-slate-500 border border-dashed border-white/10 rounded-3xl bg-white/5">Nenhum artigo encontrado.</div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                        {filteredPosts.map(post => (
-                            <div key={post.id} onClick={() => handleSelectPost(post)} className="group bg-[#0A0A0A] border border-white/10 rounded-3xl overflow-hidden hover:border-amber-500/30 transition-all duration-500 cursor-pointer flex flex-col h-full hover:-translate-y-2 hover:shadow-2xl hover:shadow-amber-500/10 relative">
-                                <div className="h-56 overflow-hidden relative bg-white/5">
-                                    {post.cover_image && (
-                                        <>
-                                            <div className="absolute inset-0 bg-black/40 group-hover:bg-transparent transition-colors z-10"></div>
-                                            <img src={post.cover_image} alt={post.title} className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"/>
-                                        </>
-                                    )}
-                                    {post.download_url && (
-                                        <div className="absolute top-4 right-4 bg-amber-500 text-black text-[10px] font-bold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1 z-20 border border-amber-400 shadow-amber-500/50"><Download className="w-3 h-3"/> Material Rico</div>
-                                    )}
-                                </div>
-                                <div className="p-6 flex-1 flex flex-col relative bg-[#0A0A0A] group-hover:bg-white/5 transition-colors">
-                                    <div className="flex gap-2 mb-4">
-                                        {post.tags?.slice(0, 2).map(tag => (
-                                            <span key={tag} className="text-[10px] font-bold uppercase tracking-widest text-amber-500 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20">{tag}</span>
+                {/* Main Content Area */}
+                <main className="flex-1 overflow-y-auto custom-scrollbar bg-[#050505] relative">
+                    {loading ? (
+                        <div className="flex flex-col items-center justify-center h-full gap-4 text-slate-500">
+                            <Loader2 className="w-8 h-8 animate-spin text-amber-500"/>
+                            <span className="text-xs font-bold uppercase tracking-widest">Sincronizando Insights...</span>
+                        </div>
+                    ) : selectedPost ? (
+                        /* DETAIL VIEW */
+                        <article className="max-w-4xl mx-auto px-6 py-12 md:py-20 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            <div className="bg-[#0A0A0A] border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl relative mb-20">
+                                {selectedPost.cover_image && (
+                                    <div className="relative h-[25rem] w-full bg-black">
+                                        <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/40 to-transparent z-10"></div>
+                                        <img src={selectedPost.cover_image} alt={selectedPost.title} className="w-full h-full object-cover opacity-80"/>
+                                    </div>
+                                )}
+                                
+                                <div className="p-8 md:p-14 -mt-40 relative z-20">
+                                    <div className="flex flex-wrap gap-2 mb-8">
+                                        {selectedPost.tags?.map(tag => (
+                                            <span key={tag} className="px-4 py-1.5 bg-amber-500 text-black rounded-full text-[10px] font-black uppercase tracking-[0.15em] shadow-lg shadow-amber-500/20">
+                                                {tag}
+                                            </span>
                                         ))}
                                     </div>
-                                    <h3 className="text-xl font-bold text-white mb-3 line-clamp-2 leading-tight group-hover:text-amber-400 transition-colors">{post.title}</h3>
-                                    <div className="mt-auto pt-6 flex items-center justify-between text-slate-500 text-xs font-bold border-t border-white/5 group-hover:border-white/10 transition-colors">
-                                        <span className="flex items-center gap-2"><Calendar className="w-3 h-3"/> {new Date(post.created_at).toLocaleDateString()}</span>
-                                        <span className="group-hover:text-amber-500 transition-colors flex items-center gap-1 text-slate-400">Ler Artigo <ChevronRight className="w-3 h-3"/></span>
+
+                                    <h1 className="text-4xl md:text-6xl font-black text-white mb-8 leading-[1.1] tracking-tight">
+                                        {selectedPost.title}
+                                    </h1>
+
+                                    <div className="flex items-center gap-6 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-12 pb-8 border-b border-white/5">
+                                        <span className="flex items-center gap-2"><Calendar className="w-4 h-4 text-amber-500"/> {new Date(selectedPost.created_at).toLocaleDateString()}</span>
+                                        <span className="hidden sm:inline">•</span>
+                                        <span className="hidden sm:inline">Por Shinkō Engineering Team</span>
                                     </div>
+
+                                    <div 
+                                        className="prose prose-invert max-w-none text-slate-300 leading-relaxed text-lg prose-headings:font-black prose-headings:text-white prose-a:text-amber-400 prose-img:rounded-3xl prose-strong:text-white"
+                                        dangerouslySetInnerHTML={{ __html: selectedPost.content || '' }}
+                                    />
+
+                                    {selectedPost.download_url && (
+                                        <div className="mt-20 p-1 rounded-[2rem] bg-gradient-to-br from-amber-500 via-orange-600 to-amber-700 shadow-2xl">
+                                            <div className="bg-[#0A0A0A] rounded-[1.8rem] p-8 md:p-12 relative overflow-hidden">
+                                                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none"></div>
+                                                <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
+                                                    <div className="text-center md:text-left">
+                                                        <h3 className="text-3xl font-black text-white mb-3 flex items-center justify-center md:justify-start gap-4">
+                                                            <FileText className="w-8 h-8 text-amber-500"/> Material Rico
+                                                        </h3>
+                                                        <p className="text-slate-400 text-base max-w-md">Acesse o checklist completo e o framework técnico detalhado: {selectedPost.download_title || 'material'}.</p>
+                                                    </div>
+                                                    <button onClick={handleDownloadClick} className="px-10 py-5 bg-white text-black font-black uppercase tracking-widest text-xs rounded-2xl shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-3 shrink-0">
+                                                        <Download className="w-5 h-5"/> Baixar Agora
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
-                        ))}
-                    </div>
-                )}
+                        </article>
+                    ) : (
+                        /* LIST VIEW */
+                        <div className="max-w-7xl mx-auto px-6 py-12 md:py-20 animate-in fade-in duration-500">
+                            <div className="mb-16">
+                                <h1 className="text-5xl md:text-7xl font-black text-white mb-6 tracking-tight leading-none">
+                                    Engenharia de <br/><span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-600">Insights</span>.
+                                </h1>
+                                <p className="text-slate-400 text-lg md:text-xl max-w-2xl leading-relaxed">Frameworks, estratégias e deep-dives técnicos sobre inovação e construção de produtos digitais de alta performance.</p>
+                            </div>
+
+                            {filteredPosts.length === 0 ? (
+                                <div className="text-center py-40 text-slate-500 border border-dashed border-white/10 rounded-[3rem] bg-white/5">
+                                    Nenhum artigo encontrado para os critérios selecionados.
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                                    {filteredPosts.map(post => (
+                                        <div key={post.id} onClick={() => handleSelectPost(post)} className="group bg-[#0A0A0A] border border-white/10 rounded-[2.5rem] overflow-hidden hover:border-amber-500/30 transition-all duration-500 cursor-pointer flex flex-col h-full hover:-translate-y-2 hover:shadow-2xl hover:shadow-amber-500/5 relative">
+                                            <div className="h-64 overflow-hidden relative bg-white/5">
+                                                {post.cover_image && (
+                                                    <>
+                                                        <div className="absolute inset-0 bg-black/30 group-hover:bg-transparent transition-colors z-10"></div>
+                                                        <img src={post.cover_image} alt={post.title} className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"/>
+                                                    </>
+                                                )}
+                                                {post.download_url && (
+                                                    <div className="absolute top-6 right-6 bg-amber-500 text-black text-[10px] font-black px-4 py-2 rounded-full shadow-lg flex items-center gap-2 z-20 border border-amber-400 shadow-amber-500/40 uppercase tracking-widest">
+                                                        <Download className="w-3 h-3"/> Material Rico
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="p-8 flex-1 flex flex-col relative bg-[#0A0A0A] group-hover:bg-white/[0.02] transition-colors">
+                                                <div className="flex gap-2 mb-6">
+                                                    {post.tags?.slice(0, 2).map(tag => (
+                                                        <span key={tag} className="text-[9px] font-black uppercase tracking-widest text-amber-500 bg-amber-500/10 px-3 py-1 rounded-lg border border-amber-500/20">{tag}</span>
+                                                    ))}
+                                                </div>
+                                                <h3 className="text-2xl font-bold text-white mb-6 line-clamp-2 leading-tight group-hover:text-amber-400 transition-colors">
+                                                    {post.title}
+                                                </h3>
+                                                <div className="mt-auto pt-6 flex items-center justify-between text-slate-500 text-[10px] font-black uppercase tracking-widest border-t border-white/5 group-hover:border-white/10 transition-colors">
+                                                    <span className="flex items-center gap-2"><Calendar className="w-3 h-3 text-amber-500/50"/> {new Date(post.created_at).toLocaleDateString()}</span>
+                                                    <span className="group-hover:text-amber-500 transition-colors flex items-center gap-2">Ler Artigo <ArrowRight className="w-3 h-3"/></span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </main>
             </div>
+
+            {/* Lead Modal */}
+            {showLeadModal && (
+                <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-in fade-in duration-300">
+                    <div className="w-full max-w-md bg-slate-900 rounded-[2.5rem] p-10 shadow-2xl relative border border-white/10 ring-1 ring-white/5">
+                        <button onClick={() => setShowLeadModal(false)} className="absolute top-6 right-6 text-slate-500 hover:text-white transition-colors p-2"><X className="w-6 h-6"/></button>
+                        
+                        <div className="text-center mb-10">
+                            <div className="w-16 h-16 bg-amber-500/20 text-amber-500 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-amber-500/30 animate-pulse">
+                                <Download className="w-8 h-8"/>
+                            </div>
+                            <h3 className="text-2xl font-black text-white mb-3">Quase lá!</h3>
+                            <p className="text-slate-400 text-sm leading-relaxed">Informe seus dados corporativos para liberar o acesso ao download imediatamente.</p>
+                        </div>
+
+                        <form onSubmit={handleLeadSubmit} className="space-y-5">
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Nome Completo</label>
+                                <input required value={leadName} onChange={e => setLeadName(e.target.value)} className="w-full p-4 bg-black/40 border border-white/10 rounded-2xl outline-none focus:border-amber-500 text-white transition-all text-sm placeholder:text-slate-700" placeholder="Ex: Pedro Borba"/>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Email Profissional</label>
+                                <input required type="email" value={leadEmail} onChange={e => setLeadEmail(e.target.value)} className="w-full p-4 bg-black/40 border border-white/10 rounded-2xl outline-none focus:border-amber-500 text-white transition-all text-sm placeholder:text-slate-700" placeholder="nome@empresa.com"/>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">WhatsApp</label>
+                                <input required type="tel" value={leadPhone} onChange={e => setLeadPhone(e.target.value)} className="w-full p-4 bg-black/40 border border-white/10 rounded-2xl outline-none focus:border-amber-500 text-white transition-all text-sm placeholder:text-slate-700" placeholder="(00) 00000-0000"/>
+                            </div>
+                            <button disabled={isSubmitting} className="w-full py-5 bg-amber-500 hover:bg-amber-400 text-black font-black uppercase tracking-widest text-xs rounded-2xl shadow-[0_0_30px_rgba(245,158,11,0.2)] transition-all flex items-center justify-center gap-3 mt-8 hover:scale-[1.02] active:scale-95 disabled:opacity-50">
+                                {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin"/> : <CheckCircle className="w-5 h-5"/>}
+                                Liberar Conteúdo
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
