@@ -6,7 +6,7 @@ import { GanttView } from './GanttView';
 import { CalendarView } from './CalendarView';
 import OpportunityDetail from './OpportunityDetail'; 
 import BpmnBuilder from './BpmnBuilder';
-import { ArrowLeft, LayoutDashboard, Trello, GanttChartSquare, Calendar as CalendarIcon, Lock, Edit, Trash2, Link as LinkIcon, Check, Workflow } from 'lucide-react';
+import { ArrowLeft, LayoutDashboard, Trello, GanttChartSquare, Calendar as CalendarIcon, Edit, Workflow, ChevronRight } from 'lucide-react';
 
 interface Props {
   opportunity: Opportunity;
@@ -26,68 +26,62 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
   const [activeTab, setActiveTab] = useState<Tab>('overview');
 
   const tabs = [
-      { id: 'overview', label: 'Visão Geral', icon: LayoutDashboard, moduleId: 'projects' },
-      { id: 'bpms', label: 'BPMS & Fluxo', icon: Workflow, moduleId: 'projects' }, // BPMS is core to Shinko
+      { id: 'overview', label: 'Geral', icon: LayoutDashboard, moduleId: 'projects' },
+      { id: 'bpms', label: 'BPMS & Fluxo', icon: Workflow, moduleId: 'projects' }, 
       { id: 'kanban', label: 'Tarefas', icon: Trello, moduleId: 'kanban' }, 
       { id: 'calendar', label: 'Agenda', icon: CalendarIcon, moduleId: 'calendar' },
   ].filter(tab => !activeModules || activeModules.includes(tab.moduleId) || tab.moduleId === 'projects'); 
 
   return (
     <div className="h-full flex flex-col bg-slate-50 dark:bg-[#050505] animate-in fade-in duration-300">
-      {/* Page Header (Not Modal Header) */}
-      <header className="h-16 px-6 flex items-center justify-between border-b border-slate-200 dark:border-white/10 bg-white dark:bg-[#0a0a0a] shrink-0">
-          <div className="flex items-center gap-4">
+      <header className="h-20 px-8 flex items-center justify-between border-b border-slate-200 dark:border-white/5 bg-white/80 dark:bg-[#0a0a0a]/80 backdrop-blur-2xl shrink-0 z-20">
+          <div className="flex items-center gap-6">
               <button 
                 onClick={onBack} 
-                className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg text-slate-500 transition-colors"
-                title="Voltar para lista"
+                className="p-3 hover:bg-slate-100 dark:hover:bg-white/5 rounded-2xl text-slate-500 transition-all shadow-sm dark:shadow-none"
               >
                   <ArrowLeft className="w-5 h-5"/>
               </button>
               
               <div className="flex flex-col">
                   <div className="flex items-center gap-3">
-                      <h1 className="text-lg font-bold text-slate-900 dark:text-white truncate max-w-md">{opportunity.title}</h1>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                          opportunity.status === 'Active' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
-                          opportunity.status === 'Negotiation' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
-                          'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-400'
-                      }`}>
-                          {opportunity.status}
-                      </span>
+                      <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Iniciativa Ativa</span>
+                      <ChevronRight className="w-3 h-3 text-slate-300 dark:text-slate-700"/>
+                      <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tighter truncate max-w-md">{opportunity.title}</h1>
                   </div>
               </div>
           </div>
           
-          <div className="flex gap-2">
-              <button onClick={() => onEdit(opportunity)} className="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg text-xs font-bold text-slate-500 transition-colors">
-                  <Edit className="w-4 h-4"/> <span className="hidden sm:inline">Editar Info</span>
+          <div className="flex gap-3">
+              <button 
+                onClick={() => onEdit(opportunity)} 
+                className="flex items-center gap-3 px-6 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all shadow-xl active:scale-95"
+              >
+                  <Edit className="w-4 h-4"/> Editar Info
               </button>
           </div>
       </header>
 
-      {/* Tabs Navigation */}
-      <div className="px-6 border-b border-slate-200 dark:border-white/10 bg-white dark:bg-[#0a0a0a] flex gap-8 shrink-0 overflow-x-auto custom-scrollbar">
+      <div className="px-8 border-b border-slate-200 dark:border-white/5 bg-white/50 dark:bg-[#0a0a0a]/50 backdrop-blur-xl flex gap-10 shrink-0 overflow-x-auto custom-scrollbar">
           {tabs.map(tab => (
               <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as Tab)}
-                  className={`h-12 flex items-center gap-2 text-sm font-bold border-b-[3px] transition-all whitespace-nowrap ${
+                  className={`h-14 flex items-center gap-3 text-[11px] font-black uppercase tracking-[0.2em] border-b-[3px] transition-all whitespace-nowrap ${
                       activeTab === tab.id 
-                      ? 'border-shinko-primary text-slate-900 dark:text-white' 
-                      : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:border-slate-200 dark:hover:border-white/10'
+                      ? 'border-amber-500 text-slate-900 dark:text-white' 
+                      : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
                   }`}
               >
-                  <tab.icon className={`w-4 h-4 ${activeTab === tab.id ? 'text-shinko-primary' : ''}`}/> 
+                  <tab.icon className={`w-4 h-4 ${activeTab === tab.id ? 'text-amber-500' : ''}`}/> 
                   {tab.label}
               </button>
           ))}
       </div>
 
-      {/* Page Content */}
-      <div className="flex-1 overflow-hidden relative bg-slate-50 dark:bg-black/20">
+      <div className="flex-1 overflow-hidden relative bg-slate-100/50 dark:bg-black/20">
           {activeTab === 'overview' && (
-              <div className="h-full overflow-y-auto custom-scrollbar">
+              <div className="h-full overflow-y-auto custom-scrollbar p-1">
                   <OpportunityDetail 
                       opportunity={opportunity} 
                       onClose={onBack} 
@@ -112,7 +106,7 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
           )}
 
           {activeTab === 'kanban' && (
-              <div className="h-full p-6 overflow-y-auto custom-scrollbar">
+              <div className="h-full p-8 overflow-y-auto custom-scrollbar">
                   <KanbanBoard 
                       onSelectOpportunity={() => {}} 
                       userRole={userRole}
@@ -125,7 +119,7 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
           )}
           
           {activeTab === 'calendar' && (
-              <div className="h-full p-6 overflow-y-auto custom-scrollbar">
+              <div className="h-full p-8 overflow-y-auto custom-scrollbar">
                   <CalendarView 
                       opportunities={[opportunity]} 
                       onSelectOpportunity={() => {}} 

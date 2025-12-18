@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { supabase } from '../services/supabaseClient';
-import { Mail, Lock, Loader2, Sparkles, X, ArrowRight, User } from 'lucide-react';
+import { Loader2, X, Sparkles, ArrowRight } from 'lucide-react';
 
 interface Props {
   onGuestLogin: (persona?: any) => void;
@@ -11,87 +11,60 @@ interface Props {
   customColor?: string;
 }
 
-const DEFAULT_LOGO = "https://zjssfnbcboibqeoubeou.supabase.co/storage/v1/object/public/fotoperfil/fotoperfil/2.png";
-
-const AuthScreen: React.FC<Props> = ({ onGuestLogin, onClose, customOrgName, customLogoUrl, customColor }) => {
+const AuthScreen: React.FC<Props> = ({ onClose }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [error, setError] = useState<string | null>(null);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError(null);
     try {
-      if (mode === 'login') {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
-        alert('Verifique seu email!');
-        setMode('login');
-      }
+      const { error } = mode === 'login' 
+        ? await supabase.auth.signInWithPassword({ email, password })
+        : await supabase.auth.signUp({ email, password });
+      if (error) throw error;
       onClose();
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err: any) { alert(err.message); } finally { setLoading(false); }
   };
 
-  const primaryColor = customColor || '#0f172a'; // Default slate-900
-  const displayLogo = customLogoUrl || DEFAULT_LOGO;
-
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
-      <div className="w-full max-w-sm bg-white dark:bg-black rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-white/10 relative">
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/95 backdrop-blur-2xl animate-in fade-in">
+      <div className="w-full max-w-md bg-[#0A0A0C] rounded-[3rem] shadow-glass border border-white/10 overflow-hidden relative animate-ios-pop">
         
-        <button onClick={onClose} className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
-            <X className="w-5 h-5"/>
+        <button onClick={onClose} className="absolute top-8 right-8 text-slate-600 hover:text-white transition-colors">
+            <X className="w-6 h-6"/>
         </button>
 
-        <div className="p-8 pb-0 flex flex-col items-center">
-            <img 
-                src={displayLogo} 
-                alt="Logo" 
-                className="h-32 w-auto mb-6 object-contain drop-shadow-md" 
-            />
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white text-center">
-                {customOrgName || 'Shinkō OS'}
+        <div className="p-12 pb-8 flex flex-col items-center text-center">
+            <div className="w-16 h-16 rounded-[1.5rem] bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white mb-8 shadow-glow-amber">
+                <Sparkles className="w-8 h-8"/>
+            </div>
+            <h2 className="text-4xl font-black text-white tracking-tighter leading-none">
+                Bem-vindo ao <br/><span className="text-amber-500">Shinkō OS</span>.
             </h2>
-            <p className="text-xs text-slate-500 text-center mt-2">
-                Acesse sua conta para continuar.
-            </p>
+            <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px] mt-4">Sistema de Inovação Industrial</p>
         </div>
 
-        <form onSubmit={handleAuth} className="p-8 space-y-4">
-            {error && (
-                <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 text-xs font-bold text-center">
-                    {error}
-                </div>
-            )}
-
+        <form onSubmit={handleAuth} className="px-12 pb-12 space-y-5">
             <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest ml-1">E-mail Corporativo</label>
                 <input 
                     type="email" 
                     value={email}
                     onChange={e => setEmail(e.target.value)}
-                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm outline-none focus:border-slate-400 transition-all text-slate-900 dark:text-white"
-                    placeholder="Email"
+                    className="w-full p-4 rounded-2xl bg-white/5 border border-white/10 text-white outline-none focus:border-amber-500/50 transition-all"
                     required
                 />
             </div>
-
             <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest ml-1">Senha de Acesso</label>
                 <input 
                     type="password" 
                     value={password}
                     onChange={e => setPassword(e.target.value)}
-                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm outline-none focus:border-slate-400 transition-all text-slate-900 dark:text-white"
-                    placeholder="Senha"
+                    className="w-full p-4 rounded-2xl bg-white/5 border border-white/10 text-white outline-none focus:border-amber-500/50 transition-all"
                     required
                 />
             </div>
@@ -99,23 +72,19 @@ const AuthScreen: React.FC<Props> = ({ onGuestLogin, onClose, customOrgName, cus
             <button 
                 type="submit" 
                 disabled={loading}
-                className="w-full py-3 rounded-xl text-white font-bold text-sm shadow-lg hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2 bg-slate-900 dark:bg-white dark:text-black"
-                style={customColor ? { backgroundColor: primaryColor } : {}}
+                className="w-full py-5 bg-white text-black rounded-2xl font-black text-xs uppercase tracking-widest shinko-button flex items-center justify-center gap-2 mt-4 hover:bg-amber-500"
             >
-                {loading && <Loader2 className="w-4 h-4 animate-spin"/>}
-                {mode === 'login' ? 'Entrar' : 'Criar Conta'}
+                {loading ? <Loader2 className="w-4 h-4 animate-spin"/> : mode === 'login' ? 'Entrar no Sistema' : 'Criar minha Conta'}
+                <ArrowRight className="w-4 h-4"/>
             </button>
 
-            <div className="flex items-center justify-center gap-2 text-xs text-slate-500 mt-4">
-                <span>{mode === 'login' ? 'Novo por aqui?' : 'Já tem conta?'}</span>
-                <button 
-                    type="button"
-                    onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
-                    className="font-bold hover:underline text-slate-900 dark:text-white"
-                >
-                    {mode === 'login' ? 'Cadastre-se' : 'Login'}
-                </button>
-            </div>
+            <button 
+                type="button"
+                onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
+                className="w-full text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-white transition-colors mt-6"
+            >
+                {mode === 'login' ? 'Não tem uma conta? Registre-se' : 'Já possui conta? Faça Login'}
+            </button>
         </form>
       </div>
     </div>

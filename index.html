@@ -4,7 +4,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="theme-color" content="#000000" />
+    <meta name="theme-color" content="#020203" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Shinkō OS" />
@@ -13,26 +13,7 @@
     
     <link rel="icon" href="https://zjssfnbcboibqeoubeou.supabase.co/storage/v1/object/public/fotoperfil/fotoperfil/3.png" />
     <link rel="apple-touch-icon" href="https://zjssfnbcboibqeoubeou.supabase.co/storage/v1/object/public/fotoperfil/fotoperfil/3.png" />
-    <link rel="manifest" href="/manifest.json" />
     
-    <script>
-      (function() {
-        try {
-          var localTheme = localStorage.getItem('shinko-theme');
-          var supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
-          var html = document.documentElement;
-          
-          if (localTheme === 'dark' || (!localTheme && supportDarkMode)) {
-            html.classList.add('dark');
-            html.style.colorScheme = 'dark';
-          } else {
-            html.classList.remove('dark');
-            html.style.colorScheme = 'light';
-          }
-        } catch (e) {}
-      })();
-    </script>
-
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -40,33 +21,25 @@
         theme: {
           extend: {
             colors: {
-              slate: {
-                50: '#f8fafc',
-                100: '#f1f5f9',
-                200: '#e2e8f0',
-                300: '#cbd5e1',
-                400: '#94a3b8',
-                500: '#71717a', 
-                600: '#52525b', 
-                700: '#3f3f46',
-                800: '#27272a',
-                900: '#18181b',
-                950: '#09090b',
-              },
               shinko: {
-                primary: 'var(--brand-primary)', 
-                secondary: 'var(--brand-secondary)',
-                accent: '#FBBF24',
-                glass: 'rgba(var(--brand-primary-rgb), 0.15)',
+                primary: '#F59E0B',
+                secondary: '#D97706',
+                obsidian: '#020203',
+                surface: '#0A0A0C',
+                border: 'rgba(255, 255, 255, 0.08)',
+                glass: 'rgba(255, 255, 255, 0.03)',
               }
             },
             fontFamily: {
-              sans: ['SF Pro Display', '-apple-system', 'BlinkMacSystemFont', 'Inter', 'sans-serif'],
+              sans: ['SF Pro Display', 'Inter', 'sans-serif'],
             },
             boxShadow: {
-              'glass': '0 8px 32px 0 rgba(0, 0, 0, 0.3)',
-              'glow-amber': '0 0 20px rgba(245, 158, 11, 0.15)',
-              'glow-purple': '0 0 20px rgba(168, 85, 247, 0.15)',
+              'glow-amber': '0 0 25px rgba(245, 158, 11, 0.2)',
+              'glass': '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
+              'ios': '0 15px 40px -10px rgba(0,0,0,0.08)',
+            },
+            borderRadius: {
+              'ios': '2.5rem',
             }
           }
         }
@@ -75,80 +48,101 @@
     <style>
       :root {
         --brand-primary: #F59E0B;
-        --brand-secondary: #D97706;
-        --brand-primary-rgb: 245, 158, 11;
-        --bg-color: #f1f5f9; 
-        --bg-gradient: linear-gradient(180deg, #f1f5f9 0%, #e2e8f0 100%);
-        --text-primary: #0f172a;
-        --glass-surface: rgba(255, 255, 255, 0.95);
-        --glass-border: rgba(226, 232, 240, 0.8);
-        --card-bg: #ffffff;
-        --card-border: #e2e8f0;
+        --bg-color: #020203;
+        --surface: rgba(10, 10, 12, 0.85);
+        --card-bg: rgba(255, 255, 255, 0.03);
+        --card-bg-hover: rgba(255, 255, 255, 0.06);
+        --border-color: rgba(255, 255, 255, 0.08);
+        --text-main: #ffffff;
+        --text-muted: #94a3b8;
+        --input-bg: rgba(0, 0, 0, 0.3);
+        --calendar-cell: rgba(255, 255, 255, 0.02);
       }
 
-      .dark {
-        /* Deep Obsidian Aesthetic */
-        --bg-color: #020203; 
-        --bg-gradient: radial-gradient(circle at 50% 0%, #0c0c12 0%, #020203 100%);
-        --text-primary: #ffffff;
-        --glass-surface: rgba(15, 15, 20, 0.7);
-        --glass-border: rgba(255, 255, 255, 0.08);
-        --card-bg: rgba(20, 20, 25, 0.6);
-        --card-border: rgba(255, 255, 255, 0.05);
+      .light {
+        --bg-color: #F2F2F7;
+        --surface: rgba(255, 255, 255, 0.8);
+        --card-bg: rgba(255, 255, 255, 0.85);
+        --card-bg-hover: rgba(255, 255, 255, 1);
+        --border-color: rgba(0, 0, 0, 0.06);
+        --text-main: #1D1D1F;
+        --text-muted: #86868B;
+        --input-bg: rgba(255, 255, 255, 0.6);
+        --calendar-cell: rgba(255, 255, 255, 0.5);
       }
 
       body {
         background-color: var(--bg-color);
-        background-image: var(--bg-gradient);
+        background-image: radial-gradient(circle at 50% 0%, #111115 0%, #020203 100%);
         background-attachment: fixed;
-        color: var(--text-primary);
-        font-family: "SF Pro Display", sans-serif;
+        color: var(--text-main);
+        font-family: "SF Pro Display", "Inter", sans-serif;
         overflow: hidden;
+        transition: background 0.5s ease, color 0.3s ease;
+      }
+
+      .light body {
+        background-image: radial-gradient(circle at 50% 0%, #FFFFFF 0%, #E5E5EA 100%);
       }
 
       .glass-panel {
-        background: var(--glass-surface);
+        background: var(--surface);
+        backdrop-filter: blur(40px);
+        -webkit-backdrop-filter: blur(40px);
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+      }
+
+      .glass-card {
+        background: var(--card-bg);
         backdrop-filter: blur(20px);
         -webkit-backdrop-filter: blur(20px);
-        border: 1px solid var(--glass-border);
+        border: 1px solid var(--border-color);
+        transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+        border-radius: 2.2rem;
+        color: var(--text-main);
       }
 
-      .dark .glass-card-kpi {
-        background: linear-gradient(145deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%);
-        border: 1px solid rgba(255, 255, 255, 0.06);
-        box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
-        transition: all 0.3s ease;
+      .glass-card:hover {
+        background: var(--card-bg-hover);
+        border-color: rgba(245, 158, 11, 0.4);
+        transform: translateY(-4px);
+        box-shadow: 0 20px 40px -10px rgba(0,0,0,0.1);
       }
 
-      .dark .glass-card-kpi:hover {
-        background: linear-gradient(145deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
-        border-color: rgba(255, 255, 255, 0.12);
-        transform: translateY(-2px);
+      .shinko-button {
+        transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+      }
+      .shinko-button:active { transform: scale(0.96); }
+
+      @keyframes ios-pop {
+        0% { transform: scale(0.95); opacity: 0; }
+        100% { transform: scale(1); opacity: 1; }
+      }
+
+      .animate-ios-pop {
+        animation: ios-pop 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
       }
 
       ::-webkit-scrollbar { width: 6px; }
-      ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
-      
-      @keyframes ios-pop {
-        0% { opacity: 0; transform: scale(0.98) translateY(10px); }
-        100% { opacity: 1; transform: scale(1) translateY(0); }
-      }
-      .animate-ios-pop { animation: ios-pop 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: rgba(128, 128, 128, 0.2); border-radius: 10px; }
+      ::-webkit-scrollbar-thumb:hover { background: rgba(128, 128, 128, 0.4); }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "recharts": "https://esm.sh/recharts@^3.6.0",
-    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3",
-    "lucide-react": "https://esm.sh/lucide-react@^0.561.0",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.88.0"
-  }
-}
-</script>
-</head>
+    <script type="importmap">
+    {
+      "imports": {
+        "recharts": "https://esm.sh/recharts@^3.6.0",
+        "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
+        "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+        "react/": "https://esm.sh/react@^19.2.3/",
+        "react": "https://esm.sh/react@^19.2.3",
+        "lucide-react": "https://esm.sh/lucide-react@^0.561.0",
+        "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.88.0"
+      }
+    }
+    </script>
+  </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>

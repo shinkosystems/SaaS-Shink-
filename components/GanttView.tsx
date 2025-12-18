@@ -1,9 +1,10 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Opportunity, DbTask } from '../types';
 import { fetchAllTasks, updateTask, deleteTask, fetchAssignableUsers } from '../services/projectService';
 import { optimizeSchedule } from '../services/geminiService';
 import { TaskDetailModal } from './TaskDetailModal';
-import { Calendar, ChevronLeft, ChevronRight, RefreshCw, ZoomIn, ZoomOut, Zap, Loader2 } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, RefreshCw, ZoomIn, ZoomOut, Zap, Loader2, Filter } from 'lucide-react';
 
 interface Props {
   opportunities: Opportunity[];
@@ -23,22 +24,15 @@ export const GanttView: React.FC<Props> = ({
     const [loading, setLoading] = useState(false);
     const [isOptimizing, setIsOptimizing] = useState(false);
     const [viewDate, setViewDate] = useState(new Date());
-    const [zoomLevel, setZoomLevel] = useState(1); // 1 = Day, 0.5 = Week
     const [editingTaskCtx, setEditingTaskCtx] = useState<any | null>(null);
 
-    useEffect(() => {
-        loadData();
-    }, [organizationId, projectId]);
+    useEffect(() => { loadData(); }, [organizationId, projectId]);
 
     const loadData = async () => {
         setLoading(true);
         if (organizationId) {
             const allTasks = await fetchAllTasks(organizationId);
-            if (projectId) {
-                setTasks(allTasks.filter(t => t.projeto?.toString() === projectId));
-            } else {
-                setTasks(allTasks);
-            }
+            setTasks(projectId ? allTasks.filter(t => t.projeto?.toString() === projectId) : allTasks);
         }
         setLoading(false);
     };
@@ -47,44 +41,20 @@ export const GanttView: React.FC<Props> = ({
         if (!organizationId) return;
         setIsOptimizing(true);
         try {
-            // 1. Fetch available developers
             const devs = await fetchAssignableUsers(organizationId);
-            
-            // 2. Prepare tasks for optimization (Only pending ones)
             const pendingTasks = tasks.filter(t => t.status !== 'done' && t.status !== 'approval');
-            
             const tasksForAi = pendingTasks.map(t => ({
-                taskId: t.id,
-                taskText: t.titulo,
-                estimatedHours: t.duracaohoras,
-                assigneeId: t.responsavel,
-                gut: { g: t.gravidade, u: t.urgencia, t: t.tendencia }
+                taskId: t.id, taskText: t.titulo, estimatedHours: t.duracaohoras, assigneeId: t.responsavel, gut: { g: t.gravidade, u: t.urgencia, t: t.tendencia }
             }));
-
-            // 3. Call AI Service
             const updates = await optimizeSchedule(tasksForAi, devs);
-
-            // 4. Apply Updates
             if (updates && updates.length > 0) {
                 for (const update of updates) {
-                    await updateTask(update.id, {
-                        datainicio: update.startDate,
-                        datafim: update.dueDate,
-                        responsavel: update.assigneeId
-                    });
+                    await updateTask(update.id, { datainicio: update.startDate, datafim: update.dueDate, responsavel: update.assigneeId });
                 }
                 alert(`Otimização concluída! ${updates.length} tarefas reagendadas.`);
                 loadData();
-            } else {
-                alert("Nenhuma otimização necessária ou erro na IA.");
             }
-
-        } catch (e: any) {
-            console.error("Erro na otimização:", e);
-            alert("Erro ao otimizar cronograma.");
-        } finally {
-            setIsOptimizing(false);
-        }
+        } catch (e) { alert("Erro ao otimizar cronograma."); } finally { setIsOptimizing(false); }
     };
 
     const daysInMonth = useMemo(() => {
@@ -97,143 +67,113 @@ export const GanttView: React.FC<Props> = ({
     const getTaskStyle = (task: DbTask) => {
         const start = task.datainicio ? new Date(task.datainicio) : new Date(task.dataproposta);
         const end = task.datafim ? new Date(task.datafim) : start;
-        
         const monthStart = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
         const monthEnd = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0);
-
-        // Simple overlap check
         if (end < monthStart || start > monthEnd) return null;
-
-        // Calculate position relative to view month
         const dayWidth = 100 / daysInMonth.length;
-        
-        let startDay = start.getDate();
-        if (start < monthStart) startDay = 1;
-
-        let endDay = end.getDate();
-        if (end > monthEnd) endDay = daysInMonth.length;
-
+        let startDay = Math.max(1, start.getMonth() === viewDate.getMonth() ? start.getDate() : 1);
+        let endDay = Math.min(daysInMonth.length, end.getMonth() === viewDate.getMonth() ? end.getDate() : daysInMonth.length);
         const duration = Math.max(1, endDay - startDay + 1);
-        const left = (startDay - 1) * dayWidth;
-        const width = duration * dayWidth;
-
-        let colorClass = 'bg-blue-500';
-        if (task.status === 'done') colorClass = 'bg-emerald-500';
-        else if (task.status === 'doing') colorClass = 'bg-amber-500';
-        else if (new Date(task.datafim || '') < new Date() && task.status !== 'done') colorClass = 'bg-red-500';
-
         return {
-            left: `${left}%`,
-            width: `${width}%`,
-            className: colorClass
+            left: `${(startDay - 1) * dayWidth}%`,
+            width: `${duration * dayWidth}%`,
+            className: task.status === 'done' ? 'bg-emerald-500' : task.status === 'doing' ? 'bg-blue-500 shadow-glow-blue' : 'bg-amber-500 shadow-glow-amber'
         };
     };
 
     return (
-        <div className="flex flex-col h-full bg-white dark:bg-slate-900 rounded-xl overflow-hidden">
+        <div className="flex flex-col h-full bg-[var(--bg-color)] animate-in fade-in duration-500 overflow-hidden">
             {/* Toolbar */}
-            <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-white/5">
-                <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                        <button onClick={() => setViewDate(new Date(viewDate.setMonth(viewDate.getMonth() - 1)))} className="p-1 hover:bg-slate-100 dark:hover:bg-white/10 rounded"><ChevronLeft className="w-5 h-5"/></button>
-                        <h2 className="text-lg font-bold text-slate-900 dark:text-white capitalize w-32 text-center">
+            <div className="flex flex-col md:flex-row items-center justify-between p-6 border-b border-[var(--border-color)] bg-[var(--surface)] gap-6 shrink-0">
+                <div className="flex items-center gap-6">
+                    <div className="flex bg-black/5 dark:bg-white/5 p-1 rounded-2xl border border-[var(--border-color)]">
+                        <button onClick={() => setViewDate(new Date(viewDate.setMonth(viewDate.getMonth() - 1)))} className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-xl transition-all"><ChevronLeft className="w-5 h-5 text-slate-400"/></button>
+                        <h2 className="text-sm font-black text-[var(--text-main)] uppercase tracking-[0.2em] w-48 text-center flex items-center justify-center">
                             {viewDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
                         </h2>
-                        <button onClick={() => setViewDate(new Date(viewDate.setMonth(viewDate.getMonth() + 1)))} className="p-1 hover:bg-slate-100 dark:hover:bg-white/10 rounded"><ChevronRight className="w-5 h-5"/></button>
+                        <button onClick={() => setViewDate(new Date(viewDate.setMonth(viewDate.getMonth() + 1)))} className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-xl transition-all"><ChevronRight className="w-5 h-5 text-slate-400"/></button>
                     </div>
-                    <button onClick={loadData} className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 rounded"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`}/></button>
+                    <button onClick={loadData} className="p-3 bg-white dark:bg-white/5 border border-[var(--border-color)] rounded-2xl shadow-sm"><RefreshCw className={`w-4 h-4 text-slate-400 ${loading ? 'animate-spin' : ''}`}/></button>
                 </div>
                 
-                {/* Optimize Button */}
-                <button 
-                    onClick={handleOptimize} 
-                    disabled={isOptimizing}
-                    className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition-all shadow-md disabled:opacity-50"
-                >
-                    {isOptimizing ? <Loader2 className="w-4 h-4 animate-spin"/> : <Zap className="w-4 h-4"/>}
-                    {isOptimizing ? 'Balanceando...' : 'Nivelar Recursos (IA)'}
-                </button>
+                <div className="flex gap-3">
+                    <button className="px-6 py-3 bg-white dark:bg-white/5 border border-[var(--border-color)] rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-2"><Filter className="w-4 h-4"/> Filtros</button>
+                    <button 
+                        onClick={handleOptimize} 
+                        disabled={isOptimizing}
+                        className="flex items-center gap-3 px-8 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-purple-500/20 disabled:opacity-50"
+                    >
+                        {isOptimizing ? <Loader2 className="w-4 h-4 animate-spin"/> : <Zap className="w-4 h-4"/>}
+                        Equilibrar Carga (IA)
+                    </button>
+                </div>
             </div>
 
-            {/* Gantt Chart */}
-            <div className="flex-1 overflow-auto custom-scrollbar relative">
-                {/* Header Row */}
-                <div className="flex sticky top-0 z-10 bg-slate-50 dark:bg-black border-b border-slate-200 dark:border-white/10 min-w-[800px]">
-                    <div className="w-64 p-3 font-bold text-xs text-slate-500 uppercase shrink-0 bg-slate-50 dark:bg-black sticky left-0 z-20 border-r border-slate-200 dark:border-white/10">Tarefa</div>
-                    <div className="flex-1 flex">
-                        {daysInMonth.map(d => (
-                            <div key={d.toISOString()} className="flex-1 border-r border-slate-200 dark:border-white/5 min-w-[30px] text-center py-2 text-[10px] text-slate-400">
-                                {d.getDate()}
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Task Rows */}
-                <div className="min-w-[800px]">
-                    {tasks.map(task => {
-                        const style = getTaskStyle(task);
-                        return (
-                            <div key={task.id} className="flex border-b border-slate-100 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-white/5 group">
-                                <div className="w-64 p-3 text-sm font-medium text-slate-700 dark:text-slate-300 truncate shrink-0 sticky left-0 bg-white dark:bg-slate-900 z-10 border-r border-slate-100 dark:border-white/5 group-hover:bg-slate-50 dark:group-hover:bg-transparent">
-                                    <div className="truncate cursor-pointer hover:text-blue-500" onClick={() => setEditingTaskCtx({ task: {
-                                        id: task.id.toString(),
-                                        text: task.titulo,
-                                        description: task.descricao,
-                                        status: task.status as any,
-                                        startDate: task.datainicio,
-                                        dueDate: task.datafim,
-                                        assigneeId: task.responsavel,
-                                        estimatedHours: task.duracaohoras,
-                                        completed: task.status === 'done',
-                                        gut: { g: task.gravidade, u: task.urgencia, t: task.tendencia },
-                                        tags: task.etiquetas || [],
-                                        members: task.membros || [],
-                                        attachments: task.anexos || [],
-                                        dbId: task.id
-                                    }, nodeLabel: task.projetoData?.nome || 'Tarefa' })}>
-                                        {task.titulo}
+            {/* Gantt Scroll Area */}
+            <div className="flex-1 overflow-x-auto custom-scrollbar bg-slate-50/50 dark:bg-black/20">
+                <div className="h-full min-w-[1400px] flex flex-col relative">
+                    
+                    {/* Dates Header */}
+                    <div className="flex sticky top-0 z-20 border-b border-[var(--border-color)] bg-[var(--surface)]/95 backdrop-blur-md">
+                        <div className="w-80 p-4 border-r border-[var(--border-color)] shrink-0 sticky left-0 z-30 bg-[var(--surface)]">
+                            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Ativo / Tarefa</span>
+                        </div>
+                        <div className="flex-1 flex h-14">
+                            {daysInMonth.map(d => {
+                                const isToday = new Date().toDateString() === d.toDateString();
+                                return (
+                                    <div key={d.toISOString()} className={`flex-1 border-r border-[var(--border-color)] flex flex-col items-center justify-center min-w-[40px] ${isToday ? 'bg-amber-500/10' : ''}`}>
+                                        <span className={`text-[10px] font-black ${isToday ? 'text-amber-500' : 'text-slate-400'}`}>{d.getDate()}</span>
+                                        <span className="text-[8px] font-bold text-slate-500 uppercase">{d.toLocaleDateString('pt-BR', {weekday: 'short'}).substring(0, 1)}</span>
                                     </div>
-                                    <div className="text-[10px] text-slate-400 truncate">{task.projetoData?.nome}</div>
-                                </div>
-                                <div className="flex-1 relative h-12">
-                                    {daysInMonth.map(d => (
-                                        <div key={d.toISOString()} className="absolute top-0 bottom-0 border-r border-slate-100 dark:border-white/5" style={{ left: `${(d.getDate() - 1) * (100 / daysInMonth.length)}%`, width: `${100 / daysInMonth.length}%` }}></div>
-                                    ))}
-                                    {style && (
-                                        <div 
-                                            className={`absolute top-2.5 h-7 rounded-md shadow-sm cursor-pointer opacity-90 hover:opacity-100 transition-all ${style.className}`}
-                                            style={{ left: style.left, width: style.width }}
-                                            onClick={() => setEditingTaskCtx({ task: {
-                                                id: task.id.toString(),
-                                                text: task.titulo,
-                                                description: task.descricao,
-                                                status: task.status as any,
-                                                startDate: task.datainicio,
-                                                dueDate: task.datafim,
-                                                assigneeId: task.responsavel,
-                                                estimatedHours: task.duracaohoras,
-                                                completed: task.status === 'done',
-                                                gut: { g: task.gravidade, u: task.urgencia, t: task.tendencia },
-                                                tags: task.etiquetas || [],
-                                                members: task.membros || [],
-                                                attachments: task.anexos || [],
-                                                dbId: task.id
-                                            }, nodeLabel: task.projetoData?.nome || 'Tarefa' })}
-                                        >
-                                            <div className="px-2 py-1 text-[10px] text-white font-bold truncate">
-                                                {task.responsavelData?.nome?.split(' ')[0]}
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Rows */}
+                    <div className="flex-1 overflow-y-auto custom-scrollbar">
+                        {tasks.map(task => {
+                            const style = getTaskStyle(task);
+                            return (
+                                <div key={task.id} className="flex border-b border-[var(--border-color)] hover:bg-slate-100/50 dark:hover:bg-white/[0.02] group transition-colors">
+                                    <div className="w-80 p-5 border-r border-[var(--border-color)] shrink-0 sticky left-0 z-10 bg-[var(--bg-color)] shadow-[5px_0_15px_rgba(0,0,0,0.05)]">
+                                        <div className="flex flex-col gap-1">
+                                            <span className="text-[8px] font-black text-amber-500 uppercase tracking-widest">{task.projetoData?.nome || 'AD-HOC'}</span>
+                                            <span className="text-xs font-bold text-[var(--text-main)] truncate group-hover:text-amber-500 transition-colors cursor-pointer" onClick={() => setEditingTaskCtx({ task: { ...task, id: task.id.toString(), status: task.status as any }, nodeLabel: 'Tarefa' })}>{task.titulo}</span>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <div className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden border border-white/10">
+                                                    {task.responsavelData?.avatar_url && <img src={task.responsavelData.avatar_url} className="w-full h-full object-cover"/>}
+                                                </div>
+                                                <span className="text-[8px] font-bold text-slate-400 uppercase">{task.responsavelData?.nome || 'Sem Resp.'}</span>
                                             </div>
                                         </div>
-                                    )}
+                                    </div>
+                                    <div className="flex-1 relative h-20">
+                                        {/* Day Columns BG */}
+                                        <div className="absolute inset-0 flex">
+                                            {daysInMonth.map((d, idx) => (
+                                                <div key={idx} className="flex-1 border-r border-slate-200/30 dark:border-white/5"></div>
+                                            ))}
+                                        </div>
+                                        {/* Task Bar */}
+                                        {style && (
+                                            <div 
+                                                className={`absolute top-1/2 -translate-y-1/2 h-8 rounded-full z-10 shadow-lg border border-white/20 flex items-center px-4 cursor-pointer transition-transform hover:scale-[1.02] active:scale-95 ${style.className}`}
+                                                style={{ left: style.left, width: style.width }}
+                                                onClick={() => setEditingTaskCtx({ task: { ...task, id: task.id.toString(), status: task.status as any }, nodeLabel: 'Tarefa' })}
+                                            >
+                                                <span className="text-[8px] font-black text-white uppercase tracking-tighter truncate">{task.titulo}</span>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                        );
-                    })}
+                            );
+                        })}
+                    </div>
                 </div>
             </div>
 
-            {/* Modal */}
             {editingTaskCtx && (
                 <TaskDetailModal 
                     task={editingTaskCtx.task}
@@ -241,31 +181,8 @@ export const GanttView: React.FC<Props> = ({
                     opportunityTitle={editingTaskCtx.nodeLabel}
                     organizationId={organizationId}
                     onClose={() => setEditingTaskCtx(null)}
-                    onDelete={async (id) => {
-                        if (!isNaN(Number(id))) {
-                            await deleteTask(Number(id));
-                            loadData();
-                            setEditingTaskCtx(null);
-                        }
-                    }}
                     onSave={async (updated) => {
-                        if (updated.id) {
-                            const dbId = Number(updated.id);
-                            if (!isNaN(dbId)) {
-                                await updateTask(dbId, {
-                                    titulo: updated.text,
-                                    descricao: updated.description,
-                                    status: updated.status,
-                                    responsavel: updated.assigneeId,
-                                    duracaohoras: updated.estimatedHours,
-                                    datafim: updated.dueDate,
-                                    datainicio: updated.startDate,
-                                    etiquetas: updated.tags,
-                                    membros: updated.members,
-                                    anexos: updated.attachments
-                                });
-                            }
-                        }
+                        await updateTask(Number(updated.id), { titulo: updated.text, status: updated.status, datafim: updated.dueDate, datainicio: updated.startDate });
                         loadData();
                     }}
                 />

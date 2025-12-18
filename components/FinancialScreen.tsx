@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { FinancialDashboard } from './FinancialDashboard';
 import { FinancialLedger } from './FinancialLedger';
@@ -18,16 +19,12 @@ export const FinancialScreen: React.FC<Props> = ({ orgType }) => {
     const [orgId, setOrgId] = useState<number | null>(null);
 
     const loadData = async () => {
-        // Se não for a carga inicial, não ativa o loading full screen
         if (transactions.length === 0) setLoading(true);
-        
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
             const { data: userData } = await supabase.from('users').select('organizacao').eq('id', user.id).single();
             if (userData && userData.organizacao) {
                 setOrgId(userData.organizacao);
-                
-                // Busca transações reais (que agora incluem as importadas dos contratos)
                 const data = await fetchTransactions(userData.organizacao);
                 setTransactions(data);
             }
@@ -35,54 +32,30 @@ export const FinancialScreen: React.FC<Props> = ({ orgType }) => {
         setLoading(false);
     };
 
-    // Fetch Real Data
-    useEffect(() => {
-        loadData();
-    }, []);
+    useEffect(() => { loadData(); }, []);
 
     const handleAddTransaction = async (t: Omit<FinancialTransaction, 'id'>) => {
         if (!orgId) return;
-        
-        // Otimistic update
         const tempId = crypto.randomUUID();
         const newT = { ...t, id: tempId, organizationId: orgId };
         setTransactions(prev => [newT, ...prev].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-
         const saved = await addTransaction({ ...t, organizationId: orgId });
-        
-        if (saved) {
-            setTransactions(prev => prev.map(item => item.id === tempId ? saved : item));
-        } else {
-            setTransactions(prev => prev.filter(item => item.id !== tempId));
-            alert("Erro ao salvar transação.");
-        }
+        if (saved) setTransactions(prev => prev.map(item => item.id === tempId ? saved : item));
+        else { setTransactions(prev => prev.filter(item => item.id !== tempId)); alert("Erro ao salvar transação."); }
     };
 
     const handleEditTransaction = async (t: FinancialTransaction) => {
         if (!orgId) return;
-
-        // Optimistic Update
         setTransactions(prev => prev.map(item => item.id === t.id ? t : item).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-
         const updated = await updateTransaction(t);
-        if (updated) {
-            setTransactions(prev => prev.map(item => item.id === updated.id ? updated : item));
-        } else {
-            alert("Erro ao atualizar transação.");
-            loadData(); // Revert on error
-        }
+        if (!updated) { alert("Erro ao atualizar transação."); loadData(); }
     };
 
     const handleDeleteTransaction = async (id: string) => {
-        // Permitir deleção de qualquer transação agora que elas são reais no banco
         const backup = [...transactions];
         setTransactions(prev => prev.filter(t => t.id !== id));
-
         const success = await deleteTransaction(id);
-        if (!success) {
-            setTransactions(backup);
-            alert("Erro ao excluir transação.");
-        }
+        if (!success) { setTransactions(backup); alert("Erro ao excluir transação."); }
     };
 
     const handleSyncContracts = async () => {
@@ -90,52 +63,33 @@ export const FinancialScreen: React.FC<Props> = ({ orgType }) => {
         setIsSyncing(true);
         const result = await syncContractTransactions(orgId);
         setIsSyncing(false);
-        
-        if (result.created > 0) {
-            alert(`${result.created} parcelas de contratos foram lançadas com sucesso!`);
-            loadData(); // Refresh list
-        } else if (result.errors > 0) {
-            alert("Houve um erro ao sincronizar alguns contratos.");
-        } else {
-            alert("Todos os contratos já estão sincronizados.");
-        }
+        if (result.created > 0) { alert(`${result.created} parcelas lançadas!`); loadData(); }
+        else if (result.errors > 0) alert("Erro ao sincronizar contratos.");
+        else alert("Tudo sincronizado.");
     };
 
     return (
-        <div className="w-full flex flex-col animate-in fade-in duration-500">
-            
-            {/* Tab Switcher */}
-            <div className="flex justify-center mb-6">
-                <div className="bg-slate-100 dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800 flex shadow-inner">
+        <div className="w-full h-full flex flex-col animate-in fade-in duration-500 overflow-hidden">
+            <div className="flex justify-center mb-8 shrink-0">
+                <div className="glass-panel p-1 rounded-2xl flex shadow-sm">
                     <button 
                         onClick={() => setActiveTab('dashboard')}
-                        className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${
-                            activeTab === 'dashboard' 
-                            ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-md' 
-                            : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                        }`}
+                        className={`flex items-center gap-2 px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'dashboard' ? 'bg-amber-500 text-black shadow-glow-amber' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}
                     >
                         <LayoutDashboard className="w-4 h-4"/> Dashboard
                     </button>
                     <button 
                         onClick={() => setActiveTab('ledger')}
-                        className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${
-                            activeTab === 'ledger' 
-                            ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-md' 
-                            : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                        }`}
+                        className={`flex items-center gap-2 px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'ledger' ? 'bg-amber-500 text-black shadow-glow-amber' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}
                     >
                         <List className="w-4 h-4"/> Lançamentos
                     </button>
                 </div>
             </div>
 
-            {/* Content Area - No fixed height, no overflow hidden */}
-            <div className="w-full">
+            <div className="flex-1 overflow-y-auto custom-scrollbar px-1">
                 {loading ? (
-                    <div className="w-full py-20 flex items-center justify-center">
-                        <Loader2 className="w-8 h-8 animate-spin text-shinko-primary"/>
-                    </div>
+                    <div className="w-full py-20 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-amber-500"/></div>
                 ) : (
                     activeTab === 'dashboard' ? (
                         <FinancialDashboard manualTransactions={transactions} orgType={orgType} />
