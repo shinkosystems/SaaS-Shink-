@@ -2,38 +2,14 @@
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { Opportunity } from "../types";
 
-const getApiKey = (): string | undefined => {
-  let key: string | undefined = undefined;
-
-  // 1. Check Vite Import Meta (Preferred for Vercel/Vite)
-  try {
-    // @ts-ignore
-    if (import.meta && import.meta.env) {
-        // @ts-ignore
-        if (import.meta.env.VITE_API_KEY) key = import.meta.env.VITE_API_KEY;
-        // @ts-ignore
-        else if (import.meta.env.API_KEY) key = import.meta.env.API_KEY;
-    }
-  } catch(e) {}
-
-  // 2. Check Standard Process Env (Fallback)
-  if (!key && typeof process !== 'undefined' && process.env) {
-    if (process.env.VITE_API_KEY) key = process.env.VITE_API_KEY;
-    else if (process.env.API_KEY) key = process.env.API_KEY;
-    else if (process.env.NEXT_PUBLIC_API_KEY) key = process.env.NEXT_PUBLIC_API_KEY;
-    else if (process.env.REACT_APP_API_KEY) key = process.env.REACT_APP_API_KEY;
-  }
-
-  if (!key) {
-      console.warn("⚠️ Gemini Service: API Key is MISSING.");
-  }
-
-  return key;
-};
-
+/* Guideline compliant initialization helper */
 const getAiClient = () => {
-  const apiKey = getApiKey();
-  if (!apiKey) return null;
+  /* Guideline: The API key must be obtained exclusively from the environment variable process.env.API_KEY. */
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+      console.warn("⚠️ Gemini Service: API Key is MISSING in process.env.API_KEY.");
+      return null;
+  }
   return new GoogleGenAI({ apiKey });
 };
 
@@ -108,10 +84,12 @@ export const analyzeOpportunity = async (title: string, description: string, org
   `;
 
   try {
+    /* Guideline: Use gemini-3-flash-preview for basic text tasks */
     const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: prompt,
     }));
+    /* Guideline: use .text property, not .text() */
     return response.text || "Não foi possível gerar a análise.";
   } catch (error) {
     console.error("Gemini Analysis Error:", error);
@@ -133,8 +111,9 @@ export const suggestEvidence = async (title: string, description: string, orgTyp
     `;
 
     try {
+      /* Guideline: Use gemini-3-flash-preview for basic text tasks */
       const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3-flash-preview',
         contents: prompt,
         config: {
             responseMimeType: 'application/json',
@@ -148,6 +127,7 @@ export const suggestEvidence = async (title: string, description: string, orgTyp
         }
       }));
       
+      /* Guideline: use .text property, not .text() */
       if (response.text) return JSON.parse(response.text);
       return null;
     } catch (error) {
@@ -189,8 +169,9 @@ export const generateSubtasksForTask = async (
     `;
 
     try {
+        /* Guideline: Use gemini-3-pro-preview for complex text tasks */
         const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3-pro-preview',
             contents: prompt,
             config: { 
                 responseMimeType: 'application/json',
@@ -208,6 +189,7 @@ export const generateSubtasksForTask = async (
             }
         }));
         
+        /* Guideline: use .text property, not .text() */
         if (response.text) return JSON.parse(response.text);
         return [];
     } catch (error) {
@@ -263,12 +245,14 @@ export const generateBpmn = async (
     }`;
     
     try {
+        /* Guideline: Use gemini-3-pro-preview for complex tasks */
         const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3-pro-preview',
             contents: prompt,
             config: { responseMimeType: 'application/json' }
         }));
         
+        /* Guideline: use .text property, not .text() */
         const text = cleanJson(response.text || "");
         if (!text) {
             console.warn("Resposta vazia da IA detectada.");
@@ -288,14 +272,15 @@ export const generateBpmn = async (
 };
 
 export const extractPdfContext = async (base64Pdf: string): Promise<string> => {
-    // Basic implementation without retry for now as it's heavy
     const ai = getAiClient();
     if (!ai) return "Erro API Key";
     try {
+        /* Guideline: Use gemini-3-flash-preview for summarizing */
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3-flash-preview',
             contents: { parts: [{ inlineData: { mimeType: 'application/pdf', data: base64Pdf } }, { text: "Resuma." }] }
         });
+        /* Guideline: use .text property, not .text() */
         return response.text || "Erro PDF";
     } catch (e) { return "Erro processamento"; }
 };
@@ -336,8 +321,9 @@ export const optimizeSchedule = async (tasks: any[], availableDevelopers: any[],
     `;
 
     try {
+        /* Guideline: Use gemini-3-pro-preview for complex scheduling tasks */
         const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3-pro-preview',
             contents: prompt,
             config: { 
                 responseMimeType: 'application/json',
@@ -355,6 +341,7 @@ export const optimizeSchedule = async (tasks: any[], availableDevelopers: any[],
             }
         }));
         
+        /* Guideline: use .text property, not .text() */
         if (response.text) {
             const result = JSON.parse(response.text);
             return result;
@@ -370,10 +357,12 @@ export const askGuru = async (question: string, context: string): Promise<string
     const ai = getAiClient();
     if (!ai) return "Guru offline.";
     try {
+        /* Guideline: Use gemini-3-flash-preview for Q&A */
         const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3-flash-preview',
             contents: `Contexto: ${context}. Pergunta: ${question}. Responda como COO.`
         }));
+        /* Guideline: use .text property, not .text() */
         return response.text || "Sem resposta.";
     } catch (e) { return "Guru indisponível no momento."; }
 };
@@ -382,11 +371,13 @@ export const generateDashboardInsight = async (contextSummary: string): Promise<
     const ai = getAiClient();
     if (!ai) return null;
     try {
+        /* Guideline: Use gemini-3-flash-preview for summarization/insight */
         const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3-flash-preview',
             contents: `Analise como COO: ${contextSummary}. Retorne JSON {alertTitle, alertLevel, insightText, actions}.`,
             config: { responseMimeType: 'application/json' }
         }));
+        /* Guideline: use .text property, not .text() */
         return JSON.parse(cleanJson(response.text || "{}"));
     } catch (e) { return null; }
 };

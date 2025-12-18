@@ -3,7 +3,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { fetchAllOwners, updateGlobalClientData, fetchPlans, fetchGlobalMetrics, AdminUser, GlobalMetrics, updateUserStatus, fetchPendingApprovals, approveSubscription } from '../services/adminService';
 import { fetchCmsCases, saveCmsCase, deleteCmsCase, fetchCmsPosts, saveCmsPost, deleteCmsPost, uploadCmsFile } from '../services/cmsService';
 import { DbPlan, FinancialTransaction, CmsCase, CmsPost } from '../types';
-import { Shield, Search, CreditCard, Loader2, Edit, CheckCircle, AlertTriangle, User, Zap, Building2, Users, DollarSign, TrendingUp, Activity, Filter, Calendar, Heart, UserMinus, Gem, MousePointer2, X, Clock, BarChart3, Wifi, Lock, ExternalLink, Check, Briefcase, FileText, Image as ImageIcon, Link as LinkIcon, Download, Save, Plus, Trash2, ArrowLeft } from 'lucide-react';
+// Added UploadCloud to imports to fix the missing name error
+import { Shield, Search, CreditCard, Loader2, Edit, CheckCircle, AlertTriangle, User, Zap, Building2, Users, DollarSign, TrendingUp, Activity, Filter, Calendar, Heart, UserMinus, Gem, MousePointer2, X, Clock, BarChart3, Wifi, Lock, ExternalLink, Check, Briefcase, FileText, Image as ImageIcon, Link as LinkIcon, Download, Save, Plus, Trash2, ArrowLeft, Globe, Tag, Eye, UploadCloud } from 'lucide-react';
 import { RichTextEditor } from './RichTextEditor';
 
 interface Props {
@@ -26,6 +27,9 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
     const [editingCase, setEditingCase] = useState<Partial<CmsCase> | null>(null);
     const [editingPost, setEditingPost] = useState<Partial<CmsPost> | null>(null);
     
+    // Local Tag State for Post Editor
+    const [tagInput, setTagInput] = useState('');
+
     // Filters
     const [dashStart, setDashStart] = useState<string>(new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0]);
     const [dashEnd, setDashEnd] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -65,7 +69,6 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
     };
 
     const handleSaveUser = async (updated: AdminUser) => {
-        // Logic to save user updates (mock for brevity, connect to service in real)
         await updateGlobalClientData({
             userId: updated.id,
             orgId: updated.organizacao,
@@ -82,11 +85,32 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
         loadData();
     };
 
+    const generateSlug = (text: string) => {
+        return text
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^\w\s-]/g, '')
+            .replace(/\s+/g, '-')
+            .replace(/--+/g, '-')
+            .trim();
+    };
+
     const handleSavePost = async () => {
-        if (!editingPost?.title) return;
-        await saveCmsPost(editingPost);
-        setEditingPost(null);
-        loadData();
+        if (!editingPost?.title) {
+            alert("Título é obrigatório.");
+            return;
+        }
+        setIsLoading(true);
+        try {
+            await saveCmsPost(editingPost);
+            setEditingPost(null);
+            loadData();
+        } catch (e) {
+            alert("Erro ao salvar post.");
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const handleSaveCase = async () => {
@@ -99,6 +123,8 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: string, isPost = false) => {
         const file = e.target.files?.[0];
         if (!file) return;
+        
+        // Show indicator if possible or just rely on async
         const url = await uploadCmsFile(file, 'fotoperfil');
         if (url) {
             if (isPost && editingPost) setEditingPost({ ...editingPost, [field]: url });
@@ -106,68 +132,131 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
         }
     };
 
+    const addTag = () => {
+        if (!tagInput.trim() || !editingPost) return;
+        const currentTags = editingPost.tags || [];
+        if (!currentTags.includes(tagInput.trim())) {
+            setEditingPost({ ...editingPost, tags: [...currentTags, tagInput.trim()] });
+        }
+        setTagInput('');
+    };
+
+    const removeTag = (tagToRemove: string) => {
+        if (!editingPost) return;
+        setEditingPost({ 
+            ...editingPost, 
+            tags: (editingPost.tags || []).filter(t => t !== tagToRemove) 
+        });
+    };
+
     return (
-        <div className="h-full flex flex-col p-6 overflow-y-auto custom-scrollbar">
+        <div className="h-full flex flex-col p-6 overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-black/40">
             <div className="flex justify-between items-center mb-8">
-                <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <Shield className="w-6 h-6 text-purple-600"/> Painel Super Admin
-                </h1>
-                <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
-                    {['dashboard', 'clients', 'approvals', 'cms_cases', 'cms_blog'].map((tab) => (
+                <div>
+                    <h1 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+                        <Shield className="w-6 h-6 text-purple-600"/> Painel Super Admin
+                    </h1>
+                    <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Controle de Ecossistema Shinkō</p>
+                </div>
+                <div className="flex bg-white dark:bg-slate-900 p-1 rounded-xl shadow-sm border border-slate-200 dark:border-white/5">
+                    {[
+                        { id: 'dashboard', label: 'Overview', icon: BarChart3 },
+                        { id: 'clients', label: 'Clientes', icon: Users },
+                        { id: 'approvals', label: 'Aprovações', icon: CreditCard },
+                        { id: 'cms_cases', label: 'Cases', icon: Briefcase },
+                        { id: 'cms_blog', label: 'Blog', icon: FileText }
+                    ].map((tab) => (
                         <button 
-                            key={tab}
-                            onClick={() => setActiveTab(tab as any)}
-                            className={`px-4 py-2 rounded-lg text-xs font-bold capitalize ${activeTab === tab ? 'bg-white dark:bg-white/10 shadow text-slate-900 dark:text-white' : 'text-slate-500'}`}
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id as any)}
+                            className={`px-4 py-2 rounded-lg text-xs font-bold capitalize flex items-center gap-2 transition-all ${activeTab === tab.id ? 'bg-slate-900 dark:bg-white shadow-lg text-white dark:text-slate-900' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                         >
-                            {tab.replace('cms_', '')}
+                            <tab.icon className="w-3.5 h-3.5"/>
+                            {tab.label}
                         </button>
                     ))}
                 </div>
             </div>
 
-            {isLoading && <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-purple-500"/></div>}
+            {isLoading && <div className="flex flex-col items-center justify-center py-40 gap-4">
+                <Loader2 className="w-10 h-10 animate-spin text-purple-500"/>
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Sincronizando Banco de Dados...</span>
+            </div>}
 
+            {/* DASHBOARD VIEW */}
             {!isLoading && activeTab === 'dashboard' && metrics && (
-                <div className="grid grid-cols-4 gap-4">
-                    <div className="glass-panel p-5 rounded-xl"><div className="text-xs font-bold text-slate-500">MRR Total</div><div className="text-2xl font-black">R$ {metrics.totalMrr.toLocaleString()}</div></div>
-                    <div className="glass-panel p-5 rounded-xl"><div className="text-xs font-bold text-slate-500">Clientes Ativos</div><div className="text-2xl font-black">{metrics.activeClients}</div></div>
-                    <div className="glass-panel p-5 rounded-xl"><div className="text-xs font-bold text-slate-500">Ticket Médio</div><div className="text-2xl font-black">R$ {metrics.avgTicket.toFixed(0)}</div></div>
-                    <div className="glass-panel p-5 rounded-xl"><div className="text-xs font-bold text-slate-500">NPS</div><div className="text-2xl font-black">{metrics.npsScore}</div></div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-in fade-in duration-500">
+                    <div className="glass-panel p-6 rounded-2xl border border-slate-200 dark:border-white/5 bg-white/50">
+                        <div className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2"><DollarSign className="w-3 h-3"/> MRR Estimado</div>
+                        <div className="text-3xl font-black text-slate-900 dark:text-white">R$ {metrics.totalMrr.toLocaleString()}</div>
+                    </div>
+                    <div className="glass-panel p-6 rounded-2xl border border-slate-200 dark:border-white/5 bg-white/50">
+                        <div className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2"><Users className="w-3 h-3"/> Clientes Pagantes</div>
+                        <div className="text-3xl font-black text-slate-900 dark:text-white">{metrics.activeClients}</div>
+                    </div>
+                    <div className="glass-panel p-6 rounded-2xl border border-slate-200 dark:border-white/5 bg-white/50">
+                        <div className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2"><Activity className="w-3 h-3"/> DAU (Engajamento)</div>
+                        <div className="text-3xl font-black text-slate-900 dark:text-white">{metrics.dau}</div>
+                    </div>
+                    <div className="glass-panel p-6 rounded-2xl border border-slate-200 dark:border-white/5 bg-white/50">
+                        <div className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2"><Heart className="w-3 h-3"/> NPS Global</div>
+                        <div className="text-3xl font-black text-emerald-500">{metrics.npsScore}</div>
+                    </div>
                 </div>
             )}
 
+            {/* CLIENTS LIST */}
             {!isLoading && activeTab === 'clients' && (
-                <div className="space-y-2">
+                <div className="space-y-3 animate-in fade-in duration-500">
                     {users.map(u => (
-                        <div key={u.id} className="flex justify-between items-center p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl">
-                            <div>
-                                <div className="font-bold">{u.nome}</div>
-                                <div className="text-xs text-slate-500">{u.orgName} • {u.planName}</div>
+                        <div key={u.id} className="flex justify-between items-center p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-2xl hover:shadow-md transition-all">
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-white/5 flex items-center justify-center font-bold text-slate-500">
+                                    {u.nome.charAt(0)}
+                                </div>
+                                <div>
+                                    <div className="font-bold text-slate-900 dark:text-white">{u.nome}</div>
+                                    <div className="text-xs text-slate-500 font-medium">{u.orgName} • <span className="text-purple-500">{u.planName}</span></div>
+                                </div>
                             </div>
-                            <button onClick={() => setEditingUser(u)} className="px-3 py-1 bg-slate-100 dark:bg-white/10 rounded text-xs font-bold">Editar</button>
+                            <div className="flex items-center gap-4">
+                                <div className="text-right hidden sm:block">
+                                    <div className="text-[10px] font-bold text-slate-400 uppercase">Último Acesso</div>
+                                    <div className="text-xs text-slate-600 dark:text-slate-300">{u.ultimo_acesso ? new Date(u.ultimo_acesso).toLocaleDateString() : 'N/A'}</div>
+                                </div>
+                                <button onClick={() => setEditingUser(u)} className="px-4 py-2 bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 rounded-xl text-xs font-bold transition-colors">Gerenciar</button>
+                            </div>
                         </div>
                     ))}
                 </div>
             )}
 
+            {/* APPROVALS */}
             {!isLoading && activeTab === 'approvals' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {approvals.length === 0 && <div className="col-span-3 text-center text-slate-500">Nenhuma aprovação pendente.</div>}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-500">
+                    {approvals.length === 0 && <div className="col-span-3 py-20 text-center text-slate-500 border border-dashed border-slate-300 dark:border-white/10 rounded-3xl">Nenhuma aprovação pendente.</div>}
                     {approvals.map(a => (
-                        <div key={a.id} className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-amber-500/20">
-                            <div className="flex justify-between mb-2">
-                                <span className="font-bold text-sm">{a.orgName}</span>
-                                <span className="text-xs font-mono text-slate-500">{new Date(a.date).toLocaleDateString()}</span>
+                        <div key={a.id} className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-amber-500/30 shadow-xl shadow-amber-500/5 flex flex-col">
+                            <div className="flex justify-between items-start mb-4">
+                                <div>
+                                    <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest block mb-1">Aguardando Aprovação</span>
+                                    <h3 className="font-bold text-base text-slate-900 dark:text-white">{a.orgName}</h3>
+                                </div>
+                                <span className="text-[10px] font-mono text-slate-400">{new Date(a.date).toLocaleDateString()}</span>
                             </div>
-                            <div className="text-xl font-black text-emerald-500 mb-4">R$ {a.amount.toLocaleString()}</div>
-                            <div className="flex gap-2">
-                                {a.comprovante && <a href={a.comprovante} target="_blank" className="flex-1 py-2 bg-slate-100 dark:bg-white/5 rounded text-center text-xs font-bold">Ver Comp.</a>}
+                            <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mb-6">R$ {a.amount.toLocaleString()}</div>
+                            <div className="mt-auto flex gap-2 pt-4 border-t border-slate-100 dark:border-white/5">
+                                {a.comprovante && (
+                                    <a href={a.comprovante} target="_blank" className="flex-1 py-3 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 rounded-xl text-center text-xs font-bold text-slate-600 dark:text-white transition-all flex items-center justify-center gap-2">
+                                        <ExternalLink className="w-3.5 h-3.5"/> Comprovante
+                                    </a>
+                                )}
                                 <button 
                                     onClick={() => handleApprove(a.id.toString(), a.organizationId)} 
                                     disabled={approvingId === a.id.toString()}
-                                    className="flex-1 py-2 bg-emerald-600 text-white rounded text-center text-xs font-bold flex items-center justify-center gap-1"
+                                    className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-center text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 transition-all active:scale-95"
                                 >
-                                    {approvingId === a.id.toString() ? <Loader2 className="w-3 h-3 animate-spin"/> : <Check className="w-3 h-3"/>} Aprovar
+                                    {approvingId === a.id.toString() ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <Check className="w-3.5 h-3.5"/>} Liberar
                                 </button>
                             </div>
                         </div>
@@ -175,22 +264,30 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                 </div>
             )}
 
+            {/* CMS CASES */}
             {!isLoading && activeTab === 'cms_cases' && (
-                <div className="space-y-4">
-                    <button onClick={() => setEditingCase({ title: '' })} className="w-full py-3 border border-dashed border-slate-300 dark:border-white/10 rounded-xl text-slate-500 font-bold hover:bg-slate-50 dark:hover:bg-white/5">+ Novo Case</button>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-6 animate-in fade-in duration-500">
+                    <button onClick={() => setEditingCase({ title: '', category: 'Case Study' })} className="w-full py-4 border-2 border-dashed border-slate-300 dark:border-white/10 rounded-2xl text-slate-400 font-black uppercase tracking-widest hover:border-purple-500/50 hover:bg-purple-500/5 transition-all flex items-center justify-center gap-2 group">
+                        <Plus className="w-5 h-5 group-hover:scale-110 transition-transform"/> Criar Novo Estudo de Caso
+                    </button>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {cmsCases.map(c => (
-                            <div key={c.id} className="bg-white dark:bg-slate-900 rounded-xl overflow-hidden border border-slate-200 dark:border-white/10 group relative">
-                                <div className="h-32 bg-slate-200 dark:bg-black">
-                                    {c.image_url && <img src={c.image_url} className="w-full h-full object-cover opacity-80"/>}
+                            <div key={c.id} className="bg-white dark:bg-slate-900 rounded-2xl overflow-hidden border border-slate-200 dark:border-white/5 group relative hover:shadow-xl transition-all">
+                                <div className="h-40 bg-slate-100 dark:bg-black relative overflow-hidden">
+                                    {c.image_url ? (
+                                        <img src={c.image_url} className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-700"/>
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-slate-300"><ImageIcon className="w-10 h-10"/></div>
+                                    )}
+                                    <div className="absolute top-3 left-3 px-2 py-1 bg-purple-600 text-white text-[10px] font-bold rounded uppercase tracking-wider">{c.category}</div>
                                 </div>
-                                <div className="p-4">
-                                    <div className="font-bold text-sm">{c.title}</div>
-                                    <div className="text-xs text-slate-500 mt-1">{c.metric}</div>
+                                <div className="p-5">
+                                    <div className="font-bold text-slate-900 dark:text-white mb-2 leading-tight">{c.title}</div>
+                                    <div className="text-xs text-emerald-600 font-bold flex items-center gap-1"><TrendingUp className="w-3 h-3"/> {c.metric}</div>
                                 </div>
-                                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onClick={() => setEditingCase(c)} className="p-1 bg-white rounded shadow text-blue-500"><Edit className="w-3 h-3"/></button>
-                                    <button onClick={() => deleteCmsCase(c.id).then(loadData)} className="p-1 bg-white rounded shadow text-red-500"><Trash2 className="w-3 h-3"/></button>
+                                <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onClick={() => setEditingCase(c)} className="p-2 bg-white rounded-lg shadow-lg text-blue-600 hover:scale-110 transition-transform"><Edit className="w-4 h-4"/></button>
+                                    <button onClick={() => { if(confirm("Excluir?")) deleteCmsCase(c.id).then(loadData); }} className="p-2 bg-white rounded-lg shadow-lg text-red-600 hover:scale-110 transition-transform"><Trash2 className="w-4 h-4"/></button>
                                 </div>
                             </div>
                         ))}
@@ -198,85 +295,317 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                 </div>
             )}
 
+            {/* CMS BLOG */}
             {!isLoading && activeTab === 'cms_blog' && (
-                <div className="space-y-4">
-                    <button onClick={() => setEditingPost({ title: '', content: '' })} className="w-full py-3 border border-dashed border-slate-300 dark:border-white/10 rounded-xl text-slate-500 font-bold hover:bg-slate-50 dark:hover:bg-white/5">+ Novo Artigo</button>
-                    {cmsPosts.map(p => (
-                        <div key={p.id} className="flex justify-between items-center p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl">
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 bg-slate-200 rounded overflow-hidden">
-                                    {p.cover_image && <img src={p.cover_image} className="w-full h-full object-cover"/>}
+                <div className="space-y-6 animate-in fade-in duration-500">
+                    <button onClick={() => setEditingPost({ title: '', content: '', tags: [], published: false, slug: '' })} className="w-full py-4 border-2 border-dashed border-slate-300 dark:border-white/10 rounded-2xl text-slate-400 font-black uppercase tracking-widest hover:border-amber-500/50 hover:bg-amber-500/5 transition-all flex items-center justify-center gap-2 group">
+                        <Plus className="w-5 h-5 group-hover:scale-110 transition-transform"/> Publicar Novo Insight
+                    </button>
+                    <div className="space-y-3">
+                        {cmsPosts.map(p => (
+                            <div key={p.id} className="flex justify-between items-center p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-2xl hover:shadow-md transition-all group">
+                                <div className="flex items-center gap-5">
+                                    <div className="w-16 h-12 bg-slate-100 dark:bg-black rounded-lg overflow-hidden border border-slate-200 dark:border-white/5">
+                                        {p.cover_image && <img src={p.cover_image} className="w-full h-full object-cover"/>}
+                                    </div>
+                                    <div>
+                                        <div className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                            {p.title}
+                                            {p.download_url && <Download className="w-3 h-3 text-amber-500" title="Possui Material Rico"/>}
+                                        </div>
+                                        <div className="flex items-center gap-3 mt-1">
+                                            <div className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider ${p.published ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{p.published ? 'Publicado' : 'Rascunho'}</div>
+                                            <span className="text-[10px] text-slate-400 font-mono">/{p.slug}</span>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div>
-                                    <div className="font-bold text-sm">{p.title}</div>
-                                    <div className={`text-[10px] px-2 py-0.5 rounded inline-block ${p.published ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>{p.published ? 'Publicado' : 'Rascunho'}</div>
+                                <div className="flex gap-2">
+                                    <button onClick={() => setEditingPost(p)} className="p-3 bg-slate-50 dark:bg-white/5 rounded-xl text-slate-500 hover:text-blue-500 transition-colors"><Edit className="w-4 h-4"/></button>
+                                    <button onClick={() => { if(confirm("Excluir post?")) deleteCmsPost(p.id).then(loadData); }} className="p-3 bg-slate-50 dark:bg-white/5 rounded-xl text-slate-500 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4"/></button>
                                 </div>
                             </div>
-                            <div className="flex gap-2">
-                                <button onClick={() => setEditingPost(p)} className="p-2 hover:bg-slate-100 rounded text-slate-500"><Edit className="w-4 h-4"/></button>
-                                <button onClick={() => deleteCmsPost(p.id).then(loadData)} className="p-2 hover:bg-red-50 rounded text-red-500"><Trash2 className="w-4 h-4"/></button>
-                            </div>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
                 </div>
             )}
 
-            {/* Modals */}
+            {/* MODAL: EDIT USER */}
             {editingUser && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-xl w-full max-w-md shadow-2xl">
-                        <h3 className="font-bold text-lg mb-4">Editar {editingUser.nome}</h3>
-                        <div className="space-y-3">
-                            <input value={editingUser.orgName} onChange={e => setEditingUser({...editingUser, orgName: e.target.value})} className="w-full p-2 border rounded" placeholder="Empresa"/>
-                            <div className="flex gap-2">
-                                <input type="number" value={editingUser.orgColaboradores} onChange={e => setEditingUser({...editingUser, orgColaboradores: Number(e.target.value)})} className="w-1/2 p-2 border rounded" placeholder="Users Limit"/>
-                                <select value={editingUser.currentPlanId} onChange={e => setEditingUser({...editingUser, currentPlanId: Number(e.target.value)})} className="w-1/2 p-2 border rounded">
-                                    {plans.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+                    <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl w-full max-w-lg shadow-2xl border border-white/10 ring-1 ring-white/5">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">Gerenciar Assinante</h3>
+                            <button onClick={() => setEditingUser(null)}><X className="w-5 h-5 text-slate-400 hover:text-white"/></button>
+                        </div>
+                        <div className="space-y-5">
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Nome da Empresa</label>
+                                <input value={editingUser.orgName} onChange={e => setEditingUser({...editingUser, orgName: e.target.value})} className="w-full p-3 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:border-purple-500 text-sm font-bold"/>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Limite Colab.</label>
+                                    <input type="number" value={editingUser.orgColaboradores} onChange={e => setEditingUser({...editingUser, orgColaboradores: Number(e.target.value)})} className="w-full p-3 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:border-purple-500 text-sm"/>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Plano Atual</label>
+                                    <select value={editingUser.currentPlanId} onChange={e => setEditingUser({...editingUser, currentPlanId: Number(e.target.value)})} className="w-full p-3 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:border-purple-500 text-sm">
+                                        {plans.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Status da Conta</label>
+                                <select value={editingUser.status} onChange={e => setEditingUser({...editingUser, status: e.target.value})} className="w-full p-3 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:border-purple-500 text-sm">
+                                    <option value="Ativo">✅ Ativo / Em Dia</option>
+                                    <option value="Pendente">⏳ Aguardando Pgto</option>
+                                    <option value="Bloqueado">🚫 Bloqueado / Inativo</option>
                                 </select>
                             </div>
-                            <button onClick={() => handleSaveUser(editingUser)} className="w-full bg-blue-600 text-white py-2 rounded font-bold">Salvar</button>
-                            <button onClick={() => setEditingUser(null)} className="w-full text-slate-500 py-2 text-sm">Cancelar</button>
+                            <button onClick={() => handleSaveUser(editingUser)} className="w-full bg-slate-900 dark:bg-white text-white dark:text-black py-4 rounded-xl font-bold text-sm shadow-xl hover:scale-[1.02] active:scale-95 transition-all mt-4 flex items-center justify-center gap-2">
+                                <Save className="w-4 h-4"/> Atualizar Cadastro
+                            </button>
                         </div>
                     </div>
                 </div>
             )}
 
+            {/* MODAL: FULL SCREEN BLOG EDITOR */}
             {editingPost && (
-                <div className="fixed inset-0 z-[100] bg-white dark:bg-slate-950 flex flex-col">
-                    <div className="p-4 border-b flex justify-between items-center">
-                        <button onClick={() => setEditingPost(null)}><ArrowLeft className="w-5 h-5"/></button>
-                        <span className="font-bold">Editor de Blog</span>
-                        <button onClick={handleSavePost} className="px-4 py-2 bg-black text-white rounded-lg text-xs font-bold">Salvar</button>
+                <div className="fixed inset-0 z-[150] bg-slate-50 dark:bg-[#050505] flex flex-col animate-in slide-in-from-bottom-4 duration-500 overflow-hidden font-sans">
+                    {/* Top Action Bar */}
+                    <div className="h-20 shrink-0 border-b border-slate-200 dark:border-white/10 bg-white dark:bg-black/40 flex justify-between items-center px-8 backdrop-blur-md">
+                        <div className="flex items-center gap-4">
+                            <button onClick={() => setEditingPost(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl transition-colors text-slate-500">
+                                <ArrowLeft className="w-6 h-6"/>
+                            </button>
+                            <div className="w-px h-8 bg-slate-200 dark:bg-white/10 mx-2"></div>
+                            <div>
+                                <h2 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Editor de Insights</h2>
+                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Publicação v2.5</p>
+                            </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-3 bg-slate-100 dark:bg-white/5 px-4 py-2 rounded-xl border border-slate-200 dark:border-white/10">
+                                <span className="text-xs font-bold text-slate-500 uppercase">Visibilidade</span>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" checked={editingPost.published || false} onChange={e => setEditingPost({...editingPost, published: e.target.checked})} className="sr-only peer"/>
+                                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-emerald-600"></div>
+                                    <span className="ml-3 text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider">{editingPost.published ? 'Publicado' : 'Rascunho'}</span>
+                                </label>
+                            </div>
+                            
+                            <button 
+                                onClick={handleSavePost}
+                                disabled={isLoading}
+                                className="px-8 py-3 bg-amber-500 hover:bg-amber-400 text-black font-black uppercase tracking-widest text-xs rounded-xl shadow-lg shadow-amber-500/20 transition-all active:scale-95 flex items-center gap-2"
+                            >
+                                {isLoading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4"/>} 
+                                Salvar Alterações
+                            </button>
+                        </div>
                     </div>
-                    <div className="flex-1 p-8 max-w-4xl mx-auto w-full overflow-y-auto">
-                        <input value={editingPost.title} onChange={e => setEditingPost({...editingPost, title: e.target.value})} className="text-3xl font-bold w-full bg-transparent outline-none mb-6" placeholder="Título do Artigo"/>
-                        <div className="mb-6 h-40 border-2 border-dashed rounded-xl flex items-center justify-center relative overflow-hidden group">
-                            {editingPost.cover_image ? <img src={editingPost.cover_image} className="w-full h-full object-cover absolute"/> : <span className="text-slate-400">Capa</span>}
-                            <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleFileUpload(e, 'cover_image', true)}/>
+
+                    <div className="flex-1 flex overflow-hidden">
+                        
+                        {/* Editor Main Section */}
+                        <div className="flex-1 p-8 overflow-y-auto custom-scrollbar bg-white dark:bg-transparent">
+                            <div className="max-w-4xl mx-auto space-y-8">
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 block">Título do Artigo</label>
+                                    <input 
+                                        value={editingPost.title} 
+                                        onChange={e => {
+                                            const val = e.target.value;
+                                            const updates: any = { title: val };
+                                            // Auto-generate slug if it's a new post or slug is empty
+                                            if (!editingPost.id || !editingPost.slug) {
+                                                updates.slug = generateSlug(val);
+                                            }
+                                            setEditingPost({...editingPost, ...updates});
+                                        }} 
+                                        className="text-4xl md:text-5xl font-black w-full bg-transparent outline-none text-slate-900 dark:text-white placeholder-slate-200 dark:placeholder-white/10 tracking-tight leading-tight" 
+                                        placeholder="Título impactante aqui..."
+                                        autoFocus
+                                    />
+                                </div>
+
+                                <div className="space-y-3">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                                        <FileText className="w-3 h-3"/> Conteúdo Rico
+                                    </label>
+                                    <RichTextEditor 
+                                        value={editingPost.content || ''} 
+                                        onChange={html => setEditingPost({...editingPost, content: html})} 
+                                        className="min-h-[600px] border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-black/20"
+                                        placeholder="Comece a escrever seu insight técnico ou estratégia..."
+                                    />
+                                </div>
+                            </div>
                         </div>
-                        <RichTextEditor value={editingPost.content || ''} onChange={html => setEditingPost({...editingPost, content: html})} className="min-h-[400px]"/>
-                        <div className="mt-4 flex gap-4 items-center">
-                            <label className="flex items-center gap-2"><input type="checkbox" checked={editingPost.published || false} onChange={e => setEditingPost({...editingPost, published: e.target.checked})}/> Publicar</label>
-                            <input type="file" onChange={(e) => handleFileUpload(e, 'download_url', true)}/>
-                        </div>
+
+                        {/* Sidebar Configuration */}
+                        <aside className="w-96 border-l border-slate-200 dark:border-white/10 bg-white dark:bg-black/40 p-8 overflow-y-auto custom-scrollbar space-y-10">
+                            
+                            {/* SEO & URL */}
+                            <div className="space-y-4">
+                                <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 dark:border-white/5 pb-2">
+                                    <Globe className="w-4 h-4 text-blue-500"/> SEO & Roteamento
+                                </h3>
+                                <div className="space-y-1.5">
+                                    <label className="text-[9px] font-black text-slate-500 uppercase ml-1">Slug da URL</label>
+                                    <div className="relative group">
+                                        <div className="absolute left-3 top-3.5 text-slate-500 text-xs font-bold">/blog/</div>
+                                        <input 
+                                            value={editingPost.slug} 
+                                            onChange={e => setEditingPost({...editingPost, slug: generateSlug(e.target.value)})}
+                                            className="w-full pl-14 pr-4 py-3 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:border-blue-500 text-xs font-mono text-slate-700 dark:text-slate-300"
+                                            placeholder="url-amigavel-aqui"
+                                        />
+                                    </div>
+                                    <p className="text-[9px] text-slate-500 italic px-1">O slug define o link final do post. Use apenas letras, números e hífens.</p>
+                                </div>
+                            </div>
+
+                            {/* Cover Image */}
+                            <div className="space-y-4">
+                                <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 dark:border-white/5 pb-2">
+                                    <ImageIcon className="w-4 h-4 text-purple-500"/> Imagem de Capa
+                                </h3>
+                                <div className="aspect-video border-2 border-dashed border-slate-200 dark:border-white/10 rounded-2xl flex flex-col items-center justify-center relative overflow-hidden group bg-slate-50 dark:bg-black/40 hover:border-purple-500/50 transition-colors">
+                                    {editingPost.cover_image ? (
+                                        <>
+                                            <img src={editingPost.cover_image} className="w-full h-full object-cover"/>
+                                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                                <button className="p-2 bg-white rounded-lg text-black hover:scale-110 transition-transform"><Edit className="w-4 h-4"/></button>
+                                                <button onClick={() => setEditingPost({...editingPost, cover_image: ''})} className="p-2 bg-red-600 rounded-lg text-white hover:scale-110 transition-transform"><Trash2 className="w-4 h-4"/></button>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="text-center p-6 cursor-pointer">
+                                            <UploadCloud className="w-8 h-8 text-slate-400 mx-auto mb-2 group-hover:text-purple-500 transition-colors"/>
+                                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Upload Capa</span>
+                                            <span className="text-[9px] text-slate-400 block mt-1">16:9 Recomendado</span>
+                                        </div>
+                                    )}
+                                    <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleFileUpload(e, 'cover_image', true)}/>
+                                </div>
+                            </div>
+
+                            {/* Tags Manager */}
+                            <div className="space-y-4">
+                                <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 dark:border-white/5 pb-2">
+                                    <Tag className="w-4 h-4 text-amber-500"/> Categorias (Tags)
+                                </h3>
+                                <div className="flex gap-2">
+                                    <input 
+                                        value={tagInput}
+                                        onChange={e => setTagInput(e.target.value)}
+                                        onKeyDown={e => e.key === 'Enter' && addTag()}
+                                        placeholder="Adicionar tag..."
+                                        className="flex-1 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs outline-none focus:border-amber-500"
+                                    />
+                                    <button onClick={addTag} className="p-2 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 transition-opacity"><Plus className="w-4 h-4"/></button>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {editingPost.tags?.map(tag => (
+                                        <span key={tag} className="px-2.5 py-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 rounded-lg text-[10px] font-bold flex items-center gap-1 group">
+                                            {tag}
+                                            <button onClick={() => removeTag(tag)} className="hover:text-red-500"><X className="w-3 h-3"/></button>
+                                        </span>
+                                    ))}
+                                    {(!editingPost.tags || editingPost.tags.length === 0) && <span className="text-[10px] text-slate-500 italic">Sem tags definidas.</span>}
+                                </div>
+                            </div>
+
+                            {/* Rich Material / Download */}
+                            <div className="space-y-4">
+                                <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 dark:border-white/5 pb-2">
+                                    <Download className="w-4 h-4 text-emerald-500"/> Material Rico (Lead Gen)
+                                </h3>
+                                <div className="space-y-4 bg-emerald-500/5 p-4 rounded-2xl border border-emerald-500/10">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[9px] font-black text-slate-500 uppercase ml-1">Título do Download</label>
+                                        <input 
+                                            value={editingPost.download_title || ''} 
+                                            onChange={e => setEditingPost({...editingPost, download_title: e.target.value})}
+                                            placeholder="Ex: Checklist Framework RDE"
+                                            className="w-full p-2.5 bg-white dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:border-emerald-500 text-xs text-slate-700 dark:text-slate-300 font-bold"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[9px] font-black text-slate-500 uppercase ml-1">Arquivo PDF/DOC</label>
+                                        <div className="flex flex-col gap-2">
+                                            {editingPost.download_url ? (
+                                                <div className="flex items-center gap-2 p-2 bg-emerald-500/20 rounded-lg border border-emerald-500/30 overflow-hidden">
+                                                    <FileText className="w-4 h-4 text-emerald-500 shrink-0"/>
+                                                    <span className="text-[9px] font-mono text-emerald-600 dark:text-emerald-400 truncate flex-1">{editingPost.download_url}</span>
+                                                    <button onClick={() => setEditingPost({...editingPost, download_url: ''})} className="text-red-500 hover:scale-110 transition-transform shrink-0"><Trash2 className="w-3.5 h-3.5"/></button>
+                                                </div>
+                                            ) : (
+                                                <div className="relative group">
+                                                    <button className="w-full py-3 bg-white dark:bg-white/5 border border-dashed border-slate-300 dark:border-emerald-500/30 rounded-xl text-[10px] font-bold text-slate-500 dark:text-emerald-500 uppercase tracking-widest hover:bg-emerald-500/5 transition-all flex items-center justify-center gap-2">
+                                                        <Plus className="w-3 h-3"/> Vincular Arquivo
+                                                    </button>
+                                                    <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleFileUpload(e, 'download_url', true)}/>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </aside>
                     </div>
                 </div>
             )}
 
+            {/* MODAL: EDIT CASE */}
             {editingCase && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-xl w-full max-w-lg shadow-2xl">
-                        <h3 className="font-bold mb-4">Editar Case</h3>
-                        <div className="space-y-3">
-                            <input value={editingCase.title || ''} onChange={e => setEditingCase({...editingCase, title: e.target.value})} className="w-full p-2 border rounded" placeholder="Título"/>
-                            <input value={editingCase.metric || ''} onChange={e => setEditingCase({...editingCase, metric: e.target.value})} className="w-full p-2 border rounded" placeholder="Métrica (Ex: +200% ROI)"/>
-                            <textarea value={editingCase.description || ''} onChange={e => setEditingCase({...editingCase, description: e.target.value})} className="w-full p-2 border rounded h-24" placeholder="Descrição"/>
-                            <div className="border p-2 rounded relative">
-                                <span className="text-xs text-slate-500">Imagem de Capa</span>
-                                <input type="file" onChange={(e) => handleFileUpload(e, 'image_url')}/>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+                    <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl w-full max-w-lg shadow-2xl border border-white/10 ring-1 ring-white/5">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">Gerenciar Estudo de Caso</h3>
+                            <button onClick={() => setEditingCase(null)}><X className="w-5 h-5 text-slate-400 hover:text-white"/></button>
+                        </div>
+                        <div className="space-y-4">
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Título do Case</label>
+                                <input value={editingCase.title || ''} onChange={e => setEditingCase({...editingCase, title: e.target.value})} className="w-full p-3 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:border-purple-500 text-sm font-bold text-slate-900 dark:text-white" placeholder="Título"/>
                             </div>
-                            <button onClick={handleSaveCase} className="w-full bg-blue-600 text-white py-2 rounded font-bold">Salvar</button>
-                            <button onClick={() => setEditingCase(null)} className="w-full text-slate-500 py-2 text-sm">Cancelar</button>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Métrica de Impacto</label>
+                                    <input value={editingCase.metric || ''} onChange={e => setEditingCase({...editingCase, metric: e.target.value})} className="w-full p-3 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:border-emerald-500 text-sm font-black text-emerald-600" placeholder="+200% ROI"/>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Categoria</label>
+                                    <input value={editingCase.category || ''} onChange={e => setEditingCase({...editingCase, category: e.target.value})} className="w-full p-3 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:border-purple-500 text-sm" placeholder="Ex: FinTech"/>
+                                </div>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Descrição Curta</label>
+                                <textarea value={editingCase.description || ''} onChange={e => setEditingCase({...editingCase, description: e.target.value})} className="w-full p-3 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:border-purple-500 text-sm h-24 resize-none" placeholder="Breve resumo da transformação..."/>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Link Externo</label>
+                                <input value={editingCase.link_url || ''} onChange={e => setEditingCase({...editingCase, link_url: e.target.value})} className="w-full p-3 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:border-blue-500 text-xs font-mono text-blue-500" placeholder="https://..."/>
+                            </div>
+                            <div className="border border-slate-200 dark:border-white/10 p-4 rounded-xl relative bg-slate-50 dark:bg-black/20 overflow-hidden group">
+                                <div className="flex justify-between items-center relative z-10">
+                                    <div className="flex items-center gap-2">
+                                        <ImageIcon className="w-4 h-4 text-slate-400"/>
+                                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Capa do Case</span>
+                                    </div>
+                                    <input type="file" className="absolute inset-0 opacity-0 cursor-pointer z-20" onChange={(e) => handleFileUpload(e, 'image_url')}/>
+                                    {editingCase.image_url && <div className="text-[9px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded">Alterar</div>}
+                                </div>
+                                {editingCase.image_url && <img src={editingCase.image_url} className="mt-3 w-full h-24 object-cover rounded-lg opacity-60"/>}
+                            </div>
+                            <button onClick={handleSaveCase} className="w-full bg-slate-900 dark:bg-white text-white dark:text-black py-4 rounded-xl font-bold text-sm shadow-xl hover:scale-[1.02] active:scale-95 transition-all mt-4 flex items-center justify-center gap-2">
+                                <Save className="w-4 h-4"/> Salvar Case
+                            </button>
                         </div>
                     </div>
                 </div>
