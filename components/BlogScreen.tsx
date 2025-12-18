@@ -1,17 +1,18 @@
 
 import React, { useState, useEffect } from 'react';
 import { CmsPost } from '../types';
-import { fetchCmsPosts, captureLead } from '../services/cmsService';
+import { fetchCmsPosts, captureLead, fetchCmsPostById } from '../services/cmsService';
 import { ArrowLeft, Calendar, Tag, Download, CheckCircle, Loader2, Search, X, ChevronRight, FileText, ArrowRight } from 'lucide-react';
 
 interface Props {
     onBack: () => void;
     onEnter?: () => void;
+    initialPostId?: string | null;
 }
 
 const LOGO_URL = "https://zjssfnbcboibqeoubeou.supabase.co/storage/v1/object/public/fotoperfil/fotoperfil/1%20(1).png";
 
-export const BlogScreen: React.FC<Props> = ({ onBack, onEnter }) => {
+export const BlogScreen: React.FC<Props> = ({ onBack, onEnter, initialPostId }) => {
     const [posts, setPosts] = useState<CmsPost[]>([]);
     const [selectedPost, setSelectedPost] = useState<CmsPost | null>(null);
     const [loading, setLoading] = useState(true);
@@ -25,15 +26,48 @@ export const BlogScreen: React.FC<Props> = ({ onBack, onEnter }) => {
     const [leadPhone, setLeadPhone] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    // Initial Load & Post Sync
     useEffect(() => {
-        loadPosts();
+        const init = async () => {
+            setLoading(true);
+            const data = await fetchCmsPosts(true);
+            setPosts(data);
+            
+            // If we have an initial ID, try to load it
+            if (initialPostId) {
+                const post = await fetchCmsPostById(initialPostId);
+                if (post && post.published) {
+                    setSelectedPost(post);
+                }
+            }
+            setLoading(false);
+        };
+        init();
     }, []);
 
-    const loadPosts = async () => {
-        setLoading(true);
-        const data = await fetchCmsPosts(true);
-        setPosts(data);
-        setLoading(false);
+    // Sync on prop change (Browser Back/Forward)
+    useEffect(() => {
+        if (!initialPostId) {
+            setSelectedPost(null);
+        } else if (initialPostId && (!selectedPost || selectedPost.id !== initialPostId)) {
+            const found = posts.find(p => p.id === initialPostId);
+            if (found) setSelectedPost(found);
+            else {
+                // Fetch individually if not in cache
+                fetchCmsPostById(initialPostId).then(p => {
+                    if (p && p.published) setSelectedPost(p);
+                });
+            }
+        }
+    }, [initialPostId, posts]);
+
+    const handleSelectPost = (post: CmsPost | null) => {
+        setSelectedPost(post);
+        if (post) {
+            window.history.pushState({}, '', `/blog/${post.id}`);
+        } else {
+            window.history.pushState({}, '', '/blog');
+        }
     };
 
     const handleDownloadClick = () => {
@@ -56,8 +90,6 @@ export const BlogScreen: React.FC<Props> = ({ onBack, onEnter }) => {
                     alert("Por favor, permita popups para baixar o arquivo.");
                     window.location.href = selectedPost.download_url;
                 }
-            } else {
-                alert("Erro: Link do arquivo não encontrado.");
             }
         } else {
             alert("Erro ao processar seus dados. Tente novamente.");
@@ -76,21 +108,19 @@ export const BlogScreen: React.FC<Props> = ({ onBack, onEnter }) => {
     if (selectedPost) {
         return (
             <div className="fixed inset-0 z-[250] bg-[#050505] text-white animate-in fade-in slide-in-from-right-8 overflow-y-auto custom-scrollbar">
-                {/* Background Noise & Brand Glow */}
                 <div className="fixed inset-0 w-full h-full overflow-hidden pointer-events-none">
                     <div className="absolute top-[-20%] left-[-10%] w-[800px] h-[800px] bg-amber-600/10 rounded-full blur-[120px] mix-blend-screen"></div>
                     <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
                 </div>
                 
-                {/* Standard Header in Detail */}
                 <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md border-b border-white/5 bg-[#050505]/80">
                     <div className="max-w-7xl mx-auto px-6 h-20 flex justify-between items-center">
-                        <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setSelectedPost(null)}>
+                        <div className="flex items-center gap-3 cursor-pointer group" onClick={() => handleSelectPost(null)}>
                             <img src={LOGO_URL} alt="Shinkō OS" className="h-8 w-auto object-contain relative z-10" />
                         </div>
                         
                         <div className="flex items-center gap-4">
-                            <button onClick={() => setSelectedPost(null)} className="group relative px-6 py-2.5 bg-white/10 text-white font-bold text-sm rounded-xl hover:bg-white/20 transition-all border border-white/10 flex items-center gap-2">
+                            <button onClick={() => handleSelectPost(null)} className="group relative px-6 py-2.5 bg-white/10 text-white font-bold text-sm rounded-xl hover:bg-white/20 transition-all border border-white/10 flex items-center gap-2">
                                 <ArrowLeft className="w-4 h-4"/> Voltar
                             </button>
                         </div>
@@ -130,7 +160,6 @@ export const BlogScreen: React.FC<Props> = ({ onBack, onEnter }) => {
                                 dangerouslySetInnerHTML={{ __html: selectedPost.content || '' }}
                             />
 
-                            {/* Call to Action - Download */}
                             {selectedPost.download_url && (
                                 <div className="mt-16 p-1 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 shadow-2xl animate-pulse-slow">
                                     <div className="bg-[#0A0A0A] rounded-xl p-8 relative overflow-hidden group">
@@ -142,10 +171,7 @@ export const BlogScreen: React.FC<Props> = ({ onBack, onEnter }) => {
                                                 </h3>
                                                 <p className="text-slate-400 text-sm">Acesse o conteúdo completo: {selectedPost.download_title || 'material'}.</p>
                                             </div>
-                                            <button 
-                                                onClick={handleDownloadClick}
-                                                className="px-8 py-4 bg-white text-black font-bold rounded-xl shadow-lg hover:scale-105 transition-transform flex items-center gap-2"
-                                            >
+                                            <button onClick={handleDownloadClick} className="px-8 py-4 bg-white text-black font-bold rounded-xl shadow-lg hover:scale-105 transition-transform flex items-center gap-2">
                                                 <Download className="w-5 h-5"/> Baixar Agora
                                             </button>
                                         </div>
@@ -156,12 +182,10 @@ export const BlogScreen: React.FC<Props> = ({ onBack, onEnter }) => {
                     </div>
                 </div>
 
-                {/* Lead Modal */}
                 {showLeadModal && (
                     <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
                         <div className="glass-panel w-full max-w-md rounded-3xl p-8 shadow-2xl relative border border-white/10 bg-slate-900/90">
                             <button onClick={() => setShowLeadModal(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors"><X className="w-5 h-5"/></button>
-                            
                             <div className="text-center mb-8">
                                 <div className="w-12 h-12 bg-amber-500/20 text-amber-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-500/30">
                                     <Download className="w-6 h-6"/>
@@ -169,7 +193,6 @@ export const BlogScreen: React.FC<Props> = ({ onBack, onEnter }) => {
                                 <h3 className="text-xl font-bold text-white mb-2">Quase lá!</h3>
                                 <p className="text-slate-400 text-xs">Preencha seus dados para liberar o download imediatamente.</p>
                             </div>
-                            
                             <form onSubmit={handleLeadSubmit} className="space-y-4">
                                 <div className="space-y-1">
                                     <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Nome</label>
@@ -198,19 +221,16 @@ export const BlogScreen: React.FC<Props> = ({ onBack, onEnter }) => {
     // --- LIST VIEW ---
     return (
         <div className="fixed inset-0 z-[200] bg-[#050505] text-white flex flex-col overflow-y-auto custom-scrollbar">
-            {/* Background Noise & Brand Glow */}
             <div className="fixed inset-0 w-full h-full overflow-hidden pointer-events-none">
                 <div className="absolute top-[-20%] left-[-10%] w-[800px] h-[800px] bg-amber-600/10 rounded-full blur-[120px] mix-blend-screen"></div>
                 <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
             </div>
             
-            {/* --- STANDARD HEADER (Consistent with Landing) --- */}
             <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md border-b border-white/5 bg-[#050505]/80">
                 <div className="max-w-7xl mx-auto px-6 h-20 flex justify-between items-center">
                     <div className="flex items-center gap-3 cursor-pointer group" onClick={onBack}>
                         <img src={LOGO_URL} alt="Shinkō OS" className="h-8 w-auto object-contain relative z-10" />
                     </div>
-                    
                     <div className="flex items-center gap-4">
                         <div className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-400 mr-4">
                             <button onClick={onBack} className="hover:text-white transition-colors">Home</button>
@@ -226,50 +246,24 @@ export const BlogScreen: React.FC<Props> = ({ onBack, onEnter }) => {
                 </div>
             </nav>
 
-            {/* Content */}
             <div className="max-w-7xl mx-auto px-6 py-12 pt-32 w-full relative z-10 flex-1">
-                
-                {/* Search & Tags */}
                 <div className="mb-12">
-                    <h1 className="text-4xl md:text-6xl font-black text-white mb-2 tracking-tight">
-                        Blog & Insights
-                    </h1>
-                    <p className="text-slate-400 text-sm md:text-base max-w-lg mb-8">
-                        Estratégias, frameworks e deep-dives sobre inovação, engenharia de software e modelos de negócio.
-                    </p>
-
+                    <h1 className="text-4xl md:text-6xl font-black text-white mb-2 tracking-tight">Blog & Insights</h1>
+                    <p className="text-slate-400 text-sm md:text-base max-w-lg mb-8">Estratégias, frameworks e deep-dives sobre inovação, engenharia de software e modelos de negócio.</p>
                     <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
                         <div className="relative w-full md:w-96">
                             <Search className="absolute left-4 top-3.5 w-4 h-4 text-slate-500"/>
-                            <input 
-                                type="text" 
-                                placeholder="Buscar artigos..." 
-                                value={searchTerm}
-                                onChange={e => setSearchTerm(e.target.value)}
-                                className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-amber-500/50 focus:bg-white/10 text-sm text-white transition-all placeholder:text-slate-500 focus:ring-1 focus:ring-amber-500/50"
-                            />
+                            <input type="text" placeholder="Buscar artigos..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-amber-500/50 focus:bg-white/10 text-sm text-white transition-all placeholder:text-slate-500 focus:ring-1 focus:ring-amber-500/50"/>
                         </div>
                         <div className="flex gap-2 overflow-x-auto max-w-full pb-2 md:pb-0 scrollbar-hide">
-                            <button 
-                                onClick={() => setActiveTag(null)}
-                                className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all border ${!activeTag ? 'bg-amber-500 text-black border-amber-500 shadow-lg shadow-amber-500/20' : 'bg-transparent border-white/10 text-slate-400 hover:border-white/30 hover:text-white'}`}
-                            >
-                                Todos
-                            </button>
+                            <button onClick={() => setActiveTag(null)} className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all border ${!activeTag ? 'bg-amber-500 text-black border-amber-500 shadow-lg shadow-amber-500/20' : 'bg-transparent border-white/10 text-slate-400 hover:border-white/30 hover:text-white'}`}>Todos</button>
                             {allTags.map(tag => (
-                                <button 
-                                    key={tag}
-                                    onClick={() => setActiveTag(tag)}
-                                    className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all border ${activeTag === tag ? 'bg-amber-500 text-black border-amber-500 shadow-lg shadow-amber-500/20' : 'bg-transparent border-white/10 text-slate-400 hover:border-white/30 hover:text-white'}`}
-                                >
-                                    {tag}
-                                </button>
+                                <button key={tag} onClick={() => setActiveTag(tag)} className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all border ${activeTag === tag ? 'bg-amber-500 text-black border-amber-500 shadow-lg shadow-amber-500/20' : 'bg-transparent border-white/10 text-slate-400 hover:border-white/30 hover:text-white'}`}>{tag}</button>
                             ))}
                         </div>
                     </div>
                 </div>
 
-                {/* Grid */}
                 {loading ? (
                     <div className="flex justify-center py-40"><Loader2 className="w-10 h-10 animate-spin text-amber-500 opacity-50"/></div>
                 ) : filteredPosts.length === 0 ? (
@@ -277,11 +271,7 @@ export const BlogScreen: React.FC<Props> = ({ onBack, onEnter }) => {
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                         {filteredPosts.map(post => (
-                            <div 
-                                key={post.id}
-                                onClick={() => setSelectedPost(post)}
-                                className="group bg-[#0A0A0A] border border-white/10 rounded-3xl overflow-hidden hover:border-amber-500/30 transition-all duration-500 cursor-pointer flex flex-col h-full hover:-translate-y-2 hover:shadow-2xl hover:shadow-amber-500/10 relative"
-                            >
+                            <div key={post.id} onClick={() => handleSelectPost(post)} className="group bg-[#0A0A0A] border border-white/10 rounded-3xl overflow-hidden hover:border-amber-500/30 transition-all duration-500 cursor-pointer flex flex-col h-full hover:-translate-y-2 hover:shadow-2xl hover:shadow-amber-500/10 relative">
                                 <div className="h-56 overflow-hidden relative bg-white/5">
                                     {post.cover_image && (
                                         <>
@@ -290,9 +280,7 @@ export const BlogScreen: React.FC<Props> = ({ onBack, onEnter }) => {
                                         </>
                                     )}
                                     {post.download_url && (
-                                        <div className="absolute top-4 right-4 bg-amber-500 text-black text-[10px] font-bold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1 z-20 border border-amber-400 shadow-amber-500/50">
-                                            <Download className="w-3 h-3"/> Material Rico
-                                        </div>
+                                        <div className="absolute top-4 right-4 bg-amber-500 text-black text-[10px] font-bold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1 z-20 border border-amber-400 shadow-amber-500/50"><Download className="w-3 h-3"/> Material Rico</div>
                                     )}
                                 </div>
                                 <div className="p-6 flex-1 flex flex-col relative bg-[#0A0A0A] group-hover:bg-white/5 transition-colors">
@@ -301,9 +289,7 @@ export const BlogScreen: React.FC<Props> = ({ onBack, onEnter }) => {
                                             <span key={tag} className="text-[10px] font-bold uppercase tracking-widest text-amber-500 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20">{tag}</span>
                                         ))}
                                     </div>
-                                    <h3 className="text-xl font-bold text-white mb-3 line-clamp-2 leading-tight group-hover:text-amber-400 transition-colors">
-                                        {post.title}
-                                    </h3>
+                                    <h3 className="text-xl font-bold text-white mb-3 line-clamp-2 leading-tight group-hover:text-amber-400 transition-colors">{post.title}</h3>
                                     <div className="mt-auto pt-6 flex items-center justify-between text-slate-500 text-xs font-bold border-t border-white/5 group-hover:border-white/10 transition-colors">
                                         <span className="flex items-center gap-2"><Calendar className="w-3 h-3"/> {new Date(post.created_at).toLocaleDateString()}</span>
                                         <span className="group-hover:text-amber-500 transition-colors flex items-center gap-1 text-slate-400">Ler Artigo <ChevronRight className="w-3 h-3"/></span>

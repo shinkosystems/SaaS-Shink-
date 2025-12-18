@@ -89,7 +89,6 @@ const App: React.FC = () => {
 
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
-  // 'showCreate' deprecated in favor of routing
   const [editingOpportunity, setEditingOpportunity] = useState<Opportunity | null>(null);
 
   const [showCreateTask, setShowCreateTask] = useState(false);
@@ -98,12 +97,13 @@ const App: React.FC = () => {
   
   // Public Routes
   const [showBlog, setShowBlog] = useState(false);
+  const [blogPostId, setBlogPostId] = useState<string | null>(null);
 
   // New State for Feedback Modal
   const [showFeedback, setShowFeedback] = useState(false);
 
   const [selectedProject, setSelectedProjectState] = useState<Opportunity | null>(null);
-  const [isSharedMode, setIsSharedMode] = useState(false); // Controls focused view
+  const [isSharedMode, setIsSharedMode] = useState(false); 
   const [theme, setTheme] = useState<'light'|'dark'>('dark');
 
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
@@ -128,14 +128,11 @@ const App: React.FC = () => {
   });
   const [dbStatus, setDbStatus] = useState<'connected'|'disconnected'>('connected');
 
-  // --- ROUTING LOGIC ---
-
   // Helper to change URL without reloading
   const navigateTo = (path: string) => {
       try {
           window.history.pushState({}, '', path);
       } catch (e) {
-          // Ignore routing errors in restricted environments (e.g. sandboxes, blobs)
           console.warn("Routing state update blocked by environment:", e);
       }
   };
@@ -143,7 +140,7 @@ const App: React.FC = () => {
   // 1. Handle Navigation (Change View)
   const setView = (newView: string) => {
       setViewState(newView);
-      setSelectedProjectState(null); // Close project if navigating away
+      setSelectedProjectState(null); 
       setEditingOpportunity(null);
       const path = ROUTES[newView] || '/';
       navigateTo(path);
@@ -158,7 +155,6 @@ const App: React.FC = () => {
   // 3. Handle Back from Project
   const closeProject = () => {
       setSelectedProjectState(null);
-      // Return to the URL of the current view (dashboard usually)
       setView('dashboard');
   };
 
@@ -174,15 +170,20 @@ const App: React.FC = () => {
       const handleRouting = async () => {
           let path = window.location.pathname;
           
-          // Fallback for blob URLs or empty paths
           if (!path || path.startsWith('blob:')) {
               path = '/';
           }
 
-          // Blog Route
-          if (path === '/blog') {
+          // Blog Route with Deep Link
+          if (path.startsWith('/blog')) {
+              const parts = path.split('/');
+              const id = parts[2];
               setShowBlog(true);
+              setBlogPostId(id || null);
               return;
+          } else {
+              setShowBlog(false);
+              setBlogPostId(null);
           }
 
           // Create Project Route
@@ -197,7 +198,7 @@ const App: React.FC = () => {
           if (path.startsWith('/project/')) {
               const parts = path.split('/');
               const projectId = parts[2];
-              const subAction = parts[3]; // e.g., 'edit'
+              const subAction = parts[3]; 
 
               if (projectId) {
                   const opp = await fetchOpportunityById(projectId);
@@ -208,10 +209,9 @@ const App: React.FC = () => {
                           setSelectedProjectState(null);
                       } else {
                           setSelectedProjectState(opp);
-                          setViewState('project-view'); // Internal view state for ProjectWorkspace
+                          setViewState('project-view'); 
                       }
                   } else {
-                      // Project not found, redirect to dashboard
                       setView('dashboard');
                   }
               }
@@ -225,19 +225,15 @@ const App: React.FC = () => {
               setSelectedProjectState(null);
               setEditingOpportunity(null);
           } else {
-              // Default/Unknown -> Dashboard
               if (path !== '/' && !path.includes('type=recovery')) {
-                  // If unknown path, redirect to root
                   navigateTo('/'); 
               }
               setViewState('dashboard');
           }
       };
 
-      // Handle initial load
       handleRouting();
 
-      // Handle Browser Back/Forward
       const onPopState = () => {
           handleRouting();
       };
@@ -246,10 +242,9 @@ const App: React.FC = () => {
       return () => window.removeEventListener('popstate', onPopState);
   }, []); 
 
-  // Check URL for White Label, Password Reset or Blog (Legacy Checks + New Routing)
+  // Check URL for White Label or Password Recovery
   useEffect(() => {
       const hash = window.location.hash;
-      
       if (hash && hash.includes('type=recovery')) {
           setShowResetPassword(true);
       }
@@ -269,14 +264,6 @@ const App: React.FC = () => {
           });
       }
   }, []);
-
-  // Sync Plan from Org State
-  useEffect(() => {
-      if (orgPlanId !== null) {
-          const planString = mapDbPlanIdToString(orgPlanId);
-          setCurrentPlan(planString);
-      }
-  }, [orgPlanId]);
 
   // Auth & Session
   useEffect(() => {
@@ -301,35 +288,20 @@ const App: React.FC = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Determine Plan & Org
   const loadUserData = async (userId: string) => {
       setLoading(true);
       try {
           const { data, error } = await supabase.from('users').select('*').eq('id', userId).single();
-          
           if (data) {
-              setUserData({
-                  name: data.nome,
-                  email: data.email,
-                  avatar: data.avatar_url,
-              });
+              setUserData({ name: data.nome, email: data.email, avatar: data.avatar_url });
               setUserRole(data.perfil || 'colaborador');
               setUserOrgId(data.organizacao);
-              
               if (data.organizacao) {
                   await loadOrganization(data.organizacao);
                   loadOpportunities(data.organizacao);
               }
-
-              // Analytics & Presence
               trackUserAccess(userId);
               const unsubPresence = subscribeToPresence(userId, (ids) => setOnlineUsers(ids));
-              
-              if (orgPlanId === null) {
-                  const plan = await getCurrentUserPlan(userId);
-                  setCurrentPlan(plan);
-              }
-
               return () => { unsubPresence(); };
           }
       } catch (e) {
@@ -345,28 +317,14 @@ const App: React.FC = () => {
       if (data) {
           const planId = data.plano || 4;
           setOrgPlanId(planId);
-          
-          const planString = mapDbPlanIdToString(planId);
-          setCurrentPlan(planString);
-
+          setCurrentPlan(mapDbPlanIdToString(planId));
           setOrgDetails({
-              name: data.nome,
-              limit: data.colaboradores,
-              logoUrl: data.logo,
-              primaryColor: data.cor || '#F59E0B',
-              aiSector: data.setor || '',
-              aiTone: data.tomdevoz || '',
-              aiContext: data.dna || '',
-              isWhitelabelActive: false 
+              name: data.nome, limit: data.colaboradores, logoUrl: data.logo, primaryColor: data.cor || '#F59E0B',
+              aiSector: data.setor || '', aiTone: data.tomdevoz || '', aiContext: data.dna || '', isWhitelabelActive: false 
           });
-
           const modules = await fetchActiveOrgModules(orgId);
-          if (modules.length > 0) {
-              setActiveModules(modules);
-          } else {
-              const defaultModules = getPlanDefaultModules(planId);
-              setActiveModules(defaultModules);
-          }
+          if (modules.length > 0) setActiveModules(modules);
+          else setActiveModules(getPlanDefaultModules(planId));
       }
   };
 
@@ -389,63 +347,35 @@ const App: React.FC = () => {
       });
   };
 
-  useEffect(() => {
-      if (theme === 'dark') document.documentElement.classList.add('dark');
-  }, []);
+  useEffect(() => { if (theme === 'dark') document.documentElement.classList.add('dark'); }, []);
 
   const handleCreateTask = async (task: BpmnTask, projectId: string | null) => {
       if (!userOrgId || !user) return;
-      
       await createTask({
           projeto: projectId ? Number(projectId) : null,
-          titulo: task.text,
-          descricao: task.description,
-          status: task.status,
-          responsavel: task.assigneeId || user.id,
-          gravidade: task.gut?.g,
-          urgencia: task.gut?.u,
-          tendencia: task.gut?.t,
-          datainicio: task.startDate,
-          datafim: task.dueDate,
-          duracaohoras: task.estimatedHours,
-          organizacao: userOrgId,
-          sutarefa: false
+          titulo: task.text, descricao: task.description, status: task.status,
+          responsavel: task.assigneeId || user.id, gravidade: task.gut?.g, urgencia: task.gut?.u, tendencia: task.gut?.t,
+          datainicio: task.startDate, datafim: task.dueDate, duracaohoras: task.estimatedHours,
+          organizacao: userOrgId, sutarefa: false
       });
-      
       alert("Tarefa criada com sucesso!");
       loadOpportunities(userOrgId);
   };
 
-  const handleUpdateOrgDetails = async (updates: { logoFile?: File, color?: string, name?: string, limit?: number, aiSector?: string, aiTone?: string, aiContext?: string, modulos?: string[] }) => {
+  const handleUpdateOrgDetails = async (updates: any) => {
       if (!userOrgId) return;
       try {
-          let logoUrl = undefined;
-          if (updates.logoFile) {
-              logoUrl = await uploadLogo(userOrgId, updates.logoFile);
-          }
-          
-          await updateOrgDetails(userOrgId, {
-              logoUrl,
-              primaryColor: updates.color,
-              name: updates.name,
-              limit: updates.limit,
-              aiSector: updates.aiSector,
-              aiTone: updates.aiTone,
-              aiContext: updates.aiContext
-          });
-          
+          let logoUrl = updates.logoFile ? await uploadLogo(userOrgId, updates.logoFile) : undefined;
+          await updateOrgDetails(userOrgId, { ...updates, logoUrl });
           loadOrganization(userOrgId);
           alert('Configurações atualizadas!');
-      } catch (e: any) {
-          alert('Erro ao atualizar: ' + e.message);
-      }
+      } catch (e: any) { alert('Erro ao atualizar: ' + e.message); }
   };
 
   const handleRefreshModules = async () => {
       if (userOrgId) {
           const modules = await fetchActiveOrgModules(userOrgId);
           if (modules.length > 0) setActiveModules(modules);
-          else setActiveModules(['projects']);
       }
   };
 
@@ -456,22 +386,15 @@ const App: React.FC = () => {
       else if (actionId === 'nav_matrix') setView('dashboard');
       else if (actionId === 'create_project') setView('create-project');
       else if (actionId === 'create_task') setShowCreateTask(true);
-      else {
-          console.warn("Action ID not handled:", actionId);
-      }
   };
 
   // --- WHITELABEL LOGIC ---
   const shouldUseWhitelabel = activeModules.includes('whitelabel') || activeModules.includes('whitelable') || orgDetails.isWhitelabelActive;
-  
   const appBrandName = shouldUseWhitelabel && orgDetails.name ? orgDetails.name : 'Shinkō OS';
   const appLogoUrl = shouldUseWhitelabel ? orgDetails.logoUrl : null;
   const appPrimaryColor = shouldUseWhitelabel ? orgDetails.primaryColor : '#F59E0B';
 
-  useEffect(() => {
-      document.title = appBrandName;
-  }, [appBrandName]);
-
+  useEffect(() => { document.title = appBrandName; }, [appBrandName]);
   useEffect(() => {
       const root = document.documentElement;
       const hexToRgb = (hex: string) => {
@@ -484,7 +407,6 @@ const App: React.FC = () => {
       }
   }, [appPrimaryColor]);
 
-  // --- SEARCH FILTER ---
   const filteredOpportunities = useMemo(() => {
       if (!searchTerm) return opportunities;
       const lower = searchTerm.toLowerCase();
@@ -499,6 +421,7 @@ const App: React.FC = () => {
       if (showBlog) {
           return (
               <BlogScreen 
+                initialPostId={blogPostId}
                 onBack={() => {
                     setShowBlog(false);
                     navigateTo('/');
@@ -542,76 +465,39 @@ const App: React.FC = () => {
   // LOGGED IN USER
   return (
     <div className={`flex h-screen w-full bg-slate-100 dark:bg-black text-slate-900 dark:text-slate-100 transition-colors duration-300 ${theme}`}>
-        
-        {/* Hide Sidebar for Full Page Views only for Wizard */}
         {!isSharedMode && view !== 'create-project' && view !== 'edit-project' && (
-            <div className={''}>
-                <Sidebar 
-                    currentView={view} 
-                    onChangeView={setView} 
-                    onOpenCreate={() => setView('create-project')}
-                    onOpenCreateTask={() => setShowCreateTask(true)}
-                    onToggleTheme={toggleTheme}
-                    onLogout={handleLogout}
-                    onSearch={(q) => setSearchTerm(q)}
-                    onOpenFeedback={() => setShowFeedback(true)}
-                    theme={theme}
-                    dbStatus={dbStatus}
-                    isMobileOpen={isMobileOpen}
-                    setIsMobileOpen={setIsMobileOpen}
-                    userRole={userRole}
-                    userData={userData || { name: 'Carregando...', avatar: null }}
-                    currentPlan={currentPlan}
-                    customLogoUrl={appLogoUrl}
-                    orgName={appBrandName}
-                    activeModules={activeModules}
-                />
-            </div>
+            <Sidebar 
+                currentView={view} onChangeView={setView} 
+                onOpenCreate={() => setView('create-project')} onOpenCreateTask={() => setShowCreateTask(true)}
+                onToggleTheme={toggleTheme} onLogout={handleLogout} onSearch={(q) => setSearchTerm(q)}
+                onOpenFeedback={() => setShowFeedback(true)} theme={theme} dbStatus={dbStatus}
+                isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} userRole={userRole}
+                userData={userData || { name: 'Carregando...', avatar: null }} currentPlan={currentPlan}
+                customLogoUrl={appLogoUrl} orgName={appBrandName} activeModules={activeModules}
+            />
         )}
         
-        {/* Mobile Drawer (Only if not in focused mode) */}
         {!isSharedMode && view !== 'create-project' && view !== 'edit-project' && (
             <MobileDrawer 
-                currentView={view} 
-                onChangeView={setView} 
-                onOpenCreate={() => setView('create-project')}
-                onOpenCreateTask={() => setShowCreateTask(true)}
-                onToggleTheme={toggleTheme}
-                onLogout={handleLogout}
-                onSearch={(q) => setSearchTerm(q)}
-                onOpenFeedback={() => setShowFeedback(true)}
-                theme={theme}
-                dbStatus={dbStatus}
-                isMobileOpen={isMobileOpen}
-                setIsMobileOpen={setIsMobileOpen}
-                userRole={userRole}
-                userData={userData || { name: 'Carregando...', avatar: null }}
-                currentPlan={currentPlan}
-                customLogoUrl={appLogoUrl}
-                orgName={appBrandName}
-                activeModules={activeModules}
+                currentView={view} onChangeView={setView} onOpenCreate={() => setView('create-project')}
+                onOpenCreateTask={() => setShowCreateTask(true)} onToggleTheme={toggleTheme} onLogout={handleLogout}
+                onSearch={(q) => setSearchTerm(q)} onOpenFeedback={() => setShowFeedback(true)} theme={theme}
+                dbStatus={dbStatus} isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} userRole={userRole}
+                userData={userData || { name: 'Carregando...', avatar: null }} currentPlan={currentPlan}
+                customLogoUrl={appLogoUrl} orgName={appBrandName} activeModules={activeModules}
             />
         )}
 
         <main className={`flex-1 overflow-hidden relative ${!isSharedMode ? 'pt-16 xl:pt-0' : ''}`}>
             <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500"></div></div>}>
-                
-                {/* 1. PROJECT VIEW (Workspace) */}
                 {selectedProject ? (
                     <ProjectWorkspace 
-                        opportunity={selectedProject} 
-                        onBack={closeProject}
+                        opportunity={selectedProject} onBack={closeProject}
                         onUpdate={(opp) => updateOpportunity(opp).then(() => loadOpportunities(userOrgId!))}
-                        onEdit={onEditProject}
-                        onDelete={(id) => deleteOpportunity(id).then(() => { closeProject(); loadOpportunities(userOrgId!); })}
-                        userRole={userRole}
-                        currentPlan={currentPlan}
-                        isSharedMode={isSharedMode}
-                        activeModules={activeModules}
+                        onEdit={onEditProject} onDelete={(id) => deleteOpportunity(id).then(() => { closeProject(); loadOpportunities(userOrgId!); })}
+                        userRole={userRole} currentPlan={currentPlan} isSharedMode={isSharedMode} activeModules={activeModules}
                     />
                 ) : 
-                
-                /* 2. CREATE/EDIT PROJECT (Wizard as Full Page) */
                 (view === 'create-project' || view === 'edit-project') ? (
                     <OpportunityWizard 
                         initialData={editingOpportunity || undefined}
@@ -619,12 +505,10 @@ const App: React.FC = () => {
                             if (editingOpportunity) {
                                 await updateOpportunity(opp);
                                 if(userOrgId) loadOpportunities(userOrgId);
-                                // Return to project view
                                 onOpenProject(opp);
                             } else {
                                 const newOpp = await createOpportunity({ ...opp, organizationId: userOrgId });
                                 if(userOrgId) loadOpportunities(userOrgId);
-                                // Open new project
                                 if(newOpp) onOpenProject(newOpp);
                                 else setView('dashboard');
                             }
@@ -633,34 +517,20 @@ const App: React.FC = () => {
                             if (editingOpportunity) onOpenProject(editingOpportunity);
                             else setView('dashboard');
                         }}
-                        orgType={orgDetails.name}
-                        activeModules={activeModules}
+                        orgType={orgDetails.name} activeModules={activeModules}
                     />
                 ) :
-
-                /* 3. MAIN DASHBOARD & LISTS */
                 (
                     <>
                         {view === 'dashboard' && (
                             <div className="h-full p-4 md:p-8 overflow-y-auto custom-scrollbar">
                                 <Dashboard 
                                     opportunities={filteredOpportunities} 
-                                    onNavigate={(status) => {
-                                        if (status === 'Active' || status === 'Negotiation' || status === 'Future') {
-                                            setView('kanban'); 
-                                        }
-                                    }}
-                                    onOpenProject={onOpenProject}
-                                    user={{ user_metadata: { full_name: userData?.name } }} 
-                                    theme={theme}
-                                    userRole={userRole}
-                                    organizationId={userOrgId || undefined}
-                                    appBrandName={appBrandName}
-                                    whitelabel={shouldUseWhitelabel}
-                                    onActivateWhitelabel={() => {
-                                        setSettingsStartTab('modules');
-                                        setView('settings');
-                                    }}
+                                    onNavigate={(status) => { if (status === 'Active' || status === 'Negotiation' || status === 'Future') setView('kanban'); }}
+                                    onOpenProject={onOpenProject} user={{ user_metadata: { full_name: userData?.name } }} 
+                                    theme={theme} userRole={userRole} organizationId={userOrgId || undefined}
+                                    appBrandName={appBrandName} whitelabel={shouldUseWhitelabel}
+                                    onActivateWhitelabel={() => { setSettingsStartTab('modules'); setView('settings'); }}
                                     activeModules={activeModules}
                                 />
                             </div>
@@ -668,49 +538,25 @@ const App: React.FC = () => {
                         {view === 'list' && activeModules.includes('projects') && (
                             <div className="h-full p-4 md:p-8 overflow-y-auto custom-scrollbar">
                                 <ProjectList 
-                                    opportunities={filteredOpportunities} 
-                                    onOpenProject={onOpenProject}
-                                    userRole={userRole}
-                                    organizationId={userOrgId || undefined}
-                                    activeModules={activeModules}
-                                    onOpenCreate={() => setView('create-project')}
+                                    opportunities={filteredOpportunities} onOpenProject={onOpenProject}
+                                    userRole={userRole} organizationId={userOrgId || undefined}
+                                    activeModules={activeModules} onOpenCreate={() => setView('create-project')}
                                 />
                             </div>
                         )}
                         {view === 'kanban' && activeModules.includes('kanban') && (
                             <div className="h-full p-4 md:p-8 overflow-hidden">
-                                <KanbanBoard 
-                                    onSelectOpportunity={onOpenProject} 
-                                    userRole={userRole}
-                                    organizationId={userOrgId || undefined}
-                                    currentPlan={currentPlan}
-                                    activeModules={activeModules}
-                                    projectId={undefined}
-                                />
+                                <KanbanBoard onSelectOpportunity={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} currentPlan={currentPlan} activeModules={activeModules} projectId={undefined} />
                             </div>
                         )}
                         {view === 'gantt' && activeModules.includes('gantt') && (
                             <div className="h-full p-4 md:p-8 overflow-hidden">
-                                <GanttView 
-                                    opportunities={filteredOpportunities} 
-                                    onSelectOpportunity={onOpenProject} 
-                                    onTaskUpdate={() => {}} 
-                                    userRole={userRole}
-                                    organizationId={userOrgId || undefined}
-                                    customPrimaryColor={appPrimaryColor}
-                                />
+                                <GanttView opportunities={filteredOpportunities} onSelectOpportunity={onOpenProject} onTaskUpdate={() => {}} userRole={userRole} organizationId={userOrgId || undefined} customPrimaryColor={appPrimaryColor} />
                             </div>
                         )}
                         {view === 'calendar' && activeModules.includes('calendar') && (
                             <div className="h-full p-4 md:p-8 overflow-hidden">
-                                <CalendarView 
-                                    opportunities={filteredOpportunities} 
-                                    onSelectOpportunity={onOpenProject} 
-                                    onTaskUpdate={() => {}} 
-                                    userRole={userRole}
-                                    organizationId={userOrgId || undefined}
-                                    activeModules={activeModules}
-                                />
+                                <CalendarView opportunities={filteredOpportunities} onSelectOpportunity={onOpenProject} onTaskUpdate={() => {}} userRole={userRole} organizationId={userOrgId || undefined} activeModules={activeModules} />
                             </div>
                         )}
                         {view === 'crm' && activeModules.includes('crm') && (
@@ -725,12 +571,7 @@ const App: React.FC = () => {
                         )}
                         {view === 'clients' && activeModules.includes('clients') && (
                             <div className="h-full p-4 md:p-8 overflow-hidden">
-                                <ClientsScreen 
-                                    userRole={userRole} 
-                                    onlineUsers={onlineUsers} 
-                                    organizationId={userOrgId || undefined} 
-                                    onOpenProject={onOpenProject} 
-                                />
+                                <ClientsScreen userRole={userRole} onlineUsers={onlineUsers} organizationId={userOrgId || undefined} onOpenProject={onOpenProject} />
                             </div>
                         )}
                         {view === 'product' && activeModules.includes('product') && (
@@ -745,19 +586,10 @@ const App: React.FC = () => {
                         )}
                         {view === 'settings' && (
                             <SettingsScreen 
-                                theme={theme} 
-                                onToggleTheme={toggleTheme} 
-                                onlineUsers={onlineUsers}
-                                userOrgId={userOrgId}
-                                orgDetails={orgDetails}
-                                onUpdateOrgDetails={handleUpdateOrgDetails}
-                                setView={setView}
-                                userRole={userRole}
-                                userData={userData}
-                                currentPlan={currentPlan}
-                                activeModules={activeModules}
-                                onRefreshModules={handleRefreshModules}
-                                initialTab={settingsStartTab}
+                                theme={theme} onToggleTheme={toggleTheme} onlineUsers={onlineUsers} userOrgId={userOrgId}
+                                orgDetails={orgDetails} onUpdateOrgDetails={handleUpdateOrgDetails} setView={setView}
+                                userRole={userRole} userData={userData} currentPlan={currentPlan} activeModules={activeModules}
+                                onRefreshModules={handleRefreshModules} initialTab={settingsStartTab}
                             />
                         )}
                         {view === 'profile' && (
@@ -777,31 +609,14 @@ const App: React.FC = () => {
 
         {showCreateTask && (
             <QuickTaskModal 
-                opportunities={opportunities} 
-                onClose={() => setShowCreateTask(false)}
-                onSave={handleCreateTask}
-                userRole={userRole}
+                opportunities={opportunities} onClose={() => setShowCreateTask(false)}
+                onSave={handleCreateTask} userRole={userRole}
             />
         )}
 
-        {showFeedback && user && (
-            <FeedbackModal 
-                userId={user.id} 
-                onClose={() => setShowFeedback(false)} 
-            />
-        )}
-
-        {user && userRole !== 'cliente' && !isSharedMode && activeModules.includes('ia') && (
-            <GuruFab 
-                opportunities={opportunities} 
-                user={user} 
-                organizationId={userOrgId || undefined} 
-                onAction={handleGuruAction}
-            />
-        )}
-
+        {showFeedback && user && <FeedbackModal userId={user.id} onClose={() => setShowFeedback(false)} />}
+        {user && userRole !== 'cliente' && !isSharedMode && activeModules.includes('ia') && <GuruFab opportunities={opportunities} user={user} organizationId={userOrgId || undefined} onAction={handleGuruAction} />}
         {showOnboarding && <OnboardingGuide run={showOnboarding} onFinish={() => setShowOnboarding(false)} />}
-        
         {user && <NpsSurvey userId={user.id} userRole={userRole} />}
     </div>
   );
