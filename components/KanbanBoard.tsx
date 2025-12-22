@@ -220,8 +220,8 @@ export const KanbanBoard: React.FC<Props> = ({ organizationId, projectId }) => {
                         className="w-full pl-9 pr-8 py-2 bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-xl text-xs font-bold outline-none appearance-none cursor-pointer"
                     >
                         <option value="0">Qualquer GUT</option>
-                        <option value="27">GUT > 27</option>
-                        <option value="60">GUT > 60</option>
+                        <option value="27">GUT &gt; 27</option>
+                        <option value="60">GUT &gt; 60</option>
                     </select>
                 </div>
 
