@@ -35,6 +35,7 @@ import { NpsSurvey } from './components/NpsSurvey';
 import { GuruFab } from './components/GuruFab';
 import { FeedbackModal } from './components/FeedbackModal';
 import { CrmBoard } from './components/CrmBoard';
+import { AssetsScreen } from './components/AssetsScreen';
 
 // --- ROUTING CONFIGURATION ---
 const ROUTES: Record<string, string> = {
@@ -42,6 +43,7 @@ const ROUTES: Record<string, string> = {
     'list': '/projects',
     'create-project': '/project/new',
     'kanban': '/kanban',
+    'assets': '/assets',
     'gantt': '/gantt',
     'calendar': '/calendar',
     'crm': '/crm',
@@ -136,6 +138,7 @@ const App: React.FC = () => {
 
   const onEditProject = (opp: Opportunity) => {
       setEditingOpportunity(opp);
+      setSelectedProjectState(null); // CRÍTICO: Limpa o projeto selecionado para permitir a renderização do Wizard
       setViewState('edit-project');
       navigateTo(`/project/${opp.id}/edit`);
   };
@@ -420,7 +423,7 @@ const App: React.FC = () => {
                 onToggleTheme={toggleTheme} onLogout={handleLogout} onSearch={(q) => setSearchTerm(q)}
                 onOpenFeedback={() => setShowFeedback(true)} theme={theme} dbStatus={dbStatus}
                 isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} userRole={userRole}
-                userData={userData || { name: 'Carregando...', avatar: null }} currentPlan={currentPlan}
+                userData={userData || { name: 'Carregando...', avatar: null, email: '' }} currentPlan={currentPlan}
                 customLogoUrl={appLogoUrl} orgName={appBrandName} activeModules={activeModules}
             />
         )}
@@ -430,7 +433,7 @@ const App: React.FC = () => {
                 onOpenCreateTask={() => setShowCreateTask(true)} onToggleTheme={toggleTheme} onLogout={handleLogout}
                 onSearch={(q) => setSearchTerm(q)} onOpenFeedback={() => setShowFeedback(true)} theme={theme}
                 dbStatus={dbStatus} isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} userRole={userRole}
-                userData={userData || { name: 'Carregando...', avatar: null }} currentPlan={currentPlan}
+                userData={userData || { name: 'Carregando...', avatar: null, email: '' }} currentPlan={currentPlan}
                 customLogoUrl={appLogoUrl} orgName={appBrandName} activeModules={activeModules}
             />
         )}
@@ -494,6 +497,11 @@ const App: React.FC = () => {
                         {view === 'kanban' && activeModules.includes('kanban') && (
                             <div className="h-full p-4 md:p-8 overflow-hidden">
                                 <KanbanBoard onSelectOpportunity={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} currentPlan={currentPlan} activeModules={activeModules} projectId={undefined} />
+                            </div>
+                        )}
+                        {view === 'assets' && userData?.email === 'peboorba@gmail.com' && (
+                            <div className="h-full overflow-y-auto custom-scrollbar">
+                                <AssetsScreen organizationId={userOrgId || undefined} />
                             </div>
                         )}
                         {view === 'gantt' && activeModules.includes('gantt') && (

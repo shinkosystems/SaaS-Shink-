@@ -4,7 +4,7 @@ import {
     LayoutDashboard, List, Calendar, User, Settings, 
     PlusCircle, LogOut, Sun, Moon, Briefcase, TrendingUp,
     Users, DollarSign, Shield, Sparkles, Lightbulb, Menu, X, ChevronRight,
-    Code2, BarChart3, Plus
+    Code2, BarChart3, Plus, Box, Activity
 } from 'lucide-react';
 
 interface Props {
@@ -42,6 +42,7 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, activeModules: string
             items: [
                 ...(hasModule('projects') ? [{ id: 'list', label: 'Projetos', icon: List }] : []),
                 ...(hasModule('kanban') ? [{ id: 'kanban', label: 'Tarefas', icon: Briefcase }] : []),
+                ...(userEmail === 'peboorba@gmail.com' ? [{ id: 'assets', label: 'Performance', icon: Activity }] : []),
                 ...(hasModule('calendar') ? [{ id: 'calendar', label: 'Cronograma', icon: Calendar }] : []),
             ]
         }
@@ -169,7 +170,6 @@ export const MobileDrawer: React.FC<Props> = (props) => {
 
     return (
         <>
-            {/* Header Mobile Fixo com Safe Area Padding */}
             <div className="fixed top-0 left-0 right-0 h-16 lg:hidden z-[100] glass-panel border-b border-slate-200 dark:border-white/5 flex items-center px-4 justify-between" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
                 <div className="flex items-center gap-3">
                     <button 

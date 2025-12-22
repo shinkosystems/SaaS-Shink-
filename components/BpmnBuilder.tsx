@@ -30,6 +30,7 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
     }, [opportunity.bpmn]);
 
     const handleTaskClick = (task: BpmnTask, node: BpmnNode) => {
+        // Enriquecer task com metadados do DB se existirem
         setEditingTask({
             task,
             nodeId: node.id,
@@ -108,14 +109,30 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
         setNodes(newNodes);
         
         if (updatedTask.dbId) {
-            await updateTask(updatedTask.dbId, {
+            const now = new Date().toISOString();
+            const updatePayload: any = {
                 titulo: updatedTask.text,
                 descricao: updatedTask.description,
                 status: updatedTask.status,
                 responsavel: updatedTask.assigneeId,
                 duracaohoras: updatedTask.estimatedHours,
                 datafim: updatedTask.dueDate
-            });
+            };
+
+            // Se mudou status, injeta timestamp
+            if (updatedTask.status !== editingTask.task.status) {
+                const dateFields: Record<string, string> = {
+                    todo: 'dataafazer',
+                    doing: 'datafazendo',
+                    review: 'datarevisao',
+                    approval: 'dataaprovacao',
+                    done: 'dataconclusao'
+                };
+                const field = dateFields[updatedTask.status];
+                if (field) updatePayload[field] = now;
+            }
+
+            await updateTask(updatedTask.dbId, updatePayload);
         }
     };
 

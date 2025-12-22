@@ -81,6 +81,33 @@ export const GanttView: React.FC<Props> = ({
         };
     };
 
+    const handleTaskClick = (task: DbTask) => {
+        setEditingTaskCtx({ 
+            task: { 
+                ...task, 
+                id: task.id.toString(), 
+                dbId: task.id,
+                text: task.titulo, 
+                description: task.descricao,
+                status: task.status as any,
+                gut: { g: task.gravidade || 1, u: task.urgencia || 1, t: task.tendencia || 1 },
+                dueDate: task.datafim,
+                startDate: task.datainicio,
+                estimatedHours: task.duracaohoras,
+                createdAt: task.createdat,
+                lifecycle: {
+                    created: task.createdat,
+                    todo: task.dataafazer,
+                    doing: task.datafazendo,
+                    review: task.datarevisao,
+                    approval: task.dataaprovacao,
+                    done: task.dataconclusao
+                }
+            }, 
+            nodeLabel: task.projetoData?.nome || 'Tarefa' 
+        });
+    };
+
     return (
         <div className="flex flex-col h-full bg-[var(--bg-color)] animate-in fade-in duration-500 overflow-hidden">
             {/* Toolbar */}
@@ -140,7 +167,7 @@ export const GanttView: React.FC<Props> = ({
                                     <div className="w-80 p-5 border-r border-[var(--border-color)] shrink-0 sticky left-0 z-10 bg-[var(--bg-color)] shadow-[5px_0_15px_rgba(0,0,0,0.05)]">
                                         <div className="flex flex-col gap-1">
                                             <span className="text-[8px] font-black text-amber-500 uppercase tracking-widest">{task.projetoData?.nome || 'AD-HOC'}</span>
-                                            <span className="text-xs font-bold text-[var(--text-main)] truncate group-hover:text-amber-500 transition-colors cursor-pointer" onClick={() => setEditingTaskCtx({ task: { ...task, id: task.id.toString(), status: task.status as any }, nodeLabel: 'Tarefa' })}>{task.titulo}</span>
+                                            <span className="text-xs font-bold text-[var(--text-main)] truncate group-hover:text-amber-500 transition-colors cursor-pointer" onClick={() => handleTaskClick(task)}>{task.titulo}</span>
                                             <div className="flex items-center gap-2 mt-1">
                                                 <div className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden border border-white/10">
                                                     {task.responsavelData?.avatar_url && <img src={task.responsavelData.avatar_url} className="w-full h-full object-cover"/>}
@@ -161,7 +188,7 @@ export const GanttView: React.FC<Props> = ({
                                             <div 
                                                 className={`absolute top-1/2 -translate-y-1/2 h-8 rounded-full z-10 shadow-lg border border-white/20 flex items-center px-4 cursor-pointer transition-transform hover:scale-[1.02] active:scale-95 ${style.className}`}
                                                 style={{ left: style.left, width: style.width }}
-                                                onClick={() => setEditingTaskCtx({ task: { ...task, id: task.id.toString(), status: task.status as any }, nodeLabel: 'Tarefa' })}
+                                                onClick={() => handleTaskClick(task)}
                                             >
                                                 <span className="text-[8px] font-black text-white uppercase tracking-tighter truncate">{task.titulo}</span>
                                             </div>
@@ -182,7 +209,29 @@ export const GanttView: React.FC<Props> = ({
                     organizationId={organizationId}
                     onClose={() => setEditingTaskCtx(null)}
                     onSave={async (updated) => {
-                        await updateTask(Number(updated.id), { titulo: updated.text, status: updated.status, datafim: updated.dueDate, datainicio: updated.startDate });
+                        const now = new Date().toISOString();
+                        const updatePayload: any = { 
+                            titulo: updated.text, 
+                            descricao: updated.description,
+                            status: updated.status, 
+                            datafim: updated.dueDate, 
+                            datainicio: updated.startDate 
+                        };
+                        
+                        // Sincronizar timestamps se o status mudou
+                        if (updated.status !== editingTaskCtx.task.status) {
+                            const dateFields: Record<string, string> = {
+                                todo: 'dataafazer',
+                                doing: 'datafazendo',
+                                review: 'datarevisao',
+                                approval: 'dataaprovacao',
+                                done: 'dataconclusao'
+                            };
+                            const field = dateFields[updated.status];
+                            if (field) updatePayload[field] = now;
+                        }
+
+                        await updateTask(Number(updated.id), updatePayload);
                         loadData();
                     }}
                 />

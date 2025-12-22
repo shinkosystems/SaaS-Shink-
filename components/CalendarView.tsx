@@ -169,7 +169,25 @@ export const CalendarView: React.FC<Props> = ({
                                     </div>
                                     <div className="flex-1 space-y-1.5 overflow-y-auto custom-scrollbar">
                                         {dayTasks.map(task => (
-                                            <div key={task.id} onClick={() => setEditingTaskCtx({ task: { ...task, id: task.id.toString(), status: task.status as any, gut: { g: task.gravidade, u: task.urgencia, t: task.tendencia }, subtasks: [] }, nodeLabel: task.projetoData?.nome || 'Tarefa' })} className={`p-2 rounded-xl text-[9px] font-black uppercase tracking-wider border-l-4 truncate cursor-pointer transition-all hover:translate-x-1 ${task.status === 'done' ? 'bg-emerald-500/10 border-emerald-500 text-emerald-600' : 'bg-amber-500/10 border-amber-500 text-amber-600'}`}>
+                                            <div key={task.id} onClick={() => setEditingTaskCtx({ 
+                                                task: { 
+                                                    ...task, 
+                                                    id: task.id.toString(), 
+                                                    status: task.status as any, 
+                                                    createdAt: task.createdat,
+                                                    lifecycle: {
+                                                        created: task.createdat,
+                                                        todo: task.dataafazer,
+                                                        doing: task.datafazendo,
+                                                        review: task.datarevisao,
+                                                        approval: task.dataaprovacao,
+                                                        done: task.dataconclusao
+                                                    },
+                                                    gut: { g: task.gravidade, u: task.urgencia, t: task.tendencia }, 
+                                                    subtasks: [] 
+                                                }, 
+                                                nodeLabel: task.projetoData?.nome || 'Tarefa' 
+                                            })} className={`p-2 rounded-xl text-[9px] font-black uppercase tracking-wider border-l-4 truncate cursor-pointer transition-all hover:translate-x-1 ${task.status === 'done' ? 'bg-emerald-500/10 border-emerald-500 text-emerald-600' : 'bg-amber-500/10 border-amber-500 text-amber-600'}`}>
                                                 {task.titulo}
                                             </div>
                                         ))}
@@ -186,7 +204,23 @@ export const CalendarView: React.FC<Props> = ({
                     task={editingTaskCtx.task} nodeTitle={editingTaskCtx.nodeLabel} opportunityTitle={editingTaskCtx.nodeLabel}
                     organizationId={organizationId} onClose={() => setEditingTaskCtx(null)}
                     onSave={async (updated) => {
-                        await updateTask(Number(updated.id), { ...updated, status: updated.status });
+                        const now = new Date().toISOString();
+                        const updatePayload: any = { ...updated, status: updated.status };
+                        
+                        // Timestamps update if status changed
+                        if (updated.status !== editingTaskCtx.task.status) {
+                            const dateFields: Record<string, string> = {
+                                todo: 'dataafazer',
+                                doing: 'datafazendo',
+                                review: 'datarevisao',
+                                approval: 'dataaprovacao',
+                                done: 'dataconclusao'
+                            };
+                            const field = dateFields[updated.status];
+                            if (field) updatePayload[field] = now;
+                        }
+
+                        await updateTask(Number(updated.id), updatePayload);
                         loadTasks();
                     }}
                 />
