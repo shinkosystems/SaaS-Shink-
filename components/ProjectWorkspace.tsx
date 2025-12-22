@@ -20,15 +20,16 @@ interface Props {
   activeModules?: string[];
 }
 
-type Tab = 'overview' | 'bpms' | 'kanban' | 'calendar';
+type Tab = 'overview' | 'bpms' | 'kanban' | 'calendar' | 'gantt';
 
 export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdate, onEdit, onDelete, userRole, currentPlan, isSharedMode, activeModules }) => {
   const [activeTab, setActiveTab] = useState<Tab>('overview');
 
   const tabs = [
       { id: 'overview', label: 'Geral', icon: LayoutDashboard, moduleId: 'projects' },
-      { id: 'bpms', label: 'BPMS & Fluxo', icon: Workflow, moduleId: 'projects' }, 
-      { id: 'kanban', label: 'Tarefas', icon: Trello, moduleId: 'kanban' }, 
+      { id: 'bpms', label: 'Fluxo', icon: Workflow, moduleId: 'projects' }, 
+      { id: 'kanban', label: 'Kanban', icon: Trello, moduleId: 'kanban' }, 
+      { id: 'gantt', label: 'Gantt', icon: GanttChartSquare, moduleId: 'gantt' },
       { id: 'calendar', label: 'Agenda', icon: CalendarIcon, moduleId: 'calendar' },
   ].filter(tab => !activeModules || activeModules.includes(tab.moduleId) || tab.moduleId === 'projects'); 
 
@@ -62,7 +63,6 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
           </div>
       </header>
 
-      {/* Navigation Tabs - Icon only on mobile */}
       <div className="px-4 lg:px-8 border-b border-slate-200 dark:border-white/5 bg-white/50 dark:bg-[#0a0a0a]/50 backdrop-blur-xl flex gap-6 lg:gap-10 shrink-0 overflow-x-auto no-scrollbar">
           {tabs.map(tab => (
               <button
@@ -114,6 +114,20 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
                       projectId={opportunity.dbProjectId?.toString() || opportunity.id}
                       organizationId={opportunity.organizationId} 
                       currentPlan={currentPlan}
+                      activeModules={activeModules}
+                  />
+              </div>
+          )}
+
+          {activeTab === 'gantt' && (
+              <div className="h-full p-4 lg:p-8 overflow-hidden">
+                  <GanttView 
+                      opportunities={[opportunity]} 
+                      onSelectOpportunity={() => {}} 
+                      onTaskUpdate={() => {}} 
+                      userRole={userRole}
+                      projectId={opportunity.dbProjectId?.toString() || opportunity.id}
+                      organizationId={opportunity.organizationId}
                       activeModules={activeModules}
                   />
               </div>

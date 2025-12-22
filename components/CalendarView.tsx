@@ -5,7 +5,7 @@ import { fetchAllTasks, updateTask, syncTaskChecklist } from '../services/projec
 import { fetchOrganizationDetails } from '../services/organizationService';
 import { optimizeSchedule } from '../services/geminiService';
 import { TaskDetailModal } from './TaskDetailModal';
-import { ChevronLeft, ChevronRight, RefreshCw, Sparkles, Loader2, CheckCircle2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RefreshCw, Sparkles, Loader2, CheckCircle2, ArrowRight } from 'lucide-react';
 
 interface Props {
   opportunities: Opportunity[];
@@ -115,6 +115,12 @@ export const CalendarView: React.FC<Props> = ({
         return days;
     }, [currentDate, viewMode]);
 
+    // Função utilitária para normalizar datas para comparação (apenas YYYY-MM-DD)
+    const normalizeDate = (d: Date | string) => {
+        const date = new Date(d);
+        return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+    };
+
     return (
         <div className="flex flex-col h-full glass-panel rounded-[2.5rem] overflow-hidden shadow-glass border-slate-200 dark:border-white/10 relative transition-all">
             {isOptimizing && (
@@ -127,7 +133,7 @@ export const CalendarView: React.FC<Props> = ({
             <div className="flex flex-col md:flex-row items-center justify-between p-6 border-b border-slate-200 dark:border-white/5 gap-6">
                 <div className="flex bg-slate-100 dark:bg-white/5 p-1.5 rounded-2xl shadow-inner shrink-0">
                     {['day', 'week', 'month'].map(m => (
-                        <button key={m} onClick={() => setViewMode(m as any)} className={`px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${viewMode === m ? 'bg-white dark:bg-white/10 shadow-sm text-slate-900 dark:text-white' : 'text-slate-400 hover:text-slate-600'}`}>{m === 'day' ? 'Dia' : m === 'week' ? 'Semana' : 'Mês'}</button>
+                        <button key={m} onClick={() => setViewMode(m as any)} className={`px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${viewMode === m ? 'bg-white dark:bg-white/10 shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-600'}`}>{m === 'day' ? 'Dia' : m === 'week' ? 'Semana' : 'Mês'}</button>
                     ))}
                 </div>
 
@@ -157,7 +163,16 @@ export const CalendarView: React.FC<Props> = ({
                         {getDaysInView.map((date, i) => {
                             if (!date) return <div key={i} className="bg-slate-50 dark:bg-black/20 opacity-20"></div>;
                             const isToday = new Date().toDateString() === date.toDateString();
-                            const dayTasks = tasks.filter(t => !t.sutarefa && new Date(t.datafim || t.dataproposta).toDateString() === date.toDateString());
+                            const currentTimestamp = normalizeDate(date);
+
+                            // Lógica de filtro para aparecer em todos os dias que a tarefa está ativa
+                            const dayTasks = tasks.filter(t => {
+                                if (t.sutarefa) return false;
+                                const start = normalizeDate(t.datainicio || t.dataproposta);
+                                const end = normalizeDate(t.datafim || t.dataproposta);
+                                return currentTimestamp >= start && currentTimestamp <= end;
+                            });
+
                             const totalH = dayTasks.reduce((a, t) => a + (t.duracaohoras || 0), 0);
                             const perc = Math.min(100, (totalH / orgCapacity) * 100);
 
@@ -168,43 +183,59 @@ export const CalendarView: React.FC<Props> = ({
                                         {totalH > 0 && <div className="text-right"><span className="text-[8px] font-black text-slate-400 uppercase">{totalH}h / {orgCapacity}h</span><div className="w-10 h-1 bg-slate-100 dark:bg-white/10 rounded-full mt-1 overflow-hidden"><div className={`h-full ${perc > 100 ? 'bg-red-500' : 'bg-amber-500'}`} style={{ width: `${perc}%` }}></div></div></div>}
                                     </div>
                                     <div className="flex-1 space-y-1.5 overflow-y-auto custom-scrollbar">
-                                        {dayTasks.map(task => (
-                                            <div key={task.id} onClick={() => setEditingTaskCtx({ 
-                                                task: { 
-                                                    ...task, 
-                                                    id: task.id.toString(), 
-                                                    dbId: task.id,
-                                                    text: task.titulo,
-                                                    description: task.descricao,
-                                                    status: task.status as any, 
-                                                    dueDate: task.datafim,
-                                                    startDate: task.datainicio,
-                                                    estimatedHours: task.duracaohoras,
-                                                    assigneeId: task.responsavel,
-                                                    createdAt: task.createdat,
-                                                    lifecycle: {
-                                                        created: task.createdat,
-                                                        todo: task.dataafazer,
-                                                        doing: task.datafazendo,
-                                                        review: task.datarevisao,
-                                                        approval: task.dataaprovacao,
-                                                        done: task.dataconclusao
-                                                    },
-                                                    gut: { g: task.gravidade, u: task.urgencia, t: task.tendencia }, 
-                                                    subtasks: tasks
-                                                        .filter(t => (t.tarefamae === task.id || t.tarefa === task.id) && t.sutarefa)
-                                                        .map(t => ({
-                                                            id: t.id.toString(),
-                                                            text: t.titulo,
-                                                            completed: t.status === 'done',
-                                                            dbId: t.id
-                                                        }))
-                                                }, 
-                                                nodeLabel: task.projetoData?.nome || 'Tarefa' 
-                                            })} className={`p-2 rounded-xl text-[9px] font-black uppercase tracking-wider border-l-4 truncate cursor-pointer transition-all hover:translate-x-1 ${task.status === 'done' ? 'bg-emerald-500/10 border-emerald-500 text-emerald-600' : 'bg-amber-500/10 border-amber-500 text-amber-600'}`}>
-                                                {task.titulo}
-                                            </div>
-                                        ))}
+                                        {dayTasks.map(task => {
+                                            const isStart = normalizeDate(task.datainicio || task.dataproposta) === currentTimestamp;
+                                            const isEnd = normalizeDate(task.datafim || task.dataproposta) === currentTimestamp;
+                                            const isDone = task.status === 'done';
+
+                                            return (
+                                                <div 
+                                                    key={task.id} 
+                                                    onClick={() => setEditingTaskCtx({ 
+                                                        task: { 
+                                                            ...task, 
+                                                            id: task.id.toString(), 
+                                                            dbId: task.id,
+                                                            text: task.titulo,
+                                                            description: task.descricao,
+                                                            status: task.status as any, 
+                                                            dueDate: task.datafim,
+                                                            startDate: task.datainicio,
+                                                            estimatedHours: task.duracaohoras,
+                                                            assigneeId: task.responsavel,
+                                                            createdAt: task.createdat,
+                                                            lifecycle: {
+                                                                created: task.createdat,
+                                                                todo: task.dataafazer,
+                                                                doing: task.datafazendo,
+                                                                review: task.datarevisao,
+                                                                approval: task.dataaprovacao,
+                                                                done: task.dataconclusao
+                                                            },
+                                                            gut: { g: task.gravidade, u: task.urgencia, t: task.tendencia }, 
+                                                            subtasks: tasks
+                                                                .filter(t => (t.tarefamae === task.id || t.tarefa === task.id) && t.sutarefa)
+                                                                .map(t => ({
+                                                                    id: t.id.toString(),
+                                                                    text: t.titulo,
+                                                                    completed: t.status === 'done',
+                                                                    dbId: t.id
+                                                                }))
+                                                        }, 
+                                                        nodeLabel: task.projetoData?.nome || 'Tarefa' 
+                                                    })} 
+                                                    className={`p-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider truncate cursor-pointer transition-all hover:scale-105 active:scale-95 border flex items-center gap-1.5 ${
+                                                        isDone 
+                                                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600' 
+                                                        : 'bg-amber-500/10 border-amber-500/20 text-amber-600'
+                                                    } ${isStart ? 'border-l-[3px]' : ''} ${isEnd ? 'border-r-[3px]' : ''}`}
+                                                >
+                                                    {isStart && <div className="w-1 h-1 rounded-full bg-current"></div>}
+                                                    <span className="flex-1 truncate">{task.titulo}</span>
+                                                    {isEnd && <ArrowRight className="w-2 h-2 opacity-60"/>}
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             );
@@ -229,7 +260,6 @@ export const CalendarView: React.FC<Props> = ({
                             datainicio: updated.startDate
                         };
                         
-                        // Timestamps update if status changed
                         if (updated.status !== editingTaskCtx.task.status) {
                             const dateFields: Record<string, string> = {
                                 todo: 'dataafazer',
