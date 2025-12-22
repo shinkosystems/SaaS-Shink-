@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Opportunity, BpmnNode, BpmnTask } from '../types';
 import { TaskDetailModal } from './TaskDetailModal';
 import { 
-    Plus, BrainCircuit, Zap, Loader2, Sparkles, RefreshCw,
+    Plus, BrainCircuit, Zap, LoaderCircle as Loader, Sparkles, RefreshCw,
     ChevronRight, Workflow as WorkflowIcon, Clock
 } from 'lucide-react';
 import { updateTask, deleteTask, syncTaskChecklist, syncBpmnTasks } from '../services/projectService';
@@ -106,14 +106,12 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
             return n;
         });
 
-        // 1. Atualizar Estado Local
+        // 1. Atualizar Estado Local IMEDIATAMENTE para feedback visual
         setNodes(newNodes);
         
         // 2. Persistir no JSON do Projeto (Estrutura visual contendo checklist/subtarefas)
-        await onUpdate({
-            ...opportunity,
-            bpmn: { ...opportunity.bpmn, nodes: newNodes }
-        } as any);
+        const updatedOpp = { ...opportunity, bpmn: { ...opportunity.bpmn, nodes: newNodes } } as any;
+        await onUpdate(updatedOpp);
 
         // 3. Sincronizar com Tabela de Tasks se houver ID de banco
         if (updatedTask.dbId) {
@@ -173,7 +171,7 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
                         disabled={isGenerating || readOnly}
                         className="flex-1 md:flex-none whitespace-nowrap flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shadow-lg disabled:opacity-50"
                     >
-                        {isGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <BrainCircuit className="w-3.5 h-3.5"/>}
+                        {isGenerating ? <Loader className="w-3.5 h-3.5 animate-spin"/> : <BrainCircuit className="w-3.5 h-3.5"/>}
                         <span className="hidden sm:inline">Gerar Fluxo</span>
                         <span className="sm:hidden">IA Flow</span>
                     </button>

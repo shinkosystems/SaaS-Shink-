@@ -129,7 +129,10 @@ export const updateOpportunity = async (opp: Opportunity): Promise<Opportunity |
         
         const { data, error } = await supabase.from(TABLE_NAME).update(updateData).eq('id', opp.id).select().single();
         if (error) return null;
-        return mapDbProjectToOpportunity(data, []); 
+
+        // Buscar tarefas para reidratar o retorno com dados atualizados do banco
+        const { data: tasks } = await supabase.from('tasks').select('*').eq('projeto', opp.id);
+        return mapDbProjectToOpportunity(data, tasks || []); 
     } catch (err) { return null; }
 };
 
@@ -196,7 +199,7 @@ const mapOpportunityToDbProject = (opp: Opportunity): any => {
         cliente: opp.clientId || null,
         rde: opp.rde || 'Morno',
         velocidade: typeof opp.velocity === 'number' ? opp.velocity : 1,
-        viabilidade: typeof opp.viability === 'number' ? opp.viability : 1,
+        viability: typeof opp.viability === 'number' ? opp.viability : 1,
         receita: typeof opp.revenue === 'number' ? opp.revenue : 1,
         prioseis: typeof opp.prioScore === 'number' ? opp.prioScore : 0,
         arquetipo: opp.archetype || 'SaaS',

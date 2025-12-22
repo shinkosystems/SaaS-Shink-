@@ -9,8 +9,8 @@ import { subscribeToPresence } from './services/presenceService';
 import { trackUserAccess } from './services/analyticsService';
 import { getCurrentUserPlan, mapDbPlanIdToString } from './services/asaasService';
 
-// Icons/Components - Definição no topo para evitar erro de hoisting no build
-const Loader2 = ({className}: {className?: string}) => (
+// Componente de carregamento estável definido no topo para evitar erros de build
+const AppLoader = ({className}: {className?: string}) => (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1s linear infinite' }}>
         <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
         <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
@@ -43,6 +43,7 @@ import { NpsSurvey } from './components/NpsSurvey';
 import { GuruFab } from './components/GuruFab';
 import { FeedbackModal } from './components/FeedbackModal';
 import { CrmBoard } from './components/CrmBoard';
+import { AssetsScreen } from './components/AssetsScreen';
 
 // --- ROUTING CONFIGURATION ---
 const ROUTES: Record<string, string> = {
@@ -59,7 +60,8 @@ const ROUTES: Record<string, string> = {
     'dev-metrics': '/metrics/engineering',
     'settings': '/settings',
     'profile': '/profile',
-    'admin-manager': '/admin'
+    'admin-manager': '/admin',
+    'assets': '/performance'
 };
 
 const REVERSE_ROUTES: Record<string, string> = Object.entries(ROUTES).reduce((acc, [key, value]) => {
@@ -76,7 +78,6 @@ const App: React.FC = () => {
   const [currentPlan, setCurrentPlan] = useState<string>('plan_free');
   const [searchTerm, setSearchTerm] = useState('');
   const [view, setViewState] = useState<string>('dashboard');
-  const [settingsStartTab, setSettingsStartTab] = useState<'general' | 'team' | 'ai' | 'modules'>('general');
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeModules, setActiveModules] = useState<string[]>(['projects', 'kanban']); 
@@ -93,8 +94,8 @@ const App: React.FC = () => {
   const [theme, setTheme] = useState<'light'|'dark'>('dark');
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [orgDetails, setOrgDetails] = useState<{ 
-      name: string, limit: number, logoUrl: string | null, primaryColor: string, aiSector: string, aiTone: string, aiContext: string, isWhitelabelActive?: boolean
-  }>({ name: '', limit: 1, logoUrl: null, primaryColor: '#F59E0B', aiSector: '', aiTone: '', aiContext: '', isWhitelabelActive: false });
+      name: string, limit: number, logoUrl: string | null, primaryColor: string, aiSector: string, aiTone: string, aiContext: string
+  }>({ name: '', limit: 1, logoUrl: null, primaryColor: '#F59E0B', aiSector: '', aiTone: '', aiContext: '' });
   const [dbStatus, setDbStatus] = useState<'connected'|'disconnected'>('connected');
 
   const navigateTo = (path: string) => {
@@ -111,13 +112,6 @@ const App: React.FC = () => {
   const onOpenProject = (opp: Opportunity) => {
       setSelectedProjectState(opp);
       navigateTo(`/project/${opp.id}`);
-  };
-
-  const onEditProject = (opp: Opportunity) => {
-      setEditingOpportunity(opp);
-      setSelectedProjectState(null); 
-      setViewState('edit-project');
-      navigateTo(`/project/${opp.id}/edit`);
   };
 
   useEffect(() => {
@@ -191,7 +185,7 @@ const App: React.FC = () => {
           setCurrentPlan(mapDbPlanIdToString(data.plano || 4));
           setOrgDetails({
               name: data.nome, limit: data.colaboradores, logoUrl: data.logo, primaryColor: data.cor || '#F59E0B',
-              aiSector: data.setor || '', aiTone: data.tomdevoz || '', aiContext: data.dna || '', isWhitelabelActive: false 
+              aiSector: data.setor || '', aiTone: data.tomdevoz || '', aiContext: data.dna || ''
           });
           const modules = await fetchActiveOrgModules(orgId);
           if (modules.length > 0) setActiveModules(modules);
@@ -206,11 +200,22 @@ const App: React.FC = () => {
         await updateOrgDetails(userOrgId, { ...updates, logoUrl });
         await loadOrganization(userOrgId);
         alert('Configurações atualizadas!');
-    } catch (e: any) {
-        alert('Erro ao atualizar: ' + e.message);
-    }
+    } catch (e: any) { alert('Erro ao atualizar: ' + e.message); }
   };
 
+  const handleUpdateOpportunity = async (opp: Opportunity) => {
+      const updated = await updateOpportunity(opp);
+      if (updated) {
+          setSelectedProjectState(updated);
+          const opps = await fetchOpportunities(userOrgId!);
+          if (opps) setOpportunities(opps);
+      }
+  };
+
+  /**
+   * handleCreateTask (Fix for line 303 error)
+   * Processa a criação de tarefas vinda do QuickTaskModal
+   */
   const handleCreateTask = async (task: BpmnTask, projectId: string | null) => {
     if (!userOrgId || !user) return;
     await createTask({
@@ -229,25 +234,22 @@ const App: React.FC = () => {
         sutarefa: false
     });
     alert("Tarefa criada com sucesso!");
-    const opps = await fetchOpportunities(userOrgId);
-    if (opps) setOpportunities(opps);
+    if (userOrgId) {
+        const opps = await fetchOpportunities(userOrgId);
+        if (opps) setOpportunities(opps);
+    }
   };
 
-  const handleUpdateOpportunity = async (opp: Opportunity) => {
-      const updated = await updateOpportunity(opp);
-      if (updated) {
-          setSelectedProjectState(updated);
-          const opps = await fetchOpportunities(userOrgId!);
-          if (opps) setOpportunities(opps);
-      }
-  };
-
+  /**
+   * handleGuruAction (Fix for line 305 error)
+   * Processa comandos acionados pela IA do Shinkō Guru
+   */
   const handleGuruAction = (actionId: string) => {
     if (actionId === 'nav_kanban') setView('kanban');
     else if (actionId === 'nav_calendar') setView('calendar');
     else if (actionId === 'nav_financial') setView('financial');
     else if (actionId === 'nav_matrix') setView('dashboard');
-    else if (actionId === 'create_project') setView('create-project');
+    else if (actionId === 'create_project') setViewState('create-project');
     else if (actionId === 'create_task') setShowCreateTask(true);
   };
 
@@ -271,7 +273,7 @@ const App: React.FC = () => {
       if (showBlog) return <BlogScreen initialPostSlug={blogPostSlug} onBack={() => { setShowBlog(false); setView('dashboard'); }} onEnter={() => setShowAuth(true)} />;
       return (
           <>
-            <LandingPage onEnter={() => setShowAuth(true)} onOpenBlog={() => { setShowBlog(true); navigateTo('/blog'); }} customName={activeModules.includes('whitelabel') ? orgDetails.name : undefined} />
+            <LandingPage onEnter={() => setShowAuth(true)} onOpenBlog={() => { setShowBlog(false); navigateTo('/blog'); }} customName={activeModules.includes('whitelabel') ? orgDetails.name : undefined} />
             {showAuth && <AuthScreen onClose={() => setShowAuth(false)} onGuestLogin={() => setShowOnboarding(true)} customOrgName={orgDetails.name} />}
           </>
       );
@@ -304,13 +306,13 @@ const App: React.FC = () => {
         )}
 
         <main className={`flex-1 overflow-hidden relative ${!isWizardMode ? 'pt-20 lg:pt-0' : ''}`}>
-            <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="w-12 h-12 text-amber-500"/></div>}>
+            <Suspense fallback={<div className="flex items-center justify-center h-full"><AppLoader className="w-12 h-12 text-amber-500"/></div>}>
                 {selectedProject ? (
                     <ProjectWorkspace 
-                        opportunity={selectedProject} onBack={() => { setSelectedProjectState(null); setView('dashboard'); }}
+                        opportunity={selectedProject} onBack={() => setSelectedProjectState(null)}
                         onUpdate={handleUpdateOpportunity}
-                        onEdit={onEditProject} 
-                        onDelete={(id) => deleteOpportunity(id).then(() => { setSelectedProjectState(null); setView('dashboard'); })}
+                        onEdit={(opp) => { setEditingOpportunity(opp); setViewState('edit-project'); }} 
+                        onDelete={(id) => deleteOpportunity(id).then(() => setSelectedProjectState(null))}
                         userRole={userRole} currentPlan={currentPlan} activeModules={activeModules}
                     />
                 ) : isWizardMode ? (
@@ -334,7 +336,8 @@ const App: React.FC = () => {
                         {view === 'clients' && activeModules.includes('clients') && <div className="h-full p-4 md:p-8 overflow-hidden"><ClientsScreen organizationId={userOrgId || undefined} onOpenProject={onOpenProject} /></div>}
                         {view === 'product' && activeModules.includes('product') && <div className="h-full p-4 md:p-8 overflow-hidden"><ProductIndicators /></div>}
                         {view === 'dev-metrics' && activeModules.includes('engineering') && <div className="h-full p-4 md:p-8 overflow-hidden"><DevIndicators organizationId={userOrgId || undefined} /></div>}
-                        {view === 'settings' && <div className="h-full overflow-y-auto"><SettingsScreen theme={theme} onToggleTheme={toggleTheme} onlineUsers={onlineUsers} userOrgId={userOrgId} orgDetails={orgDetails} onUpdateOrgDetails={handleUpdateOrgDetails} setView={setView} userRole={userRole} userData={userData} activeModules={activeModules} onRefreshModules={() => loadOrganization(userOrgId!)} initialTab={settingsStartTab} /></div>}
+                        {view === 'assets' && userData?.email === 'peboorba@gmail.com' && <div className="h-full p-4 md:p-8 overflow-y-auto"><AssetsScreen organizationId={userOrgId || undefined} /></div>}
+                        {view === 'settings' && <div className="h-full overflow-y-auto"><SettingsScreen theme={theme} onToggleTheme={toggleTheme} onlineUsers={onlineUsers} userOrgId={userOrgId} orgDetails={orgDetails} onUpdateOrgDetails={handleUpdateOrgDetails} setView={setView} userRole={userRole} userData={userData} activeModules={activeModules} onRefreshModules={() => loadOrganization(userOrgId!)} /></div>}
                         {view === 'profile' && <div className="h-full p-4 md:p-8 overflow-y-auto"><ProfileScreen currentPlan={currentPlan} onRefresh={() => loadUserData(user.id)} /></div>}
                         {view === 'admin-manager' && userData?.email === 'peboorba@gmail.com' && <div className="h-full p-4 md:p-8 overflow-y-auto"><AdminManagerScreen onlineUsers={onlineUsers}/></div>}
                     </>
