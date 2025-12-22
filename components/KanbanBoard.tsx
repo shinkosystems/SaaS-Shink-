@@ -220,8 +220,8 @@ export const KanbanBoard: React.FC<Props> = ({ organizationId, projectId }) => {
                         className="w-full pl-9 pr-8 py-2 bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-xl text-xs font-bold outline-none appearance-none cursor-pointer"
                     >
                         <option value="0">Qualquer GUT</option>
-                        <option value="27">GUT &gt; 27</option>
-                        <option value="60">GUT &gt; 60</option>
+                        <option value="27">{"GUT > 27"}</option>
+                        <option value="60">{"GUT > 60"}</option>
                     </select>
                 </div>
 
@@ -278,7 +278,7 @@ export const KanbanBoard: React.FC<Props> = ({ organizationId, projectId }) => {
                                             <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-white/5">
                                                 <div className="flex items-center gap-2">
                                                     <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-white/10 flex items-center justify-center text-[9px] font-black text-slate-500 dark:text-white overflow-hidden shadow-sm">
-                                                        {task.responsavelData?.avatar_url ? <img src={task.responsavelData.avatar_url} className="w-full h-full object-cover"/> : task.responsavelData?.nome?.charAt(0)}
+                                                        {task.responsavelData?.avatar_url ? <img src={task.responsavelData.avatar_url} className="w-full h-full object-cover" alt="avatar"/> : task.responsavelData?.nome?.charAt(0)}
                                                     </div>
                                                     <span className="text-[9px] font-bold text-slate-400 uppercase hidden sm:inline">{task.responsavelData?.nome?.split(' ')[0]}</span>
                                                 </div>
