@@ -173,7 +173,14 @@ export const CalendarView: React.FC<Props> = ({
                                                 task: { 
                                                     ...task, 
                                                     id: task.id.toString(), 
+                                                    dbId: task.id,
+                                                    text: task.titulo,
+                                                    description: task.descricao,
                                                     status: task.status as any, 
+                                                    dueDate: task.datafim,
+                                                    startDate: task.datainicio,
+                                                    estimatedHours: task.duracaohoras,
+                                                    assigneeId: task.responsavel,
                                                     createdAt: task.createdat,
                                                     lifecycle: {
                                                         created: task.createdat,
@@ -205,7 +212,15 @@ export const CalendarView: React.FC<Props> = ({
                     organizationId={organizationId} onClose={() => setEditingTaskCtx(null)}
                     onSave={async (updated) => {
                         const now = new Date().toISOString();
-                        const updatePayload: any = { ...updated, status: updated.status };
+                        const updatePayload: any = { 
+                            titulo: updated.text, 
+                            descricao: updated.description, 
+                            status: updated.status,
+                            responsavel: updated.assigneeId,
+                            duracaohoras: updated.estimatedHours,
+                            datafim: updated.dueDate,
+                            datainicio: updated.startDate
+                        };
                         
                         // Timestamps update if status changed
                         if (updated.status !== editingTaskCtx.task.status) {

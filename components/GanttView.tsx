@@ -94,6 +94,7 @@ export const GanttView: React.FC<Props> = ({
                 dueDate: task.datafim,
                 startDate: task.datainicio,
                 estimatedHours: task.duracaohoras,
+                assigneeId: task.responsavel,
                 createdAt: task.createdat,
                 lifecycle: {
                     created: task.createdat,
@@ -213,7 +214,9 @@ export const GanttView: React.FC<Props> = ({
                         const updatePayload: any = { 
                             titulo: updated.text, 
                             descricao: updated.description,
-                            status: updated.status, 
+                            status: updated.status,
+                            responsavel: updated.assigneeId,
+                            duracaohoras: updated.estimatedHours,
                             datafim: updated.dueDate, 
                             datainicio: updated.startDate 
                         };
