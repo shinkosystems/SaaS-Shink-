@@ -487,6 +487,7 @@ const App: React.FC = () => {
                                     opportunities={filteredOpportunities} onOpenProject={onOpenProject}
                                     userRole={userRole} organizationId={userOrgId || undefined}
                                     activeModules={activeModules} onOpenCreate={() => setViewState('create-project')}
+                                    onRefresh={() => userOrgId && loadOpportunities(userOrgId)}
                                 />
                             </div>
                         )}

@@ -26,10 +26,22 @@ export const ProjectList: React.FC<Props> = ({ opportunities, onOpenProject, use
   });
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
+      e.preventDefault();
       e.stopPropagation();
+      
       if (confirm("Deseja realmente excluir este ativo? Esta ação é irreversível e apagará todas as tarefas vinculadas.")) {
-          const success = await deleteOpportunity(id);
-          if (success && onRefresh) onRefresh();
+          try {
+              const success = await deleteOpportunity(id);
+              if (success) {
+                  if (onRefresh) onRefresh();
+                  else window.location.reload(); // Fallback if no refresh function
+              } else {
+                  alert("Erro ao excluir projeto. Verifique suas permissões.");
+              }
+          } catch (err) {
+              console.error("Delete Project Error:", err);
+              alert("Falha na comunicação com o banco.");
+          }
       }
   };
 
@@ -83,8 +95,10 @@ export const ProjectList: React.FC<Props> = ({ opportunities, onOpenProject, use
                 >
                     {userRole !== 'cliente' && (
                         <button 
+                            type="button"
                             onClick={(e) => handleDelete(e, opp.id)}
-                            className="absolute top-6 right-6 p-3 bg-red-500/10 text-red-500 rounded-2xl opacity-0 group-hover:opacity-100 hover:bg-red-500 hover:text-white transition-all duration-300 z-10"
+                            className="absolute top-6 right-6 p-3 bg-red-500/10 text-red-500 rounded-2xl md:opacity-0 md:group-hover:opacity-100 hover:bg-red-500 hover:text-white transition-all duration-300 z-10"
+                            title="Excluir Ativo"
                         >
                             <Trash2 className="w-4 h-4"/>
                         </button>
