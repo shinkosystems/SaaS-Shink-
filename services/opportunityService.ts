@@ -61,33 +61,19 @@ export const createOpportunity = async (opp: Opportunity): Promise<Opportunity |
         const { data: { user } } = await supabase.auth.getUser();
         let targetOrgId = opp.organizationId;
 
-        // Force fallback if orgId is missing
         if (!targetOrgId && user) {
             const { data: u } = await supabase.from('users').select('organizacao').eq('id', user.id).single();
             targetOrgId = u?.organizacao;
         }
 
-        if (!targetOrgId) {
-            console.error("CRITICAL: Organization ID missing for createOpportunity. Cannot save.");
-            return null;
-        }
+        if (!targetOrgId) return null;
 
-        // Prepare Payload with Fallbacks - ensuring no undefined fields
         const dbPayload = mapOpportunityToDbProject({ ...opp, organizationId: targetOrgId });
-        
-        // Remove ID to allow DB to auto-generate
         delete dbPayload.id; 
         
-        console.log("Inserindo Projeto (Payload):", dbPayload);
-
         const { data: projectData, error } = await supabase.from(TABLE_NAME).insert(dbPayload).select().single();
+        if (error) return null;
 
-        if (error) {
-            console.error('Supabase Insert Error (createOpportunity):', error.message, error.details, error.hint);
-            return null;
-        }
-
-        // Tasks Insertion Logic
         if (opp.bpmn?.nodes) {
             const defaultAssignee = user?.id;
             for (const node of opp.bpmn.nodes) {
@@ -131,7 +117,6 @@ export const createOpportunity = async (opp: Opportunity): Promise<Opportunity |
         
         return mapDbProjectToOpportunity(projectData, []);
     } catch (err: any) {
-        console.error('Create Opportunity Exception:', err.message);
         return null;
     }
 };
@@ -140,7 +125,7 @@ export const updateOpportunity = async (opp: Opportunity): Promise<Opportunity |
     if (!supabase) return null;
     try {
         const dbPayload = mapOpportunityToDbProject(opp);
-        const { id, ...updateData } = dbPayload; // Exclude ID from update payload body
+        const { id, ...updateData } = dbPayload;
         
         const { data, error } = await supabase.from(TABLE_NAME).update(updateData).eq('id', opp.id).select().single();
         if (error) return null;
@@ -154,29 +139,18 @@ export const deleteOpportunity = async (id: string): Promise<boolean> => {
     if (isNaN(numericId)) return false;
 
     try {
-        // 1. Fetch all tasks for project
         const { data: tasks } = await supabase.from('tasks').select('id').eq('projeto', numericId);
-        
         if (tasks && tasks.length > 0) {
             const taskIds = tasks.map((t: any) => t.id);
-            
-            // 2. Delete comments for these tasks
             await supabase.from('comentarios').delete().in('task', taskIds);
-            
-            // 3. Delete tasks
             await supabase.from('tasks').delete().eq('projeto', numericId);
         }
-
-        // 4. Delete Project
         const { error } = await supabase.from(TABLE_NAME).delete().eq('id', numericId);
         return !error;
     } catch (err) { 
-        console.error("Critical error deleting opportunity:", err);
         return false; 
     }
 };
-
-// --- MAPPERS ---
 
 const mapDbProjectToOpportunity = (row: DbProject, tasks: DbTask[] = []): Opportunity => {
     const tads: TadsCriteria = {
@@ -187,9 +161,8 @@ const mapDbProjectToOpportunity = (row: DbProject, tasks: DbTask[] = []): Opport
         mvpSpeed: row.tadsvelocidade
     };
 
-    // Simplified Bpmn Construction for brevity
-    const nodes: BpmnNode[] = (row.bpmn_structure as any)?.nodes || [];
-    // ... (Full hydration logic preserved from original file logic)
+    // Preservar TODA a estrutura BPMN vinda do banco, não apenas os nodes vazios
+    const bpmnStructure = row.bpmn_structure || { lanes: [], nodes: [], edges: [] };
 
     return {
         id: row.id.toString(),
@@ -209,7 +182,7 @@ const mapDbProjectToOpportunity = (row: DbProject, tasks: DbTask[] = []): Opport
         evidence: { clientsAsk: [], clientsSuffer: [], wontPay: [] },
         status: row.projoport ? 'Future' : 'Active',
         createdAt: row.created_at,
-        bpmn: { lanes: [], nodes: nodes, edges: [] } as any,
+        bpmn: bpmnStructure,
         dbProjectId: row.id,
         docsContext: row.contexto_ia || '',
         color: row.cor || '#3b82f6'
@@ -218,12 +191,11 @@ const mapDbProjectToOpportunity = (row: DbProject, tasks: DbTask[] = []): Opport
 
 const mapOpportunityToDbProject = (opp: Opportunity): any => {
     return {
-        // ID is NOT included for inserts, but is for updates logic handled above
         nome: opp.title || 'Sem Título',
         descricao: opp.description || '',
         cliente: opp.clientId || null,
-        rde: opp.rde || 'Morno', // STRICT DEFAULT
-        velocidade: typeof opp.velocity === 'number' ? opp.velocity : 1, // STRICT TYPE CHECK
+        rde: opp.rde || 'Morno',
+        velocidade: typeof opp.velocity === 'number' ? opp.velocity : 1,
         viabilidade: typeof opp.viability === 'number' ? opp.viability : 1,
         receita: typeof opp.revenue === 'number' ? opp.revenue : 1,
         prioseis: typeof opp.prioScore === 'number' ? opp.prioScore : 0,

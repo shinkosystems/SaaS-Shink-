@@ -9,7 +9,14 @@ import { subscribeToPresence } from './services/presenceService';
 import { trackUserAccess } from './services/analyticsService';
 import { getCurrentUserPlan, mapDbPlanIdToString } from './services/asaasService';
 
-// Components
+// Icons/Components
+const Loader2 = ({className}: {className?: string}) => (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1s linear infinite' }}>
+        <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+        <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+    </svg>
+);
+
 import { Sidebar, MobileDrawer } from './components/Navigation';
 import { Dashboard } from './components/Dashboard';
 import { ProjectList } from './components/ProjectList';
@@ -230,7 +237,7 @@ const App: React.FC = () => {
   const handleUpdateOpportunity = async (opp: Opportunity) => {
       const updated = await updateOpportunity(opp);
       if (updated) {
-          setSelectedProjectState(updated); // CRUCIAL: Atualizar o estado local com os dados salvos (checklist incluído)
+          setSelectedProjectState(updated);
           const opps = await fetchOpportunities(userOrgId!);
           if (opps) setOpportunities(opps);
       }
@@ -298,7 +305,7 @@ const App: React.FC = () => {
         )}
 
         <main className={`flex-1 overflow-hidden relative ${!isWizardMode ? 'pt-20 lg:pt-0' : ''}`}>
-            <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="animate-spin w-12 h-12 text-amber-500"/></div>}>
+            <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="w-12 h-12 text-amber-500"/></div>}>
                 {selectedProject ? (
                     <ProjectWorkspace 
                         opportunity={selectedProject} onBack={() => { setSelectedProjectState(null); setView('dashboard'); }}
@@ -343,7 +350,5 @@ const App: React.FC = () => {
     </div>
   );
 };
-
-const Loader2 = ({className}: {className?: string}) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>;
 
 export default App;

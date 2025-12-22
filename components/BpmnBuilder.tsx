@@ -13,7 +13,7 @@ import { fetchRoles } from '../services/organizationService';
 
 interface Props {
   opportunity: Opportunity;
-  onUpdate: (opp: Opportunity) => void;
+  onUpdate: (opp: Opportunity) => Promise<void> | void;
   readOnly?: boolean;
 }
 
@@ -64,7 +64,7 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
                 }));
                 
                 setNodes(newNodes);
-                onUpdate({
+                await onUpdate({
                     ...opportunity,
                     bpmn: { ...opportunity.bpmn, nodes: newNodes, lanes: result.lanes || [], edges: result.edges || [] }
                 } as any);
@@ -82,7 +82,7 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
         try {
             const updatedNodes = await syncBpmnTasks(opportunity.dbProjectId, opportunity.organizationId, nodes);
             setNodes(updatedNodes);
-            onUpdate({ 
+            await onUpdate({ 
                 ...opportunity, 
                 bpmn: { ...opportunity.bpmn, nodes: updatedNodes } 
             } as any);
@@ -110,7 +110,7 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
         // 1. Atualizar Estado Local
         setNodes(newNodes);
         
-        // 2. Persistir no JSON do Projeto (Estrutura visual)
+        // 2. Persistir no JSON do Projeto (Estrutura visual contendo checklist/subtarefas)
         await onUpdate({
             ...opportunity,
             bpmn: { ...opportunity.bpmn, nodes: newNodes }
@@ -262,7 +262,7 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
                         if (editingTask.task.dbId) await deleteTask(editingTask.task.dbId);
                         const newNodes = nodes.map(n => ({ ...n, checklist: n.checklist.filter(t => t.id !== id) }));
                         setNodes(newNodes);
-                        onUpdate({ ...opportunity, bpmn: { ...opportunity.bpmn, nodes: newNodes } } as any);
+                        await onUpdate({ ...opportunity, bpmn: { ...opportunity.bpmn, nodes: newNodes } } as any);
                         setEditingTask(null);
                     }}
                 />
