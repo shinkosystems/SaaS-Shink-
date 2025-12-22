@@ -49,10 +49,19 @@ export const SettingsScreen: React.FC<Props> = ({
   const [members, setMembers] = useState<any[]>([]);
   const [newRoleName, setNewRoleName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
   
   // Create Org State
-  const [creatingOrg, setCreatingOrg] = useState(false);
   const [newOrgData, setNewOrgData] = useState({ name: '', sector: '', dna: '' });
+
+  // Organization Local Edit State (Loaded from props)
+  const [editOrg, setEditOrg] = useState({
+      name: orgDetails?.name || '',
+      sector: orgDetails?.aiSector || '',
+      primaryColor: orgDetails?.primaryColor || '#F59E0B',
+      logoFile: null as File | null,
+      logoPreview: orgDetails?.logoUrl || null
+  });
 
   // AI Config Local State
   const [aiConfig, setAiConfig] = useState({
@@ -68,6 +77,17 @@ export const SettingsScreen: React.FC<Props> = ({
         loadTeamData();
     }
   }, [userOrgId]);
+
+  // Sync edit state when orgDetails change
+  useEffect(() => {
+    setEditOrg(prev => ({
+        ...prev,
+        name: orgDetails?.name || '',
+        sector: orgDetails?.aiSector || '',
+        primaryColor: orgDetails?.primaryColor || '#F59E0B',
+        logoPreview: orgDetails?.logoUrl || null
+    }));
+  }, [orgDetails]);
 
   const loadTeamData = async () => {
     if (!userOrgId) return;
@@ -90,12 +110,33 @@ export const SettingsScreen: React.FC<Props> = ({
           if (!user) throw new Error("Sessão não identificada.");
           
           await createOrganization(user.id, newOrgData.name, newOrgData.sector, newOrgData.dna);
-          alert("Organização criada com sucesso! O sistema será reiniciado.");
+          alert("Organização criada com sucesso!");
           window.location.reload();
       } catch (e: any) {
           alert(e.message);
       } finally {
           setIsSaving(false);
+      }
+  };
+
+  const handleSaveOrgProfile = async () => {
+      setIsSaving(true);
+      try {
+          await onUpdateOrgDetails({
+              name: editOrg.name,
+              aiSector: editOrg.sector,
+              primaryColor: editOrg.primaryColor,
+              logoFile: editOrg.logoFile
+          });
+      } finally {
+          setIsSaving(false);
+      }
+  };
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+          setEditOrg({ ...editOrg, logoFile: file, logoPreview: URL.createObjectURL(file) });
       }
   };
 
@@ -240,6 +281,126 @@ export const SettingsScreen: React.FC<Props> = ({
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto custom-scrollbar pb-20">
             
+            {/* TAB: GENERAL */}
+            {activeTab === 'general' && (
+                <div className="max-w-4xl space-y-16 animate-in slide-in-from-left-4">
+                    
+                    {/* User Theme Config */}
+                    <div className="space-y-6">
+                        <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.4em] flex items-center gap-2">
+                            <Monitor className="w-4 h-4" /> Experiência de Uso
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl">
+                            <button onClick={onToggleTheme} className={`p-8 rounded-[2.5rem] border transition-all flex flex-col items-center gap-4 ${theme === 'light' ? 'bg-white border-amber-500/50 shadow-xl text-amber-600' : 'bg-white/5 border-white/5 text-slate-500'}`}>
+                                <Sun className="w-8 h-8"/> <span className="text-[10px] font-black uppercase tracking-widest">Modo Claro</span>
+                            </button>
+                            <button onClick={onToggleTheme} className={`p-8 rounded-[2.5rem] border transition-all flex flex-col items-center gap-4 ${theme === 'dark' ? 'bg-slate-900 border-amber-500/30 text-white shadow-glow-amber' : 'bg-black/10 border-white/5 text-slate-500'}`}>
+                                <Moon className="w-8 h-8"/> <span className="text-[10px] font-black uppercase tracking-widest">Modo Escuro</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Organization Management (ONLY FOR OWNERS) */}
+                    {isAdmin && (
+                        <div className="space-y-10 animate-in fade-in duration-1000">
+                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.4em] flex items-center gap-2">
+                                <Building className="w-4 h-4 text-amber-500" /> Perfil da Organização
+                            </h3>
+                            
+                            <div className="glass-panel p-10 rounded-[2.5rem] border-slate-200 dark:border-white/5 space-y-10 relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full -mr-16 -mt-16 blur-3xl"></div>
+                                
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                                    <div className="space-y-6">
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Identificação da Marca</label>
+                                            <div className="flex items-center gap-6">
+                                                <div 
+                                                    onClick={() => logoInputRef.current?.click()}
+                                                    className="w-24 h-24 rounded-[1.8rem] bg-slate-100 dark:bg-black/40 border-2 border-dashed border-slate-200 dark:border-white/10 flex flex-col items-center justify-center cursor-pointer hover:border-amber-500/50 hover:bg-amber-500/5 transition-all group overflow-hidden shadow-inner"
+                                                >
+                                                    {editOrg.logoPreview ? (
+                                                        <img src={editOrg.logoPreview} className="w-full h-full object-contain p-2" />
+                                                    ) : (
+                                                        <>
+                                                            <UploadCloud className="w-6 h-6 text-slate-400 group-hover:text-amber-500 mb-1" />
+                                                            <span className="text-[8px] font-black text-slate-500 uppercase">Logo</span>
+                                                        </>
+                                                    )}
+                                                </div>
+                                                <input type="file" ref={logoInputRef} hidden accept="image/*" onChange={handleLogoChange} />
+                                                
+                                                <div className="flex-1 space-y-3">
+                                                    <div>
+                                                        <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Cor Primária</label>
+                                                        <div className="flex items-center gap-3 bg-white/50 dark:bg-black/20 p-2.5 rounded-xl border border-slate-200 dark:border-white/5 shadow-inner">
+                                                            <input 
+                                                                type="color" 
+                                                                value={editOrg.primaryColor}
+                                                                onChange={e => setEditOrg({...editOrg, primaryColor: e.target.value})}
+                                                                className="w-10 h-10 rounded-lg cursor-pointer bg-transparent border-none"
+                                                            />
+                                                            <span className="text-xs font-mono font-bold text-slate-600 dark:text-slate-400">{editOrg.primaryColor.toUpperCase()}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Nome Comercial</label>
+                                            <input 
+                                                value={editOrg.name}
+                                                onChange={e => setEditOrg({...editOrg, name: e.target.value})}
+                                                className="w-full glass-panel p-4 rounded-xl text-sm font-bold text-slate-900 dark:text-white outline-none focus:border-amber-500/50 shadow-inner"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-6">
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Nicho de Atuação</label>
+                                            <select 
+                                                value={editOrg.sector}
+                                                onChange={e => setEditOrg({...editOrg, sector: e.target.value})}
+                                                className="w-full glass-panel p-4 rounded-xl text-sm font-bold text-slate-900 dark:text-white outline-none cursor-pointer shadow-inner"
+                                            >
+                                                <option value="SaaS / Software">SaaS / Software House</option>
+                                                <option value="Arquitetura & Design">Arquitetura & Design</option>
+                                                <option value="Marketing & Growth">Marketing & Growth</option>
+                                                <option value="Consultoria Técnica">Consultoria Técnica</option>
+                                                <option value="E-commerce / Retail">E-commerce / Retail</option>
+                                                <option value="Outros">Outros</option>
+                                            </select>
+                                        </div>
+
+                                        <div className="p-6 bg-amber-500/5 rounded-[2rem] border border-amber-500/10 space-y-3">
+                                            <div className="flex items-center gap-2 text-[10px] font-black text-amber-500 uppercase tracking-widest">
+                                                <Sparkles className="w-3.5 h-3.5" /> Automação e White Label
+                                            </div>
+                                            <p className="text-[10px] text-slate-500 font-bold leading-relaxed">
+                                                Estas configurações afetam como o sistema apresenta sua marca para colaboradores e clientes em portais externos.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-end pt-6 border-t border-slate-200 dark:border-white/5">
+                                    <button 
+                                        onClick={handleSaveOrgProfile}
+                                        disabled={isSaving}
+                                        className="px-12 py-4 bg-slate-900 dark:bg-white text-white dark:text-black rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-3 disabled:opacity-50"
+                                    >
+                                        {isSaving ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4"/>}
+                                        Sincronizar Organização
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* TAB: MARKETPLACE */}
             {activeTab === 'modules' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-4 duration-500">
@@ -276,23 +437,6 @@ export const SettingsScreen: React.FC<Props> = ({
                             </div>
                         );
                     })}
-                </div>
-            )}
-
-            {/* TAB: GENERAL */}
-            {activeTab === 'general' && (
-                <div className="max-w-2xl space-y-12 animate-in slide-in-from-left-4">
-                    <div className="space-y-6">
-                        <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.4em]">Experiência de Uso</h3>
-                        <div className="grid grid-cols-2 gap-6">
-                            <button onClick={onToggleTheme} className={`p-8 rounded-[2.5rem] border transition-all flex flex-col items-center gap-4 ${theme === 'light' ? 'bg-white border-amber-500/50 shadow-xl text-amber-600' : 'bg-white/5 border-white/5 text-slate-500'}`}>
-                                <Sun className="w-8 h-8"/> <span className="text-[10px] font-black uppercase tracking-widest">Modo Claro</span>
-                            </button>
-                            <button onClick={onToggleTheme} className={`p-8 rounded-[2.5rem] border transition-all flex flex-col items-center gap-4 ${theme === 'dark' ? 'bg-slate-900 border-amber-500/30 text-white shadow-glow-amber' : 'bg-black/10 border-white/5 text-slate-500'}`}>
-                                <Moon className="w-8 h-8"/> <span className="text-[10px] font-black uppercase tracking-widest">Modo Escuro</span>
-                            </button>
-                        </div>
-                    </div>
                 </div>
             )}
 
