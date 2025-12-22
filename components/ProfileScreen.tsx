@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Save, Camera, CreditCard, Loader2, Building2, Clock, History, LogOut, ArrowRight, Zap } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { uploadAvatar } from '../services/organizationService';
 
 const DEFAULT_AVATAR = "https://zjssfnbcboibqeoubeou.supabase.co/storage/v1/object/public/fotoperfil/fotoperfil/1.png";
 
@@ -12,6 +13,7 @@ interface Props {
 
 export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
   const [loading, setLoading] = useState(true);
+  const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [avatarUrl, setAvatarUrl] = useState(DEFAULT_AVATAR);
@@ -51,8 +53,22 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
-      // Upload logic (simplified for UI focus)
-      alert("Upload simulado. Funcionalidade completa no backend.");
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      setIsUpdatingAvatar(true);
+      try {
+          const newUrl = await uploadAvatar(user.id, file);
+          setAvatarUrl(newUrl);
+          onRefresh(); // Sincroniza foto na sidebar etc
+          alert("Foto de perfil atualizada com sucesso!");
+      } catch (err: any) {
+          alert(`Erro no upload: ${err.message}`);
+      } finally {
+          setIsUpdatingAvatar(false);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+      }
   };
 
   const getPlanDetails = (users: number) => {
@@ -88,14 +104,20 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
             </div>
 
             <div className="flex items-center gap-6">
-                <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                    <div className="w-24 h-24 rounded-full bg-slate-100 dark:bg-white/10 overflow-hidden ring-4 ring-white dark:ring-black">
-                        <img src={avatarUrl} className="w-full h-full object-cover"/>
+                <div className="relative group cursor-pointer" onClick={() => !isUpdatingAvatar && fileInputRef.current?.click()}>
+                    <div className="w-24 h-24 rounded-full bg-slate-100 dark:bg-white/10 overflow-hidden ring-4 ring-white dark:ring-black flex items-center justify-center">
+                        {isUpdatingAvatar ? (
+                            <Loader2 className="w-8 h-8 animate-spin text-amber-500"/>
+                        ) : (
+                            <img src={avatarUrl} className="w-full h-full object-cover"/>
+                        )}
                     </div>
-                    <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Camera className="w-6 h-6 text-white"/>
-                    </div>
-                    <input type="file" ref={fileInputRef} className="hidden" onChange={handleAvatarUpload}/>
+                    {!isUpdatingAvatar && (
+                        <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Camera className="w-6 h-6 text-white"/>
+                        </div>
+                    )}
+                    <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleAvatarUpload}/>
                 </div>
                 <div>
                     <h2 className="text-xl font-bold text-slate-900 dark:text-white">{name}</h2>
@@ -148,7 +170,7 @@ export const ProfileScreen: React.FC<Props> = ({ currentPlan, onRefresh }) => {
                         <input 
                             type="range" min="1" max="50" step="1" 
                             value={calcUsers} onChange={(e) => setCalcUsers(Number(e.target.value))}
-                            className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-white"
+                            className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-white mb-6"
                         />
                         <div className="flex bg-white/10 p-1 rounded-xl w-full max-w-xs">
                             <button 

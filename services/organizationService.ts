@@ -76,6 +76,34 @@ export const uploadLogo = async (orgId: number, file: File) => {
     }
 };
 
+export const uploadAvatar = async (userId: string, file: File) => {
+    try {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `fotoperfil/avatar-${userId}-${Date.now()}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+            .from(LOGO_BUCKET)
+            .upload(fileName, file, { upsert: true });
+        
+        if (uploadError) throw uploadError;
+
+        const { data } = supabase.storage.from(LOGO_BUCKET).getPublicUrl(fileName);
+        const publicUrl = data.publicUrl;
+
+        // Atualizar a tabela de usuários com a nova URL
+        const { error: updateError } = await supabase
+            .from('users')
+            .update({ avatar_url: publicUrl })
+            .eq('id', userId);
+
+        if (updateError) throw updateError;
+
+        return publicUrl;
+    } catch (error: any) {
+        throw new Error(`Erro no upload da foto: ${error.message}`);
+    }
+};
+
 export const fetchOrganizationDetails = async (orgId: number) => {
     try {
         const { data, error } = await supabase
