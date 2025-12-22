@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Opportunity, DbTask } from '../types';
-import { fetchAllTasks, updateTask } from '../services/projectService';
+import { fetchAllTasks, updateTask, syncTaskChecklist } from '../services/projectService';
 import { fetchOrganizationDetails } from '../services/organizationService';
 import { optimizeSchedule } from '../services/geminiService';
 import { TaskDetailModal } from './TaskDetailModal';
@@ -191,7 +191,14 @@ export const CalendarView: React.FC<Props> = ({
                                                         done: task.dataconclusao
                                                     },
                                                     gut: { g: task.gravidade, u: task.urgencia, t: task.tendencia }, 
-                                                    subtasks: [] 
+                                                    subtasks: tasks
+                                                        .filter(t => (t.tarefamae === task.id || t.tarefa === task.id) && t.sutarefa)
+                                                        .map(t => ({
+                                                            id: t.id.toString(),
+                                                            text: t.titulo,
+                                                            completed: t.status === 'done',
+                                                            dbId: t.id
+                                                        }))
                                                 }, 
                                                 nodeLabel: task.projetoData?.nome || 'Tarefa' 
                                             })} className={`p-2 rounded-xl text-[9px] font-black uppercase tracking-wider border-l-4 truncate cursor-pointer transition-all hover:translate-x-1 ${task.status === 'done' ? 'bg-emerald-500/10 border-emerald-500 text-emerald-600' : 'bg-amber-500/10 border-amber-500 text-amber-600'}`}>
@@ -236,6 +243,9 @@ export const CalendarView: React.FC<Props> = ({
                         }
 
                         await updateTask(Number(updated.id), updatePayload);
+                        if (updated.subtasks && organizationId) {
+                            await syncTaskChecklist(Number(updated.id), updated.subtasks, organizationId, Number(editingTaskCtx.task.projeto), updated.assigneeId);
+                        }
                         loadTasks();
                     }}
                 />

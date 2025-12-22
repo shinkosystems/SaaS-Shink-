@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Opportunity, DbTask } from '../types';
-import { fetchAllTasks, updateTask, deleteTask, fetchAssignableUsers } from '../services/projectService';
+import { fetchAllTasks, updateTask, syncTaskChecklist, fetchAssignableUsers } from '../services/projectService';
 import { optimizeSchedule } from '../services/geminiService';
 import { TaskDetailModal } from './TaskDetailModal';
 import { Calendar, ChevronLeft, ChevronRight, RefreshCw, ZoomIn, ZoomOut, Zap, Loader2, Filter } from 'lucide-react';
@@ -103,7 +103,15 @@ export const GanttView: React.FC<Props> = ({
                     review: task.datarevisao,
                     approval: task.dataaprovacao,
                     done: task.dataconclusao
-                }
+                },
+                subtasks: tasks
+                    .filter(t => (t.tarefamae === task.id || t.tarefa === task.id) && t.sutarefa)
+                    .map(t => ({
+                        id: t.id.toString(),
+                        text: t.titulo,
+                        completed: t.status === 'done',
+                        dbId: t.id
+                    }))
             }, 
             nodeLabel: task.projetoData?.nome || 'Tarefa' 
         });
@@ -235,6 +243,9 @@ export const GanttView: React.FC<Props> = ({
                         }
 
                         await updateTask(Number(updated.id), updatePayload);
+                        if (updated.subtasks && organizationId) {
+                            await syncTaskChecklist(Number(updated.id), updated.subtasks, organizationId, Number(editingTaskCtx.task.projeto), updated.assigneeId);
+                        }
                         loadData();
                     }}
                 />

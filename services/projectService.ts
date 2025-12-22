@@ -115,7 +115,7 @@ export const createProject = async (nome: string, cliente: string | null, userId
             cor: '#3b82f6'
         })
         .select()
-        .single();
+        .maybeSingle();
 
     if (error) {
         console.error('Erro ao criar projeto:', error.message);
@@ -142,7 +142,7 @@ export const addAttachmentToProject = async (projectId: number, attachment: Atta
 };
 
 export const fetchProjectAttachments = async (projectId: number): Promise<Attachment[]> => {
-    const { data: proj } = await supabase.from(PROJECT_TABLE).select('bpmn_structure').eq('id', projectId).single();
+    const { data: proj } = await supabase.from(PROJECT_TABLE).select('bpmn_structure').eq('id', projectId).maybeSingle();
     if (proj && proj.bpmn_structure) {
         return (proj.bpmn_structure as any).attachments || [];
     }
@@ -276,8 +276,6 @@ export const fetchAssignableUsers = async (organizationId: number): Promise<{id:
 
 export const createTask = async (task: Partial<DbTask>): Promise<DbTask | null> => {
     try {
-        // Validation: If no responsavel is provided, try to fetch current user (fallback)
-        // But better to throw if not provided by caller.
         if (!task.responsavel) {
              const { data: user } = await supabase.auth.getUser();
              if (user.user) task.responsavel = user.user.id;
@@ -285,7 +283,6 @@ export const createTask = async (task: Partial<DbTask>): Promise<DbTask | null> 
         }
 
         if (!task.organizacao) {
-            // Fallback fetch org from responsavel
             const { data: u } = await supabase.from('users').select('organizacao').eq('id', task.responsavel).single();
             if (u) task.organizacao = u.organizacao;
             else throw new Error("Erro de Segurança: ID da Organização não fornecido.");
@@ -294,7 +291,6 @@ export const createTask = async (task: Partial<DbTask>): Promise<DbTask | null> 
         const { projetoData, responsavelData, createdat, id, anexos, ...cleanTask } = task as any;
         const prazo = cleanTask.datafim || new Date().toISOString();
 
-        // Pack attachments into description
         const packedDescription = packAttachments(cleanTask.descricao || '', anexos || []);
 
         const payload = {
@@ -316,35 +312,32 @@ export const createTask = async (task: Partial<DbTask>): Promise<DbTask | null> 
             organizacao: cleanTask.organizacao,
             membros: cleanTask.membros || [],
             etiquetas: cleanTask.etiquetas || []
-            // NO 'anexos' COLUMN HERE
         };
 
         const { data, error } = await supabase
             .from(TASKS_TABLE)
             .insert(payload)
             .select()
-            .single();
+            .maybeSingle();
 
         if (error) throw error;
+        if (!data) return null;
         
-        // Return unwrapped
         const { description, anexos: savedAnexos } = unpackAttachments(data.descricao);
         return { ...data, descricao: description, anexos: savedAnexos };
 
     } catch (error: any) {
         console.error('Erro ao criar tarefa (tasks):', error.message || error);
-        return null; // Return null gracefully on error so UI can handle it
+        return null;
     }
 };
 
 export const updateTask = async (id: number, updates: Partial<DbTask>): Promise<DbTask | null> => {
-    // Explicitly clean payload
     const payload: any = {};
     let hasAttachmentsUpdate = false;
     let newAttachments: Attachment[] = [];
 
     Object.entries(updates).forEach(([key, value]) => {
-        // Filter out hydration and local-only fields
         if (key === 'anexos') {
             hasAttachmentsUpdate = true;
             newAttachments = value as Attachment[];
@@ -357,39 +350,34 @@ export const updateTask = async (id: number, updates: Partial<DbTask>): Promise<
         }
     });
 
+    if (Object.keys(payload).length === 0 && !hasAttachmentsUpdate) {
+        return null;
+    }
+
     if (payload.responsavel === null) {
         delete payload.responsavel;
     }
 
-    // Handle Attachments packing
     if (hasAttachmentsUpdate) {
         let descriptionToPack = payload.descricao;
-        
-        // If description is not in updates, we must fetch it from DB to avoid losing it
         if (descriptionToPack === undefined) {
-            const { data: currentTask } = await supabase.from(TASKS_TABLE).select('descricao').eq('id', id).single();
+            const { data: currentTask } = await supabase.from(TASKS_TABLE).select('descricao').eq('id', id).maybeSingle();
             if (currentTask) {
-                // Unpack existing to get clean description, then repack with new attachments
                 const { description } = unpackAttachments(currentTask.descricao);
                 descriptionToPack = description;
             } else {
                 descriptionToPack = "";
             }
         }
-        
-        // Pack
         payload.descricao = packAttachments(descriptionToPack, newAttachments);
-    } 
-    // If we are updating description but NOT attachments, we must preserve existing attachments
-    else if (payload.descricao !== undefined) {
-         const { data: currentTask } = await supabase.from(TASKS_TABLE).select('descricao').eq('id', id).single();
+    } else if (payload.descricao !== undefined) {
+         const { data: currentTask } = await supabase.from(TASKS_TABLE).select('descricao').eq('id', id).maybeSingle();
          if (currentTask) {
              const { anexos } = unpackAttachments(currentTask.descricao);
              payload.descricao = packAttachments(payload.descricao, anexos);
          }
     }
 
-    // REMOVE ANEXOS FROM PAYLOAD TO PREVENT DB ERROR
     delete (payload as any).anexos;
 
     const { data, error } = await supabase
@@ -397,14 +385,15 @@ export const updateTask = async (id: number, updates: Partial<DbTask>): Promise<
         .update(payload)
         .eq('id', id)
         .select()
-        .single();
+        .maybeSingle();
 
     if (error) {
         console.error(`Erro ao atualizar tarefa (ID: ${id}):`, error.message);
         return null;
     }
     
-    // Return unwrapped
+    if (!data) return null;
+    
     const { description, anexos } = unpackAttachments(data.descricao);
     return { ...data, descricao: description, anexos: anexos };
 };
@@ -418,9 +407,6 @@ export const syncTaskChecklist = async (
     defaultAssigneeId?: string
 ): Promise<void> => {
     try {
-        console.log(`Syncing checklist for Parent ${parentId}`, subtasks);
-
-        // 1. Fetch Existing Subtasks from DB
         const { data: existing, error } = await supabase
             .from(TASKS_TABLE)
             .select('id')
@@ -431,35 +417,29 @@ export const syncTaskChecklist = async (
         const existingIds = new Set((existing as { id: number }[])?.map(t => t.id) || []);
         const incomingIds = new Set(subtasks.filter(s => s.dbId).map(s => Number(s.dbId)));
 
-        // 2. Delete Orphans (In DB but not in new list)
         const toDelete = [...existingIds].filter(id => !incomingIds.has(id));
         if (toDelete.length > 0) {
-            // Must delete comments for these subtasks first to avoid FK error
             await supabase.from('comentarios').delete().in('task', toDelete);
             await supabase.from(TASKS_TABLE).delete().in('id', toDelete);
         }
 
-        // 3. Upsert (Update or Insert)
         for (const sub of subtasks) {
-            
             if (sub.dbId) {
-                // Update
                 await updateTask(Number(sub.dbId), {
                     titulo: sub.text,
                     status: sub.completed ? 'done' : 'todo',
-                    responsavel: sub.assigneeId, // Only update if explicitly set
+                    responsavel: sub.assigneeId,
                     datafim: sub.dueDate,
                     datainicio: sub.startDate,
                     duracaohoras: sub.estimatedHours
                 });
             } else {
-                // Insert
                 await createTask({
                     tarefamae: parentId,
                     titulo: sub.text,
                     descricao: 'Item de Checklist',
                     status: sub.completed ? 'done' : 'todo',
-                    responsavel: sub.assigneeId || defaultAssigneeId, // Use fallback if not set
+                    responsavel: sub.assigneeId || defaultAssigneeId,
                     datafim: sub.dueDate,
                     datainicio: sub.startDate || new Date().toISOString(),
                     duracaohoras: sub.estimatedHours || 1,
@@ -476,29 +456,18 @@ export const syncTaskChecklist = async (
 };
 
 export const deleteTask = async (id: number): Promise<boolean> => {
-    // 1. Buscar subtarefas para limpar dependências
     const { data: subtasks } = await supabase.from(TASKS_TABLE).select('id').eq('tarefamae', id);
     
     if (subtasks && subtasks.length > 0) {
         const subIds = subtasks.map(s => s.id);
-        
-        // 2. Deletar comentários das subtarefas
         await supabase.from('comentarios').delete().in('task', subIds);
-        
-        // 3. Deletar subtarefas
         const { error: subError } = await supabase.from(TASKS_TABLE).delete().in('id', subIds);
-        if (subError) {
-            console.error('Erro ao deletar subtarefas:', subError.message);
-        }
+        if (subError) console.error('Erro ao deletar subtarefas:', subError.message);
     }
 
-    // 4. Deletar comentários da tarefa principal
     const { error: commentError } = await supabase.from('comentarios').delete().eq('task', id);
-    if (commentError) {
-        console.error('Erro ao deletar comentários da tarefa:', commentError.message);
-    }
+    if (commentError) console.error('Erro ao deletar comentários da tarefa:', commentError.message);
 
-    // 5. Deletar tarefa principal
     const { error } = await supabase.from(TASKS_TABLE).delete().eq('id', id);
     if (error) {
         console.error('Erro ao deletar tarefa:', error.message);
@@ -508,10 +477,6 @@ export const deleteTask = async (id: number): Promise<boolean> => {
 };
 
 export const syncBpmnTasks = async (projectId: number, organizationId: number, nodes: BpmnNode[]): Promise<BpmnNode[]> => {
-    // This function handles the main nodes sync, but for checklist inside nodes, it was only doing 1 level deep.
-    // If BpmnNode.checklist items are "Tasks", they are main tasks.
-    // Their `subtasks` property are the checklist items (level 2).
-    
     const updatedNodes = JSON.parse(JSON.stringify(nodes));
     
     for (const node of updatedNodes) {
@@ -527,7 +492,6 @@ export const syncBpmnTasks = async (projectId: number, organizationId: number, n
 
             let dbId = task.dbId;
 
-            // 1. Sync Parent Task
             if (dbId) {
                 await updateTask(dbId, {
                     titulo: task.text,
@@ -559,7 +523,6 @@ export const syncBpmnTasks = async (projectId: number, organizationId: number, n
                 }
             }
 
-            // 2. Sync Subtasks (Checklist) using the new robust helper
             if (dbId && task.subtasks) {
                 await syncTaskChecklist(dbId, task.subtasks, organizationId, projectId, task.assigneeId);
             }
