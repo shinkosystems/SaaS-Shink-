@@ -9,8 +9,6 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Shinkō OS" />
     
-    <title>ShinkŌS</title>
-    
     <link rel="icon" href="https://zjssfnbcboibqeoubeou.supabase.co/storage/v1/object/public/fotoperfil/fotoperfil/3.png" />
     <link rel="apple-touch-icon" href="https://zjssfnbcboibqeoubeou.supabase.co/storage/v1/object/public/fotoperfil/fotoperfil/3.png" />
     
@@ -61,14 +59,14 @@
 
       .light {
         --bg-color: #F2F2F7;
-        --surface: rgba(255, 255, 255, 0.8);
-        --card-bg: rgba(255, 255, 255, 0.85);
-        --card-bg-hover: rgba(255, 255, 255, 1);
+        --surface: rgba(255, 255, 255, 0.85);
+        --card-bg: #ffffff;
+        --card-bg-hover: #ffffff;
         --border-color: rgba(0, 0, 0, 0.06);
         --text-main: #1D1D1F;
         --text-muted: #86868B;
-        --input-bg: rgba(255, 255, 255, 0.6);
-        --calendar-cell: rgba(255, 255, 255, 0.5);
+        --input-bg: #E5E5EA;
+        --calendar-cell: #ffffff;
       }
 
       body {
@@ -87,6 +85,7 @@
 
       .light body {
         background-image: radial-gradient(circle at 50% 0%, #FFFFFF 0%, #E5E5EA 100%);
+        color: #1D1D1F;
       }
 
       .glass-panel {
@@ -133,7 +132,6 @@
       ::-webkit-scrollbar-thumb { background: rgba(128, 128, 128, 0.2); border-radius: 10px; }
       ::-webkit-scrollbar-thumb:hover { background: rgba(128, 128, 128, 0.4); }
 
-      /* Responsividade Extra */
       @media (max-width: 640px) {
         .glass-card { border-radius: 1.5rem; }
         h1 { font-size: 2.5rem !important; }

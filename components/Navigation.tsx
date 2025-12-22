@@ -4,7 +4,7 @@ import {
     LayoutDashboard, List, Calendar, User, Settings, Search, 
     PlusCircle, LogOut, Sun, Moon, Briefcase, TrendingUp,
     Users, DollarSign, Shield, Sparkles, Lightbulb, Menu, X, ChevronRight,
-    Code2, BarChart3, Plus, Box, Activity, Layers
+    Code2, BarChart3, Plus, Activity
 } from 'lucide-react';
 import { PLAN_LIMITS } from '../types';
 import { fetchOrganizationDetails } from '../services/organizationService';
@@ -124,7 +124,7 @@ export const Sidebar: React.FC<Props> = (props) => {
                 <button onClick={props.onOpenCreate} className="w-full py-4 bg-slate-900 dark:bg-white text-white dark:text-black rounded-[1.3rem] font-black text-[11px] uppercase tracking-widest shinko-button hover:opacity-90 transition-all flex items-center justify-center gap-2 shadow-xl">
                     <PlusCircle className="w-4 h-4"/> Novo Projeto
                 </button>
-                <button onClick={props.onOpenCreateTask} className="w-full py-3 bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:border-amber-500/30 rounded-[1.3rem] font-black text-[10px] uppercase tracking-widest shinko-button transition-all flex items-center justify-center gap-2 group">
+                <button onClick={props.onOpenCreateTask} className="w-full py-3 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:border-amber-500/30 rounded-[1.3rem] font-black text-[10px] uppercase tracking-widest shinko-button transition-all flex items-center justify-center gap-2 group">
                     <Plus className="w-3.5 h-3.5 text-amber-500 group-hover:scale-110 transition-transform"/> Nova Tarefa
                 </button>
             </div>
@@ -159,10 +159,10 @@ export const Sidebar: React.FC<Props> = (props) => {
         {!isClient && (
             <div className="px-6 pb-4">
                 <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-2xl flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-[10px] font-black text-purple-400 uppercase tracking-widest">
+                    <div className="flex items-center gap-2 text-[10px] font-black text-purple-600 dark:text-purple-400 uppercase tracking-widest">
                         <Sparkles className="w-3.5 h-3.5"/> IA Status
                     </div>
-                    <span className="text-[10px] font-mono text-purple-300 font-black">
+                    <span className="text-[10px] font-mono text-purple-700 dark:text-purple-300 font-black">
                         {planLimits?.aiLimit >= 9000 ? '∞' : `${Math.max(0, (planLimits?.aiLimit || 0) - aiUsage)}`}
                     </span>
                 </div>
@@ -187,7 +187,7 @@ export const Sidebar: React.FC<Props> = (props) => {
                     <div className="text-sm font-black text-slate-900 dark:text-white truncate">{props.userData.name}</div>
                     <div className="text-[9px] font-bold text-amber-600 dark:text-amber-500/60 uppercase tracking-widest">{props.currentPlan?.replace('plan_', '').toUpperCase() || 'FREE'}</div>
                 </div>
-                <button onClick={(e) => { e.stopPropagation(); props.onLogout(); }} className="p-2.5 text-slate-400 hover:text-red-500 transition-all">
+                <button onClick={(e) => { e.stopPropagation(); props.onLogout(); }} className="p-2 text-slate-400 hover:text-red-500 transition-all">
                     <LogOut className="w-4 h-4"/>
                 </button>
             </div>
@@ -251,7 +251,7 @@ export const MobileDrawer: React.FC<Props> = (props) => {
                                 </button>
                                 <button 
                                     onClick={() => { props.onOpenCreateTask(); props.setIsMobileOpen(false); }} 
-                                    className="w-full py-2.5 bg-white/5 border border-white/10 text-slate-400 rounded-xl font-black text-[9px] uppercase tracking-widest flex items-center justify-center gap-2"
+                                    className="w-full py-2.5 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-500 rounded-xl font-black text-[9px] uppercase tracking-widest flex items-center justify-center gap-2"
                                 >
                                     <Plus className="w-3.5 h-3.5 text-amber-500"/> Nova Tarefa
                                 </button>
