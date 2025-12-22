@@ -6,9 +6,10 @@ import {
     Fingerprint, Loader2, AlertTriangle, Lock, Copy, CheckCircle, LayoutGrid, 
     DollarSign, Code2, BarChart3, Calendar, TrendingUp, ShieldCheck, ShoppingCart, 
     CreditCard, ExternalLink, Receipt, X, Image as ImageIcon, FileText, ArrowRight, ChevronRight,
-    UserPlus, Mail, Shield, Zap
+    UserPlus, Mail, Shield, Zap, Rocket, Building
 } from 'lucide-react';
-import { fetchRoles, createRole, deleteRole, fetchOrganizationMembersWithRoles, updateUserRole, updateOrgModules } from '../services/organizationService';
+import { fetchRoles, createRole, deleteRole, fetchOrganizationMembersWithRoles, updateUserRole, updateOrgModules, createOrganization } from '../services/organizationService';
+import { supabase } from '../services/supabaseClient';
 
 interface Props {
   theme: 'dark' | 'light';
@@ -49,11 +50,15 @@ export const SettingsScreen: React.FC<Props> = ({
   const [newRoleName, setNewRoleName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   
+  // Create Org State
+  const [creatingOrg, setCreatingOrg] = useState(false);
+  const [newOrgData, setNewOrgData] = useState({ name: '', sector: '', dna: '' });
+
   // AI Config Local State
   const [aiConfig, setAiConfig] = useState({
-      sector: orgDetails.aiSector || '',
-      tone: orgDetails.aiTone || '',
-      context: orgDetails.aiContext || ''
+      sector: orgDetails?.aiSector || '',
+      tone: orgDetails?.aiTone || '',
+      context: orgDetails?.aiContext || ''
   });
 
   const isAdmin = userRole === 'dono';
@@ -72,6 +77,26 @@ export const SettingsScreen: React.FC<Props> = ({
     ]);
     setRoles(r);
     setMembers(m);
+  };
+
+  const handleCreateOrg = async () => {
+      if (!newOrgData.name.trim() || !newOrgData.sector.trim()) {
+          alert("Nome e Setor são obrigatórios.");
+          return;
+      }
+      setIsSaving(true);
+      try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) throw new Error("Sessão não identificada.");
+          
+          await createOrganization(user.id, newOrgData.name, newOrgData.sector, newOrgData.dna);
+          alert("Organização criada com sucesso! O sistema será reiniciado.");
+          window.location.reload();
+      } catch (e: any) {
+          alert(e.message);
+      } finally {
+          setIsSaving(false);
+      }
   };
 
   const handleCreateRole = async () => {
@@ -101,6 +126,81 @@ export const SettingsScreen: React.FC<Props> = ({
       });
       setIsSaving(false);
   };
+
+  // RENDER: CREATE ORGANIZATION VIEW FOR OWNERS WITHOUT ORG
+  if (!userOrgId && userRole === 'dono') {
+      return (
+          <div className="flex flex-col h-full items-center justify-center p-8 animate-in fade-in duration-700 bg-slate-50 dark:bg-[#020203]">
+              <div className="max-w-2xl w-full space-y-12">
+                  <div className="text-center space-y-4">
+                      <div className="w-20 h-20 bg-amber-500 rounded-[2rem] flex items-center justify-center text-black shadow-glow-amber mx-auto mb-8 animate-ios-pop">
+                          <Rocket className="w-10 h-10" />
+                      </div>
+                      <h1 className="text-5xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">
+                          Nova <span className="text-amber-500">Organização</span>.
+                      </h1>
+                      <p className="text-slate-500 text-lg font-bold uppercase tracking-widest">Inicie sua operação no ecossistema Shinkō</p>
+                  </div>
+
+                  <div className="glass-panel p-10 rounded-[3rem] space-y-8 border-slate-200 dark:border-white/5 shadow-2xl relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full -mr-16 -mt-16 blur-3xl"></div>
+                      
+                      <div className="space-y-6">
+                          <div>
+                              <label className="block text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-[0.3em] mb-3 ml-1">Nome da Empresa / Razão Social</label>
+                              <input 
+                                  value={newOrgData.name}
+                                  onChange={e => setNewOrgData({...newOrgData, name: e.target.value})}
+                                  placeholder="Ex: Shinkō Software House"
+                                  className="w-full glass-panel p-5 rounded-2xl text-base font-bold text-slate-900 dark:text-white outline-none focus:border-amber-500/50 shadow-inner"
+                              />
+                          </div>
+
+                          <div>
+                              <label className="block text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-[0.3em] mb-3 ml-1">Setor Principal</label>
+                              <select 
+                                  value={newOrgData.sector}
+                                  onChange={e => setNewOrgData({...newOrgData, sector: e.target.value})}
+                                  className="w-full glass-panel p-5 rounded-2xl text-base font-bold text-slate-900 dark:text-white outline-none cursor-pointer shadow-inner"
+                              >
+                                  <option value="">Selecione seu nicho...</option>
+                                  <option value="SaaS / Software">SaaS / Software House</option>
+                                  <option value="Arquitetura & Design">Arquitetura & Design</option>
+                                  <option value="Marketing & Growth">Marketing & Growth</option>
+                                  <option value="Consultoria Técnica">Consultoria Técnica</option>
+                                  <option value="E-commerce / Retail">E-commerce / Retail</option>
+                                  <option value="Outros">Outros</option>
+                              </select>
+                          </div>
+
+                          <div>
+                              <label className="block text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-[0.3em] mb-3 ml-1">DNA Mestre (IA Context)</label>
+                              <textarea 
+                                  value={newOrgData.dna}
+                                  onChange={e => setNewOrgData({...newOrgData, dna: e.target.value})}
+                                  placeholder="Conte um pouco sobre o que sua empresa faz para treinar seu Guru AI..."
+                                  className="w-full h-32 glass-panel p-6 rounded-[2rem] text-sm leading-relaxed font-medium text-slate-700 dark:text-slate-300 outline-none focus:border-amber-500/50 resize-none shadow-inner"
+                              />
+                          </div>
+                      </div>
+
+                      <button 
+                          onClick={handleCreateOrg}
+                          disabled={isSaving}
+                          className="w-full py-6 bg-slate-900 dark:bg-white text-white dark:text-black rounded-[1.8rem] font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:scale-[1.02] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                      >
+                          {isSaving ? <Loader2 className="w-5 h-5 animate-spin"/> : <CheckCircle className="w-5 h-5"/>}
+                          Configurar Minha Organização
+                      </button>
+                  </div>
+                  
+                  <p className="text-center text-[10px] text-slate-500 font-bold uppercase tracking-widest flex items-center justify-center gap-2">
+                      <ShieldCheck className="w-3 h-3 text-emerald-500"/> Segurança e Governança Garantidas pelo Framework
+                  </p>
+              </div>
+          </div>
+      );
+  }
 
   return (
     <div className="flex flex-col h-full animate-in fade-in duration-700 max-w-7xl mx-auto p-8 space-y-12">

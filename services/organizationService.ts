@@ -5,8 +5,7 @@ import { PLAN_LIMITS } from '../types';
 const ORG_TABLE = 'organizacoes';
 const LOGO_BUCKET = 'fotoperfil'; 
 
-// System Modules Definition (Keys used for logic)
-// Estes devem corresponder exatamente aos IDs usados no Frontend (SettingsScreen)
+// System Modules Definition
 export const SYSTEM_MODULES_DEF = [
     'projects', 'kanban', 'gantt', 'calendar', 'crm', 'financial', 'clients', 'engineering', 'product', 'ia', 'whitelabel'
 ];
@@ -18,45 +17,65 @@ const getPlanKeyFromId = (id: number): string => {
         case 1: return 'plan_solo';
         case 2: return 'plan_studio';
         case 3: return 'plan_scale';
-        
-        // Mapeamento para Governança (ID 9) e Agency (5)
         case 9: return 'plan_scale'; 
         case 5: return 'plan_agency'; 
         case 10: return 'plan_enterprise';
-
-        // ANNUAL PLANS (IDs 11, 12, 13)
         case 11: return 'plan_solo_yearly';
         case 12: return 'plan_studio_yearly';
         case 13: return 'plan_scale_yearly';
-
         default: return 'plan_free';
     }
 };
 
-// Uploads a new logo and returns the public URL
+export const createOrganization = async (userId: string, name: string, sector: string, dna?: string) => {
+    try {
+        // 1. Criar a Organização
+        const { data: org, error: orgError } = await supabase
+            .from(ORG_TABLE)
+            .insert({ 
+                nome: name, 
+                setor: sector, 
+                dna: dna || '',
+                plano: 4, // Default Free
+                colaboradores: 1,
+                pedidoia: 0,
+                cor: '#F59E0B'
+            })
+            .select()
+            .single();
+        
+        if (orgError) throw orgError;
+
+        // 2. Vincular o Usuário à nova Organização
+        const { error: userError } = await supabase
+            .from('users')
+            .update({ organizacao: org.id })
+            .eq('id', userId);
+        
+        if (userError) throw userError;
+
+        return org;
+    } catch (err: any) {
+        throw new Error(`Falha ao criar organização: ${err.message}`);
+    }
+};
+
 export const uploadLogo = async (orgId: number, file: File) => {
     try {
         const fileExt = file.name.split('.').pop();
         const fileName = `fotoperfil/org-logo-${orgId}-${Date.now()}.${fileExt}`;
-        const filePath = fileName;
-
         const { error } = await supabase.storage
             .from(LOGO_BUCKET)
-            .upload(filePath, file, { upsert: true });
+            .upload(fileName, file, { upsert: true });
         
         if (error) throw error;
-
-        const { data } = supabase.storage
-            .from(LOGO_BUCKET)
-            .getPublicUrl(filePath);
-
+        const { data } = supabase.storage.from(LOGO_BUCKET).getPublicUrl(fileName);
         return data.publicUrl;
     } catch (error: any) {
-        throw new Error(`Erro no upload do logo: ${error.message || JSON.stringify(error)}`);
+        throw new Error(`Erro no upload do logo: ${error.message}`);
     }
 };
 
-// Fetch full organization details (Including AI fields)
 export const fetchOrganizationDetails = async (orgId: number) => {
     try {
         const { data, error } = await supabase
@@ -64,269 +83,112 @@ export const fetchOrganizationDetails = async (orgId: number) => {
             .select('*')
             .eq('id', orgId)
             .single();
-
-        if (error) {
-            // Ignora erro PGRST116 (Row not found) para não poluir o console se for apenas um ID novo
-            if (error.code !== 'PGRST116') {
-                console.error(`Error fetching organization details for ID ${orgId}:`, JSON.stringify(error, null, 2));
-            }
-            return null;
-        }
+        if (error && error.code !== 'PGRST116') console.error(`Error fetching organization details:`, error);
         return data;
-    } catch (err) {
-        console.error("Exceção ao buscar organização:", err);
-        return null;
-    }
+    } catch (err) { return null; }
 };
 
-// Updates all organization details in the database
-export const updateOrgDetails = async (
-    orgId: number, 
-    { logoUrl, primaryColor, name, limit, aiSector, aiTone, aiContext }: 
-    { logoUrl?: string; primaryColor?: string; name?: string; limit?: number; aiSector?: string; aiTone?: string; aiContext?: string }
-) => {
-    console.log("updateOrgDetails - Atualizando Org ID:", orgId);
-    
-    const updates: any = {};
-    
-    if (logoUrl !== undefined) updates.logo = logoUrl;
-    if (primaryColor !== undefined) updates.cor = primaryColor;
-    if (name !== undefined) updates.nome = name;
-    if (limit !== undefined) updates.colaboradores = limit;
+export const updateOrgDetails = async (orgId: number, updates: any) => {
+    const payload: any = {};
+    if (updates.logoUrl !== undefined) payload.logo = updates.logoUrl;
+    if (updates.primaryColor !== undefined) payload.cor = updates.primaryColor;
+    if (updates.name !== undefined) payload.nome = updates.name;
+    if (updates.limit !== undefined) payload.colaboradores = updates.limit;
+    if (updates.aiSector !== undefined) payload.setor = updates.aiSector; 
+    if (updates.aiTone !== undefined) payload.tomdevoz = updates.aiTone;
+    if (updates.aiContext !== undefined) payload.dna = updates.aiContext;
 
-    // AI Fields Mapping to DB Schema
-    if (aiSector !== undefined) updates.setor = aiSector; 
-    if (aiTone !== undefined) updates.tomdevoz = aiTone;
-    if (aiContext !== undefined) updates.dna = aiContext;
-
-    console.log("Payload enviado ao Supabase:", updates);
-
-    if (Object.keys(updates).length === 0) return { success: true };
+    if (Object.keys(payload).length === 0) return { success: true };
 
     try {
-        const { data, error } = await supabase
-            .from(ORG_TABLE)
-            .update(updates)
-            .eq('id', orgId)
-            .select();
-
-        if (error) {
-            const errorDetails = error.message || JSON.stringify(error);
-            console.error("Erro detalhado no update do Supabase:", errorDetails);
-            throw new Error(errorDetails);
-        }
-        
+        const { data, error } = await supabase.from(ORG_TABLE).update(payload).eq('id', orgId).select();
+        if (error) throw new Error(error.message);
         return { success: true, data };
-    } catch (err: any) {
-        const msg = err.message || JSON.stringify(err);
-        throw new Error(`Falha ao salvar no banco: ${msg}`);
-    }
+    } catch (err: any) { throw new Error(err.message); }
 };
 
-// --- MODULE MANAGEMENT (RELATIONAL) ---
-
-// Seeding: Ensures the 'modulos' table has the basic system modules
 export const seedSystemModules = async () => {
     try {
         const { data: existing } = await supabase.from('modulos').select('nome');
         const existingNames = new Set(existing?.map(m => m.nome) || []);
-
-        const toInsert = SYSTEM_MODULES_DEF
-            .filter(key => !existingNames.has(key))
-            .map(key => ({ nome: key }));
-
-        if (toInsert.length > 0) {
-            console.log("Seeding modules:", toInsert);
-            await supabase.from('modulos').insert(toInsert);
-        }
-    } catch (e) {
-        console.error("Error seeding modules:", e);
-    }
+        const toInsert = SYSTEM_MODULES_DEF.filter(key => !existingNames.has(key)).map(key => ({ nome: key }));
+        if (toInsert.length > 0) await supabase.from('modulos').insert(toInsert);
+    } catch (e) {}
 };
 
-// Helper to get map of module names to IDs
 export const fetchSystemModuleMap = async (): Promise<Record<string, number>> => {
-    await seedSystemModules(); // Ensure they exist
+    await seedSystemModules();
     const { data } = await supabase.from('modulos').select('id, nome');
     if (!data) return {};
-    
     const map: Record<string, number> = {};
-    data.forEach(m => {
-        if (m.nome) map[m.nome] = m.id;
-    });
+    data.forEach(m => { if (m.nome) map[m.nome] = m.id; });
     return map;
 };
 
 export const fetchActiveOrgModules = async (orgId: number): Promise<string[]> => {
     try {
-        const { data, error } = await supabase
-            .from('organizacao_modulo')
-            .select('modulo (nome)') // Relational join
-            .eq('organizacao', orgId);
-
-        if (error) {
-            console.error("Error fetching active modules:", JSON.stringify(error));
-            return []; 
-        }
-
-        const modules = data.map((item: any) => item.modulo?.nome).filter(Boolean);
-        return modules;
-    } catch (e) {
-        console.error("Exception active modules:", e);
-        return [];
-    }
+        const { data, error } = await supabase.from('organizacao_modulo').select('modulo (nome)').eq('organizacao', orgId);
+        if (error) return []; 
+        return data.map((item: any) => item.modulo?.nome).filter(Boolean);
+    } catch (e) { return []; }
 };
 
-// Updates org modules using String Keys (Legacy/UI compatibility)
 export const updateOrgModules = async (orgId: number, moduleKeys: string[]) => {
     try {
-        console.log(`Updating modules for Org ${orgId}. New active set:`, moduleKeys);
         await seedSystemModules();
-
         const { data: allModules } = await supabase.from('modulos').select('id, nome');
         if (!allModules) throw new Error("System modules not found.");
-
         const moduleMap = new Map(allModules.map(m => [m.nome, m.id]));
         const idsToInsert = moduleKeys.map(k => moduleMap.get(k)).filter(Boolean) as number[];
-
         return updateOrgModulesByIds(orgId, idsToInsert);
-    } catch (err: any) {
-        console.error("Error updating org modules (String Keys):", err);
-        throw new Error(err.message);
-    }
+    } catch (err: any) { throw new Error(err.message); }
 };
 
-// Updates org modules using Integer IDs (Direct/Admin compatibility)
 export const updateOrgModulesByIds = async (orgId: number, moduleIds: number[]) => {
     try {
-        console.log(`Updating modules for Org ${orgId} using IDs:`, moduleIds);
-
-        // 1. Clean existing relations for this Org
-        const { error: deleteError } = await supabase.from('organizacao_modulo').delete().eq('organizacao', orgId);
-        if (deleteError) throw deleteError;
-
-        // 2. Insert new relations
+        await supabase.from('organizacao_modulo').delete().eq('organizacao', orgId);
         if (moduleIds.length > 0) {
-            const payload = moduleIds.map(modId => ({
-                organizacao: orgId,
-                modulo: modId
-            }));
-            const { error: insertError } = await supabase.from('organizacao_modulo').insert(payload);
-            if (insertError) throw insertError;
+            const payload = moduleIds.map(modId => ({ organizacao: orgId, modulo: modId }));
+            await supabase.from('organizacao_modulo').insert(payload);
         }
-        
         return { success: true };
-    } catch (err: any) {
-        console.error("Error updating org modules (IDs):", err);
-        throw new Error(err.message);
-    }
+    } catch (err: any) { throw new Error(err.message); }
 };
 
-// Contract a specific module (Add to existing)
 export const contractModule = async (orgId: number, moduleKey: string) => {
     try {
-        // 1. Get Module ID
         const moduleMap = await fetchSystemModuleMap();
         const moduleId = moduleMap[moduleKey];
-        
         if (!moduleId) throw new Error("Módulo inválido.");
-
-        // 2. Check if already exists
-        const { data: existing } = await supabase
-            .from('organizacao_modulo')
-            .select('id')
-            .eq('organizacao', orgId)
-            .eq('modulo', moduleId)
-            .single();
-
+        const { data: existing } = await supabase.from('organizacao_modulo').select('id').eq('organizacao', orgId).eq('modulo', moduleId).single();
         if (existing) return { success: true, msg: "Já contratado" };
-
-        // 3. Insert new relation
-        const { error } = await supabase
-            .from('organizacao_modulo')
-            .insert({ organizacao: orgId, modulo: moduleId });
-
-        if (error) throw error;
-
-        // Optional: Create a financial transaction record for the purchase here
-        // await addTransaction({ ... }) 
-
+        await supabase.from('organizacao_modulo').insert({ organizacao: orgId, modulo: moduleId });
         return { success: true };
-    } catch (err: any) {
-        console.error("Erro ao contratar módulo:", err);
-        throw new Error(err.message);
-    }
+    } catch (err: any) { throw new Error(err.message); }
 };
 
-// Fetches public organization details for White Label Login
 export const getPublicOrgDetails = async (orgId: number) => {
     try {
-        const { data, error } = await supabase
-            .from('organizacoes')
-            .select('nome, logo, cor, plano') 
-            .eq('id', orgId)
-            .single();
-
+        const { data, error } = await supabase.from('organizacoes').select('nome, logo, cor, plano').eq('id', orgId).single();
         if (error || !data) return null;
-        
         const isWhitelabelAllowed = data.plano === 10 || data.plano === 5 || (data as any).whitelable === true;
-
-        if (isWhitelabelAllowed) {
-            return {
-                name: data.nome,
-                logoUrl: data.logo,
-                primaryColor: data.cor,
-                plano: data.plano
-            };
-        }
-        
+        if (isWhitelabelAllowed) return { name: data.nome, logoUrl: data.logo, primaryColor: data.cor, plano: data.plano };
         return null;
-
-    } catch (error) {
-        return null;
-    }
+    } catch (error) { return null; }
 };
-
-// --- ROLE MANAGEMENT ---
 
 export const fetchRoles = async (organizationId: number) => {
     if (!organizationId) return [];
-
-    const { data, error } = await supabase
-        .from('area_atuacao')
-        .select('*')
-        .eq('empresa', organizationId)
-        .order('cargo', { ascending: true });
-
-    if (error) {
-        console.error('Error fetching roles:', error);
-        return [];
-    }
-    
-    return data.map((d: any) => ({
-        id: d.id,
-        nome: d.cargo || `Cargo ${d.id}`
-    })) || [];
+    const { data, error } = await supabase.from('area_atuacao').select('*').eq('empresa', organizationId).order('cargo', { ascending: true });
+    if (error) return [];
+    return data.map((d: any) => ({ id: d.id, nome: d.cargo || `Cargo ${d.id}` })) || [];
 };
 
 export const createRole = async (name: string, organizationId: number) => {
     if (!organizationId) throw new Error("Organization ID required to create role");
-
-    const { data, error } = await supabase
-        .from('area_atuacao')
-        .insert({ 
-            cargo: name, 
-            empresa: organizationId 
-        })
-        .select()
-        .single();
-    
+    const { data, error } = await supabase.from('area_atuacao').insert({ cargo: name, empresa: organizationId }).select().single();
     if (error) throw error;
-    
-    return {
-        id: data.id,
-        nome: data.cargo
-    };
+    return { id: data.id, nome: data.cargo };
 };
 
 export const deleteRole = async (id: number) => {
@@ -335,23 +197,11 @@ export const deleteRole = async (id: number) => {
     return true;
 };
 
-// --- MEMBER MANAGEMENT ---
-
 export const fetchOrganizationMembersWithRoles = async (orgId: number) => {
-    const { data, error } = await supabase
-        .from('users')
-        .select('id, nome, email, avatar_url, cargo, perfil')
-        .eq('organizacao', orgId)
-        .order('nome');
-    
-    if (error) {
-        console.error('Error fetching members:', error);
-        return [];
-    }
-
+    const { data, error } = await supabase.from('users').select('id, nome, email, avatar_url, cargo, perfil').eq('organizacao', orgId).order('nome');
+    if (error) return [];
     const cargoIds = [...new Set(data.map((u: any) => u.cargo).filter(Boolean))];
     let areaMap = new Map<number, string>();
-
     if (cargoIds.length > 0) {
         const { data: areas } = await supabase.from('area_atuacao').select('*').in('id', cargoIds);
         areas?.forEach((a: any) => {
@@ -359,62 +209,33 @@ export const fetchOrganizationMembersWithRoles = async (orgId: number) => {
             areaMap.set(a.id, name);
         });
     }
-    
-    return data.map((u: any) => ({
-        ...u,
-        roleName: areaMap.get(u.cargo) || (u.cargo ? 'Cargo Excluído' : 'Sem Cargo')
-    }));
+    return data.map((u: any) => ({ ...u, roleName: areaMap.get(u.cargo) || (u.cargo ? 'Cargo Excluído' : 'Sem Cargo') }));
 };
 
 export const updateUserRole = async (userId: string, roleId: number | null) => {
-    const { error } = await supabase
-        .from('users')
-        .update({ cargo: roleId })
-        .eq('id', userId);
-    
+    const { error } = await supabase.from('users').update({ cargo: roleId }).eq('id', userId);
     if (error) throw error;
     return true;
 };
 
-// --- AI LIMIT MANAGEMENT ---
-
 export const checkAndIncrementAiUsage = async (orgId: number): Promise<{ success: boolean; usage: number; limit: number }> => {
     try {
-        const { data: orgData, error } = await supabase
-            .from(ORG_TABLE)
-            .select('pedidoia, plano')
-            .eq('id', orgId)
-            .single();
-
+        const { data: orgData, error } = await supabase.from(ORG_TABLE).select('pedidoia, plano').eq('id', orgId).single();
         if (error || !orgData) throw new Error("Erro ao verificar limite de IA.");
-
         const currentUsage = orgData.pedidoia || 0;
         const planKey = getPlanKeyFromId(orgData.plano || 4); 
         const limit = PLAN_LIMITS[planKey]?.aiLimit || 0;
-
         if (limit === 0) return { success: false, usage: currentUsage, limit: 0 };
         if (limit < 9000 && currentUsage >= limit) return { success: false, usage: currentUsage, limit };
-
-        const { error: updateError } = await supabase
-            .from(ORG_TABLE)
-            .update({ pedidoia: currentUsage + 1 })
-            .eq('id', orgId);
-
-        if (updateError) throw new Error("Erro ao registrar uso de IA.");
-
+        await supabase.from(ORG_TABLE).update({ pedidoia: currentUsage + 1 }).eq('id', orgId);
         return { success: true, usage: currentUsage + 1, limit };
-    } catch (e: any) {
-        console.error("Erro AI Usage:", e);
-        return { success: false, usage: 0, limit: 0 };
-    }
+    } catch (e: any) { return { success: false, usage: 0, limit: 0 }; }
 };
 
 export const getPlanDefaultModules = (planId: number): string[] => {
     const planKey = getPlanKeyFromId(planId);
     const planConfig = PLAN_LIMITS[planKey];
-    
     if (!planConfig) return ['projects', 'kanban'];
-
     const modules = ['projects', 'kanban'];
     if (planConfig.features.gantt) modules.push('gantt', 'calendar');
     if (planConfig.features.financial) modules.push('financial');
@@ -423,6 +244,5 @@ export const getPlanDefaultModules = (planId: number): string[] => {
     if (planConfig.features.crm) modules.push('crm');
     if (planConfig.features.aiAdvanced) modules.push('ia');
     if (planConfig.features.whitelabel) modules.push('whitelabel');
-
     return modules;
 };
