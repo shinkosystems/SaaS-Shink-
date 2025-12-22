@@ -5,7 +5,7 @@ import { TaskDetailModal } from './TaskDetailModal';
 import { 
     Plus, Settings, MoreHorizontal, CheckCircle2, Circle, 
     ArrowRight, BrainCircuit, Save, Zap, Loader2, Sparkles, RefreshCw,
-    ChevronRight, Workflow as WorkflowIcon
+    ChevronRight, Workflow as WorkflowIcon, Clock
 } from 'lucide-react';
 import { updateTask, deleteTask, syncTaskChecklist, syncBpmnTasks } from '../services/projectService';
 import { generateBpmn } from '../services/geminiService';
@@ -111,7 +111,7 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
         setNodes(newNodes);
         
         // 2. Persistir no JSON do Projeto (Estrutura visual)
-        onUpdate({
+        await onUpdate({
             ...opportunity,
             bpmn: { ...opportunity.bpmn, nodes: newNodes }
         } as any);
@@ -270,9 +270,5 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
         </div>
     );
 };
-
-const Clock = ({className}: any) => (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-);
 
 export default BpmnBuilder;

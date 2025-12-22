@@ -109,7 +109,7 @@ const App: React.FC = () => {
 
   const onEditProject = (opp: Opportunity) => {
       setEditingOpportunity(opp);
-      setSelectedProjectState(null); // CRUCIAL: Limpar para que o wizard apareça
+      setSelectedProjectState(null); 
       setViewState('edit-project');
       navigateTo(`/project/${opp.id}/edit`);
   };
@@ -227,6 +227,15 @@ const App: React.FC = () => {
     if (opps) setOpportunities(opps);
   };
 
+  const handleUpdateOpportunity = async (opp: Opportunity) => {
+      const updated = await updateOpportunity(opp);
+      if (updated) {
+          setSelectedProjectState(updated); // CRUCIAL: Atualizar o estado local com os dados salvos (checklist incluído)
+          const opps = await fetchOpportunities(userOrgId!);
+          if (opps) setOpportunities(opps);
+      }
+  };
+
   const handleGuruAction = (actionId: string) => {
     if (actionId === 'nav_kanban') setView('kanban');
     else if (actionId === 'nav_calendar') setView('calendar');
@@ -250,7 +259,6 @@ const App: React.FC = () => {
       return opportunities.filter(o => o.title.toLowerCase().includes(lower) || o.description?.toLowerCase().includes(lower));
   }, [opportunities, searchTerm]);
 
-  // Condição para esconder a navegação (Sidebar/Header Mobile)
   const isWizardMode = view === 'create-project' || view === 'edit-project';
 
   if (!user && !loading) {
@@ -294,7 +302,7 @@ const App: React.FC = () => {
                 {selectedProject ? (
                     <ProjectWorkspace 
                         opportunity={selectedProject} onBack={() => { setSelectedProjectState(null); setView('dashboard'); }}
-                        onUpdate={(opp) => updateOpportunity(opp).then(() => loadUserData(user.id))}
+                        onUpdate={handleUpdateOpportunity}
                         onEdit={onEditProject} 
                         onDelete={(id) => deleteOpportunity(id).then(() => { setSelectedProjectState(null); setView('dashboard'); })}
                         userRole={userRole} currentPlan={currentPlan} activeModules={activeModules}
@@ -311,7 +319,7 @@ const App: React.FC = () => {
                 ) : (
                     <>
                         {view === 'dashboard' && <div className="h-full p-4 md:p-8 overflow-y-auto"><Dashboard opportunities={filteredOpportunities} onNavigate={() => setView('kanban')} onOpenProject={onOpenProject} user={user} theme={theme} activeModules={activeModules} /></div>}
-                        {view === 'list' && activeModules.includes('projects') && <div className="h-full p-4 md:p-8 overflow-y-auto"><ProjectList opportunities={filteredOpportunities} onOpenProject={onOpenProject} userRole={userRole} activeModules={activeModules} /></div>}
+                        {view === 'list' && activeModules.includes('projects') && <div className="h-full p-4 md:p-8 overflow-y-auto"><ProjectList opportunities={filteredOpportunities} onOpenProject={onOpenProject} userRole={userRole} activeModules={activeModules} onRefresh={() => loadUserData(user.id)} /></div>}
                         {view === 'kanban' && activeModules.includes('kanban') && <div className="h-full p-4 md:p-8 overflow-hidden"><KanbanBoard onSelectOpportunity={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} currentPlan={currentPlan} activeModules={activeModules} /></div>}
                         {view === 'gantt' && activeModules.includes('gantt') && <div className="h-full p-4 md:p-8 overflow-hidden"><GanttView opportunities={filteredOpportunities} onSelectOpportunity={onOpenProject} organizationId={userOrgId || undefined} onTaskUpdate={() => {}} /></div>}
                         {view === 'calendar' && activeModules.includes('calendar') && <div className="h-full p-4 md:p-8 overflow-hidden"><CalendarView opportunities={filteredOpportunities} onSelectOpportunity={onOpenProject} organizationId={userOrgId || undefined} activeModules={activeModules} onTaskUpdate={() => {}} /></div>}
