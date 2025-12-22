@@ -3,8 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Opportunity, BpmnNode, BpmnTask } from '../types';
 import { TaskDetailModal } from './TaskDetailModal';
 import { 
-    Plus, Settings, MoreHorizontal, CheckCircle2, Circle, 
-    ArrowRight, BrainCircuit, Save, Zap, Loader2, Sparkles, RefreshCw,
+    Plus, BrainCircuit, Zap, Loader2, Sparkles, RefreshCw,
     ChevronRight, Workflow as WorkflowIcon, Clock
 } from 'lucide-react';
 import { updateTask, deleteTask, syncTaskChecklist, syncBpmnTasks } from '../services/projectService';

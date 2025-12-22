@@ -161,7 +161,7 @@ const mapDbProjectToOpportunity = (row: DbProject, tasks: DbTask[] = []): Opport
         mvpSpeed: row.tadsvelocidade
     };
 
-    // Preservar TODA a estrutura BPMN vinda do banco, não apenas os nodes vazios
+    // Garantir que carregamos toda a estrutura BPMN, que contém o checklist e subtasks
     const bpmnStructure = row.bpmn_structure || { lanes: [], nodes: [], edges: [] };
 
     return {

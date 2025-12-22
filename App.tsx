@@ -9,7 +9,7 @@ import { subscribeToPresence } from './services/presenceService';
 import { trackUserAccess } from './services/analyticsService';
 import { getCurrentUserPlan, mapDbPlanIdToString } from './services/asaasService';
 
-// Icons/Components
+// Icons/Components - Definição no topo para evitar erro de hoisting no build
 const Loader2 = ({className}: {className?: string}) => (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1s linear infinite' }}>
         <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
@@ -17,6 +17,7 @@ const Loader2 = ({className}: {className?: string}) => (
     </svg>
 );
 
+// Components
 import { Sidebar, MobileDrawer } from './components/Navigation';
 import { Dashboard } from './components/Dashboard';
 import { ProjectList } from './components/ProjectList';
@@ -42,7 +43,6 @@ import { NpsSurvey } from './components/NpsSurvey';
 import { GuruFab } from './components/GuruFab';
 import { FeedbackModal } from './components/FeedbackModal';
 import { CrmBoard } from './components/CrmBoard';
-import { AssetsScreen } from './components/AssetsScreen';
 
 // --- ROUTING CONFIGURATION ---
 const ROUTES: Record<string, string> = {
@@ -50,7 +50,6 @@ const ROUTES: Record<string, string> = {
     'list': '/projects',
     'create-project': '/project/new',
     'kanban': '/kanban',
-    'assets': '/assets',
     'gantt': '/gantt',
     'calendar': '/calendar',
     'crm': '/crm',
@@ -335,7 +334,6 @@ const App: React.FC = () => {
                         {view === 'clients' && activeModules.includes('clients') && <div className="h-full p-4 md:p-8 overflow-hidden"><ClientsScreen organizationId={userOrgId || undefined} onOpenProject={onOpenProject} /></div>}
                         {view === 'product' && activeModules.includes('product') && <div className="h-full p-4 md:p-8 overflow-hidden"><ProductIndicators /></div>}
                         {view === 'dev-metrics' && activeModules.includes('engineering') && <div className="h-full p-4 md:p-8 overflow-hidden"><DevIndicators organizationId={userOrgId || undefined} /></div>}
-                        {view === 'assets' && userData?.email === 'peboorba@gmail.com' && <div className="h-full overflow-y-auto"><AssetsScreen organizationId={userOrgId || undefined} /></div>}
                         {view === 'settings' && <div className="h-full overflow-y-auto"><SettingsScreen theme={theme} onToggleTheme={toggleTheme} onlineUsers={onlineUsers} userOrgId={userOrgId} orgDetails={orgDetails} onUpdateOrgDetails={handleUpdateOrgDetails} setView={setView} userRole={userRole} userData={userData} activeModules={activeModules} onRefreshModules={() => loadOrganization(userOrgId!)} initialTab={settingsStartTab} /></div>}
                         {view === 'profile' && <div className="h-full p-4 md:p-8 overflow-y-auto"><ProfileScreen currentPlan={currentPlan} onRefresh={() => loadUserData(user.id)} /></div>}
                         {view === 'admin-manager' && userData?.email === 'peboorba@gmail.com' && <div className="h-full p-4 md:p-8 overflow-y-auto"><AdminManagerScreen onlineUsers={onlineUsers}/></div>}
