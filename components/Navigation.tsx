@@ -1,11 +1,14 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
-    LayoutDashboard, List, Calendar, User, Settings, 
+    LayoutDashboard, List, Calendar, User, Settings, Search, 
     PlusCircle, LogOut, Sun, Moon, Briefcase, TrendingUp,
     Users, DollarSign, Shield, Sparkles, Lightbulb, Menu, X, ChevronRight,
-    Code2, BarChart3, Plus, Box, Activity
+    Code2, BarChart3, Plus, Box, Activity, Layers
 } from 'lucide-react';
+import { PLAN_LIMITS } from '../types';
+import { fetchOrganizationDetails } from '../services/organizationService';
+import { supabase } from '../services/supabaseClient';
 
 interface Props {
   currentView: string;
@@ -55,6 +58,12 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, activeModules: string
             ...(hasModule('clients') ? [{ id: 'clients', label: 'Clientes', icon: Users }] : []),
         ];
         if (businessItems.length > 0) groups.push({ title: 'Negócios', items: businessItems });
+        
+        const intelItems = [
+            ...(hasModule('product') ? [{ id: 'product', label: 'Métricas Produto', icon: BarChart3 }] : []),
+            ...(hasModule('engineering') ? [{ id: 'dev-metrics', label: 'Engenharia', icon: Code2 }] : []),
+        ];
+        if (intelItems.length > 0) groups.push({ title: 'Inteligência', items: intelItems });
     }
 
     const systemItems = [{ id: 'settings', label: 'Ajustes', icon: Settings }];
@@ -80,20 +89,34 @@ const Logo = ({ customLogoUrl, orgName }: { customLogoUrl?: string | null, orgNa
     )
 );
 
-const getPlanLabel = (plan?: string) => {
-    if (!plan) return 'FREE';
-    return plan.replace('plan_', '').replace('_yearly', '').toUpperCase();
-};
-
 export const Sidebar: React.FC<Props> = (props) => {
   const isClient = props.userRole === 'cliente';
   const isAdmin = props.userData.email === 'peboorba@gmail.com';
   const menuGroups = getMenuGroups(props.userRole, isAdmin, props.activeModules, props.userData.email);
+  const [aiUsage, setAiUsage] = useState(0);
+  const planLimits = PLAN_LIMITS[props.currentPlan || 'plan_free'];
+
+  useEffect(() => {
+    const loadAiUsage = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            const { data } = await supabase.from('users').select('organizacao').eq('id', user.id).single();
+            if (data?.organizacao) {
+                const org = await fetchOrganizationDetails(data.organizacao);
+                if (org) setAiUsage(org.pedidoia || 0);
+            }
+        }
+    }
+    loadAiUsage();
+  }, []);
 
   return (
     <aside className="hidden lg:flex flex-col w-72 h-full border-r border-slate-200 dark:border-white/5 bg-white/70 dark:bg-[#050507]/40 backdrop-blur-3xl shrink-0 transition-all">
-        <div className="h-24 flex items-center px-8 gap-4 border-b border-slate-200 dark:border-white/5 shrink-0">
+        <div className="h-24 flex items-center px-8 gap-4 border-b border-slate-200 dark:border-white/5 shrink-0 justify-between">
             <Logo customLogoUrl={props.customLogoUrl} orgName={props.orgName} />
+            <button onClick={props.onOpenFeedback} className="p-2 text-amber-500 hover:bg-amber-500/10 rounded-xl transition-all">
+                <Lightbulb className="w-5 h-5"/>
+            </button>
         </div>
 
         {!isClient && (
@@ -132,11 +155,26 @@ export const Sidebar: React.FC<Props> = (props) => {
             ))}
         </div>
 
+        {/* AI Counter */}
+        {!isClient && (
+            <div className="px-6 pb-4">
+                <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-2xl flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-[10px] font-black text-purple-400 uppercase tracking-widest">
+                        <Sparkles className="w-3.5 h-3.5"/> IA Status
+                    </div>
+                    <span className="text-[10px] font-mono text-purple-300 font-black">
+                        {planLimits?.aiLimit >= 9000 ? '∞' : `${Math.max(0, (planLimits?.aiLimit || 0) - aiUsage)}`}
+                    </span>
+                </div>
+            </div>
+        )}
+
         <div className="p-6 border-t border-slate-200 dark:border-white/5 bg-slate-100/50 dark:bg-black/20">
             <div className="flex items-center justify-between mb-4 px-2">
                 <button onClick={props.onToggleTheme} className="p-2.5 rounded-xl bg-white dark:bg-white/5 border border-slate-200 dark:border-transparent text-slate-500 hover:text-amber-500 transition-colors shadow-sm dark:shadow-none">
                     {props.theme === 'dark' ? <Sun className="w-4 h-4"/> : <Moon className="w-4 h-4"/>}
                 </button>
+                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">v2.5 Release</span>
             </div>
             <div 
                 onClick={() => props.onChangeView('profile')}
@@ -147,7 +185,7 @@ export const Sidebar: React.FC<Props> = (props) => {
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className="text-sm font-black text-slate-900 dark:text-white truncate">{props.userData.name}</div>
-                    <div className="text-[9px] font-bold text-amber-600 dark:text-amber-500/60 uppercase tracking-widest">PLANO {getPlanLabel(props.currentPlan)}</div>
+                    <div className="text-[9px] font-bold text-amber-600 dark:text-amber-500/60 uppercase tracking-widest">{props.currentPlan?.replace('plan_', '').toUpperCase() || 'FREE'}</div>
                 </div>
                 <button onClick={(e) => { e.stopPropagation(); props.onLogout(); }} className="p-2.5 text-slate-400 hover:text-red-500 transition-all">
                     <LogOut className="w-4 h-4"/>
@@ -170,7 +208,7 @@ export const MobileDrawer: React.FC<Props> = (props) => {
 
     return (
         <>
-            <div className="fixed top-0 left-0 right-0 h-16 lg:hidden z-[100] glass-panel border-b border-slate-200 dark:border-white/5 flex items-center px-4 justify-between" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+            <div className="fixed top-0 left-0 right-0 min-h-[4.5rem] lg:hidden z-[100] glass-panel border-b border-slate-200 dark:border-white/5 flex items-center px-4 justify-between" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
                 <div className="flex items-center gap-3">
                     <button 
                         onClick={() => props.setIsMobileOpen(true)} 
@@ -193,7 +231,7 @@ export const MobileDrawer: React.FC<Props> = (props) => {
                     <div className="absolute inset-0 bg-black/80 backdrop-blur-md pointer-events-auto" onClick={() => props.setIsMobileOpen(false)}></div>
                     <div className="absolute inset-y-0 left-0 w-[80%] max-w-[320px] bg-white dark:bg-[#020203] border-r border-slate-200 dark:border-white/10 flex flex-col animate-in slide-in-from-left duration-500 shadow-2xl overflow-hidden">
                         
-                        <div className="h-20 flex items-center justify-between px-6 border-b border-slate-100 dark:border-white/5 shrink-0" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+                        <div className="h-24 flex items-center justify-between px-6 border-b border-slate-100 dark:border-white/5 shrink-0" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
                             <Logo customLogoUrl={props.customLogoUrl} orgName={props.orgName} />
                             <button 
                                 onClick={() => props.setIsMobileOpen(false)} 
@@ -264,7 +302,7 @@ export const MobileDrawer: React.FC<Props> = (props) => {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="text-xs font-black text-slate-900 dark:text-white truncate">{props.userData.name}</div>
-                                    <div className="text-[8px] font-bold text-amber-600 dark:text-amber-500 uppercase tracking-widest">PLANO {getPlanLabel(props.currentPlan)}</div>
+                                    <div className="text-[8px] font-bold text-amber-600 dark:text-amber-500 uppercase tracking-widest">{props.currentPlan?.replace('plan_', '').toUpperCase() || 'FREE'}</div>
                                 </div>
                                 <button onClick={props.onLogout} className="p-2 text-slate-400 hover:text-red-500 transition-all">
                                     <LogOut className="w-4 h-4"/>

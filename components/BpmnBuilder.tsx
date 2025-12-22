@@ -30,7 +30,6 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
     }, [opportunity.bpmn]);
 
     const handleTaskClick = (task: BpmnTask, node: BpmnNode) => {
-        // Enriquecer task com metadados do DB se existirem
         setEditingTask({
             task,
             nodeId: node.id,
@@ -49,7 +48,7 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
                 opportunity.description, 
                 opportunity.archetype, 
                 opportunity.docsContext,
-                '', // orgType opcional
+                '', 
                 roles
             );
 
@@ -97,6 +96,7 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
 
     const handleTaskSave = async (updatedTask: BpmnTask) => {
         if (!editingTask) return;
+        
         const newNodes = nodes.map(n => {
             if (n.id === editingTask.nodeId) {
                 return {
@@ -106,8 +106,17 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
             }
             return n;
         });
+
+        // 1. Atualizar Estado Local
         setNodes(newNodes);
         
+        // 2. Persistir no JSON do Projeto (Estrutura visual)
+        onUpdate({
+            ...opportunity,
+            bpmn: { ...opportunity.bpmn, nodes: newNodes }
+        } as any);
+
+        // 3. Sincronizar com Tabela de Tasks se houver ID de banco
         if (updatedTask.dbId) {
             const now = new Date().toISOString();
             const updatePayload: any = {
@@ -119,7 +128,6 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
                 datafim: updatedTask.dueDate
             };
 
-            // Se mudou status, injeta timestamp
             if (updatedTask.status !== editingTask.task.status) {
                 const dateFields: Record<string, string> = {
                     todo: 'dataafazer',
@@ -133,12 +141,22 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
             }
 
             await updateTask(updatedTask.dbId, updatePayload);
+
+            // Sincronizar checklist (subtarefas)
+            if (updatedTask.subtasks && opportunity.organizationId) {
+                await syncTaskChecklist(
+                    updatedTask.dbId, 
+                    updatedTask.subtasks, 
+                    opportunity.organizationId, 
+                    opportunity.dbProjectId, 
+                    updatedTask.assigneeId
+                );
+            }
         }
     };
 
     return (
         <div className="h-full flex flex-col bg-[var(--bg-color)]">
-            {/* Compact Control Bar */}
             <div className="px-4 py-4 md:h-20 md:px-8 border-b border-[var(--border-color)] bg-[var(--surface)] flex flex-col md:flex-row items-center justify-between shrink-0 gap-3">
                 <div className="flex items-center gap-3 w-full md:w-auto">
                     <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500 border border-amber-500/20 shadow-glow-amber shrink-0">
@@ -173,7 +191,6 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
                 </div>
             </div>
 
-            {/* Builder Area */}
             <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar p-5 md:p-12 relative bg-slate-50 dark:bg-black/10">
                 <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03] pointer-events-none"></div>
                 
@@ -243,7 +260,9 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
                     onSave={handleTaskSave}
                     onDelete={async (id) => {
                         if (editingTask.task.dbId) await deleteTask(editingTask.task.dbId);
-                        setNodes(nodes.map(n => ({ ...n, checklist: n.checklist.filter(t => t.id !== id) })));
+                        const newNodes = nodes.map(n => ({ ...n, checklist: n.checklist.filter(t => t.id !== id) }));
+                        setNodes(newNodes);
+                        onUpdate({ ...opportunity, bpmn: { ...opportunity.bpmn, nodes: newNodes } } as any);
                         setEditingTask(null);
                     }}
                 />

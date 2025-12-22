@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { BpmnTask, BpmnSubTask } from '../types';
 import { 
@@ -13,7 +14,7 @@ interface Props {
   task: BpmnTask;
   nodeTitle: string;
   opportunityTitle?: string;
-  onSave: (updatedTask: BpmnTask) => void;
+  onSave: (updatedTask: BpmnTask) => Promise<void> | void;
   onClose: () => void;
   onDelete?: (id: string) => void;
   organizationId?: number;
@@ -32,6 +33,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
   const [availableUsers, setAvailableUsers] = useState<any[]>([]);
   const [newSubtask, setNewSubtask] = useState('');
   const [isGeneratingChecklist, setIsGeneratingChecklist] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const titleRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -43,14 +45,20 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
   useEffect(() => {
     if (titleRef.current) {
         titleRef.current.style.height = 'auto';
-        // Adiciona 4px de buffer para evitar cortes em descenders
         titleRef.current.style.height = (titleRef.current.scrollHeight + 4) + 'px';
     }
   }, [formData.text]);
 
-  const handleSync = () => {
-      onSave(formData);
-      onClose();
+  const handleSync = async () => {
+      setIsSaving(true);
+      try {
+          await onSave(formData);
+          onClose();
+      } catch (e) {
+          alert("Erro ao salvar dados.");
+      } finally {
+          setIsSaving(false);
+      }
   };
 
   const handleAddSubtask = () => {
@@ -103,7 +111,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
     <div className="fixed inset-0 z-[1000] flex items-end md:items-center justify-center p-0 md:p-6 bg-black/90 backdrop-blur-2xl animate-in fade-in duration-300" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="w-full max-w-5xl h-[95vh] md:h-[90vh] bg-white dark:bg-[#050507] rounded-t-[2rem] md:rounded-[3.5rem] shadow-glass border border-slate-200 dark:border-white/10 flex flex-col overflow-hidden animate-ios-pop">
         
-        {/* Header - Shinko Style */}
         <header className="px-5 md:px-12 py-8 border-b border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.01] shrink-0">
             <div className="flex flex-col gap-4">
                 <div className="flex justify-between items-start">
@@ -125,7 +132,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                 />
             </div>
 
-            {/* Abas Minimalistas */}
             <div className="flex bg-black/10 dark:bg-white/5 p-1 rounded-2xl w-fit mt-8 border border-white/5">
                 {[
                     { id: 'info', icon: AlignLeft }, 
@@ -143,12 +149,9 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
             </div>
         </header>
 
-        {/* Content Area */}
         <main className="flex-1 overflow-y-auto p-5 md:p-12 custom-scrollbar bg-white/50 dark:bg-black/20">
             {activeTab === 'info' && (
                 <div className="space-y-12 animate-in fade-in duration-500">
-                    
-                    {/* Grid de Propriedades (Horizontal conforme a imagem) */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1">Responsável</label>
@@ -185,7 +188,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                                 <input 
                                     type="number" 
                                     value={formData.estimatedHours || 0} 
-                                    /* Fixed error: using setFormData to update estimatedHours */
                                     onChange={e => setFormData({ ...formData, estimatedHours: parseInt(e.target.value) || 0 })} 
                                     className="bg-transparent text-xs font-bold text-slate-900 dark:text-white outline-none flex-1 w-full"
                                     placeholder="0"
@@ -194,7 +196,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                         </div>
                     </div>
 
-                    {/* Descrição do Ativo */}
                     <div className="space-y-4">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1">Descrição do Ativo</label>
                         <div className="relative group">
@@ -207,7 +208,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                         </div>
                     </div>
 
-                    {/* GUT Matrix Mini */}
                     <div className="glass-card p-6 border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.02] max-w-sm ml-auto">
                         <div className="flex justify-between items-center mb-6">
                             <label className="text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-[0.2em]">Matriz GUT</label>
@@ -275,8 +275,11 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
         </main>
 
         <footer className="h-28 px-5 md:px-12 border-t border-slate-200 dark:border-white/5 bg-white/80 dark:bg-black/80 backdrop-blur-xl flex items-center justify-end gap-6 shrink-0">
-            <button onClick={onClose} className="px-6 py-4 text-[11px] font-black uppercase tracking-[0.2em] text-slate-500 hover:text-white transition-colors">Descartar</button>
-            <button onClick={handleSync} className="px-12 py-5 bg-amber-500 text-black rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] shadow-glow-amber flex items-center justify-center gap-3 transition-transform active:scale-95"><Save className="w-5 h-5"/> Sincronizar</button>
+            <button onClick={onClose} disabled={isSaving} className="px-6 py-4 text-[11px] font-black uppercase tracking-[0.2em] text-slate-500 hover:text-white transition-colors disabled:opacity-30">Descartar</button>
+            <button onClick={handleSync} disabled={isSaving} className="px-12 py-5 bg-amber-500 text-black rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] shadow-glow-amber flex items-center justify-center gap-3 transition-transform active:scale-95 disabled:opacity-70">
+                {isSaving ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>}
+                {isSaving ? 'Salvando...' : 'Sincronizar'}
+            </button>
         </footer>
       </div>
     </div>
