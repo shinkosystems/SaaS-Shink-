@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, Suspense, useMemo } from 'react';
 import { supabase } from './services/supabaseClient';
 import { Opportunity, BpmnTask } from './types';
@@ -8,14 +7,6 @@ import { getPublicOrgDetails, updateOrgDetails, uploadLogo, fetchActiveOrgModule
 import { subscribeToPresence } from './services/presenceService';
 import { trackUserAccess } from './services/analyticsService';
 import { getCurrentUserPlan, mapDbPlanIdToString } from './services/asaasService';
-
-// Componente de carregamento estável definido no topo para evitar erros de build
-const AppLoader = ({className}: {className?: string}) => (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1s linear infinite' }}>
-        <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
-        <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
-    </svg>
-);
 
 // Components
 import { Sidebar, MobileDrawer } from './components/Navigation';
@@ -29,7 +20,8 @@ import { ClientsScreen } from './components/ClientsScreen';
 import { SettingsScreen } from './components/SettingsScreen';
 import { ProfileScreen } from './components/ProfileScreen';
 import { LandingPage } from './components/LandingPage';
-import { BlogScreen } from './components/BlogScreen';
+import { InsightCenter } from './components/InsightCenter';
+import { FrameworkExplorer } from './components/FrameworkExplorer';
 import AuthScreen from './components/AuthScreen';
 import OpportunityWizard from './components/OpportunityWizard';
 import { QuickTaskModal } from './components/QuickTaskModal';
@@ -43,11 +35,12 @@ import { NpsSurvey } from './components/NpsSurvey';
 import { GuruFab } from './components/GuruFab';
 import { FeedbackModal } from './components/FeedbackModal';
 import { CrmBoard } from './components/CrmBoard';
-import { AssetsScreen } from './components/AssetsScreen';
+import { Trello, GanttChartSquare, Calendar as CalendarIcon, Loader2 } from 'lucide-react';
 
 // --- ROUTING CONFIGURATION ---
 const ROUTES: Record<string, string> = {
     'dashboard': '/',
+    'framework-system': '/framework',
     'list': '/projects',
     'create-project': '/project/new',
     'kanban': '/kanban',
@@ -60,8 +53,7 @@ const ROUTES: Record<string, string> = {
     'dev-metrics': '/metrics/engineering',
     'settings': '/settings',
     'profile': '/profile',
-    'admin-manager': '/admin',
-    'assets': '/performance'
+    'admin-manager': '/admin'
 };
 
 const REVERSE_ROUTES: Record<string, string> = Object.entries(ROUTES).reduce((acc, [key, value]) => {
@@ -76,26 +68,25 @@ const App: React.FC = () => {
   const [userRole, setUserRole] = useState<string>('visitante');
   const [userOrgId, setUserOrgId] = useState<number | null>(null);
   const [currentPlan, setCurrentPlan] = useState<string>('plan_free');
-  const [searchTerm, setSearchTerm] = useState('');
   const [view, setViewState] = useState<string>('dashboard');
+  const [tasksSubView, setTasksSubView] = useState<'kanban' | 'gantt' | 'calendar'>('kanban');
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeModules, setActiveModules] = useState<string[]>(['projects', 'kanban']); 
+  const [activeModules, setActiveModules] = useState<string[]>(['projects', 'kanban', 'gantt', 'calendar']); 
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [editingOpportunity, setEditingOpportunity] = useState<Opportunity | null>(null);
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const [showBlog, setShowBlog] = useState(false);
-  const [blogPostSlug, setBlogPostSlug] = useState<string | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
   const [selectedProject, setSelectedProjectState] = useState<Opportunity | null>(null);
   const [theme, setTheme] = useState<'light'|'dark'>('dark');
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
-  const [orgDetails, setOrgDetails] = useState<{ 
-      name: string, limit: number, logoUrl: string | null, primaryColor: string, aiSector: string, aiTone: string, aiContext: string
-  }>({ name: '', limit: 1, logoUrl: null, primaryColor: '#F59E0B', aiSector: '', aiTone: '', aiContext: '' });
+  const [showBlog, setShowBlog] = useState(false);
+  const [blogPostSlug, setBlogPostSlug] = useState<string | null>(null);
+  const [orgDetails, setOrgDetails] = useState({ 
+      name: '', limit: 1, logoUrl: null, primaryColor: '#F59E0B', aiSector: '', aiTone: '', aiContext: '' 
+  });
   const [dbStatus, setDbStatus] = useState<'connected'|'disconnected'>('connected');
 
   const navigateTo = (path: string) => {
@@ -117,21 +108,22 @@ const App: React.FC = () => {
   useEffect(() => {
       const handleRouting = async () => {
           let path = window.location.pathname;
+
           if (path.startsWith('/blog')) {
+              const slug = path.split('/')[2];
               setShowBlog(true);
-              setBlogPostSlug(path.split('/')[2] || null);
+              setBlogPostSlug(slug || null);
               return;
+          } else {
+              setShowBlog(false);
           }
-          if (path === '/project/new') { setViewState('create-project'); return; }
+
+          if (path.startsWith('/project/new')) { setViewState('create-project'); return; }
           if (path.startsWith('/project/')) {
               const projectId = path.split('/')[2];
               const opp = await fetchOpportunityById(projectId);
               if (opp) {
-                  if (path.includes('/edit')) { 
-                    setEditingOpportunity(opp); 
-                    setSelectedProjectState(null);
-                    setViewState('edit-project'); 
-                  }
+                  if (path.includes('/edit')) { setEditingOpportunity(opp); setViewState('edit-project'); }
                   else { setSelectedProjectState(opp); setViewState('project-view'); }
               } else setView('dashboard');
               return;
@@ -169,7 +161,16 @@ const App: React.FC = () => {
               setUserRole(data.perfil || 'colaborador');
               setUserOrgId(data.organizacao);
               if (data.organizacao) {
-                  await loadOrganization(data.organizacao);
+                  const { data: orgData } = await supabase.from('organizacoes').select('*').eq('id', data.organizacao).single();
+                  if (orgData) {
+                    setCurrentPlan(mapDbPlanIdToString(orgData.plano || 4));
+                    setOrgDetails({
+                        name: orgData.nome, limit: orgData.colaboradores, logoUrl: orgData.logo, primaryColor: orgData.cor || '#F59E0B',
+                        aiSector: orgData.setor || '', aiTone: orgData.tomdevoz || '', aiContext: orgData.dna || ''
+                    });
+                    const modules = await fetchActiveOrgModules(data.organizacao);
+                    setActiveModules(modules.length > 0 ? modules : getPlanDefaultModules(orgData.plano || 4));
+                  }
                   const opps = await fetchOpportunities(data.organizacao);
                   if (opps) setOpportunities(opps);
               }
@@ -179,43 +180,6 @@ const App: React.FC = () => {
       } catch (e) { setDbStatus('disconnected'); } finally { setLoading(false); }
   };
 
-  const loadOrganization = async (orgId: number) => {
-      const { data } = await supabase.from('organizacoes').select('*').eq('id', orgId).single();
-      if (data) {
-          setCurrentPlan(mapDbPlanIdToString(data.plano || 4));
-          setOrgDetails({
-              name: data.nome, limit: data.colaboradores, logoUrl: data.logo, primaryColor: data.cor || '#F59E0B',
-              aiSector: data.setor || '', aiTone: data.tomdevoz || '', aiContext: data.dna || ''
-          });
-          const modules = await fetchActiveOrgModules(orgId);
-          if (modules.length > 0) setActiveModules(modules);
-          else setActiveModules(getPlanDefaultModules(data.plano || 4));
-      }
-  };
-
-  const handleUpdateOrgDetails = async (updates: any) => {
-    if (!userOrgId) return;
-    try {
-        let logoUrl = updates.logoFile ? await uploadLogo(userOrgId, updates.logoFile) : undefined;
-        await updateOrgDetails(userOrgId, { ...updates, logoUrl });
-        await loadOrganization(userOrgId);
-        alert('Configurações atualizadas!');
-    } catch (e: any) { alert('Erro ao atualizar: ' + e.message); }
-  };
-
-  const handleUpdateOpportunity = async (opp: Opportunity) => {
-      const updated = await updateOpportunity(opp);
-      if (updated) {
-          setSelectedProjectState(updated);
-          const opps = await fetchOpportunities(userOrgId!);
-          if (opps) setOpportunities(opps);
-      }
-  };
-
-  /**
-   * handleCreateTask (Fix for line 303 error)
-   * Processa a criação de tarefas vinda do QuickTaskModal
-   */
   const handleCreateTask = async (task: BpmnTask, projectId: string | null) => {
     if (!userOrgId || !user) return;
     await createTask({
@@ -224,32 +188,19 @@ const App: React.FC = () => {
         descricao: task.description,
         status: task.status,
         responsavel: task.assigneeId || user.id,
-        gravidade: task.gut?.g,
-        urgencia: task.gut?.u,
-        tendencia: task.gut?.t,
         datainicio: task.startDate,
         datafim: task.dueDate,
         duracaohoras: task.estimatedHours,
         organizacao: userOrgId,
         sutarefa: false
     });
-    alert("Tarefa criada com sucesso!");
-    if (userOrgId) {
-        const opps = await fetchOpportunities(userOrgId);
-        if (opps) setOpportunities(opps);
-    }
+    alert("Tarefa criada!");
+    loadUserData(user.id);
   };
 
-  /**
-   * handleGuruAction (Fix for line 305 error)
-   * Processa comandos acionados pela IA do Shinkō Guru
-   */
   const handleGuruAction = (actionId: string) => {
     if (actionId === 'nav_kanban') setView('kanban');
     else if (actionId === 'nav_calendar') setView('calendar');
-    else if (actionId === 'nav_financial') setView('financial');
-    else if (actionId === 'nav_matrix') setView('dashboard');
-    else if (actionId === 'create_project') setViewState('create-project');
     else if (actionId === 'create_task') setShowCreateTask(true);
   };
 
@@ -261,85 +212,91 @@ const App: React.FC = () => {
       });
   };
 
-  const filteredOpportunities = useMemo(() => {
-      if (!searchTerm) return opportunities;
-      const lower = searchTerm.toLowerCase();
-      return opportunities.filter(o => o.title.toLowerCase().includes(lower) || o.description?.toLowerCase().includes(lower));
-  }, [opportunities, searchTerm]);
-
-  const isWizardMode = view === 'create-project' || view === 'edit-project';
-
   if (!user && !loading) {
-      if (showBlog) return <BlogScreen initialPostSlug={blogPostSlug} onBack={() => { setShowBlog(false); setView('dashboard'); }} onEnter={() => setShowAuth(true)} />;
+      if (showBlog) {
+          return (
+              <InsightCenter 
+                  initialPostSlug={blogPostSlug} 
+                  onBack={() => { setShowBlog(false); navigateTo('/'); }} 
+                  onEnter={() => setShowAuth(true)} 
+              />
+          );
+      }
       return (
           <>
-            <LandingPage onEnter={() => setShowAuth(true)} onOpenBlog={() => { setShowBlog(false); navigateTo('/blog'); }} customName={activeModules.includes('whitelabel') ? orgDetails.name : undefined} />
-            {showAuth && <AuthScreen onClose={() => setShowAuth(false)} onGuestLogin={() => setShowOnboarding(true)} customOrgName={orgDetails.name} />}
+            <LandingPage 
+                onEnter={() => setShowAuth(true)} 
+                customName={orgDetails.name} 
+                onOpenBlog={() => { setShowBlog(true); navigateTo('/blog'); }}
+            />
+            {showAuth && <AuthScreen onClose={() => setShowAuth(false)} onGuestLogin={() => {}} customOrgName={orgDetails.name} />}
           </>
       );
   }
 
   return (
     <div className={`flex h-screen w-full bg-slate-100 dark:bg-black text-slate-900 dark:text-slate-100 transition-colors duration-300 ${theme}`}>
-        {!isWizardMode && (
-          <Sidebar 
-              currentView={view} onChangeView={setView} 
-              onOpenCreate={() => setViewState('create-project')} onOpenCreateTask={() => setShowCreateTask(true)}
-              onToggleTheme={toggleTheme} onLogout={() => supabase.auth.signOut()} onSearch={setSearchTerm}
-              onOpenFeedback={() => setShowFeedback(true)} theme={theme} dbStatus={dbStatus}
-              isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} userRole={userRole}
-              userData={userData || { name: '...', avatar: null, email: user?.email }} currentPlan={currentPlan}
-              orgName={orgDetails.name} activeModules={activeModules}
-          />
-        )}
+        <Sidebar 
+            currentView={view} onChangeView={setView} 
+            onOpenCreate={() => setViewState('create-project')} onOpenCreateTask={() => setShowCreateTask(true)}
+            onToggleTheme={toggleTheme} onLogout={() => supabase.auth.signOut()} onSearch={() => {}}
+            onOpenFeedback={() => setShowFeedback(true)} theme={theme} dbStatus={dbStatus}
+            isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} userRole={userRole}
+            userData={userData || { name: '...', avatar: null, email: user?.email }} currentPlan={currentPlan}
+            orgName={orgDetails.name} activeModules={activeModules}
+        />
         
-        {!isWizardMode && (
-          <MobileDrawer 
-              currentView={view} onChangeView={setView} 
-              onOpenCreate={() => setViewState('create-project')} onOpenCreateTask={() => setShowCreateTask(true)}
-              onToggleTheme={toggleTheme} onLogout={() => supabase.auth.signOut()} onSearch={setSearchTerm}
-              onOpenFeedback={() => setShowFeedback(true)} theme={theme} dbStatus={dbStatus}
-              isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} userRole={userRole}
-              userData={userData || { name: '...', avatar: null, email: user?.email }} currentPlan={currentPlan}
-              orgName={orgDetails.name} activeModules={activeModules}
-          />
-        )}
-
-        <main className={`flex-1 overflow-hidden relative ${!isWizardMode ? 'pt-20 lg:pt-0' : ''}`}>
-            <Suspense fallback={<div className="flex items-center justify-center h-full"><AppLoader className="w-12 h-12 text-amber-500"/></div>}>
+        <main className="flex-1 overflow-hidden relative pt-20 lg:pt-0">
+            <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-amber-500 w-8 h-8"/></div>}>
                 {selectedProject ? (
                     <ProjectWorkspace 
                         opportunity={selectedProject} onBack={() => setSelectedProjectState(null)}
-                        onUpdate={handleUpdateOpportunity}
+                        onUpdate={(opp) => updateOpportunity(opp).then(() => loadUserData(user.id))}
                         onEdit={(opp) => { setEditingOpportunity(opp); setViewState('edit-project'); }} 
                         onDelete={(id) => deleteOpportunity(id).then(() => setSelectedProjectState(null))}
                         userRole={userRole} currentPlan={currentPlan} activeModules={activeModules}
                     />
-                ) : isWizardMode ? (
-                    <OpportunityWizard 
-                        initialData={editingOpportunity || undefined}
-                        onSave={async (opp) => {
-                            if (editingOpportunity) { await updateOpportunity(opp); onOpenProject(opp); }
-                            else { const n = await createOpportunity({ ...opp, organizationId: userOrgId }); if(n) onOpenProject(n); }
-                        }}
-                        onCancel={() => setView('dashboard')} orgType={orgDetails.name}
+                ) : view === 'framework-system' ? (
+                    <FrameworkExplorer 
+                        orgType={orgDetails.name} 
+                        onBack={() => setView('dashboard')}
+                        onSaveToProject={async (opp) => {
+                            const newOpp = await createOpportunity({ ...opp, organizationId: userOrgId || undefined });
+                            if (newOpp) onOpenProject(newOpp);
+                            else setView('dashboard');
+                        }} 
                     />
+                ) : view === 'kanban' ? (
+                    <div className="h-full flex flex-col p-4 md:p-8 space-y-6 overflow-hidden">
+                        <header className="flex justify-between items-center">
+                            <div>
+                                <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">Central de <span className="text-amber-500">Tarefas</span>.</h1>
+                                <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Visão técnica consolidada da organização</p>
+                            </div>
+                            <div className="flex bg-white dark:bg-white/5 p-1 rounded-2xl shadow-sm border border-slate-200 dark:border-white/5">
+                                <button onClick={() => setTasksSubView('kanban')} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${tasksSubView === 'kanban' ? 'bg-amber-500 text-black shadow-lg' : 'text-slate-500 hover:text-slate-900'}`}>
+                                    <Trello className="w-3.5 h-3.5"/> Kanban
+                                </button>
+                                <button onClick={() => setTasksSubView('gantt')} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${tasksSubView === 'gantt' ? 'bg-amber-500 text-black shadow-lg' : 'text-slate-500 hover:text-slate-900'}`}>
+                                    <GanttChartSquare className="w-3.5 h-3.5"/> Gantt
+                                </button>
+                                <button onClick={() => setTasksSubView('calendar')} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${tasksSubView === 'calendar' ? 'bg-amber-500 text-black shadow-lg' : 'text-slate-500 hover:text-slate-900'}`}>
+                                    <CalendarIcon className="w-3.5 h-3.5"/> Agenda
+                                </button>
+                            </div>
+                        </header>
+                        <div className="flex-1 overflow-hidden">
+                            {tasksSubView === 'kanban' && <KanbanBoard onSelectOpportunity={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} />}
+                            {tasksSubView === 'gantt' && <GanttView opportunities={opportunities} onSelectOpportunity={onOpenProject} onTaskUpdate={() => {}} organizationId={userOrgId || undefined} />}
+                            {tasksSubView === 'calendar' && <CalendarView opportunities={opportunities} onSelectOpportunity={onOpenProject} onTaskUpdate={() => {}} organizationId={userOrgId || undefined} />}
+                        </div>
+                    </div>
                 ) : (
                     <>
-                        {view === 'dashboard' && <div className="h-full p-4 md:p-8 overflow-y-auto"><Dashboard opportunities={filteredOpportunities} onNavigate={() => setView('kanban')} onOpenProject={onOpenProject} user={user} theme={theme} activeModules={activeModules} /></div>}
-                        {view === 'list' && activeModules.includes('projects') && <div className="h-full p-4 md:p-8 overflow-y-auto"><ProjectList opportunities={filteredOpportunities} onOpenProject={onOpenProject} userRole={userRole} activeModules={activeModules} onRefresh={() => loadUserData(user.id)} /></div>}
-                        {view === 'kanban' && activeModules.includes('kanban') && <div className="h-full p-4 md:p-8 overflow-hidden"><KanbanBoard onSelectOpportunity={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} currentPlan={currentPlan} activeModules={activeModules} /></div>}
-                        {view === 'gantt' && activeModules.includes('gantt') && <div className="h-full p-4 md:p-8 overflow-hidden"><GanttView opportunities={filteredOpportunities} onSelectOpportunity={onOpenProject} organizationId={userOrgId || undefined} onTaskUpdate={() => {}} /></div>}
-                        {view === 'calendar' && activeModules.includes('calendar') && <div className="h-full p-4 md:p-8 overflow-hidden"><CalendarView opportunities={filteredOpportunities} onSelectOpportunity={onOpenProject} organizationId={userOrgId || undefined} activeModules={activeModules} onTaskUpdate={() => {}} /></div>}
-                        {view === 'crm' && activeModules.includes('crm') && <div className="h-full p-4 md:p-8 overflow-hidden"><CrmBoard organizationId={userOrgId || undefined} /></div>}
-                        {view === 'financial' && activeModules.includes('financial') && <div className="h-full p-4 md:p-8 overflow-hidden"><FinancialScreen orgType={orgDetails.name} /></div>}
-                        {view === 'clients' && activeModules.includes('clients') && <div className="h-full p-4 md:p-8 overflow-hidden"><ClientsScreen organizationId={userOrgId || undefined} onOpenProject={onOpenProject} /></div>}
-                        {view === 'product' && activeModules.includes('product') && <div className="h-full p-4 md:p-8 overflow-hidden"><ProductIndicators /></div>}
-                        {view === 'dev-metrics' && activeModules.includes('engineering') && <div className="h-full p-4 md:p-8 overflow-hidden"><DevIndicators organizationId={userOrgId || undefined} /></div>}
-                        {view === 'assets' && userData?.email === 'peboorba@gmail.com' && <div className="h-full p-4 md:p-8 overflow-y-auto"><AssetsScreen organizationId={userOrgId || undefined} /></div>}
-                        {view === 'settings' && <div className="h-full overflow-y-auto"><SettingsScreen theme={theme} onToggleTheme={toggleTheme} onlineUsers={onlineUsers} userOrgId={userOrgId} orgDetails={orgDetails} onUpdateOrgDetails={handleUpdateOrgDetails} setView={setView} userRole={userRole} userData={userData} activeModules={activeModules} onRefreshModules={() => loadOrganization(userOrgId!)} /></div>}
+                        {view === 'dashboard' && <div className="h-full p-4 md:p-8 overflow-y-auto"><Dashboard opportunities={opportunities} onNavigate={() => setView('kanban')} onOpenProject={onOpenProject} user={user} theme={theme} /></div>}
+                        {view === 'list' && <div className="h-full p-4 md:p-8 overflow-y-auto"><ProjectList opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} onRefresh={() => loadUserData(user.id)} /></div>}
+                        {view === 'settings' && <div className="h-full overflow-y-auto"><SettingsScreen theme={theme} onToggleTheme={toggleTheme} onlineUsers={onlineUsers} userOrgId={userOrgId} orgDetails={orgDetails} onUpdateOrgDetails={() => {}} setView={setView} userRole={userRole} userData={userData} activeModules={activeModules} onRefreshModules={() => {}} /></div>}
                         {view === 'profile' && <div className="h-full p-4 md:p-8 overflow-y-auto"><ProfileScreen currentPlan={currentPlan} onRefresh={() => loadUserData(user.id)} /></div>}
-                        {view === 'admin-manager' && userData?.email === 'peboorba@gmail.com' && <div className="h-full p-4 md:p-8 overflow-y-auto"><AdminManagerScreen onlineUsers={onlineUsers}/></div>}
                     </>
                 )}
             </Suspense>

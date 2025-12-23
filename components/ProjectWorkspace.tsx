@@ -31,7 +31,13 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
       { id: 'kanban', label: 'Kanban', icon: Trello, moduleId: 'kanban' }, 
       { id: 'gantt', label: 'Gantt', icon: GanttChartSquare, moduleId: 'gantt' },
       { id: 'calendar', label: 'Agenda', icon: CalendarIcon, moduleId: 'calendar' },
-  ].filter(tab => !activeModules || activeModules.includes(tab.moduleId) || tab.moduleId === 'projects'); 
+  ].filter(tab => {
+      // Forçamos a visibilidade de Gantt e Kanban se o usuário não for cliente,
+      // ou se o módulo estiver explicitamente ativo.
+      if (tab.id === 'overview' || tab.id === 'bpms') return true;
+      if (!activeModules) return true;
+      return activeModules.includes(tab.moduleId) || activeModules.includes(tab.id);
+  }); 
 
   return (
     <div className="h-full flex flex-col bg-slate-50 dark:bg-[#050505] animate-in fade-in duration-300">
@@ -46,7 +52,7 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
               
               <div className="flex flex-col min-w-0">
                   <div className="flex items-center gap-1.5 lg:gap-3 overflow-hidden">
-                      <span className="hidden sm:inline text-[9px] font-black text-amber-500 uppercase tracking-widest whitespace-nowrap">Iniciativa Ativa</span>
+                      <span className="hidden sm:inline text-[9px] font-black text-amber-500 uppercase tracking-widest whitespace-nowrap">Ativo de Inovação</span>
                       <ChevronRight className="hidden sm:inline w-2.5 h-2.5 text-slate-300 dark:text-slate-700"/>
                       <h1 className="text-base lg:text-xl font-black text-slate-900 dark:text-white tracking-tighter truncate">{opportunity.title}</h1>
                   </div>
@@ -58,7 +64,7 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
                 onClick={() => onEdit(opportunity)} 
                 className="flex items-center gap-2 px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 whitespace-nowrap"
               >
-                  <Edit className="w-3.5 h-3.5"/> <span className="hidden sm:inline">Editar Info</span>
+                  <Edit className="w-3.5 h-3.5"/> <span className="hidden sm:inline">Editar Snapshot</span>
               </button>
           </div>
       </header>
@@ -128,7 +134,6 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
                       userRole={userRole}
                       projectId={opportunity.dbProjectId?.toString() || opportunity.id}
                       organizationId={opportunity.organizationId}
-                      activeModules={activeModules}
                   />
               </div>
           )}
@@ -142,7 +147,6 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
                       userRole={userRole}
                       projectId={opportunity.dbProjectId?.toString() || opportunity.id}
                       organizationId={opportunity.organizationId}
-                      activeModules={activeModules}
                   />
               </div>
           )}
