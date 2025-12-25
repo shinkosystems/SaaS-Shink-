@@ -44,7 +44,7 @@ export const SECTOR_MAP: Record<string, SectorTerminology> = {
         mvpLabel: 'Velocidade de MVP',
         painPointLabel: 'Dor Real Detectada',
         recurringLabel: 'Potencial de Recorrência',
-        assetLabel: 'Ativo de Software',
+        assetLabel: 'Projeto de Valor',
         viabilityLabel: 'Viabilidade Técnica',
         revenueLabel: 'Impacto Comercial',
         archetypes: {
@@ -92,7 +92,7 @@ export const SECTOR_MAP: Record<string, SectorTerminology> = {
         mvpLabel: 'Velocidade de Entrega',
         painPointLabel: 'Valor Percebido',
         recurringLabel: 'Continuidade',
-        assetLabel: 'Iniciativa',
+        assetLabel: 'Projeto',
         viabilityLabel: 'Viabilidade de Execução',
         revenueLabel: 'Retorno Financeiro',
         archetypes: {
@@ -119,7 +119,7 @@ export const getTerminology = (sector?: string): SectorTerminology => {
     return SECTOR_MAP.default;
 };
 
-// ... restante dos tipos mantidos ...
+// ... restante do código mantido conforme o original ...
 export interface CmsCase {
     id: string;
     title: string;
