@@ -9,7 +9,26 @@ interface Props {
   onCancel: () => void;
   orgType?: string;
   activeModules?: string[];
+  customLogoUrl?: string | null;
 }
+
+const Logo = ({ customLogoUrl, orgName }: { customLogoUrl?: string | null, orgName?: string }) => (
+    <div className="flex items-center gap-3">
+        {customLogoUrl ? (
+            <img src={customLogoUrl} alt={orgName} className="h-7 w-auto object-contain" />
+        ) : (
+            <>
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-glow-amber">
+                    <Sparkles className="w-4 h-4"/>
+                </div>
+                <div className="flex flex-col">
+                    <span className="font-black text-sm tracking-tighter text-slate-900 dark:text-white leading-none">Shinkō</span>
+                    <span className="text-[6px] font-black uppercase tracking-widest text-amber-500 mt-0.5">OS 26</span>
+                </div>
+            </>
+        )}
+    </div>
+);
 
 const STEPS = [
     { id: 0, label: 'Estratégia', icon: Target },
@@ -18,9 +37,10 @@ const STEPS = [
     { id: 3, label: 'Crivo Técnico', icon: ShieldCheck }
 ];
 
-export default function OpportunityWizard({ initialData, onSave, onCancel, orgType }: Props) {
+export default function OpportunityWizard({ initialData, onSave, onCancel, orgType, customLogoUrl }: Props) {
   const [step, setStep] = useState(0);
   const terms = getTerminology(orgType);
+  const isEditing = !!initialData?.id;
 
   const [formData, setFormData] = useState<Partial<Opportunity>>(initialData || {
     title: '', 
@@ -48,7 +68,7 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
           prioScore: prioScore,
           tadsScore: tadsScore,
           createdAt: initialData?.createdAt || new Date().toISOString(),
-          status: 'Future'
+          status: initialData?.status || 'Future'
       } as Opportunity);
       setIsSaving(false);
   };
@@ -67,14 +87,16 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
     <div className="fixed inset-0 z-[600] glass-panel bg-[var(--bg-color)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-500">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.08),transparent_50%)] pointer-events-none"></div>
 
-        {/* Header Wizard - Responsivo */}
         <header className="h-20 lg:h-24 px-6 lg:px-12 flex items-center justify-between shrink-0 relative z-10 border-b border-[var(--border-color)] bg-white/5 backdrop-blur-md">
-            <div className="flex items-center gap-4 lg:gap-6">
+            <div className="flex items-center gap-4 lg:gap-10">
+                <div className="hidden lg:block border-r border-white/10 pr-10">
+                    <Logo customLogoUrl={customLogoUrl} orgName={orgType} />
+                </div>
                 <button onClick={onCancel} className="p-2 lg:p-3 hover:bg-black/5 dark:hover:bg-white/5 rounded-2xl text-slate-500 transition-all">
                     <X className="w-5 h-5 lg:w-6 lg:h-6"/>
                 </button>
                 <div>
-                    <h2 className="text-lg lg:text-2xl font-black text-[var(--text-main)] tracking-tighter leading-none truncate max-w-[150px] lg:max-w-none">Mapear <span className="text-amber-500">{terms.assetLabel}</span>.</h2>
+                    <h2 className="text-lg lg:text-2xl font-black text-[var(--text-main)] tracking-tighter leading-none truncate max-w-[150px] lg:max-w-none">{isEditing ? 'Refinar' : 'Mapear'} <span className="text-amber-500">Projeto</span>.</h2>
                     <p className="text-[8px] lg:text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1 lg:mt-2">Framework Shinkō</p>
                 </div>
             </div>
@@ -89,7 +111,7 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                 </div>
                 {step === STEPS.length - 1 ? (
                     <button onClick={handleSave} className="px-6 lg:px-12 py-3 lg:py-4 bg-amber-500 text-black rounded-2xl lg:rounded-[1.5rem] font-black text-[10px] lg:text-xs uppercase tracking-widest shadow-glow-amber hover:scale-105 transition-all">
-                        {isSaving ? <Loader2 className="animate-spin w-5 h-5"/> : 'Finalizar'}
+                        {isSaving ? <Loader2 className="animate-spin w-5 h-5"/> : 'Sincronizar'}
                     </button>
                 ) : (
                     <button onClick={() => setStep(s => s + 1)} className="px-6 lg:px-12 py-3 lg:py-4 bg-slate-900 dark:bg-white text-white dark:text-black rounded-2xl lg:rounded-[1.5rem] font-black text-[10px] lg:text-xs uppercase tracking-widest hover:scale-105 transition-all flex items-center gap-2">
@@ -99,11 +121,9 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
             </div>
         </header>
 
-        {/* Wizard Main Content - Ajustado para mobile */}
         <main className="flex-1 overflow-y-auto custom-scrollbar flex flex-col items-center py-8 lg:py-16 px-6 lg:px-8 relative z-10">
             <div className="max-w-4xl w-full">
                 
-                {/* STEP 0: ESTRATÉGIA */}
                 {step === 0 && (
                     <div className="space-y-8 lg:space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
                         <div className="space-y-4">
@@ -111,7 +131,7 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                                 <Sparkles className="w-6 h-6 lg:w-8 lg:h-8"/>
                             </div>
                             <h3 className="text-4xl lg:text-6xl font-black text-[var(--text-main)] tracking-tighter leading-[1.1]">Onde está o <br/><span className="text-amber-500">Valor?</span></h3>
-                            <p className="text-slate-500 text-base lg:text-xl font-medium max-w-lg">Defina o nome e o contexto estratégico do seu novo {terms.assetLabel.toLowerCase()}.</p>
+                            <p className="text-slate-500 text-base lg:text-xl font-medium max-w-lg">Defina o nome e o contexto estratégico do seu novo projeto.</p>
                         </div>
                         <div className="space-y-8 lg:space-y-10">
                             <div>
@@ -120,7 +140,7 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                                     autoFocus
                                     value={formData.title}
                                     onChange={e => setFormData({...formData, title: e.target.value})}
-                                    placeholder="Ex: Novo Ativo de Valor"
+                                    placeholder="Ex: Novo Projeto Estratégico"
                                     className="w-full bg-[var(--input-bg)] border border-[var(--border-color)] rounded-[1.5rem] lg:rounded-[2rem] p-6 lg:p-8 text-2xl lg:text-4xl font-black text-[var(--text-main)] outline-none focus:border-amber-500/50 transition-all shadow-inner"
                                 />
                             </div>
@@ -137,11 +157,10 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                     </div>
                 )}
 
-                {/* STEP 1: DNA (ARCHETYPE & INTENSITY) */}
                 {step === 1 && (
                     <div className="space-y-8 lg:space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
                         <div className="space-y-4">
-                            <h3 className="text-4xl lg:text-6xl font-black text-[var(--text-main)] tracking-tighter leading-none">DNA do <span className="text-amber-500">Ativo</span>.</h3>
+                            <h3 className="text-4xl lg:text-6xl font-black text-[var(--text-main)] tracking-tighter leading-none">DNA do <span className="text-amber-500">Projeto</span>.</h3>
                             <p className="text-slate-500 text-base lg:text-xl font-medium">Categorize a natureza e o peso da sua solução.</p>
                         </div>
                         
@@ -186,12 +205,9 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                                         <span>Baixa</span>
                                         <span>Crítica</span>
                                     </div>
-                                    
                                     <div className="p-4 lg:p-5 bg-blue-500/5 rounded-xl lg:rounded-2xl border border-blue-500/10 flex gap-3 lg:gap-4 items-start">
                                         <Info className="w-4 h-4 lg:w-5 lg:h-5 text-blue-500 shrink-0 mt-0.5" />
-                                        <p className="text-[10px] lg:text-xs text-blue-400 font-bold leading-relaxed">
-                                            {terms.intensities[formData.intensity || 1]}
-                                        </p>
+                                        <p className="text-[10px] lg:text-xs text-blue-400 font-bold leading-relaxed">{terms.intensities[formData.intensity || 1]}</p>
                                     </div>
                                 </div>
                             </div>
@@ -199,7 +215,6 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                     </div>
                 )}
 
-                {/* STEP 2: MATRIZ RDE */}
                 {step === 2 && (
                     <div className="space-y-8 lg:space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
                         <div className="space-y-4">
@@ -236,14 +251,12 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                     </div>
                 )}
 
-                {/* STEP 3: T.A.D.S. VALIDATION */}
                 {step === 3 && (
                     <div className="space-y-8 lg:space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
                         <div className="space-y-4">
                             <h3 className="text-4xl lg:text-6xl font-black text-[var(--text-main)] tracking-tighter leading-none">Crivo <span className="text-amber-500">T.A.D.S.</span></h3>
                             <p className="text-slate-500 text-base lg:text-xl font-medium">Fundamentos contextuais para viabilidade de longo prazo.</p>
                         </div>
-                        
                         <div className="grid grid-cols-1 gap-3 lg:gap-4">
                             {[
                                 { key: 'scalability', label: terms.scalabilityLabel, desc: `Escalabilidade em volume sem aumentar proporcionalmente o custo.` },

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Opportunity, BpmnNode, BpmnTask } from '../types';
 import { TaskDetailModal } from './TaskDetailModal';
@@ -122,7 +121,8 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
                 status: updatedTask.status,
                 responsavel: updatedTask.assigneeId,
                 duracaohoras: updatedTask.estimatedHours,
-                datafim: updatedTask.dueDate
+                datafim: updatedTask.dueDate,
+                anexos: updatedTask.attachments // Importante: passar o array de anexos para o serviço packAttachments
             };
 
             if (updatedTask.status !== editingTask.task.status) {
@@ -268,4 +268,5 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
     );
 };
 
+// Fixed: Added default export
 export default BpmnBuilder;

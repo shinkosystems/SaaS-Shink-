@@ -1,12 +1,11 @@
-
 <!DOCTYPE html>
-<html lang="pt-BR" class="dark">
+<html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <meta name="theme-color" content="#020203" />
+    <meta name="theme-color" content="#F8F8F8" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Shinkō OS" />
     
     <link rel="icon" href="https://zjssfnbcboibqeoubeou.supabase.co/storage/v1/object/public/fotoperfil/fotoperfil/3.png" />
@@ -22,22 +21,22 @@
               shinko: {
                 primary: '#F59E0B',
                 secondary: '#D97706',
-                obsidian: '#020203',
-                surface: '#0A0A0C',
-                border: 'rgba(255, 255, 255, 0.08)',
-                glass: 'rgba(255, 255, 255, 0.03)',
+                obsidian: '#F8F8F8',
+                surface: '#FFFFFF',
+                border: '#E2E2E2',
+                glass: 'rgba(255, 255, 255, 0.7)',
               }
             },
             fontFamily: {
-              sans: ['SF Pro Display', 'Inter', 'sans-serif'],
+              sans: ['Inter', 'sans-serif'],
             },
             boxShadow: {
-              'glow-amber': '0 0 25px rgba(245, 158, 11, 0.2)',
-              'glass': '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
-              'ios': '0 15px 40px -10px rgba(0,0,0,0.08)',
+              'glow-amber': '0 0 25px rgba(245, 158, 11, 0.1)',
+              'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
+              'ios': '0 4px 12px rgba(0, 0, 0, 0.05)',
             },
             borderRadius: {
-              'ios': '2.5rem',
+              'ios': '1.5rem',
             }
           }
         }
@@ -46,48 +45,54 @@
     <style>
       :root {
         --brand-primary: #F59E0B;
-        --bg-color: #020203;
-        --surface: rgba(10, 10, 12, 0.85);
-        --card-bg: rgba(255, 255, 255, 0.03);
-        --card-bg-hover: rgba(255, 255, 255, 0.06);
-        --border-color: rgba(255, 255, 255, 0.08);
-        --text-main: #ffffff;
-        --text-muted: #94a3b8;
-        --input-bg: rgba(255, 255, 255, 0.04);
-        --calendar-cell: rgba(255, 255, 255, 0.02);
+        --bg-color: #F8F8F8;
+        --surface: #FFFFFF;
+        --card-bg: #FFFFFF;
+        --card-bg-hover: rgba(0, 0, 0, 0.01);
+        --border-color: #E2E2E2;
+        --text-main: #111111;
+        --text-muted: #71717A;
+        --input-bg: #FFFFFF;
+        --calendar-cell: transparent;
       }
 
-      .light {
-        --bg-color: #F2F2F7;
-        --surface: rgba(255, 255, 255, 0.9);
-        --card-bg: #ffffff;
-        --card-bg-hover: #f9f9f9;
-        --border-color: rgba(0, 0, 0, 0.1);
-        --text-main: #1D1D1F;
-        --text-muted: #86868B;
-        --input-bg: rgba(0, 0, 0, 0.05);
-        --calendar-cell: #ffffff;
+      /* Desabilitando overrides de modo escuro para forçar diurno */
+      .dark {
+        --bg-color: #F8F8F8;
+        --surface: #FFFFFF;
+        --card-bg: #FFFFFF;
+        --card-bg-hover: rgba(0, 0, 0, 0.01);
+        --border-color: #E2E2E2;
+        --text-main: #111111;
+        --text-muted: #71717A;
+        --input-bg: #FFFFFF;
+        --calendar-cell: transparent;
       }
 
       body {
         background-color: var(--bg-color);
         color: var(--text-main);
-        font-family: "SF Pro Display", "Inter", sans-serif;
+        font-family: "Inter", sans-serif;
         transition: background 0.4s ease, color 0.3s ease;
       }
 
       .glass-panel {
-        background: var(--surface);
-        backdrop-filter: blur(40px);
-        -webkit-backdrop-filter: blur(40px);
+        background: rgba(255, 255, 255, 0.8);
         border: 1px solid var(--border-color);
         color: var(--text-main);
+        backdrop-blur: 12px;
       }
 
       .glass-card {
         background: var(--card-bg);
         border: 1px solid var(--border-color);
         color: var(--text-main);
+        transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+      }
+      
+      .glass-card:hover {
+        background: var(--card-bg-hover);
+        border-color: var(--brand-primary);
       }
 
       .glass-input {
@@ -95,28 +100,26 @@
         border: 1px solid var(--border-color);
         color: var(--text-main);
         outline: none;
-        transition: all 0.2s ease;
       }
       
       .glass-input:focus {
         border-color: var(--brand-primary);
-        background: var(--card-bg);
       }
 
-      .glass-input::placeholder {
-        color: var(--text-muted);
-        opacity: 0.6;
+      h1, h2, h3 {
+        letter-spacing: -0.02em;
       }
 
       @keyframes ios-pop {
-        0% { transform: scale(0.96); opacity: 0; }
+        0% { transform: scale(0.98); opacity: 0; }
         100% { transform: scale(1); opacity: 1; }
       }
-      .animate-ios-pop { animation: ios-pop 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); }
+      .animate-ios-pop { animation: ios-pop 0.3s ease-out; }
 
       ::-webkit-scrollbar { width: 6px; }
       ::-webkit-scrollbar-track { background: transparent; }
-      ::-webkit-scrollbar-thumb { background: rgba(128, 128, 128, 0.2); border-radius: 10px; }
+      ::-webkit-scrollbar-thumb { background: #DDD; border-radius: 10px; }
+      ::-webkit-scrollbar-thumb:hover { background: #CCC; }
     </style>
     <script type="importmap">
     {

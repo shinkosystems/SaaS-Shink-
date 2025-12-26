@@ -1,10 +1,9 @@
-
 import React, { useEffect, useState } from 'react';
 import { 
     LayoutDashboard, List, Calendar, Settings,
     LogOut, Sun, Moon, Briefcase, TrendingUp,
     Users, DollarSign, Shield, Sparkles, Menu, X, ChevronRight,
-    Code2, BarChart3, Plus, Microscope, Activity, CheckSquare
+    Code2, BarChart3, Plus, Microscope, Activity, CheckSquare, Lightbulb
 } from 'lucide-react';
 import { PLAN_LIMITS } from '../types';
 import { fetchOrganizationDetails } from '../services/organizationService';
@@ -73,14 +72,14 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, activeModules: string
 const Logo = ({ customLogoUrl, orgName }: { customLogoUrl?: string | null, orgName?: string }) => (
     <div className="flex items-center gap-3">
         {customLogoUrl ? (
-            <img src={customLogoUrl} alt={orgName} className="h-8 lg:h-9 w-auto object-contain" />
+            <img src={customLogoUrl} alt={orgName} className="h-7 w-auto object-contain" />
         ) : (
             <>
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-glow-amber">
-                    <Sparkles className="w-4.5 h-4.5"/>
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-glow-amber">
+                    <Sparkles className="w-4 h-4"/>
                 </div>
                 <div className="flex flex-col">
-                    <span className="font-black text-base tracking-tighter text-slate-900 dark:text-white leading-none">Shinkō</span>
+                    <span className="font-bold text-base tracking-tighter text-slate-900 dark:text-white leading-none">Shinkō</span>
                     <span className="text-[7px] font-black uppercase tracking-widest text-amber-500 mt-1">OS 26</span>
                 </div>
             </>
@@ -93,36 +92,42 @@ export const Sidebar: React.FC<Props> = (props) => {
   const menuGroups = getMenuGroups(props.userRole, isAdmin, props.activeModules, props.userData.email);
 
   return (
-    <aside className="hidden lg:flex flex-col w-72 h-full border-r border-slate-200 dark:border-white/5 bg-white/80 dark:bg-[#050507]/40 backdrop-blur-3xl shrink-0">
-        <div className="h-24 flex items-center px-8 border-b border-slate-200 dark:border-white/5 shrink-0 justify-between">
+    <aside className="hidden lg:flex flex-col w-64 h-full border-r border-slate-200 dark:border-[#333] bg-white dark:bg-[#121212] shrink-0">
+        <div className="h-20 flex items-center justify-between px-6 border-b border-slate-200 dark:border-[#333] shrink-0">
             <Logo customLogoUrl={props.customLogoUrl} orgName={props.orgName} />
+            <button 
+                onClick={props.onOpenFeedback}
+                className="p-2 text-amber-500 hover:bg-amber-500/10 rounded-lg transition-all"
+            >
+                <Lightbulb className="w-4 h-4"/>
+            </button>
         </div>
 
-        <div className="px-6 py-8 space-y-3">
-            <button onClick={props.onOpenCreate} className="w-full py-4 bg-amber-500 text-black rounded-2xl font-black text-[11px] uppercase tracking-widest hover:opacity-90 transition-all flex items-center justify-center gap-2 shadow-xl shadow-amber-500/10">
+        <div className="px-4 py-6 space-y-2">
+            <button onClick={props.onOpenCreate} className="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-amber-500 transition-all flex items-center justify-center gap-2 shadow-sm">
                 <Plus className="w-4 h-4"/> Novo Projeto
             </button>
-            <button onClick={props.onOpenCreateTask} className="w-full py-3 bg-white/5 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-100 dark:hover:bg-white/5 transition-all flex items-center justify-center gap-2">
-                <CheckSquare className="w-3.5 h-3.5"/> Nova Tarefa
+            <button onClick={props.onOpenCreateTask} className="w-full py-2.5 border border-slate-200 dark:border-[#333] text-slate-500 dark:text-[#A1A1AA] rounded-xl font-bold text-[9px] uppercase tracking-widest hover:bg-black/5 dark:hover:bg-white/5 transition-all flex items-center justify-center gap-2">
+                <CheckSquare className="w-3.5 h-3.5"/> Tarefa
             </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 space-y-10 custom-scrollbar pb-10">
+        <div className="flex-1 overflow-y-auto px-4 space-y-8 custom-scrollbar pb-10">
             {menuGroups.map((group, idx) => (
-                <div key={idx} className="space-y-4">
-                    <h3 className="px-4 text-[9px] font-black uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">{group.title}</h3>
-                    <div className="space-y-1">
+                <div key={idx} className="space-y-3">
+                    <h3 className="px-3 text-[8px] font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-600">{group.title}</h3>
+                    <div className="space-y-0.5">
                         {group.items.map(item => (
                             <button
                                 key={item.id}
                                 onClick={() => props.onChangeView(item.id)}
-                                className={`w-full flex items-center gap-4 px-4 py-3 rounded-2xl text-[13px] font-bold transition-all duration-300 group ${
+                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
                                     props.currentView === item.id 
-                                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-500 border border-amber-500/20' 
-                                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'
+                                    ? 'bg-slate-100 dark:bg-white/5 text-amber-500 border border-amber-500/20' 
+                                    : 'text-slate-600 dark:text-[#A1A1AA] hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5'
                                 }`}
                             >
-                                <item.icon className={`w-[18px] h-[18px] ${props.currentView === item.id ? 'text-amber-600 dark:text-amber-500' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-600'}`}/>
+                                <item.icon className={`w-4 h-4 ${props.currentView === item.id ? 'text-amber-500' : 'text-slate-400 dark:text-slate-600'}`}/>
                                 <span className="flex-1 text-left">{item.label}</span>
                             </button>
                         ))}
@@ -131,20 +136,30 @@ export const Sidebar: React.FC<Props> = (props) => {
             ))}
         </div>
 
-        <div className="p-6 border-t border-slate-200 dark:border-white/5 bg-slate-100/50 dark:bg-black/20">
+        <div className="p-4 border-t border-slate-200 dark:border-[#333] space-y-4">
+            <div className="flex items-center justify-between px-2">
+                <button 
+                    onClick={props.onToggleTheme}
+                    className="p-2 rounded-lg bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:text-amber-500 transition-all shadow-inner"
+                >
+                    {props.theme === 'dark' ? <Sun className="w-4 h-4"/> : <Moon className="w-4 h-4"/>}
+                </button>
+                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Build 2.5.0</span>
+            </div>
+
             <div 
                 onClick={() => props.onChangeView('profile')}
-                className="flex items-center gap-4 p-3 rounded-2xl hover:bg-white dark:hover:bg-white/5 cursor-pointer transition-all border border-transparent hover:border-slate-200 dark:hover:border-white/10 group"
+                className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer transition-all group"
             >
-                <div className="w-11 h-11 rounded-xl overflow-hidden border-2 border-slate-200 dark:border-white/10 shadow-sm transition-transform group-hover:scale-105">
-                    {props.userData.avatar ? <img src={props.userData.avatar} className="w-full h-full object-cover"/> : <div className="w-full h-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-black text-slate-500 dark:text-white">{props.userData.name.charAt(0)}</div>}
+                <div className="w-9 h-9 rounded-xl bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-[#333] overflow-hidden">
+                    {props.userData.avatar ? <img src={props.userData.avatar} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center font-bold text-slate-500 dark:text-white text-xs">{props.userData.name.charAt(0)}</div>}
                 </div>
                 <div className="flex-1 min-w-0">
-                    <div className="text-sm font-black text-slate-900 dark:text-white truncate">{props.userData.name}</div>
-                    <div className="text-[9px] font-bold text-amber-500 uppercase tracking-widest">{props.currentPlan?.replace('plan_', '').toUpperCase() || 'FREE'}</div>
+                    <div className="text-xs font-bold text-slate-900 dark:text-white truncate">{props.userData.name}</div>
+                    <div className="text-[8px] font-bold text-amber-500 uppercase tracking-widest">{props.currentPlan?.replace('plan_', '').toUpperCase() || 'FREE'}</div>
                 </div>
-                <button onClick={(e) => { e.stopPropagation(); props.onLogout(); }} className="p-2 text-slate-400 hover:text-red-500 transition-all">
-                    <LogOut className="w-4 h-4"/>
+                <button onClick={(e) => { e.stopPropagation(); props.onLogout(); }} className="p-1.5 text-slate-400 hover:text-red-500 transition-all">
+                    <LogOut className="w-3.5 h-3.5"/>
                 </button>
             </div>
         </div>
@@ -158,67 +173,66 @@ export const MobileDrawer: React.FC<Props> = (props) => {
 
     return (
         <>
-            <div className="fixed top-0 left-0 right-0 h-20 lg:hidden z-[1000] glass-panel border-b border-slate-200 dark:border-white/5 flex items-center px-6 justify-between bg-white dark:bg-[#020203]">
-                <div className="flex items-center gap-4">
+            <div className="fixed top-0 left-0 right-0 h-16 lg:hidden z-[1000] border-b border-slate-200 dark:border-[#333] flex items-center px-4 justify-between bg-white dark:bg-[#121212]">
+                <div className="flex items-center gap-3">
                     <button 
                         onClick={() => props.setIsMobileOpen(true)} 
-                        className="p-3 text-slate-900 dark:text-white bg-slate-100 dark:bg-white/10 rounded-2xl active:scale-95 transition-all shadow-sm"
+                        className="p-2.5 text-slate-900 dark:text-white bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-[#333] rounded-xl active:scale-95 transition-all"
                     >
-                        <Menu className="w-6 h-6"/>
+                        <Menu className="w-5 h-5"/>
                     </button>
                     <Logo customLogoUrl={props.customLogoUrl} orgName={props.orgName} />
                 </div>
-                <button 
-                    onClick={props.onOpenCreateTask} 
-                    className="w-12 h-12 bg-amber-500 text-black rounded-2xl flex items-center justify-center shadow-glow-amber active:scale-90 transition-transform"
-                >
-                    <Plus className="w-6 h-6 stroke-[3px]"/>
-                </button>
+                <div className="flex items-center gap-2">
+                    <button 
+                        onClick={props.onToggleTheme}
+                        className="p-2.5 text-slate-500 bg-slate-100 dark:bg-white/5 rounded-xl"
+                    >
+                        {props.theme === 'dark' ? <Sun className="w-5 h-5"/> : <Moon className="w-5 h-5"/>}
+                    </button>
+                    <button onClick={props.onOpenCreateTask} className="w-10 h-10 bg-amber-500 text-black rounded-xl flex items-center justify-center shadow-lg">
+                        <Plus className="w-5 h-5 stroke-[3px]"/>
+                    </button>
+                </div>
             </div>
 
             {props.isMobileOpen && (
                 <div className="fixed inset-0 z-[2000] lg:hidden">
-                    <div className="absolute inset-0 bg-black/90 backdrop-blur-md animate-in fade-in duration-300" onClick={() => props.setIsMobileOpen(false)}></div>
-                    <div className="absolute inset-y-0 left-0 w-[85%] max-w-[320px] bg-white dark:bg-[#020203] border-r border-slate-200 dark:border-white/10 flex flex-col animate-in slide-in-from-left duration-500 shadow-2xl">
+                    <div className="absolute inset-0 bg-black/90" onClick={() => props.setIsMobileOpen(false)}></div>
+                    <div className="absolute inset-y-0 left-0 w-[80%] max-w-[300px] bg-white dark:bg-[#121212] border-r border-slate-200 dark:border-[#333] flex flex-col animate-in slide-in-from-left duration-300">
                         
-                        <div className="h-24 flex items-center justify-between px-6 border-b border-slate-100 dark:border-white/5 shrink-0">
+                        <div className="h-16 flex items-center justify-between px-6 border-b border-slate-200 dark:border-[#333] shrink-0">
                             <Logo customLogoUrl={props.customLogoUrl} orgName={props.orgName} />
-                            <button onClick={() => props.setIsMobileOpen(false)} className="p-2.5 bg-slate-50 dark:bg-white/10 rounded-2xl">
-                                <X className="w-6 h-6 text-slate-900 dark:text-white"/>
+                            <button onClick={() => props.setIsMobileOpen(false)} className="p-2 text-slate-400">
+                                <X className="w-6 h-6"/>
                             </button>
                         </div>
 
-                        <div className="px-6 py-6 space-y-3">
-                            <button 
-                                onClick={() => { props.onOpenCreate(); props.setIsMobileOpen(false); }} 
-                                className="w-full py-4 bg-amber-500 text-black rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-glow-amber flex items-center justify-center gap-2"
-                            >
-                                <Plus className="w-4.5 h-4.5"/> Novo Projeto
+                        <div className="px-4 py-6 space-y-2">
+                            <button onClick={() => { props.onOpenCreate(); props.setIsMobileOpen(false); }} className="w-full py-3.5 bg-amber-500 text-black rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-sm">
+                                <Plus className="w-4 h-4"/> Novo Projeto
                             </button>
-                            <button 
-                                onClick={() => { props.onOpenCreateTask(); props.setIsMobileOpen(false); }} 
-                                className="w-full py-3 bg-white/5 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2"
-                            >
-                                <CheckSquare className="w-4 h-4"/> Nova Tarefa
+                            <button onClick={() => { props.onOpenCreateTask(); props.setIsMobileOpen(false); }} className="w-full py-3 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-[#333] text-slate-500 dark:text-[#A1A1AA] rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2">
+                                <CheckSquare className="w-4 h-4"/> Tarefa
                             </button>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-10 custom-scrollbar">
+                        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-8 custom-scrollbar">
                             {menuGroups.map((group, idx) => (
-                                <div key={idx} className="space-y-4">
-                                    <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500 pl-2">{group.title}</h3>
-                                    <div className="space-y-1.5">
+                                <div key={idx} className="space-y-3">
+                                    <h3 className="text-[8px] font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-600 pl-3">{group.title}</h3>
+                                    <div className="space-y-1">
                                         {group.items.map(item => (
                                             <button
                                                 key={item.id}
                                                 onClick={() => { props.onChangeView(item.id); props.setIsMobileOpen(false); }}
-                                                className={`w-full flex items-center gap-5 px-4 py-4 rounded-2xl text-[13px] font-black transition-all ${
+                                                className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm font-bold transition-all ${
                                                     props.currentView === item.id 
-                                                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-500 border border-amber-500/20' 
-                                                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'
+                                                    ? 'bg-slate-100 dark:bg-white/5 text-amber-500 border border-amber-500/20' 
+                                                    : 'text-slate-600 dark:text-[#A1A1AA] hover:bg-slate-50 dark:hover:bg-white/5'
                                                 }`}
                                             >
-                                                <item.icon className={`w-5 h-5 ${props.currentView === item.id ? 'text-amber-500' : 'text-slate-400'}`}/>
+                                                <item.icon className={`w-5 h-5 ${props.currentView === item.id ? 'text-amber-500' : 'text-slate-400 dark:text-slate-600'}`}/>
                                                 <span className="flex-1 text-left">{item.label}</span>
                                             </button>
                                         ))}
@@ -227,14 +241,14 @@ export const MobileDrawer: React.FC<Props> = (props) => {
                             ))}
                         </div>
 
-                        <div className="p-8 border-t border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-black/60">
+                        <div className="p-6 border-t border-slate-200 dark:border-[#333] bg-slate-50 dark:bg-black/20">
                             <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-2xl overflow-hidden border-2 border-amber-500/30">
-                                    {props.userData.avatar ? <img src={props.userData.avatar} className="w-full h-full object-cover"/> : <div className="w-full h-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-black text-white text-xs">{props.userData.name.charAt(0)}</div>}
+                                <div className="w-11 h-11 rounded-xl bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-[#333] overflow-hidden">
+                                    {props.userData.avatar ? <img src={props.userData.avatar} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center font-bold text-slate-500 dark:text-white text-xs">{props.userData.name.charAt(0)}</div>}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <div className="text-sm font-black text-slate-900 dark:text-white truncate">{props.userData.name}</div>
-                                    <div className="text-[9px] font-bold text-amber-500 uppercase tracking-widest">{props.currentPlan?.replace('plan_', '').toUpperCase() || 'FREE'}</div>
+                                    <div className="text-sm font-bold text-slate-900 dark:text-white truncate">{props.userData.name}</div>
+                                    <div className="text-[9px] font-bold text-amber-500 uppercase tracking-widest">{props.currentPlan?.toUpperCase() || 'FREE'}</div>
                                 </div>
                                 <button onClick={props.onLogout} className="p-2 text-slate-400 hover:text-red-500">
                                     <LogOut className="w-5 h-5"/>

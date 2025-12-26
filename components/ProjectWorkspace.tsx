@@ -1,4 +1,5 @@
 
+// Add useState hook to React imports
 import React, { useState } from 'react';
 import { Opportunity, BpmnTask, ProjectStatus } from '../types';
 import { KanbanBoard } from './KanbanBoard';
@@ -6,7 +7,7 @@ import { GanttView } from './GanttView';
 import { CalendarView } from './CalendarView';
 import OpportunityDetail from './OpportunityDetail'; 
 import BpmnBuilder from './BpmnBuilder';
-import { ArrowLeft, LayoutDashboard, Trello, GanttChartSquare, Calendar as CalendarIcon, Edit, Workflow, ChevronRight } from 'lucide-react';
+import { ArrowLeft, LayoutDashboard, Trello, GanttChartSquare, Calendar as CalendarIcon, Edit, Workflow, ChevronRight, Sparkles } from 'lucide-react';
 
 interface Props {
   opportunity: Opportunity;
@@ -18,11 +19,31 @@ interface Props {
   currentPlan?: string;
   isSharedMode?: boolean;
   activeModules?: string[];
+  customLogoUrl?: string | null;
+  orgName?: string;
 }
+
+const Logo = ({ customLogoUrl, orgName }: { customLogoUrl?: string | null, orgName?: string }) => (
+    <div className="flex items-center gap-3">
+        {customLogoUrl ? (
+            <img src={customLogoUrl} alt={orgName} className="h-7 w-auto object-contain" />
+        ) : (
+            <>
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-glow-amber">
+                    <Sparkles className="w-4 h-4"/>
+                </div>
+                <div className="flex flex-col">
+                    <span className="font-black text-sm tracking-tighter text-slate-900 dark:text-white leading-none">Shinkō</span>
+                    <span className="text-[6px] font-black uppercase tracking-widest text-amber-500 mt-0.5">OS 26</span>
+                </div>
+            </>
+        )}
+    </div>
+);
 
 type Tab = 'overview' | 'bpms' | 'kanban' | 'calendar' | 'gantt';
 
-export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdate, onEdit, onDelete, userRole, currentPlan, isSharedMode, activeModules }) => {
+export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdate, onEdit, onDelete, userRole, currentPlan, isSharedMode, activeModules, customLogoUrl, orgName }) => {
   const [activeTab, setActiveTab] = useState<Tab>('overview');
 
   const tabs = [
@@ -32,8 +53,6 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
       { id: 'gantt', label: 'Gantt', icon: GanttChartSquare, moduleId: 'gantt' },
       { id: 'calendar', label: 'Agenda', icon: CalendarIcon, moduleId: 'calendar' },
   ].filter(tab => {
-      // Forçamos a visibilidade de Gantt e Kanban se o usuário não for cliente,
-      // ou se o módulo estiver explicitamente ativo.
       if (tab.id === 'overview' || tab.id === 'bpms') return true;
       if (!activeModules) return true;
       return activeModules.includes(tab.moduleId) || activeModules.includes(tab.id);
@@ -42,18 +61,22 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
   return (
     <div className="h-full flex flex-col bg-slate-50 dark:bg-[#050505] animate-in fade-in duration-300">
       <header className="h-16 lg:h-20 px-4 lg:px-8 flex items-center justify-between border-b border-slate-200 dark:border-white/5 bg-white/80 dark:bg-[#0a0a0a]/80 backdrop-blur-2xl shrink-0 z-20">
-          <div className="flex items-center gap-3 lg:gap-6 min-w-0">
+          <div className="flex items-center gap-3 lg:gap-8 min-w-0">
+              <div className="hidden sm:block border-r border-slate-200 dark:border-white/10 pr-6">
+                <Logo customLogoUrl={customLogoUrl} orgName={orgName} />
+              </div>
+              
               <button 
                 onClick={onBack} 
-                className="p-2 lg:p-3 hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl lg:rounded-2xl text-slate-500 transition-all"
+                className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl text-slate-500 transition-all"
               >
                   <ArrowLeft className="w-5 h-5"/>
               </button>
               
               <div className="flex flex-col min-w-0">
                   <div className="flex items-center gap-1.5 lg:gap-3 overflow-hidden">
-                      <span className="hidden sm:inline text-[9px] font-black text-amber-500 uppercase tracking-widest whitespace-nowrap">Ativo de Inovação</span>
-                      <ChevronRight className="hidden sm:inline w-2.5 h-2.5 text-slate-300 dark:text-slate-700"/>
+                      <span className="hidden lg:inline text-[9px] font-black text-amber-500 uppercase tracking-widest whitespace-nowrap">Projeto de Inovação</span>
+                      <ChevronRight className="hidden lg:inline w-2.5 h-2.5 text-slate-300 dark:text-slate-700"/>
                       <h1 className="text-base lg:text-xl font-black text-slate-900 dark:text-white tracking-tighter truncate">{opportunity.title}</h1>
                   </div>
               </div>
@@ -64,7 +87,7 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
                 onClick={() => onEdit(opportunity)} 
                 className="flex items-center gap-2 px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 whitespace-nowrap"
               >
-                  <Edit className="w-3.5 h-3.5"/> <span className="hidden sm:inline">Editar Snapshot</span>
+                  <Edit className="w-3.5 h-3.5"/> <span className="hidden sm:inline">Editar Projeto</span>
               </button>
           </div>
       </header>

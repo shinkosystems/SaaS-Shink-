@@ -1,27 +1,17 @@
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, useMemo } from 'react';
 import { supabase } from './services/supabaseClient';
 import { Opportunity, BpmnTask } from './types';
 import { fetchOpportunities, createOpportunity, updateOpportunity, deleteOpportunity, fetchOpportunityById } from './services/opportunityService';
 import { createTask } from './services/projectService';
-import { fetchActiveOrgModules, getPlanDefaultModules } from './services/organizationService';
+import { getPublicOrgDetails, updateOrgDetails, uploadLogo, fetchActiveOrgModules, getPlanDefaultModules } from './services/organizationService';
 import { subscribeToPresence } from './services/presenceService';
 import { trackUserAccess } from './services/analyticsService';
-import { mapDbPlanIdToString } from './services/asaasService';
+import { getCurrentUserPlan, mapDbPlanIdToString } from './services/asaasService';
 
-// Layout Components
+// Navigation Components
 import { Sidebar, MobileDrawer } from './components/Navigation';
-import { QuickTaskModal } from './components/QuickTaskModal';
-import { FeedbackModal } from './components/FeedbackModal';
-import { ProjectWorkspace } from './components/ProjectWorkspace';
-import { GuruFab } from './components/GuruFab';
-import { NpsSurvey } from './components/NpsSurvey';
-import { ResetPasswordModal } from './components/ResetPasswordModal';
-import { OnboardingGuide } from './components/OnboardingGuide';
-import AuthScreen from './components/AuthScreen';
-import { LandingPage } from './components/LandingPage';
-import { InsightCenter } from './components/InsightCenter';
 
-// Pages
+// Page Components
 import { DashboardPage } from './pages/DashboardPage';
 import { FrameworkPage } from './pages/FrameworkPage';
 import { ProjectsPage } from './pages/ProjectsPage';
@@ -34,6 +24,16 @@ import { SettingsPage } from './pages/SettingsPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { AdminPage } from './pages/AdminPage';
 
+// Utility Components
+import AuthScreen from './components/AuthScreen';
+import OpportunityWizard from './components/OpportunityWizard';
+import { QuickTaskModal } from './components/QuickTaskModal';
+import { ProjectWorkspace } from './components/ProjectWorkspace';
+import { NpsSurvey } from './components/NpsSurvey';
+import { GuruFab } from './components/GuruFab';
+import { FeedbackModal } from './components/FeedbackModal';
+import { LandingPage } from './components/LandingPage';
+import { InsightCenter } from './components/InsightCenter';
 import { Loader2 } from 'lucide-react';
 
 const ROUTES: Record<string, string> = {
@@ -41,6 +41,8 @@ const ROUTES: Record<string, string> = {
     'framework-system': '/framework',
     'list': '/projects',
     'kanban': '/tasks',
+    'calendar': '/calendar',
+    'gantt': '/timeline',
     'crm': '/crm',
     'financial': '/finance',
     'clients': '/clients',
@@ -70,7 +72,11 @@ const App: React.FC = () => {
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [selectedProject, setSelectedProjectState] = useState<Opportunity | null>(null);
-  const [theme, setTheme] = useState<'light'|'dark'>('dark');
+  const [editingOpportunity, setEditingOpportunity] = useState<Opportunity | null>(null);
+  
+  // Forçando inicialização em modo claro (diurno)
+  const [theme, setTheme] = useState<'light'|'dark'>('light');
+
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [showBlog, setShowBlog] = useState(false);
   const [blogPostSlug, setBlogPostSlug] = useState<string | null>(null);
@@ -86,14 +92,31 @@ const App: React.FC = () => {
   const setView = (newView: string) => {
       setViewState(newView);
       setSelectedProjectState(null); 
+      setEditingOpportunity(null);
       setIsMobileOpen(false);
       navigateTo(ROUTES[newView] || '/');
   };
 
   const onOpenProject = (opp: Opportunity) => {
       setSelectedProjectState(opp);
+      setEditingOpportunity(null);
       navigateTo(`/project/${opp.id}`);
   };
+
+  const onEditProject = (opp: Opportunity) => {
+      setEditingOpportunity(opp);
+      setSelectedProjectState(null);
+      navigateTo(`/project/${opp.id}/edit`);
+  };
+
+  // Efeito centralizado forçando a remoção da classe dark
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.add('light');
+    root.classList.remove('dark');
+    // Forçamos o tema no localStorage como light também
+    localStorage.setItem('shinko_theme', 'light');
+  }, [theme]);
 
   useEffect(() => {
       const handleRouting = async () => {
@@ -105,13 +128,30 @@ const App: React.FC = () => {
               return;
           } else { setShowBlog(false); }
 
-          if (path.startsWith('/project/')) {
-              const projectId = path.split('/')[2];
-              const opp = await fetchOpportunityById(projectId);
-              if (opp) setSelectedProjectState(opp);
-              else setView('dashboard');
+          if (path === '/project/new') {
+              setViewState('create-project');
+              setSelectedProjectState(null);
               return;
           }
+
+          if (path.startsWith('/project/')) {
+              const parts = path.split('/');
+              const projectId = parts[2];
+              const subAction = parts[3]; 
+
+              const opp = await fetchOpportunityById(projectId);
+              if (opp) {
+                  if (subAction === 'edit') {
+                      setEditingOpportunity(opp);
+                      setSelectedProjectState(null);
+                  } else {
+                      setSelectedProjectState(opp);
+                      setEditingOpportunity(null);
+                  }
+              } else setView('dashboard');
+              return;
+          }
+
           const mappedView = REVERSE_ROUTES[path];
           if (mappedView) setViewState(mappedView);
           else setView('dashboard');
@@ -163,30 +203,9 @@ const App: React.FC = () => {
       } catch (e) { setDbStatus('disconnected'); } finally { setLoading(false); }
   };
 
-  const handleCreateTask = async (task: BpmnTask, projectId: string | null) => {
-    if (!userOrgId || !user) return;
-    await createTask({
-        projeto: projectId ? Number(projectId) : null,
-        titulo: task.text,
-        descricao: task.description,
-        status: task.status,
-        responsavel: task.assigneeId || user.id,
-        datainicio: task.startDate,
-        datafim: task.dueDate,
-        duracaohoras: task.estimatedHours,
-        organizacao: userOrgId,
-        sutarefa: false
-    });
-    alert("Tarefa criada!");
-    loadUserData(user.id);
-  };
-
+  // Mantendo a função, mas agora ela garante o modo claro
   const toggleTheme = () => {
-      setTheme(prev => {
-          const n = prev === 'dark' ? 'light' : 'dark';
-          document.documentElement.classList.toggle('dark', n === 'dark');
-          return n;
-      });
+      setTheme('light');
   };
 
   if (!user && !loading) {
@@ -201,45 +220,76 @@ const App: React.FC = () => {
 
   const commonProps = {
       currentView: view, onChangeView: setView,
-      onOpenCreate: () => setView('framework-system'), 
+      onOpenCreate: () => navigateTo('/project/new'), 
       onOpenCreateTask: () => setShowCreateTask(true),
       onToggleTheme: toggleTheme, onLogout: () => supabase.auth.signOut(),
       onSearch: () => {}, onOpenFeedback: () => setShowFeedback(true),
-      theme, dbStatus, isMobileOpen, setIsMobileOpen, userRole,
+      theme: 'light' as const, dbStatus, isMobileOpen, setIsMobileOpen, userRole,
       userData: userData || { name: '...', avatar: null, email: user?.email },
-      currentPlan, orgName: orgDetails.name, activeModules
+      currentPlan, orgName: orgDetails.name, activeModules, customLogoUrl: orgDetails.logoUrl
   };
 
   return (
-    <div className={`flex h-screen w-full bg-slate-100 dark:bg-[#020203] text-slate-900 dark:text-slate-100 transition-colors duration-300 ${theme}`}>
-        <Sidebar {...commonProps} />
-        <MobileDrawer {...commonProps} />
+    <div className="flex h-screen w-full bg-[var(--bg-color)] text-slate-900 transition-colors duration-300">
+        {view !== 'create-project' && !editingOpportunity && <Sidebar {...commonProps} />}
+        {view !== 'create-project' && !editingOpportunity && <MobileDrawer {...commonProps} />}
         
-        <main className="flex-1 overflow-hidden relative pt-20 lg:pt-0">
+        <main className={`flex-1 overflow-hidden relative ${view !== 'create-project' && !editingOpportunity ? 'pt-20 lg:pt-0' : ''}`}>
             <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-amber-500 w-8 h-8"/></div>}>
-                {selectedProject ? (
+                {editingOpportunity ? (
+                    <OpportunityWizard 
+                        initialData={editingOpportunity} 
+                        orgType={orgDetails.name}
+                        customLogoUrl={orgDetails.logoUrl}
+                        onSave={async (opp) => {
+                            await updateOpportunity(opp);
+                            loadUserData(user.id);
+                            onOpenProject(opp);
+                        }}
+                        onCancel={() => onOpenProject(editingOpportunity)}
+                    />
+                ) : selectedProject ? (
                     <ProjectWorkspace 
                         opportunity={selectedProject} onBack={() => setSelectedProjectState(null)}
                         onUpdate={(opp) => updateOpportunity(opp).then(() => loadUserData(user.id))}
-                        onEdit={(opp) => onOpenProject(opp)} 
+                        onEdit={(opp) => onEditProject(opp)} 
                         onDelete={(id) => deleteOpportunity(id).then(() => setSelectedProjectState(null))}
                         userRole={userRole} currentPlan={currentPlan} activeModules={activeModules}
+                        customLogoUrl={orgDetails.logoUrl} orgName={orgDetails.name}
+                    />
+                ) : view === 'create-project' ? (
+                    <OpportunityWizard 
+                        orgType={orgDetails.name}
+                        customLogoUrl={orgDetails.logoUrl}
+                        onSave={async (opp) => {
+                            const newOpp = await createOpportunity({ ...opp, organizationId: userOrgId || undefined });
+                            if (newOpp) {
+                                loadUserData(user.id);
+                                onOpenProject(newOpp);
+                            } else setView('dashboard');
+                        }}
+                        onCancel={() => setView('dashboard')}
                     />
                 ) : (
                     <>
-                        {view === 'dashboard' && <DashboardPage opportunities={opportunities} onOpenProject={onOpenProject} onNavigate={setView} user={user} theme={theme} />}
+                        {view === 'dashboard' && <DashboardPage opportunities={opportunities} onOpenProject={onOpenProject} onNavigate={setView} user={user} theme="light" />}
                         {view === 'framework-system' && <FrameworkPage orgName={orgDetails.name} onBack={() => setView('dashboard')} onSaveToProject={async (opp) => {
                             const newOpp = await createOpportunity({ ...opp, organizationId: userOrgId || undefined });
                             if (newOpp) onOpenProject(newOpp);
                             else setView('dashboard');
                         }} />}
                         {view === 'list' && <ProjectsPage opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} onRefresh={() => loadUserData(user.id)} />}
-                        {view === 'kanban' && <TasksPage opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} />}
+                        
+                        {/* Gestão de Tarefas unificada pela TasksPage */}
+                        {view === 'kanban' && <TasksPage initialSubView="kanban" opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} />}
+                        {view === 'calendar' && <TasksPage initialSubView="calendar" opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} />}
+                        {view === 'gantt' && <TasksPage initialSubView="gantt" opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} />}
+                        
                         {view === 'crm' && <CrmPage organizationId={userOrgId || undefined} />}
                         {view === 'financial' && <FinancialPage orgType={orgDetails.name} />}
                         {view === 'clients' && <ClientsPage userRole={userRole} onlineUsers={onlineUsers} organizationId={userOrgId || undefined} onOpenProject={onOpenProject} />}
                         {view === 'intelligence' && <IntelligencePage organizationId={userOrgId || undefined} opportunities={opportunities} />}
-                        {view === 'settings' && <SettingsPage theme={theme} onToggleTheme={toggleTheme} onlineUsers={onlineUsers} userOrgId={userOrgId} orgDetails={orgDetails} onUpdateOrgDetails={() => {}} setView={setView} userRole={userRole} userData={userData} activeModules={activeModules} onRefreshModules={() => {}} />}
+                        {view === 'settings' && <SettingsPage theme="light" onToggleTheme={toggleTheme} onlineUsers={onlineUsers} userOrgId={userOrgId} orgDetails={orgDetails} onUpdateOrgDetails={() => {}} setView={setView} userRole={userRole} userData={userData} activeModules={activeModules} onRefreshModules={() => {}} />}
                         {view === 'profile' && <ProfilePage currentPlan={currentPlan} onRefresh={() => loadUserData(user.id)} />}
                         {view === 'admin-manager' && <AdminPage onlineUsers={onlineUsers} />}
                     </>
@@ -247,7 +297,12 @@ const App: React.FC = () => {
             </Suspense>
         </main>
 
-        {showCreateTask && <QuickTaskModal opportunities={opportunities} onClose={() => setShowCreateTask(false)} onSave={handleCreateTask} userRole={userRole} />}
+        {showCreateTask && <QuickTaskModal opportunities={opportunities} onClose={() => setShowCreateTask(false)} onSave={async (task, pid) => {
+            if (!userOrgId || !user) return;
+            await createTask({...task, projeto: pid ? Number(pid) : null, responsavel: task.assigneeId || user.id, organizacao: userOrgId});
+            loadUserData(user.id);
+            setShowCreateTask(false);
+        }} userRole={userRole} />}
         {showFeedback && user && <FeedbackModal userId={user.id} onClose={() => setShowFeedback(false)} />}
         {user && userRole !== 'cliente' && activeModules.includes('ia') && <GuruFab opportunities={opportunities} user={user} organizationId={userOrgId || undefined} onAction={(aid) => aid === 'create_task' ? setShowCreateTask(true) : setView(aid.replace('nav_', ''))} />}
         <NpsSurvey userId={user?.id} userRole={userRole} />
