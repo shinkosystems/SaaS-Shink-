@@ -245,49 +245,65 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
                 </div>
             )}
 
-            {/* CREATE/EDIT MODAL - SHINKO GLASS */}
+            {/* CREATE/EDIT MODAL - EXPANDED FOR FULL SCREEN FEELING */}
             {showModal && (
                 <div className="fixed inset-0 z-[700] flex items-center justify-center p-6 bg-black/60 backdrop-blur-2xl animate-in fade-in">
-                    <div className="glass-panel w-full max-w-md rounded-[3rem] shadow-glass border-[var(--border-color)] overflow-hidden relative animate-ios-pop">
+                    <div className="glass-panel w-full max-w-4xl rounded-[3rem] shadow-glass border-[var(--border-color)] overflow-hidden relative animate-ios-pop flex flex-col max-h-[90vh]">
                         <div className="p-8 border-b border-[var(--border-color)] flex justify-between items-center bg-white/5">
-                            <h3 className="text-xl font-black text-[var(--text-main)] tracking-tighter">{newTrans.id ? 'Refinar' : 'Novo'} Lançamento</h3>
-                            <button onClick={() => setShowModal(false)} className="p-2 hover:bg-white/10 rounded-xl transition-all"><X className="w-6 h-6 text-slate-400"/></button>
+                            <div>
+                                <h3 className="text-2xl font-black text-[var(--text-main)] tracking-tighter">{newTrans.id ? 'Refinar' : 'Novo'} Lançamento</h3>
+                                <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mt-1">Entrada de Dados Financeiros</p>
+                            </div>
+                            <button onClick={() => setShowModal(false)} className="p-3 hover:bg-white/10 rounded-2xl transition-all"><X className="w-6 h-6 text-slate-400"/></button>
                         </div>
-                        <div className="p-10 space-y-8">
-                            <div className="flex bg-black/5 dark:bg-white/5 p-1.5 rounded-2xl border border-[var(--border-color)]">
-                                <button onClick={() => setNewTrans({...newTrans, type: 'inflow'})} className={`flex-1 py-3 rounded-[1.2rem] text-[10px] font-black uppercase tracking-widest transition-all ${newTrans.type === 'inflow' ? 'bg-emerald-500 text-white shadow-lg' : 'text-slate-500'}`}>Entrada</button>
-                                <button onClick={() => setNewTrans({...newTrans, type: 'outflow'})} className={`flex-1 py-3 rounded-[1.2rem] text-[10px] font-black uppercase tracking-widest transition-all ${newTrans.type === 'outflow' ? 'bg-red-500 text-white shadow-lg' : 'text-slate-500'}`}>Saída</button>
+                        
+                        <div className="p-10 space-y-10 overflow-y-auto custom-scrollbar">
+                            <div className="flex bg-black/5 dark:bg-white/5 p-1.5 rounded-2xl border border-[var(--border-color)] w-fit mx-auto">
+                                <button onClick={() => setNewTrans({...newTrans, type: 'inflow'})} className={`px-12 py-3 rounded-[1.2rem] text-[10px] font-black uppercase tracking-widest transition-all ${newTrans.type === 'inflow' ? 'bg-emerald-500 text-white shadow-lg' : 'text-slate-500'}`}>Entrada</button>
+                                <button onClick={() => setNewTrans({...newTrans, type: 'outflow'})} className={`px-12 py-3 rounded-[1.2rem] text-[10px] font-black uppercase tracking-widest transition-all ${newTrans.type === 'outflow' ? 'bg-red-500 text-white shadow-lg' : 'text-slate-500'}`}>Saída</button>
                             </div>
                             
-                            <div className="space-y-6">
+                            <div className="space-y-8">
                                 <div>
-                                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-2 block">Identificação do Ativo</label>
-                                    <input type="text" placeholder="Ex: Mensalidade Cliente Alpha" value={newTrans.description} onChange={e => setNewTrans({...newTrans, description: e.target.value})} className="w-full p-4 bg-[var(--input-bg)] border border-[var(--border-color)] rounded-2xl text-sm font-bold text-[var(--text-main)] outline-none focus:border-amber-500/50 transition-all"/>
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-3 block">Identificação do Ativo</label>
+                                    <input type="text" placeholder="Ex: Mensalidade Cliente Alpha" value={newTrans.description} onChange={e => setNewTrans({...newTrans, description: e.target.value})} className="w-full p-6 bg-[var(--input-bg)] border border-[var(--border-color)] rounded-[1.5rem] text-xl font-bold text-[var(--text-main)] outline-none focus:border-amber-500/50 transition-all shadow-inner"/>
                                 </div>
-                                <div className="grid grid-cols-2 gap-6">
-                                    <div>
-                                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-2 block">Montante (R$)</label>
-                                        <input type="number" placeholder="0,00" value={newTrans.amount || ''} onChange={e => setNewTrans({...newTrans, amount: parseFloat(e.target.value)})} className="w-full p-4 bg-[var(--input-bg)] border border-[var(--border-color)] rounded-2xl text-sm font-black text-[var(--text-main)] outline-none focus:border-amber-500/50 transition-all"/>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div className="space-y-3">
+                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-2 block">Montante (R$)</label>
+                                        <div className="relative">
+                                            <span className="absolute left-6 top-1/2 -translate-y-1/2 font-black text-slate-400">R$</span>
+                                            <input type="number" placeholder="0,00" value={newTrans.amount || ''} onChange={e => setNewTrans({...newTrans, amount: parseFloat(e.target.value)})} className="w-full p-6 pl-14 bg-[var(--input-bg)] border border-[var(--border-color)] rounded-[1.5rem] text-2xl font-black text-[var(--text-main)] outline-none focus:border-amber-500/50 transition-all shadow-inner"/>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-2 block">Data Fiscal</label>
-                                        <input type="date" value={newTrans.date} onChange={e => setNewTrans({...newTrans, date: e.target.value})} className="w-full p-4 bg-[var(--input-bg)] border border-[var(--border-color)] rounded-2xl text-xs font-black text-[var(--text-main)] outline-none focus:border-amber-500/50 transition-all uppercase tracking-widest"/>
+                                    <div className="space-y-3">
+                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-2 block">Data Fiscal</label>
+                                        <input type="date" value={newTrans.date} onChange={e => setNewTrans({...newTrans, date: e.target.value})} className="w-full p-6 bg-[var(--input-bg)] border border-[var(--border-color)] rounded-[1.5rem] text-lg font-black text-[var(--text-main)] outline-none focus:border-amber-500/50 transition-all uppercase tracking-[0.2em] shadow-inner"/>
                                     </div>
                                 </div>
-                                <div>
-                                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-2 block">Natureza Operacional</label>
-                                    <select value={newTrans.category} onChange={e => setNewTrans({...newTrans, category: e.target.value})} className="w-full p-4 bg-[var(--input-bg)] border border-[var(--border-color)] rounded-2xl text-sm font-bold text-[var(--text-main)] outline-none cursor-pointer">
-                                        <option value="Operacional" className="dark:bg-slate-900">Operacional</option>
-                                        <option value="Marketing" className="dark:bg-slate-900">Marketing</option>
-                                        <option value="Vendas" className="dark:bg-slate-900">Vendas</option>
-                                        <option value="Receita Recorrente" className="dark:bg-slate-900">Receita Recorrente</option>
-                                        <option value="Infraestrutura" className="dark:bg-slate-900">Infraestrutura</option>
-                                    </select>
+
+                                <div className="space-y-3">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-2 block">Natureza Operacional</label>
+                                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                                        {['Operacional', 'Marketing', 'Vendas', 'Receita Recorrente', 'Infraestrutura'].map(cat => (
+                                            <button
+                                                key={cat}
+                                                onClick={() => setNewTrans({...newTrans, category: cat})}
+                                                className={`p-4 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${newTrans.category === cat ? 'bg-amber-500 border-amber-400 text-black shadow-lg' : 'bg-white/5 border-white/5 text-slate-500 hover:bg-white/10'}`}
+                                            >
+                                                {cat}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
+                        </div>
 
-                            <button onClick={handleSave} className="w-full py-5 bg-amber-500 text-black font-black uppercase tracking-widest text-[11px] rounded-2xl shadow-glow-amber hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3">
-                                <Save className="w-4 h-4"/> Sincronizar no Caixa
+                        <div className="p-8 border-t border-[var(--border-color)] bg-white/5 flex gap-4 shrink-0">
+                            <button onClick={() => setShowModal(false)} className="flex-1 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">Descartar</button>
+                            <button onClick={handleSave} className="flex-[2] py-5 bg-amber-500 text-black font-black uppercase tracking-[0.2em] text-xs rounded-2xl shadow-glow-amber hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3">
+                                <Save className="w-5 h-5"/> Sincronizar no Caixa
                             </button>
                         </div>
                     </div>

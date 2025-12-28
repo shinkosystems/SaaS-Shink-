@@ -30,15 +30,16 @@ interface Props {
   customLogoUrl?: string | null;
   orgName?: string;
   activeModules?: string[];
+  organizationId?: number | null;
 }
 
-const getMenuGroups = (userRole: string, isAdmin: boolean, activeModules: string[] = [], userEmail?: string) => {
-    const isMaster = userEmail === 'peboorba@gmail.com';
+const getMenuGroups = (userRole: string, isAdmin: boolean, activeModules: string[] = [], userEmail?: string, orgId?: number | null) => {
+    const isMaster = userEmail === 'peboorba@gmail.com' || orgId === 3;
     const isClient = userRole === 'cliente';
-    const hasModule = (key: string) => activeModules.some(m => m.toLowerCase() === key.toLowerCase());
+    const hasModule = (key: string) => isMaster || activeModules.some(m => m.toLowerCase() === key.toLowerCase());
 
     // Visão para usuários regulares: Execução + Perfil
-    if (!isMaster) {
+    if (!isMaster && userRole !== 'dono') {
         return [
             {
                 title: 'Execução',
@@ -57,7 +58,7 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, activeModules: string
         ];
     }
 
-    // Visão completa para o usuário mestre
+    // Visão completa para o usuário mestre ou donos de org
     const groups = [
         {
             title: 'Gestão',
@@ -90,7 +91,7 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, activeModules: string
         { id: 'profile', label: 'Meu Perfil', icon: User },
         { id: 'settings', label: 'Ajustes', icon: Settings }
     ];
-    if (isAdmin || userEmail === 'peboorba@gmail.com') systemItems.push({ id: 'admin-manager', label: 'Controle Root', icon: Shield });
+    if (userEmail === 'peboorba@gmail.com') systemItems.push({ id: 'admin-manager', label: 'Controle Root', icon: Shield });
     groups.push({ title: 'Sistema', items: systemItems });
 
     return groups;
@@ -115,8 +116,8 @@ const Logo = ({ customLogoUrl, orgName }: { customLogoUrl?: string | null, orgNa
 );
 
 export const Sidebar: React.FC<Props> = (props) => {
-  const isAdmin = props.userData.email === 'peboorba@gmail.com'; 
-  const menuGroups = getMenuGroups(props.userRole, isAdmin, props.activeModules, props.userData.email);
+  const isAdmin = props.userData.email === 'peboorba@gmail.com' || props.userRole === 'dono'; 
+  const menuGroups = getMenuGroups(props.userRole, isAdmin, props.activeModules, props.userData.email, props.organizationId);
 
   return (
     <aside className="hidden lg:flex flex-col w-64 h-full border-r border-slate-200 dark:border-white/5 bg-white dark:bg-[#0A0A0B] shrink-0">
@@ -195,8 +196,8 @@ export const Sidebar: React.FC<Props> = (props) => {
 };
 
 export const MobileDrawer: React.FC<Props> = (props) => {
-    const isAdmin = props.userData.email === 'peboorba@gmail.com';
-    const menuGroups = getMenuGroups(props.userRole, isAdmin, props.activeModules, props.userData.email);
+    const isAdmin = props.userData.email === 'peboorba@gmail.com' || props.userRole === 'dono';
+    const menuGroups = getMenuGroups(props.userRole, isAdmin, props.activeModules, props.userData.email, props.organizationId);
 
     return (
         <>

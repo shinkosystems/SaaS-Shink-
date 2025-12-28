@@ -4,7 +4,7 @@ import { supabase } from './services/supabaseClient';
 import { Opportunity, BpmnTask } from './types';
 import { fetchOpportunities, createOpportunity, updateOpportunity, deleteOpportunity, fetchOpportunityById } from './services/opportunityService';
 import { createTask } from './services/projectService';
-import { getPublicOrgDetails, updateOrgDetails, uploadLogo, fetchActiveOrgModules, getPlanDefaultModules } from './services/organizationService';
+import { getPublicOrgDetails, updateOrgDetails, uploadLogo, fetchActiveOrgModules, getPlanDefaultModules, SYSTEM_MODULES_DEF } from './services/organizationService';
 import { subscribeToPresence } from './services/presenceService';
 import { trackUserAccess } from './services/analyticsService';
 import { getCurrentUserPlan, mapDbPlanIdToString } from './services/asaasService';
@@ -207,8 +207,14 @@ const App: React.FC = () => {
                         name: orgData.nome, limit: orgData.colaboradores, logoUrl: orgData.logo, primaryColor: orgData.cor || '#F59E0B',
                         aiSector: orgData.setor || '', aiTone: orgData.tomdevoz || '', aiContext: orgData.dna || ''
                     });
-                    const modules = await fetchActiveOrgModules(data.organizacao);
-                    setActiveModules(modules.length > 0 ? modules : getPlanDefaultModules(orgData.plano || 4));
+
+                    // ACESSO TOTAL PARA ORGANIZAÇÃO 3 (SHINKO)
+                    if (data.organizacao === 3) {
+                        setActiveModules(SYSTEM_MODULES_DEF);
+                    } else {
+                        const modules = await fetchActiveOrgModules(data.organizacao);
+                        setActiveModules(modules.length > 0 ? modules : getPlanDefaultModules(orgData.plano || 4));
+                    }
                   }
                   const opps = await fetchOpportunities(data.organizacao);
                   if (opps) setOpportunities(opps);
@@ -241,7 +247,8 @@ const App: React.FC = () => {
       onSearch: () => {}, onOpenFeedback: () => setShowFeedback(true),
       theme: theme, dbStatus, isMobileOpen, setIsMobileOpen, userRole,
       userData: userData || { name: '...', avatar: null, email: user?.email },
-      currentPlan, orgName: orgDetails.name, activeModules, customLogoUrl: orgDetails.logoUrl
+      currentPlan, orgName: orgDetails.name, activeModules, customLogoUrl: orgDetails.logoUrl,
+      organizationId: userOrgId
   };
 
   return (
@@ -277,7 +284,6 @@ const App: React.FC = () => {
                         orgType={orgDetails.name}
                         customLogoUrl={orgDetails.logoUrl}
                         onSave={async (opp) => {
-                            // Garantindo que a organização do usuário logado seja passada
                             const newOpp = await createOpportunity({ 
                                 ...opp, 
                                 organizationId: userOrgId || undefined 
