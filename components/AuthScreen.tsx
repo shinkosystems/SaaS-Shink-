@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { findOrgIdByOwnerEmail, createOrganization } from '../services/organizationService';
-import { Loader2, X, Sparkles, ArrowRight, Building2, Users } from 'lucide-react';
+import { Loader2, X, Sparkles, ArrowRight, Building2, Users, Eye, EyeOff } from 'lucide-react';
 
 interface Props {
   onGuestLogin: (persona?: any) => void;
@@ -20,6 +20,7 @@ const AuthScreen: React.FC<Props> = ({ onClose, customLogoUrl, customOrgName }) 
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [showPassword, setShowPassword] = useState(false);
   
   // Registration Flow state
   const [orgFlow, setOrgFlow] = useState<'new' | 'join'>('new');
@@ -133,14 +134,23 @@ const AuthScreen: React.FC<Props> = ({ onClose, customLogoUrl, customOrgName }) 
             </div>
             <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest ml-1">Senha de Acesso</label>
-                <input 
-                    type="password" 
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    className="w-full p-4 rounded-2xl bg-white/5 border border-white/10 text-white outline-none focus:border-amber-500/50 transition-all"
-                    required
-                    placeholder="••••••••"
-                />
+                <div className="relative group">
+                    <input 
+                        type={showPassword ? 'text' : 'password'} 
+                        value={password}
+                        onChange={e => setPassword(e.target.value)}
+                        className="w-full p-4 pr-12 rounded-2xl bg-white/5 border border-white/10 text-white outline-none focus:border-amber-500/50 transition-all"
+                        required
+                        placeholder="••••••••"
+                    />
+                    <button 
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
+                    >
+                        {showPassword ? <EyeOff className="w-5 h-5"/> : <Eye className="w-5 h-5"/>}
+                    </button>
+                </div>
             </div>
 
             {mode === 'register' && (
