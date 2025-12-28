@@ -34,7 +34,7 @@ interface Props {
 }
 
 const getMenuGroups = (userRole: string, isAdmin: boolean, activeModules: string[] = [], userEmail?: string, orgId?: number | null) => {
-    const isMaster = userEmail === 'peboorba@gmail.com' || orgId === 3;
+    const isMaster = userEmail === 'peboorba@gmail.com' || userEmail === 'shinkosystems@gmail.com' || orgId === 3;
     const isClient = userRole === 'cliente';
     const hasModule = (key: string) => isMaster || activeModules.some(m => m.toLowerCase() === key.toLowerCase());
 
@@ -89,7 +89,7 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, activeModules: string
         { id: 'profile', label: 'Meu Perfil', icon: User },
         { id: 'settings', label: 'Ajustes', icon: Settings }
     ];
-    if (userEmail === 'peboorba@gmail.com') systemItems.push({ id: 'admin-manager', label: 'Controle Root', icon: Shield });
+    if (userEmail === 'peboorba@gmail.com' || userEmail === 'shinkosystems@gmail.com') systemItems.push({ id: 'admin-manager', label: 'Controle Root', icon: Shield });
     groups.push({ title: 'Sistema', items: systemItems });
 
     return groups;
@@ -114,7 +114,8 @@ const Logo = ({ customLogoUrl, orgName }: { customLogoUrl?: string | null, orgNa
 );
 
 export const Sidebar: React.FC<Props> = (props) => {
-  const isAdmin = props.userData.email === 'peboorba@gmail.com' || props.userRole === 'dono'; 
+  const isMaster = props.userData.email === 'peboorba@gmail.com' || props.userData.email === 'shinkosystems@gmail.com';
+  const isAdmin = isMaster || props.userRole === 'dono'; 
   const menuGroups = getMenuGroups(props.userRole, isAdmin, props.activeModules, props.userData.email, props.organizationId);
 
   return (
@@ -194,7 +195,8 @@ export const Sidebar: React.FC<Props> = (props) => {
 };
 
 export const MobileDrawer: React.FC<Props> = (props) => {
-    const isAdmin = props.userData.email === 'peboorba@gmail.com' || props.userRole === 'dono';
+    const isMaster = props.userData.email === 'peboorba@gmail.com' || props.userData.email === 'shinkosystems@gmail.com';
+    const isAdmin = isMaster || props.userRole === 'dono';
     const menuGroups = getMenuGroups(props.userRole, isAdmin, props.activeModules, props.userData.email, props.organizationId);
 
     return (

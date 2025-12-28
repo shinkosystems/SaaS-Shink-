@@ -4,226 +4,78 @@ import { supabase } from './supabaseClient';
 import { fetchSystemModuleMap } from './organizationService';
 
 // --- CONFIGURAÇÃO ---
-// TRUE = Tenta usar Supabase Edge Function. 
-// Se falhar (Failed to fetch), o sistema fará fallback automático para Mock.
 const USE_REAL_ASAAS = true; 
-
-// Link fixo gerado pelo cliente
 const FIXED_PAYMENT_LINK = 'https://www.asaas.com/c/3xh5fsyxc16odebg';
 
-// Updated Fallback Plans based on Shinkō Pricing Playbook & Database IDs
-const FALLBACK_PLANS: SubscriptionPlan[] = [
-    {
-        id: 'plan_free',
-        dbId: 4,
-        name: 'Free',
-        price: 0.00,
-        features: [
-            'Apenas 1 Projeto Ativo',
-            '1 Usuário (Dono)',
-            'Sem acesso a IA',
-            'Kanban & Cronograma Básico'
-        ],
-        recommended: false,
-        cycle: 'MONTHLY'
-    },
-    {
-        id: 'plan_solo',
-        dbId: 1,
-        name: 'Shinkō Core Solo',
-        price: 89.90, // Core Solo (1 User)
-        features: [
-            '1 Usuário Incluso',
-            'Projetos Ilimitados',
-            'Metodologia 6 Etapas',
-            'Kanban e Cronograma',
-            'Acesso a Módulos Adicionais'
-        ],
-        recommended: false,
-        cycle: 'MONTHLY'
-    },
-    {
-        id: 'plan_studio',
-        dbId: 2,
-        name: 'Shinkō Core Studio',
-        price: 297.90, // Core Studio (5 Users)
-        features: [
-            'Até 5 Usuários',
-            'Todos os recursos do Solo',
-            'Múltiplos projetos simultâneos',
-            'Gestão de Equipe',
-            'Acesso a Módulos Avançados'
-        ],
-        recommended: true,
-        cycle: 'MONTHLY'
-    },
-    {
-        id: 'plan_scale',
-        dbId: 3,
-        name: 'Shinkō Core Scale', 
-        price: 899.90, // Core Scale (15 Users)
-        features: [
-            'Até 15 Usuários',
-            'Ideal para Scale-ups',
-            'Relatórios Avançados',
-            'Suporte Prioritário',
-            'Governança'
-        ],
-        recommended: false,
-        cycle: 'MONTHLY'
-    },
-    {
-        id: 'plan_enterprise',
-        dbId: 10,
-        name: 'Enterprise',
-        price: 6500.00,
-        features: [
-            'Usuários Ilimitados',
-            'IA Completa: Gerador de Fluxo (BPMS), Enriquecimento',
-            'Portal do Cliente Interativo: Aprovação de Milestones',
-            'White Label / Branding Personalizado',
-            'SLA de Suporte Prioritário'
-        ],
-        recommended: false,
-        cycle: 'MONTHLY'
-    }
+// Módulos disponíveis para contratação manual
+export const PRICING_MODULES = [
+    { id: 'gantt', label: 'Cronograma Gantt', price: 29.90 },
+    { id: 'financial', label: 'Gestão Financeira', price: 39.90 },
+    { id: 'crm', label: 'CRM de Vendas', price: 49.90 },
+    { id: 'ia', label: 'Shinkō Guru AI', price: 59.90 },
+    { id: 'engineering', label: 'Engenharia (DORA)', price: 69.90 },
+    { id: 'whitelabel', label: 'White Label', price: 1500.00 }
 ];
 
-// --- DADOS MOCKADOS (FALLBACK DE EMERGÊNCIA) ---
-let MOCK_PAYMENTS: AsaasPayment[] = [
-    {
-        id: 'pay_mock_1',
-        dateCreated: new Date(Date.now() - 86400000 * 30).toISOString(),
-        customer: 'cus_000001',
-        paymentLink: null,
-        value: 297.90,
-        netValue: 290.00,
-        billingType: 'CREDIT_CARD',
-        status: 'RECEIVED',
-        description: 'Assinatura Studio (Fallback Mode)',
-        invoiceUrl: '#'
-    }
-];
+export const calculateDynamicPrice = (users: number, selectedModuleIds: string[], billingCycle: 'monthly' | 'yearly') => {
+    let basePrice = 0;
+    let planId = 4; // Free
 
-// --- FUNÇÕES ---
+    if (users === 1) { basePrice = 89.90; planId = 1; }
+    else if (users <= 5) { basePrice = 297.90; planId = 2; }
+    else if (users <= 15) { basePrice = 899.90; planId = 3; }
+    else { basePrice = 6500.00; planId = 10; } // Enterprise
 
-export const getFixedPaymentLink = () => FIXED_PAYMENT_LINK;
+    const modulesPrice = selectedModuleIds.reduce((acc, id) => {
+        const mod = PRICING_MODULES.find(m => m.id === id);
+        return acc + (mod ? mod.price : 0);
+    }, 0);
 
-export const calculateSubscriptionStatus = (lastPaymentDate: string | Date) => {
-    const paymentDate = new Date(lastPaymentDate);
-    const expireDate = new Date(paymentDate);
-    expireDate.setDate(expireDate.getDate() + 30); // Ciclo de 30 dias
-
-    const today = new Date();
-    const timeDiff = expireDate.getTime() - today.getTime();
-    const daysRemaining = Math.ceil(timeDiff / (1000 * 3600 * 24));
+    const totalMonthly = basePrice + modulesPrice;
+    const finalPrice = billingCycle === 'yearly' ? (totalMonthly * 0.8) : totalMonthly;
 
     return {
-        isValid: daysRemaining > 0,
-        daysRemaining,
-        expireDate,
-        shouldWarn: daysRemaining <= 5 && daysRemaining > 0
+        total: finalPrice,
+        planId,
+        basePrice,
+        modulesPrice
     };
 };
 
+const FALLBACK_PLANS: SubscriptionPlan[] = [
+    { id: 'plan_free', dbId: 4, name: 'Free', price: 0.00, features: ['1 Projeto', '1 Usuário'], recommended: false, cycle: 'MONTHLY' },
+    { id: 'plan_solo', dbId: 1, name: 'Core Solo', price: 89.90, features: ['1 Usuário'], recommended: false, cycle: 'MONTHLY' },
+    { id: 'plan_studio', dbId: 2, name: 'Core Studio', price: 297.90, features: ['Até 5 Usuários'], recommended: true, cycle: 'MONTHLY' },
+    { id: 'plan_scale', dbId: 3, name: 'Core Scale', price: 899.90, features: ['Até 15 Usuários'], recommended: false, cycle: 'MONTHLY' },
+    { id: 'plan_enterprise', dbId: 10, name: 'Enterprise', price: 6500.00, features: ['Usuários Ilimitados'], recommended: false, cycle: 'MONTHLY' }
+];
+
 export const mapDbPlanIdToString = (dbId: number | string): string => {
     const id = Number(dbId);
-    
-    // Check for ID 10 specifically first (Enterprise)
     if (id === 10) return 'plan_enterprise';
-    
-    // Check for IDs 6 and 8 (TRIAL/Legacy)
-    if (id === 6 || id === 8) return 'plan_trial';
-    
-    // Check for ID 5 (Agency)
-    if (id === 5) return 'plan_agency';
-
     switch (id) {
-        // Monthly
         case 1: return 'plan_solo';
         case 2: return 'plan_studio';
         case 3: return 'plan_scale';
         case 4: return 'plan_free';
-        
-        // Annual (Assuming IDs 11, 12, 13 based on sequence after 10)
-        // Adjust these if your DB generated different IDs
-        case 11: return 'plan_solo_yearly';
-        case 12: return 'plan_studio_yearly';
-        case 13: return 'plan_scale_yearly';
-
         default: return 'plan_free';
     }
 };
 
 export const getCurrentUserPlan = async (userId: string): Promise<string> => {
     try {
-        // 1. Get user profile to find organization
-        const { data: userProfile, error: profileError } = await supabase
-            .from('users')
-            .select('organizacao, perfil, email')
-            .eq('id', userId)
-            .single();
+        const { data: userProfile } = await supabase.from('users').select('organizacao, perfil, email').eq('id', userId).single();
+        if (!userProfile) return 'plan_free';
 
-        if (profileError || !userProfile) {
-            return 'plan_free';
-        }
+        // Override Super Admin
+        if (userProfile.email === 'peboorba@gmail.com' || userProfile.email === 'shinkosystems@gmail.com') return 'plan_enterprise';
 
-        // SUPER ADMIN OVERRIDE
-        if (userProfile.email === 'peboorba@gmail.com') {
-            return 'plan_enterprise';
-        }
-
-        // 2. PRIORITY CHECK (CONNECTION): Check the 'plano' column on the 'organizacoes' table directly.
-        // This confirms the connection: User -> Organization -> Plan
         if (userProfile.organizacao) {
-            const { data: orgData, error: orgError } = await supabase
-                .from('organizacoes')
-                .select('plano')
-                .eq('id', userProfile.organizacao)
-                .single();
-
-            if (!orgError && orgData && orgData.plano) {
-                // Return the plan attached to the organization
-                return mapDbPlanIdToString(orgData.plano);
-            }
+            const { data: orgData } = await supabase.from('organizacoes').select('plano').eq('id', userProfile.organizacao).single();
+            if (orgData && orgData.plano) return mapDbPlanIdToString(orgData.plano);
         }
-
-        // 3. Fallback: Check subscription history (cliente_plano) 
-        // This is only for users not yet migrated to the new org-based plan structure
-        let ownerId = userId;
-        if (userProfile.perfil !== 'dono' && userProfile.organizacao) {
-            const { data: ownerProfile } = await supabase
-                .from('users')
-                .select('id')
-                .eq('organizacao', userProfile.organizacao)
-                .eq('perfil', 'dono')
-                .limit(1)
-                .single();
-            
-            if (ownerProfile) ownerId = ownerProfile.id;
-        }
-
-        const { data: subData, error: subError } = await supabase
-            .from('cliente_plano')
-            .select('datafim, plano (id, nome)')
-            .eq('dono', ownerId)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
-
-        if (subError || !subData) {
-            return 'plan_free';
-        }
-
-        const endDate = new Date(subData.datafim || '2099-12-31');
-        if (endDate < new Date()) {
-            return 'plan_free';
-        }
-        
-        return mapDbPlanIdToString(subData.plano?.id || 4);
-
+        return 'plan_free';
     } catch (e) {
-        console.error("Error getting user plan:", e);
         return 'plan_free'; 
     }
 };
@@ -231,188 +83,64 @@ export const getCurrentUserPlan = async (userId: string): Promise<string> => {
 export const uploadReceiptAndNotify = async (
     userId: string,
     orgId: number,
-    planId: string,
-    planPrice: number,
+    planId: number,
+    totalAmount: number,
     receiptFile: File,
     description: string,
-    metadata?: any // Contains module keys (strings)
+    metadata: { users: number; modules: string[] }
 ): Promise<{ success: boolean; error?: string }> => {
     try {
         const fileExt = receiptFile.name.split('.').pop();
-        const fileName = `comprovantes/${userId}-${Date.now()}.${fileExt}`;
+        const fileName = `comprovantes/${orgId}-${Date.now()}.${fileExt}`;
 
-        // 1. Upload File
-        const { error: uploadError } = await supabase.storage
-            .from('documentos') 
-            .upload(fileName, receiptFile);
+        const { error: uploadError } = await supabase.storage.from('documentos').upload(fileName, receiptFile);
+        if (uploadError) throw uploadError;
 
-        if (uploadError) throw new Error(`Erro no upload: ${uploadError.message}`);
-
-        const { data: urlData } = supabase.storage
-            .from('documentos')
-            .getPublicUrl(fileName);
-
-        if (!urlData?.publicUrl) throw new Error("Não foi possível obter a URL do arquivo.");
+        const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(fileName);
         
-        // 2. Map Module Keys (Strings) to Module IDs (Integers)
-        let moduleIds: number[] = [];
-        if (metadata && metadata.modules && Array.isArray(metadata.modules)) {
-            const moduleMap = await fetchSystemModuleMap();
-            moduleIds = metadata.modules
-                .map((key: string) => moduleMap[key])
-                .filter((id: number) => id !== undefined);
-                
-            console.log("Mapped Modules for Transaction:", { keys: metadata.modules, ids: moduleIds });
-        }
+        // Mapear chaves de módulos para IDs do banco
+        const moduleMap = await fetchSystemModuleMap();
+        const moduleIds = metadata.modules.map(key => moduleMap[key]).filter(Boolean);
 
-        // 3. Insert into 'transacoes' table
-        const { error: insertError } = await supabase
-            .from('transacoes')
-            .insert({
-                organization_id: orgId,
-                description: description,
-                amount: planPrice,
-                type: 'inflow',
-                category: 'Assinatura',
-                date: new Date().toISOString().split('T')[0],
-                pago: false,
-                comprovante: urlData.publicUrl,
-                metadata: metadata, // Save metadata JSON (optional but good for debugging)
-                modulos: moduleIds.length > 0 ? moduleIds : null // Save IDs array to specific column
-            });
+        const { error: insertError } = await supabase.from('transacoes').insert({
+            organization_id: orgId,
+            description: description,
+            amount: totalAmount,
+            type: 'inflow',
+            category: 'Assinatura',
+            date: new Date().toISOString().split('T')[0],
+            pago: false,
+            comprovante: urlData.publicUrl,
+            metadata: { ...metadata, planId }, // Guardamos a intenção de plano aqui
+            modulos: moduleIds.length > 0 ? moduleIds : null
+        });
 
-        if (insertError) throw new Error(`Erro ao salvar transação: ${insertError.message}`);
-        
+        if (insertError) throw insertError;
         return { success: true };
     } catch (err: any) {
-        console.error("Erro no envio de comprovante:", err);
+        console.error("Erro no envio:", err);
         return { success: false, error: err.message };
     }
 };
 
 export const fetchSubscriptionPlans = async (): Promise<SubscriptionPlan[]> => {
     try {
-        const { data, error } = await supabase
-            .from('planos')
-            .select('*')
-            .order('valor', { ascending: true });
-
-        if (error) {
-            console.warn("Erro ao buscar planos do banco (usando fallback):", error.message);
-            return FALLBACK_PLANS;
-        }
-
-        if (data && data.length > 0) {
-            return data.map((plan: any) => {
-                const planKey = mapDbPlanIdToString(plan.id);
-                const featuresList = plan.descricao ? plan.descricao.split('\n').filter((s: string) => s.trim().length > 0) : [];
-
-                return {
-                    id: planKey,
-                    dbId: plan.id,
-                    name: plan.nome,
-                    price: Number(plan.valor),
-                    features: featuresList.length > 0 ? featuresList : FALLBACK_PLANS.find(p => p.id === planKey)?.features || [],
-                    recommended: plan.id === 2 || plan.id === 12,
-                    cycle: plan.meses >= 12 ? 'YEARLY' : 'MONTHLY'
-                };
-            }).sort((a,b) => {
-                const order = ['plan_free', 'plan_solo', 'plan_studio', 'plan_scale', 'plan_agency', 'plan_enterprise'];
-                const aBase = a.id.replace('_yearly', '');
-                const bBase = b.id.replace('_yearly', '');
-                return order.indexOf(aBase) - order.indexOf(bBase);
-            });
-        }
-        
-        return FALLBACK_PLANS;
+        const { data, error } = await supabase.from('planos').select('*').order('valor', { ascending: true });
+        if (error || !data) return FALLBACK_PLANS;
+        return data.map((plan: any) => ({
+            id: mapDbPlanIdToString(plan.id),
+            dbId: plan.id,
+            name: plan.nome,
+            price: Number(plan.valor),
+            features: plan.descricao ? plan.descricao.split('\n') : [],
+            recommended: plan.id === 2,
+            cycle: plan.meses >= 12 ? 'YEARLY' : 'MONTHLY'
+        }));
     } catch (err) {
-        console.error("Erro fatal ao buscar planos:", err);
         return FALLBACK_PLANS;
     }
 };
 
-export const getUserSubscriptions = async (userId: string): Promise<AsaasSubscription[]> => {
-    if (USE_REAL_ASAAS) {
-        try {
-            const { data, error } = await supabase.functions.invoke('asaas-integration', {
-                body: { action: 'GET_SUBSCRIPTIONS', userId }
-            });
-            if (error) throw error; // Throw to trigger catch block for network errors
-            return data.subscriptions || [];
-        } catch (err) { 
-            console.warn("Asaas Integration unavailable (Fetch Failed), using mock data.", err);
-            return _mockGetSubscriptions(userId); 
-        }
-    }
-    return _mockGetSubscriptions(userId);
-};
-
-export const createAsaasPayment = async (userId: string, billingType: 'PIX' | 'CREDIT_CARD', value: number, description: string) => {
-    // Falls back to mock for demo purposes if real integration isn't set up
-    return _createMockPayment(userId, billingType, value, description); 
-};
-
-export const getPaymentHistory = async (userId: string): Promise<AsaasPayment[]> => {
-    if (USE_REAL_ASAAS) {
-        try {
-            const { data, error } = await supabase.functions.invoke('asaas-integration', {
-                body: { action: 'GET_HISTORY', userId }
-            });
-            if (error) throw error; // Throw to trigger catch block
-            return data.payments || [];
-        } catch (err) { 
-            console.warn("Asaas Integration unavailable (Fetch Failed), using mock data.", err);
-            return Promise.resolve(MOCK_PAYMENTS); 
-        }
-    }
-    return Promise.resolve(MOCK_PAYMENTS);
-};
-
-// --- NOVAS FUNÇÕES EXPORTADAS (Placeholders) ---
-
-export const createModuleCheckoutSession = async (
-    moduleId: string,
-    moduleName: string,
-    price: number,
-    userId: string,
-    orgId: number
-): Promise<{ url: string | null; error?: string }> => {
-    console.log("createModuleCheckoutSession placeholder called");
-    // Em uma implementação real com Asaas, aqui seria criada uma cobrança avulsa ou link de pagamento
-    return { url: null, error: "Not implemented in Asaas Service" };
-};
-
-export const createCustomerPortalSession = async (userId: string): Promise<{ url: string | null }> => {
-    console.log("createCustomerPortalSession placeholder called");
-    // O Asaas não tem um portal de cliente "self-service" igual ao Stripe, mas tem a área do cliente
-    return { url: null };
-};
-
-const _createMockPayment = async (userId: string, billingType: string, value: number, description: string) => {
-    await new Promise(r => setTimeout(r, 1500));
-    const newPayment: AsaasPayment = {
-        id: `pay_${Math.floor(Math.random() * 1000000)}`,
-        dateCreated: new Date().toISOString(),
-        customer: userId,
-        paymentLink: null,
-        value: value,
-        netValue: value * 0.99,
-        billingType: billingType as any,
-        status: 'PENDING',
-        description: description,
-        invoiceUrl: '#'
-    };
-    if (billingType === 'PIX') {
-        return {
-            payment: newPayment,
-            qrCode: 'mock-qrcode', 
-            copyPaste: 'mock-pix-copy-paste'
-        };
-    }
-    return { payment: newPayment };
-}
-
-const _mockGetSubscriptions = async (userId: string): Promise<AsaasSubscription[]> => {
-    await new Promise(r => setTimeout(r, 600));
-    return [];
-}
+export const getUserSubscriptions = async (userId: string): Promise<AsaasSubscription[]> => [];
+export const createAsaasPayment = async (u: string, b: string, v: number, d: string) => null;
+export const getPaymentHistory = async (userId: string): Promise<AsaasPayment[]> => [];

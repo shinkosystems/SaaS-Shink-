@@ -208,8 +208,8 @@ const App: React.FC = () => {
                         aiSector: orgData.setor || '', aiTone: orgData.tomdevoz || '', aiContext: orgData.dna || ''
                     });
 
-                    // ACESSO TOTAL PARA ORGANIZAÇÃO 3 (SHINKO)
-                    if (data.organizacao === 3) {
+                    // ACESSO TOTAL PARA ORGANIZAÇÃO 3 (SHINKO) OU EMAILS MESTRES
+                    if (data.organizacao === 3 || data.email === 'peboorba@gmail.com' || data.email === 'shinkosystems@gmail.com') {
                         setActiveModules(SYSTEM_MODULES_DEF);
                     } else {
                         const modules = await fetchActiveOrgModules(data.organizacao);
@@ -250,6 +250,8 @@ const App: React.FC = () => {
       currentPlan, orgName: orgDetails.name, activeModules, customLogoUrl: orgDetails.logoUrl,
       organizationId: userOrgId
   };
+
+  const isMasterUser = userData?.email === 'peboorba@gmail.com' || userData?.email === 'shinkosystems@gmail.com';
 
   return (
     <div className="flex h-screen w-full bg-[var(--bg-color)] text-slate-900 transition-colors duration-300">
@@ -320,7 +322,7 @@ const App: React.FC = () => {
                         {view === 'intelligence' && <IntelligencePage organizationId={userOrgId || undefined} opportunities={opportunities} />}
                         {view === 'settings' && <SettingsPage theme={theme} onToggleTheme={toggleTheme} onlineUsers={onlineUsers} userOrgId={userOrgId} orgDetails={orgDetails} onUpdateOrgDetails={() => {}} setView={setView} userRole={userRole} userData={userData} activeModules={activeModules} onRefreshModules={() => {}} />}
                         {view === 'profile' && <ProfilePage currentPlan={currentPlan} onRefresh={() => loadUserData(user.id)} />}
-                        {view === 'admin-manager' && <AdminPage onlineUsers={onlineUsers} />}
+                        {view === 'admin-manager' && isMasterUser && <AdminPage onlineUsers={onlineUsers} />}
                     </>
                 )}
             </Suspense>

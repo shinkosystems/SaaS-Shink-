@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { fetchAllOwners, updateGlobalClientData, fetchPlans, fetchGlobalMetrics, AdminUser, GlobalMetrics, updateUserStatus, fetchPendingApprovals, approveSubscription } from '../services/adminService';
+// Fixed: Removed non-existent updateUserStatus from imports as it is not exported by adminService and not used in this component.
+import { fetchAllOwners, updateGlobalClientData, fetchPlans, fetchGlobalMetrics, AdminUser, GlobalMetrics, fetchPendingApprovals, approveSubscription } from '../services/adminService';
 import { fetchCmsCases, saveCmsCase, deleteCmsCase, fetchCmsPosts, saveCmsPost, deleteCmsPost, uploadCmsFile } from '../services/cmsService';
 import { DbPlan, FinancialTransaction, CmsCase, CmsPost } from '../types';
-import { Shield, Search, CreditCard, Loader2, Edit, CheckCircle, AlertTriangle, User, Zap, Building2, Users, DollarSign, TrendingUp, Activity, Filter, Calendar, Heart, UserMinus, Gem, MousePointer2, X, Clock, BarChart3, Wifi, Lock, ExternalLink, Check, Briefcase, FileText, Image as ImageIcon, Link as LinkIcon, Download, Save, Plus, Trash2, ArrowLeft, Globe, Tag, Eye, UploadCloud, ChevronRight, Settings, ArrowUpRight } from 'lucide-react';
+import { Shield, Search, CreditCard, Loader2, Edit, CheckCircle, AlertTriangle, User, Zap, Building2, Users, DollarSign, TrendingUp, Activity, Filter, Calendar, Heart, UserMinus, Gem, MousePointer2, X, Clock, BarChart3, Wifi, Lock, ExternalLink, Check, Briefcase, FileText, ImageIcon, LinkIcon, Download, Save, Plus, Trash2, ArrowLeft, Globe, Tag, Eye, UploadCloud, ChevronRight, Settings, ArrowUpRight } from 'lucide-react';
 import { RichTextEditor } from './RichTextEditor';
 
 interface Props {
@@ -196,13 +197,6 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                     ))}
                 </div>
             </div>
-
-            {isLoading && !editingUser && !editingCase && !editingPost && (
-                <div className="flex flex-col items-center justify-center py-40 gap-4">
-                    <Loader2 className="w-12 h-12 animate-spin text-amber-500"/>
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Sincronizando Ecossistema...</span>
-                </div>
-            )}
 
             {/* DASHBOARD VIEW */}
             {!isLoading && activeTab === 'dashboard' && metrics && (
