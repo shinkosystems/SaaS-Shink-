@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Opportunity } from '../types';
 import { Search, Filter, LayoutGrid, Zap, Target, ArrowRight, Briefcase, GanttChartSquare, Plus, Trash2 } from 'lucide-react';
@@ -64,7 +65,7 @@ export const ProjectList: React.FC<Props> = ({ opportunities, onOpenProject, use
             </div>
 
             <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
-                {onOpenCreate && userRole !== 'cliente' && (
+                {onOpenCreate && (
                     <button onClick={onOpenCreate} className="px-6 py-3 bg-amber-500 text-black rounded-xl font-bold text-xs uppercase tracking-widest hover:opacity-90 transition-all flex items-center gap-2">
                         <Plus className="w-4 h-4"/> Novo Projeto
                     </button>

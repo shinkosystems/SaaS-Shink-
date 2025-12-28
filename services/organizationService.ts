@@ -27,6 +27,25 @@ const getPlanKeyFromId = (id: number): string => {
     }
 };
 
+/**
+ * Busca o ID da organização vinculada ao e-mail de um dono.
+ */
+export const findOrgIdByOwnerEmail = async (email: string): Promise<number | null> => {
+    try {
+        const { data, error } = await supabase
+            .from('users')
+            .select('organizacao, perfil')
+            .eq('email', email)
+            .eq('perfil', 'dono')
+            .single();
+        
+        if (error || !data) return null;
+        return data.organizacao;
+    } catch (e) {
+        return null;
+    }
+};
+
 export const createOrganization = async (userId: string, name: string, sector: string, dna?: string) => {
     try {
         // 1. Criar a Organização
@@ -49,7 +68,7 @@ export const createOrganization = async (userId: string, name: string, sector: s
         // 2. Vincular o Usuário à nova Organização
         const { error: userError } = await supabase
             .from('users')
-            .update({ organizacao: org.id })
+            .update({ organizacao: org.id, perfil: 'dono' })
             .eq('id', userId);
         
         if (userError) throw userError;

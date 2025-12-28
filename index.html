@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="pt-BR">
   <head>
@@ -21,7 +22,8 @@
               shinko: {
                 primary: '#F59E0B',
                 secondary: '#D97706',
-                obsidian: '#F8F8F8',
+                obsidian: '#0A0A0C',
+                charcoal: '#111113',
                 surface: '#FFFFFF',
                 border: '#E2E2E2',
                 glass: 'rgba(255, 255, 255, 0.7)',
@@ -31,9 +33,10 @@
               sans: ['Inter', 'sans-serif'],
             },
             boxShadow: {
-              'glow-amber': '0 0 25px rgba(245, 158, 11, 0.1)',
+              'glow-amber': '0 0 25px rgba(245, 158, 11, 0.15)',
               'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
               'ios': '0 4px 12px rgba(0, 0, 0, 0.05)',
+              'soft': '0 10px 40px -10px rgba(0,0,0,0.05)'
             },
             borderRadius: {
               'ios': '1.5rem',
@@ -45,81 +48,85 @@
     <style>
       :root {
         --brand-primary: #F59E0B;
-        --bg-color: #F8F8F8;
+        --bg-color: #F8F9FA;
         --surface: #FFFFFF;
         --card-bg: #FFFFFF;
-        --card-bg-hover: rgba(0, 0, 0, 0.01);
-        --border-color: #E2E2E2;
+        --card-bg-hover: rgba(255, 255, 255, 0.9);
+        --border-color: #E5E7EB;
         --text-main: #111111;
         --text-muted: #71717A;
         --input-bg: #FFFFFF;
         --calendar-cell: transparent;
       }
 
-      /* Desabilitando overrides de modo escuro para forçar diurno */
       .dark {
-        --bg-color: #F8F8F8;
-        --surface: #FFFFFF;
-        --card-bg: #FFFFFF;
-        --card-bg-hover: rgba(0, 0, 0, 0.01);
-        --border-color: #E2E2E2;
-        --text-main: #111111;
-        --text-muted: #71717A;
-        --input-bg: #FFFFFF;
-        --calendar-cell: transparent;
+        --bg-color: #0A0A0C; /* Preto carvão real, sem azul */
+        --surface: #111113;
+        --card-bg: #161618;
+        --card-bg-hover: rgba(245, 158, 11, 0.05);
+        --border-color: rgba(255, 255, 255, 0.04);
+        --text-main: #F8F9FA;
+        --text-muted: #A1A1AA;
+        --input-bg: rgba(255, 255, 255, 0.02);
       }
 
       body {
         background-color: var(--bg-color);
         color: var(--text-main);
         font-family: "Inter", sans-serif;
-        transition: background 0.4s ease, color 0.3s ease;
+        transition: background 0.5s ease, color 0.3s ease;
+      }
+
+      body.dark {
+        /* Gradiente aquecido do preto para o âmbar profundo, removendo qualquer tom azulado */
+        background: radial-gradient(circle at 50% -20%, #221608 0%, #0A0A0C 85%) fixed;
       }
 
       .glass-panel {
-        background: rgba(255, 255, 255, 0.8);
-        border: 1px solid var(--border-color);
-        color: var(--text-main);
-        backdrop-blur: 12px;
+        background: rgba(255, 255, 255, 0.03);
+        backdrop-blur: 24px;
+        -webkit-backdrop-blur: 24px;
+      }
+
+      .light .glass-panel {
+        background: rgba(255, 255, 255, 0.7);
+        border-color: rgba(0,0,0,0.05);
       }
 
       .glass-card {
         background: var(--card-bg);
         border: 1px solid var(--border-color);
         color: var(--text-main);
-        transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       }
       
       .glass-card:hover {
         background: var(--card-bg-hover);
         border-color: var(--brand-primary);
-      }
-
-      .glass-input {
-        background: var(--input-bg);
-        border: 1px solid var(--border-color);
-        color: var(--text-main);
-        outline: none;
-      }
-      
-      .glass-input:focus {
-        border-color: var(--brand-primary);
+        transform: translateY(-2px);
+        box-shadow: 0 20px 40px -15px rgba(0,0,0,0.1);
       }
 
       h1, h2, h3 {
-        letter-spacing: -0.02em;
+        letter-spacing: -0.025em;
       }
 
       @keyframes ios-pop {
         0% { transform: scale(0.98); opacity: 0; }
         100% { transform: scale(1); opacity: 1; }
       }
-      .animate-ios-pop { animation: ios-pop 0.3s ease-out; }
+      .animate-ios-pop { animation: ios-pop 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
 
-      ::-webkit-scrollbar { width: 6px; }
+      ::-webkit-scrollbar { width: 4px; }
       ::-webkit-scrollbar-track { background: transparent; }
-      ::-webkit-scrollbar-thumb { background: #DDD; border-radius: 10px; }
-      ::-webkit-scrollbar-thumb:hover { background: #CCC; }
+      ::-webkit-scrollbar-thumb { background: rgba(155, 155, 155, 0.2); border-radius: 10px; }
+      ::-webkit-scrollbar-thumb:hover { background: rgba(155, 155, 155, 0.4); }
+
+      .dark input, .dark textarea, .dark select {
+        background-color: var(--input-bg);
+        border-color: var(--border-color);
+        color: var(--text-main);
+      }
     </style>
     <script type="importmap">
     {

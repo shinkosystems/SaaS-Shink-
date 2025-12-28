@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, Suspense, useMemo } from 'react';
 import { supabase } from './services/supabaseClient';
 import { Opportunity, BpmnTask } from './types';
@@ -40,6 +41,7 @@ const ROUTES: Record<string, string> = {
     'dashboard': '/',
     'framework-system': '/framework',
     'list': '/projects',
+    'create-project': '/project/new',
     'kanban': '/tasks',
     'calendar': '/calendar',
     'gantt': '/timeline',
@@ -74,9 +76,10 @@ const App: React.FC = () => {
   const [selectedProject, setSelectedProjectState] = useState<Opportunity | null>(null);
   const [editingOpportunity, setEditingOpportunity] = useState<Opportunity | null>(null);
   
-  // Forçando inicialização em modo claro (diurno)
-  const [theme, setTheme] = useState<'light'|'dark'>('light');
-
+  const [theme, setTheme] = useState<'light'|'dark'>(() => {
+    const saved = localStorage.getItem('shinko_theme');
+    return (saved as 'light' | 'dark') || 'light';
+  });
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [showBlog, setShowBlog] = useState(false);
   const [blogPostSlug, setBlogPostSlug] = useState<string | null>(null);
@@ -85,8 +88,54 @@ const App: React.FC = () => {
   });
   const [dbStatus, setDbStatus] = useState<'connected'|'disconnected'>('connected');
 
+  const handleRouting = async () => {
+      let path = window.location.pathname;
+      if (path.startsWith('/blog')) {
+          const slug = path.split('/')[2];
+          setShowBlog(true);
+          setBlogPostSlug(slug || null);
+          return;
+      } else { setShowBlog(false); }
+
+      if (path === '/project/new') {
+          setViewState('create-project');
+          setSelectedProjectState(null);
+          setEditingOpportunity(null);
+          return;
+      }
+
+      if (path.startsWith('/project/')) {
+          const parts = path.split('/');
+          const projectId = parts[2];
+          const subAction = parts[3]; 
+
+          const opp = await fetchOpportunityById(projectId);
+          if (opp) {
+              if (subAction === 'edit') {
+                  setEditingOpportunity(opp);
+                  setSelectedProjectState(null);
+                  setViewState('edit-project');
+              } else {
+                  setSelectedProjectState(opp);
+                  setEditingOpportunity(null);
+                  setViewState('project-view');
+              }
+          } else setView('dashboard');
+          return;
+      }
+
+      const mappedView = REVERSE_ROUTES[path];
+      if (mappedView) setViewState(mappedView);
+      else setViewState('dashboard');
+  };
+
   const navigateTo = (path: string) => {
-      try { window.history.pushState({}, '', path); } catch (e) { console.warn("Routing blocked:", e); }
+      try { 
+        window.history.pushState({}, '', path); 
+        handleRouting(); 
+      } catch (e) { 
+        console.warn("Routing blocked:", e); 
+      }
   };
 
   const setView = (newView: string) => {
@@ -109,53 +158,19 @@ const App: React.FC = () => {
       navigateTo(`/project/${opp.id}/edit`);
   };
 
-  // Efeito centralizado forçando a remoção da classe dark
   useEffect(() => {
     const root = document.documentElement;
-    root.classList.add('light');
-    root.classList.remove('dark');
-    // Forçamos o tema no localStorage como light também
-    localStorage.setItem('shinko_theme', 'light');
+    if (theme === 'dark') {
+        root.classList.add('dark');
+        root.classList.remove('light');
+    } else {
+        root.classList.add('light');
+        root.classList.remove('dark');
+    }
+    localStorage.setItem('shinko_theme', theme);
   }, [theme]);
 
   useEffect(() => {
-      const handleRouting = async () => {
-          let path = window.location.pathname;
-          if (path.startsWith('/blog')) {
-              const slug = path.split('/')[2];
-              setShowBlog(true);
-              setBlogPostSlug(slug || null);
-              return;
-          } else { setShowBlog(false); }
-
-          if (path === '/project/new') {
-              setViewState('create-project');
-              setSelectedProjectState(null);
-              return;
-          }
-
-          if (path.startsWith('/project/')) {
-              const parts = path.split('/');
-              const projectId = parts[2];
-              const subAction = parts[3]; 
-
-              const opp = await fetchOpportunityById(projectId);
-              if (opp) {
-                  if (subAction === 'edit') {
-                      setEditingOpportunity(opp);
-                      setSelectedProjectState(null);
-                  } else {
-                      setSelectedProjectState(opp);
-                      setEditingOpportunity(null);
-                  }
-              } else setView('dashboard');
-              return;
-          }
-
-          const mappedView = REVERSE_ROUTES[path];
-          if (mappedView) setViewState(mappedView);
-          else setView('dashboard');
-      };
       handleRouting();
       window.addEventListener('popstate', handleRouting);
       return () => window.removeEventListener('popstate', handleRouting);
@@ -183,6 +198,7 @@ const App: React.FC = () => {
               setUserData({ name: data.nome, email: data.email, avatar: data.avatar_url });
               setUserRole(data.perfil || 'colaborador');
               setUserOrgId(data.organizacao);
+              
               if (data.organizacao) {
                   const { data: orgData } = await supabase.from('organizacoes').select('*').eq('id', data.organizacao).single();
                   if (orgData) {
@@ -203,9 +219,8 @@ const App: React.FC = () => {
       } catch (e) { setDbStatus('disconnected'); } finally { setLoading(false); }
   };
 
-  // Mantendo a função, mas agora ela garante o modo claro
   const toggleTheme = () => {
-      setTheme('light');
+      setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
 
   if (!user && !loading) {
@@ -220,11 +235,11 @@ const App: React.FC = () => {
 
   const commonProps = {
       currentView: view, onChangeView: setView,
-      onOpenCreate: () => navigateTo('/project/new'), 
+      onOpenCreate: () => setView('create-project'), 
       onOpenCreateTask: () => setShowCreateTask(true),
       onToggleTheme: toggleTheme, onLogout: () => supabase.auth.signOut(),
       onSearch: () => {}, onOpenFeedback: () => setShowFeedback(true),
-      theme: 'light' as const, dbStatus, isMobileOpen, setIsMobileOpen, userRole,
+      theme: theme, dbStatus, isMobileOpen, setIsMobileOpen, userRole,
       userData: userData || { name: '...', avatar: null, email: user?.email },
       currentPlan, orgName: orgDetails.name, activeModules, customLogoUrl: orgDetails.logoUrl
   };
@@ -262,25 +277,33 @@ const App: React.FC = () => {
                         orgType={orgDetails.name}
                         customLogoUrl={orgDetails.logoUrl}
                         onSave={async (opp) => {
-                            const newOpp = await createOpportunity({ ...opp, organizationId: userOrgId || undefined });
+                            // Garantindo que a organização do usuário logado seja passada
+                            const newOpp = await createOpportunity({ 
+                                ...opp, 
+                                organizationId: userOrgId || undefined 
+                            });
                             if (newOpp) {
-                                loadUserData(user.id);
+                                await loadUserData(user.id);
                                 onOpenProject(newOpp);
-                            } else setView('dashboard');
+                            } else {
+                                alert("Falha ao salvar o projeto. Verifique sua conexão.");
+                                setView('dashboard');
+                            }
                         }}
                         onCancel={() => setView('dashboard')}
                     />
                 ) : (
                     <>
-                        {view === 'dashboard' && <DashboardPage opportunities={opportunities} onOpenProject={onOpenProject} onNavigate={setView} user={user} theme="light" />}
+                        {view === 'dashboard' && <DashboardPage opportunities={opportunities} onOpenProject={onOpenProject} onNavigate={setView} user={user} theme={theme} />}
                         {view === 'framework-system' && <FrameworkPage orgName={orgDetails.name} onBack={() => setView('dashboard')} onSaveToProject={async (opp) => {
                             const newOpp = await createOpportunity({ ...opp, organizationId: userOrgId || undefined });
-                            if (newOpp) onOpenProject(newOpp);
-                            else setView('dashboard');
+                            if (newOpp) {
+                                await loadUserData(user.id);
+                                onOpenProject(newOpp);
+                            } else setView('dashboard');
                         }} />}
                         {view === 'list' && <ProjectsPage opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} onRefresh={() => loadUserData(user.id)} />}
                         
-                        {/* Gestão de Tarefas unificada pela TasksPage */}
                         {view === 'kanban' && <TasksPage initialSubView="kanban" opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} />}
                         {view === 'calendar' && <TasksPage initialSubView="calendar" opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} />}
                         {view === 'gantt' && <TasksPage initialSubView="gantt" opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} />}
@@ -289,7 +312,7 @@ const App: React.FC = () => {
                         {view === 'financial' && <FinancialPage orgType={orgDetails.name} />}
                         {view === 'clients' && <ClientsPage userRole={userRole} onlineUsers={onlineUsers} organizationId={userOrgId || undefined} onOpenProject={onOpenProject} />}
                         {view === 'intelligence' && <IntelligencePage organizationId={userOrgId || undefined} opportunities={opportunities} />}
-                        {view === 'settings' && <SettingsPage theme="light" onToggleTheme={toggleTheme} onlineUsers={onlineUsers} userOrgId={userOrgId} orgDetails={orgDetails} onUpdateOrgDetails={() => {}} setView={setView} userRole={userRole} userData={userData} activeModules={activeModules} onRefreshModules={() => {}} />}
+                        {view === 'settings' && <SettingsPage theme={theme} onToggleTheme={toggleTheme} onlineUsers={onlineUsers} userOrgId={userOrgId} orgDetails={orgDetails} onUpdateOrgDetails={() => {}} setView={setView} userRole={userRole} userData={userData} activeModules={activeModules} onRefreshModules={() => {}} />}
                         {view === 'profile' && <ProfilePage currentPlan={currentPlan} onRefresh={() => loadUserData(user.id)} />}
                         {view === 'admin-manager' && <AdminPage onlineUsers={onlineUsers} />}
                     </>

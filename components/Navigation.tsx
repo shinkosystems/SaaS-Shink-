@@ -1,9 +1,11 @@
+
 import React, { useEffect, useState } from 'react';
 import { 
     LayoutDashboard, List, Calendar, Settings,
     LogOut, Sun, Moon, Briefcase, TrendingUp,
     Users, DollarSign, Shield, Sparkles, Menu, X, ChevronRight,
-    Code2, BarChart3, Plus, Microscope, Activity, CheckSquare, Lightbulb
+    Code2, BarChart3, Plus, Microscope, Activity, CheckSquare, Lightbulb,
+    User
 } from 'lucide-react';
 import { PLAN_LIMITS } from '../types';
 import { fetchOrganizationDetails } from '../services/organizationService';
@@ -31,9 +33,31 @@ interface Props {
 }
 
 const getMenuGroups = (userRole: string, isAdmin: boolean, activeModules: string[] = [], userEmail?: string) => {
+    const isMaster = userEmail === 'peboorba@gmail.com';
     const isClient = userRole === 'cliente';
     const hasModule = (key: string) => activeModules.some(m => m.toLowerCase() === key.toLowerCase());
 
+    // Visão para usuários regulares: Execução + Perfil
+    if (!isMaster) {
+        return [
+            {
+                title: 'Execução',
+                items: [
+                    { id: 'list', label: 'Projetos', icon: List },
+                    { id: 'kanban', label: 'Operações', icon: Briefcase },
+                    { id: 'calendar', label: 'Cronograma', icon: Calendar },
+                ]
+            },
+            {
+                title: 'Sistema',
+                items: [
+                    { id: 'profile', label: 'Meu Perfil', icon: User },
+                ]
+            }
+        ];
+    }
+
+    // Visão completa para o usuário mestre
     const groups = [
         {
             title: 'Gestão',
@@ -62,7 +86,10 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, activeModules: string
         groups.push({ title: 'Performance', items: [{ id: 'intelligence', label: 'Inteligência', icon: BarChart3 }] });
     }
 
-    const systemItems = [{ id: 'settings', label: 'Ajustes', icon: Settings }];
+    const systemItems = [
+        { id: 'profile', label: 'Meu Perfil', icon: User },
+        { id: 'settings', label: 'Ajustes', icon: Settings }
+    ];
     if (isAdmin || userEmail === 'peboorba@gmail.com') systemItems.push({ id: 'admin-manager', label: 'Controle Root', icon: Shield });
     groups.push({ title: 'Sistema', items: systemItems });
 
@@ -88,12 +115,12 @@ const Logo = ({ customLogoUrl, orgName }: { customLogoUrl?: string | null, orgNa
 );
 
 export const Sidebar: React.FC<Props> = (props) => {
-  const isAdmin = props.userData.email === 'peboorba@gmail.com';
+  const isAdmin = props.userData.email === 'peboorba@gmail.com'; 
   const menuGroups = getMenuGroups(props.userRole, isAdmin, props.activeModules, props.userData.email);
 
   return (
-    <aside className="hidden lg:flex flex-col w-64 h-full border-r border-slate-200 dark:border-[#333] bg-white dark:bg-[#121212] shrink-0">
-        <div className="h-20 flex items-center justify-between px-6 border-b border-slate-200 dark:border-[#333] shrink-0">
+    <aside className="hidden lg:flex flex-col w-64 h-full border-r border-slate-200 dark:border-white/5 bg-white dark:bg-[#0A0A0B] shrink-0">
+        <div className="h-20 flex items-center justify-between px-6 border-b border-slate-200 dark:border-white/5 shrink-0">
             <Logo customLogoUrl={props.customLogoUrl} orgName={props.orgName} />
             <button 
                 onClick={props.onOpenFeedback}
@@ -107,15 +134,15 @@ export const Sidebar: React.FC<Props> = (props) => {
             <button onClick={props.onOpenCreate} className="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-amber-500 transition-all flex items-center justify-center gap-2 shadow-sm">
                 <Plus className="w-4 h-4"/> Novo Projeto
             </button>
-            <button onClick={props.onOpenCreateTask} className="w-full py-2.5 border border-slate-200 dark:border-[#333] text-slate-500 dark:text-[#A1A1AA] rounded-xl font-bold text-[9px] uppercase tracking-widest hover:bg-black/5 dark:hover:bg-white/5 transition-all flex items-center justify-center gap-2">
+            <button onClick={props.onOpenCreateTask} className="w-full py-2.5 border border-slate-200 dark:border-white/5 text-slate-500 dark:text-slate-400 rounded-xl font-bold text-[9px] uppercase tracking-widest hover:bg-black/5 dark:hover:bg-white/5 transition-all flex items-center justify-center gap-2">
                 <CheckSquare className="w-3.5 h-3.5"/> Tarefa
             </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 space-y-8 custom-scrollbar pb-10">
+        <div className="flex-1 overflow-y-auto px-4 space-y-8 custom-scrollbar pb-10 mt-4">
             {menuGroups.map((group, idx) => (
                 <div key={idx} className="space-y-3">
-                    <h3 className="px-3 text-[8px] font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-600">{group.title}</h3>
+                    <h3 className="px-3 text-[8px] font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">{group.title}</h3>
                     <div className="space-y-0.5">
                         {group.items.map(item => (
                             <button
@@ -124,7 +151,7 @@ export const Sidebar: React.FC<Props> = (props) => {
                                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
                                     props.currentView === item.id 
                                     ? 'bg-slate-100 dark:bg-white/5 text-amber-500 border border-amber-500/20' 
-                                    : 'text-slate-600 dark:text-[#A1A1AA] hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5'
+                                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5'
                                 }`}
                             >
                                 <item.icon className={`w-4 h-4 ${props.currentView === item.id ? 'text-amber-500' : 'text-slate-400 dark:text-slate-600'}`}/>
@@ -136,7 +163,7 @@ export const Sidebar: React.FC<Props> = (props) => {
             ))}
         </div>
 
-        <div className="p-4 border-t border-slate-200 dark:border-[#333] space-y-4">
+        <div className="p-4 border-t border-slate-200 dark:border-white/5 space-y-4">
             <div className="flex items-center justify-between px-2">
                 <button 
                     onClick={props.onToggleTheme}
@@ -144,14 +171,14 @@ export const Sidebar: React.FC<Props> = (props) => {
                 >
                     {props.theme === 'dark' ? <Sun className="w-4 h-4"/> : <Moon className="w-4 h-4"/>}
                 </button>
-                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Build 2.5.0</span>
+                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Build 2.5.1</span>
             </div>
 
             <div 
                 onClick={() => props.onChangeView('profile')}
                 className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer transition-all group"
             >
-                <div className="w-9 h-9 rounded-xl bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-[#333] overflow-hidden">
+                <div className="w-9 h-9 rounded-xl bg-slate-200 dark:bg-zinc-800 border border-slate-300 dark:border-white/5 overflow-hidden">
                     {props.userData.avatar ? <img src={props.userData.avatar} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center font-bold text-slate-500 dark:text-white text-xs">{props.userData.name.charAt(0)}</div>}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -173,11 +200,11 @@ export const MobileDrawer: React.FC<Props> = (props) => {
 
     return (
         <>
-            <div className="fixed top-0 left-0 right-0 h-16 lg:hidden z-[1000] border-b border-slate-200 dark:border-[#333] flex items-center px-4 justify-between bg-white dark:bg-[#121212]">
+            <div className="fixed top-0 left-0 right-0 h-16 lg:hidden z-[1000] border-b border-slate-200 dark:border-white/5 flex items-center px-4 justify-between bg-white dark:bg-[#0A0A0B]">
                 <div className="flex items-center gap-3">
                     <button 
                         onClick={() => props.setIsMobileOpen(true)} 
-                        className="p-2.5 text-slate-900 dark:text-white bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-[#333] rounded-xl active:scale-95 transition-all"
+                        className="p-2.5 text-slate-900 dark:text-white bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl active:scale-95 transition-all"
                     >
                         <Menu className="w-5 h-5"/>
                     </button>
@@ -199,9 +226,9 @@ export const MobileDrawer: React.FC<Props> = (props) => {
             {props.isMobileOpen && (
                 <div className="fixed inset-0 z-[2000] lg:hidden">
                     <div className="absolute inset-0 bg-black/90" onClick={() => props.setIsMobileOpen(false)}></div>
-                    <div className="absolute inset-y-0 left-0 w-[80%] max-w-[300px] bg-white dark:bg-[#121212] border-r border-slate-200 dark:border-[#333] flex flex-col animate-in slide-in-from-left duration-300">
+                    <div className="absolute inset-y-0 left-0 w-[80%] max-w-[300px] bg-white dark:bg-[#0A0A0B] border-r border-slate-200 dark:border-white/5 flex flex-col animate-in slide-in-from-left duration-300">
                         
-                        <div className="h-16 flex items-center justify-between px-6 border-b border-slate-200 dark:border-[#333] shrink-0">
+                        <div className="h-16 flex items-center justify-between px-6 border-b border-slate-200 dark:border-white/5 shrink-0">
                             <Logo customLogoUrl={props.customLogoUrl} orgName={props.orgName} />
                             <button onClick={() => props.setIsMobileOpen(false)} className="p-2 text-slate-400">
                                 <X className="w-6 h-6"/>
@@ -212,7 +239,7 @@ export const MobileDrawer: React.FC<Props> = (props) => {
                             <button onClick={() => { props.onOpenCreate(); props.setIsMobileOpen(false); }} className="w-full py-3.5 bg-amber-500 text-black rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-sm">
                                 <Plus className="w-4 h-4"/> Novo Projeto
                             </button>
-                            <button onClick={() => { props.onOpenCreateTask(); props.setIsMobileOpen(false); }} className="w-full py-3 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-[#333] text-slate-500 dark:text-[#A1A1AA] rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2">
+                            <button onClick={() => { props.onOpenCreateTask(); props.setIsMobileOpen(false); }} className="w-full py-3 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 text-slate-500 dark:text-slate-400 rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2">
                                 <CheckSquare className="w-4 h-4"/> Tarefa
                             </button>
                         </div>
@@ -220,7 +247,7 @@ export const MobileDrawer: React.FC<Props> = (props) => {
                         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-8 custom-scrollbar">
                             {menuGroups.map((group, idx) => (
                                 <div key={idx} className="space-y-3">
-                                    <h3 className="text-[8px] font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-600 pl-3">{group.title}</h3>
+                                    <h3 className="text-[8px] font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500 pl-3">{group.title}</h3>
                                     <div className="space-y-1">
                                         {group.items.map(item => (
                                             <button
@@ -229,7 +256,7 @@ export const MobileDrawer: React.FC<Props> = (props) => {
                                                 className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm font-bold transition-all ${
                                                     props.currentView === item.id 
                                                     ? 'bg-slate-100 dark:bg-white/5 text-amber-500 border border-amber-500/20' 
-                                                    : 'text-slate-600 dark:text-[#A1A1AA] hover:bg-slate-50 dark:hover:bg-white/5'
+                                                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'
                                                 }`}
                                             >
                                                 <item.icon className={`w-5 h-5 ${props.currentView === item.id ? 'text-amber-500' : 'text-slate-400 dark:text-slate-600'}`}/>
@@ -241,9 +268,9 @@ export const MobileDrawer: React.FC<Props> = (props) => {
                             ))}
                         </div>
 
-                        <div className="p-6 border-t border-slate-200 dark:border-[#333] bg-slate-50 dark:bg-black/20">
+                        <div className="p-6 border-t border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-black/20">
                             <div className="flex items-center gap-4">
-                                <div className="w-11 h-11 rounded-xl bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-[#333] overflow-hidden">
+                                <div className="w-11 h-11 rounded-xl bg-slate-200 dark:bg-zinc-800 border border-slate-300 dark:border-white/5 overflow-hidden">
                                     {props.userData.avatar ? <img src={props.userData.avatar} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center font-bold text-slate-500 dark:text-white text-xs">{props.userData.name.charAt(0)}</div>}
                                 </div>
                                 <div className="flex-1 min-w-0">

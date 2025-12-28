@@ -43,7 +43,7 @@ export const fetchOpportunities = async (organizationId?: number): Promise<Oppor
   }
 };
 
-export const fetchOpportunityById = async (id: string): Promise<Opportunity | null> => {
+export const fetchOpportunityById = async (id: string | number): Promise<Opportunity | null> => {
     if (!supabase) return null;
     try {
         const { data: project, error } = await supabase.from(TABLE_NAME).select(`*, clienteData:clientes(nome, logo_url)`).eq('id', id).single();
@@ -58,35 +58,55 @@ export const createOpportunity = async (opp: Opportunity): Promise<Opportunity |
     if (!supabase) return null;
 
     try {
-        const { data: { user } } = await supabase.auth.getUser();
+        // Garantir que temos um organizationId numérico e válido
+        const { data: auth } = await supabase.auth.getUser();
         let targetOrgId = opp.organizationId;
 
-        if (!targetOrgId && user) {
-            const { data: u } = await supabase.from('users').select('organizacao').eq('id', user.id).single();
+        if (!targetOrgId && auth.user) {
+            const { data: u } = await supabase.from('users').select('organizacao').eq('id', auth.user.id).single();
             targetOrgId = u?.organizacao;
         }
 
-        if (!targetOrgId) return null;
+        if (!targetOrgId) {
+            console.error("createOpportunity: Falha ao identificar organização.");
+            return null;
+        }
 
-        const dbPayload = mapOpportunityToDbProject({ ...opp, organizationId: targetOrgId });
+        const dbPayload = mapOpportunityToDbProject({ ...opp, organizationId: Number(targetOrgId) });
+        
+        // Remove IDs se existirem para permitir que o banco gere via IDENTITY
+        // O campo id na tabela projetos é BIGINT GENERATED ALWAYS AS IDENTITY
         delete dbPayload.id; 
         
-        const { data: projectData, error } = await supabase.from(TABLE_NAME).insert(dbPayload).select().single();
-        if (error) return null;
+        console.log("createOpportunity: Inserindo no banco...", dbPayload);
+        
+        const { data: projectData, error } = await supabase
+            .from(TABLE_NAME)
+            .insert(dbPayload)
+            .select()
+            .single();
+        
+        if (error) {
+            console.error("createOpportunity: Erro de inserção DB:", error.message, error.details);
+            throw new Error(`Falha no banco: ${error.message}`);
+        }
 
-        if (opp.bpmn?.nodes) {
-            const defaultAssignee = user?.id;
+        console.log("createOpportunity: Sucesso! ID Gerado:", projectData.id);
+
+        // Provisionamento de tarefas iniciais se houver estrutura BPMN
+        if (opp.bpmn?.nodes && opp.bpmn.nodes.length > 0) {
+            const defaultAssignee = auth.user?.id;
             for (const node of opp.bpmn.nodes) {
                 if (node.checklist) {
                     for (const task of node.checklist) {
                         const { data: parentTask } = await supabase.from('tasks').insert({
                             projeto: projectData.id,
                             titulo: task.text,
-                            descricao: task.description || '',
+                            descricao: task.description || node.label || '',
                             status: 'todo',
                             responsavel: task.assigneeId || defaultAssignee,
                             duracaohoras: Number(task.estimatedHours) || 2,
-                            organizacao: targetOrgId,
+                            organizacao: Number(targetOrgId),
                             gravidade: task.gut?.g || 1, 
                             urgencia: task.gut?.u || 1, 
                             tendencia: task.gut?.t || 1,
@@ -102,8 +122,8 @@ export const createOpportunity = async (opp: Opportunity): Promise<Opportunity |
                                 responsavel: sub.assigneeId || defaultAssignee,
                                 tarefamae: parentTask.id,
                                 sutarefa: true,
-                                organizacao: targetOrgId,
-                                descricao: 'Subtarefa',
+                                organizacao: Number(targetOrgId),
+                                descricao: 'Subtarefa automatizada',
                                 dataproposta: new Date().toISOString(),
                                 gravidade: 1, urgencia: 1, tendencia: 1,
                                 duracaohoras: 1
@@ -117,6 +137,7 @@ export const createOpportunity = async (opp: Opportunity): Promise<Opportunity |
         
         return mapDbProjectToOpportunity(projectData, []);
     } catch (err: any) {
+        console.error("createOpportunity: Exceção crítica:", err);
         return null;
     }
 };
@@ -130,13 +151,12 @@ export const updateOpportunity = async (opp: Opportunity): Promise<Opportunity |
         const { data, error } = await supabase.from(TABLE_NAME).update(updateData).eq('id', opp.id).select().single();
         if (error) return null;
 
-        // Buscar tarefas para reidratar o retorno com dados atualizados do banco
         const { data: tasks } = await supabase.from('tasks').select('*').eq('projeto', opp.id);
         return mapDbProjectToOpportunity(data, tasks || []); 
     } catch (err) { return null; }
 };
 
-export const deleteOpportunity = async (id: string): Promise<boolean> => {
+export const deleteOpportunity = async (id: string | number): Promise<boolean> => {
     if (!supabase) return false;
     const numericId = Number(id);
     if (isNaN(numericId)) return false;
@@ -157,38 +177,37 @@ export const deleteOpportunity = async (id: string): Promise<boolean> => {
 
 const mapDbProjectToOpportunity = (row: DbProject, tasks: DbTask[] = []): Opportunity => {
     const tads: TadsCriteria = {
-        scalability: row.tadsescalabilidade,
-        integration: row.tadsintegracao,
-        painPoint: row.tadsdorreal,
-        recurring: row.tadsrecorrencia,
-        mvpSpeed: row.tadsvelocidade
+        scalability: !!row.tadsescalabilidade,
+        integration: !!row.tadsintegracao,
+        painPoint: !!row.tadsdorreal,
+        recurring: !!row.tadsrecorrencia,
+        mvpSpeed: !!row.tadsvelocidade
     };
 
-    // Garantir que carregamos toda a estrutura BPMN, que contém o checklist e subtasks
     const bpmnStructure = row.bpmn_structure || { lanes: [], nodes: [], edges: [] };
 
     return {
         id: row.id.toString(),
         title: row.nome,
-        description: row.descricao,
+        description: row.descricao || '',
         clientId: row.cliente || undefined,
         organizationId: row.organizacao,
-        rde: row.rde as RDEStatus,
-        viability: row.viabilidade,
-        velocity: row.velocidade,
-        revenue: row.receita,
-        prioScore: row.prioseis,
-        archetype: row.arquetipo as Archetype,
-        intensity: row.intensidade as IntensityLevel,
+        rde: (row.rde as RDEStatus) || RDEStatus.WARM,
+        viability: row.viabilidade || 1,
+        velocity: row.velocidade || 1,
+        revenue: row.receita || 1,
+        prioScore: row.prioseis || 0,
+        archetype: (row.arquetipo as Archetype) || Archetype.SAAS_ENTRY,
+        intensity: (row.intensidade as IntensityLevel) || IntensityLevel.L1,
         tads: tads,
-        tadsScore: 0, 
+        tadsScore: Object.values(tads).filter(Boolean).length * 2, 
         evidence: { clientsAsk: [], clientsSuffer: [], wontPay: [] },
         status: row.projoport ? 'Future' : 'Active',
         createdAt: row.created_at,
         bpmn: bpmnStructure,
         dbProjectId: row.id,
         docsContext: row.contexto_ia || '',
-        color: row.cor || '#3b82f6'
+        color: row.cor || '#F59E0B'
     };
 };
 
@@ -198,21 +217,21 @@ const mapOpportunityToDbProject = (opp: Opportunity): any => {
         descricao: opp.description || '',
         cliente: opp.clientId || null,
         rde: opp.rde || 'Morno',
-        velocidade: typeof opp.velocity === 'number' ? opp.velocity : 1,
-        viability: typeof opp.viability === 'number' ? opp.viability : 1,
-        receita: typeof opp.revenue === 'number' ? opp.revenue : 1,
-        prioseis: typeof opp.prioScore === 'number' ? opp.prioScore : 0,
-        arquetipo: opp.archetype || 'SaaS',
-        intensidade: opp.intensity || 1,
-        tadsescalabilidade: opp.tads?.scalability || false,
-        tadsintegracao: opp.tads?.integration || false,
-        tadsdorreal: opp.tads?.painPoint || false,
-        tadsrecorrencia: opp.tads?.recurring || false,
-        tadsvelocidade: opp.tads?.mvpSpeed || false,
-        organizacao: opp.organizationId, 
+        velocidade: Number(opp.velocity) || 1,
+        viabilidade: Number(opp.viability) || 1,
+        receita: Number(opp.revenue) || 1,
+        prioseis: Number(opp.prioScore) || 0,
+        arquetipo: opp.archetype || 'SaaS de Entrada',
+        intensidade: Number(opp.intensity) || 1,
+        tadsescalabilidade: !!opp.tads?.scalability,
+        tadsintegracao: !!opp.tads?.integration,
+        tadsdorreal: !!opp.tads?.painPoint,
+        tadsrecorrencia: !!opp.tads?.recurring,
+        tadsvelocidade: !!opp.tads?.mvpSpeed,
+        organizacao: Number(opp.organizationId), 
         projoport: opp.status === 'Future' || opp.status === 'Negotiation' || opp.status === 'Frozen',
         bpmn_structure: opp.bpmn || {},
         contexto_ia: opp.docsContext || '',
-        cor: opp.color
+        cor: opp.color || '#F59E0B'
     };
 };

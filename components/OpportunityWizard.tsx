@@ -131,7 +131,7 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                                 <Sparkles className="w-6 h-6 lg:w-8 lg:h-8"/>
                             </div>
                             <h3 className="text-4xl lg:text-6xl font-black text-[var(--text-main)] tracking-tighter leading-[1.1]">Onde está o <br/><span className="text-amber-500">Valor?</span></h3>
-                            <p className="text-slate-500 text-base lg:text-xl font-medium max-w-lg">Defina o nome e o contexto estratégico do seu novo projeto.</p>
+                            <p className="text-slate-500 dark:text-slate-400 text-base lg:text-xl font-medium max-w-lg">Defina o nome e o contexto estratégico do seu novo projeto.</p>
                         </div>
                         <div className="space-y-8 lg:space-y-10">
                             <div>
@@ -161,7 +161,7 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                     <div className="space-y-8 lg:space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
                         <div className="space-y-4">
                             <h3 className="text-4xl lg:text-6xl font-black text-[var(--text-main)] tracking-tighter leading-none">DNA do <span className="text-amber-500">Projeto</span>.</h3>
-                            <p className="text-slate-500 text-base lg:text-xl font-medium">Categorize a natureza e o peso da sua solução.</p>
+                            <p className="text-slate-500 dark:text-slate-400 text-base lg:text-xl font-medium">Categorize a natureza e o peso da sua solução.</p>
                         </div>
                         
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
@@ -178,7 +178,7 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                                                 <div className="font-black text-xs lg:text-sm uppercase tracking-widest">{terms.archetypes[arch].label}</div>
                                                 {formData.archetype === arch && <Check className="w-4 h-4" />}
                                             </div>
-                                            <p className={`text-[8px] lg:text-[10px] font-bold leading-relaxed ${formData.archetype === arch ? 'text-black/70' : 'text-slate-500'}`}>
+                                            <p className={`text-[8px] lg:text-[10px] font-bold leading-relaxed ${formData.archetype === arch ? 'text-black/70' : 'text-slate-500 dark:text-slate-400'}`}>
                                                 {terms.archetypes[arch].desc}
                                             </p>
                                         </button>
@@ -206,7 +206,7 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                                         <span>Crítica</span>
                                     </div>
                                     <div className="p-4 lg:p-5 bg-blue-500/5 rounded-xl lg:rounded-2xl border border-blue-500/10 flex gap-3 lg:gap-4 items-start">
-                                        <Info className="w-4 h-4 lg:w-5 lg:h-5 text-blue-500 shrink-0 mt-0.5" />
+                                        <div className="mt-0.5"><Info className="w-4 h-4 lg:w-5 lg:h-5 text-blue-500 shrink-0" /></div>
                                         <p className="text-[10px] lg:text-xs text-blue-400 font-bold leading-relaxed">{terms.intensities[formData.intensity || 1]}</p>
                                     </div>
                                 </div>
@@ -219,7 +219,7 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                     <div className="space-y-8 lg:space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
                         <div className="space-y-4">
                             <h3 className="text-4xl lg:text-6xl font-black text-[var(--text-main)] tracking-tighter leading-none">Matriz <span className="text-amber-500">RDE</span>.</h3>
-                            <p className="text-slate-500 text-base lg:text-xl font-medium">Priorização fundamentada em variáveis de esforço e retorno.</p>
+                            <p className="text-slate-500 dark:text-slate-400 text-base lg:text-xl font-medium">Priorização fundamentada em variáveis de esforço e retorno.</p>
                         </div>
                         <div className="grid grid-cols-1 gap-8 lg:gap-10 glass-card p-6 lg:p-12 border-[var(--border-color)]">
                             {[
@@ -255,7 +255,7 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                     <div className="space-y-8 lg:space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
                         <div className="space-y-4">
                             <h3 className="text-4xl lg:text-6xl font-black text-[var(--text-main)] tracking-tighter leading-none">Crivo <span className="text-amber-500">T.A.D.S.</span></h3>
-                            <p className="text-slate-500 text-base lg:text-xl font-medium">Fundamentos contextuais para viabilidade de longo prazo.</p>
+                            <p className="text-slate-500 dark:text-slate-400 text-base lg:text-xl font-medium">Fundamentos contextuais para viabilidade de longo prazo.</p>
                         </div>
                         <div className="grid grid-cols-1 gap-3 lg:gap-4">
                             {[
@@ -272,7 +272,7 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                                 >
                                     <div className="max-w-[80%] lg:max-w-[85%]">
                                         <div className={`text-sm lg:text-xl font-black uppercase tracking-tight mb-1 lg:mb-2 ${formData.tads?.[item.key as keyof TadsCriteria] ? 'text-black' : 'text-[var(--text-main)]'}`}>{item.label}</div>
-                                        <div className={`text-[10px] lg:text-sm font-medium leading-relaxed ${formData.tads?.[item.key as keyof TadsCriteria] ? 'text-black/70' : 'text-slate-500'}`}>{item.desc}</div>
+                                        <div className={`text-[10px] lg:text-sm font-medium leading-relaxed ${formData.tads?.[item.key as keyof TadsCriteria] ? 'text-black/70' : 'text-slate-500 dark:text-slate-400'}`}>{item.desc}</div>
                                     </div>
                                     <div className={`w-10 h-10 lg:w-14 lg:h-14 rounded-xl lg:rounded-2xl flex items-center justify-center border-2 transition-all ${formData.tads?.[item.key as keyof TadsCriteria] ? 'bg-black text-emerald-500 border-black' : 'border-slate-200 dark:border-white/10 group-hover:border-amber-500/50 shadow-sm'}`}>
                                         {formData.tads?.[item.key as keyof TadsCriteria] && <Check className="w-5 h-5 lg:w-8 lg:h-8 stroke-[4px]"/>}
