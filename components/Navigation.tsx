@@ -199,35 +199,23 @@ export const MobileDrawer: React.FC<Props> = (props) => {
 
     return (
         <>
-            <div className="fixed top-0 left-0 right-0 h-16 xl:hidden z-[1000] border-b border-slate-200 dark:border-white/5 flex items-center px-4 justify-between bg-white dark:bg-[#0A0A0B]">
-                <div className="flex items-center gap-3">
-                    <button 
-                        onClick={() => props.setIsMobileOpen(true)} 
-                        className="p-2.5 text-slate-900 dark:text-white bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl active:scale-95 transition-all"
-                    >
-                        <Menu className="w-5 h-5"/>
-                    </button>
-                    <Logo customLogoUrl={props.customLogoUrl} orgName={props.orgName} />
-                </div>
-                <div className="flex items-center gap-2">
-                    <button 
-                        onClick={props.onToggleTheme}
-                        className="p-2.5 text-slate-500 bg-slate-100 dark:bg-white/5 rounded-xl"
-                    >
-                        {props.theme === 'dark' ? <Sun className="w-5 h-5"/> : <Moon className="w-5 h-5"/>}
-                    </button>
-                    <button onClick={props.onOpenCreateTask} className="w-10 h-10 bg-amber-500 text-black rounded-xl flex items-center justify-center shadow-lg">
-                        <Plus className="w-5 h-5 stroke-[3px]"/>
-                    </button>
-                </div>
+            {/* Floating Island Header - Top Left Only */}
+            <div className="fixed top-6 left-6 z-[1000] xl:hidden flex items-center gap-4 bg-white/80 dark:bg-black/80 backdrop-blur-2xl p-2.5 pr-6 rounded-2xl border border-slate-200 dark:border-white/10 shadow-ios active:scale-[0.98] transition-all">
+                <button 
+                    onClick={() => props.setIsMobileOpen(true)} 
+                    className="p-2.5 text-slate-900 dark:text-white bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl active:scale-95 transition-all"
+                >
+                    <Menu className="w-5 h-5"/>
+                </button>
+                <Logo customLogoUrl={props.customLogoUrl} orgName={props.orgName} />
             </div>
 
             {props.isMobileOpen && (
                 <div className="fixed inset-0 z-[2000] xl:hidden">
-                    <div className="absolute inset-0 bg-black/90" onClick={() => props.setIsMobileOpen(false)}></div>
+                    <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" onClick={() => props.setIsMobileOpen(false)}></div>
                     <div className="absolute inset-y-0 left-0 w-[85%] max-w-[320px] bg-white dark:bg-[#0A0A0B] border-r border-slate-200 dark:border-white/5 flex flex-col animate-in slide-in-from-left duration-300">
                         
-                        <div className="h-16 flex items-center justify-between px-6 border-b border-slate-200 dark:border-white/5 shrink-0">
+                        <div className="h-20 flex items-center justify-between px-6 border-b border-slate-200 dark:border-white/5 shrink-0">
                             <Logo customLogoUrl={props.customLogoUrl} orgName={props.orgName} />
                             <button onClick={() => props.setIsMobileOpen(false)} className="p-2 text-slate-400">
                                 <X className="w-6 h-6"/>
@@ -265,6 +253,22 @@ export const MobileDrawer: React.FC<Props> = (props) => {
                                     </div>
                                 </div>
                             ))}
+                        </div>
+
+                        {/* Theme Toggle integrated into Drawer base */}
+                        <div className="px-4 py-4 border-t border-slate-100 dark:border-white/5">
+                            <button 
+                                onClick={props.onToggleTheme}
+                                className="w-full flex items-center justify-between p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10 group transition-all"
+                            >
+                                <div className="flex items-center gap-3">
+                                    {props.theme === 'dark' ? <Moon className="w-4 h-4 text-amber-500"/> : <Sun className="w-4 h-4 text-amber-500"/>}
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300">Modo {props.theme === 'dark' ? 'Escuro' : 'Claro'}</span>
+                                </div>
+                                <div className="w-10 h-5 bg-slate-200 dark:bg-white/10 rounded-full relative p-1 flex items-center">
+                                    <div className={`w-3 h-3 rounded-full bg-amber-500 transition-all duration-300 ${props.theme === 'dark' ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                                </div>
+                            </button>
                         </div>
 
                         <div className="p-6 border-t border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-black/20">
