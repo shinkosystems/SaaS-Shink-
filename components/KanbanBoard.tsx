@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Opportunity, TaskStatus, DbTask } from '../types';
-import { RefreshCw, Clock, Briefcase, Search, User, Target, Filter, X, BarChart3, Calendar, Timer } from 'lucide-react';
+import { RefreshCw, Clock, Briefcase, Search, User, Target, Filter, X, BarChart3, Calendar, Timer, Lock } from 'lucide-react';
 import { TaskDetailModal } from './TaskDetailModal';
 import { fetchAllTasks, updateTask, syncTaskChecklist, fetchOrgMembers, fetchProjects } from '../services/projectService';
 
@@ -12,6 +12,7 @@ interface Props {
   currentPlan?: string;
   activeModules?: string[];
   projectId?: string;
+  readOnly?: boolean;
 }
 
 const COLUMNS = [
@@ -22,7 +23,7 @@ const COLUMNS = [
     { id: 'done', label: 'Concluído', color: 'bg-emerald-500' }
 ];
 
-export const KanbanBoard: React.FC<Props> = ({ organizationId, projectId }) => {
+export const KanbanBoard: React.FC<Props> = ({ organizationId, projectId, readOnly, userRole }) => {
     const [tasks, setTasks] = useState<DbTask[]>([]);
     const [loading, setLoading] = useState(true);
     const [draggedTask, setDraggedTask] = useState<DbTask | null>(null);
@@ -53,11 +54,12 @@ export const KanbanBoard: React.FC<Props> = ({ organizationId, projectId }) => {
     const loadData = async () => {
         setLoading(true);
         const data = await fetchAllTasks(organizationId);
-        setTasks(data);
+        setTasks(projectId ? data.filter(t => t.projeto?.toString() === projectId) : data);
         setLoading(false);
     };
 
     const handleStatusChange = async (task: DbTask, newStatus: string) => {
+        if (readOnly) return;
         const now = new Date().toISOString();
         const dateFields: Record<string, string> = {
             todo: 'dataafazer',
@@ -134,9 +136,17 @@ export const KanbanBoard: React.FC<Props> = ({ organizationId, projectId }) => {
         <div className="flex flex-col h-full animate-in fade-in duration-700 space-y-6">
             {/* Header Section */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                <div>
-                    <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">Fluxo de <span className="text-amber-500">Trabalho</span>.</h1>
-                    <p className="text-slate-400 font-black text-[9px] uppercase tracking-[0.25em] mt-2">Operação Técnica Shinkō Engine</p>
+                <div className="flex items-center gap-4">
+                    <div>
+                        <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">Fluxo de <span className="text-amber-500">Trabalho</span>.</h1>
+                        <p className="text-slate-400 font-black text-[9px] uppercase tracking-[0.25em] mt-2">Operação Técnica Shinkō Engine</p>
+                    </div>
+                    {readOnly && (
+                        <div className="px-3 py-1 bg-slate-100 dark:bg-white/5 rounded-full flex items-center gap-2 border border-slate-200 dark:border-white/10">
+                            <Lock className="w-3 h-3 text-slate-400"/>
+                            <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Snapshot View</span>
+                        </div>
+                    )}
                 </div>
                 <div className="flex items-center gap-3">
                     <button onClick={loadData} className="p-2.5 bg-white dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/5 hover:border-amber-500/30 transition-all shadow-sm">
@@ -212,19 +222,6 @@ export const KanbanBoard: React.FC<Props> = ({ organizationId, projectId }) => {
                     </div>
                 </div>
 
-                <div className="relative min-w-[140px]">
-                    <BarChart3 className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400"/>
-                    <select 
-                        value={minGut}
-                        onChange={e => setMinGut(Number(e.target.value))}
-                        className="w-full pl-9 pr-8 py-2 bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-xl text-xs font-bold outline-none appearance-none cursor-pointer"
-                    >
-                        <option value="0">Qualquer GUT</option>
-                        <option value="27">{"GUT > 27"}</option>
-                        <option value="60">{"GUT > 60"}</option>
-                    </select>
-                </div>
-
                 {(searchTerm || filterAssignee || (filterProjectId && !projectId) || minGut > 0 || filterStartDate || filterEndDate) && (
                     <button 
                         onClick={resetFilters}
@@ -241,8 +238,8 @@ export const KanbanBoard: React.FC<Props> = ({ organizationId, projectId }) => {
                     {COLUMNS.map(col => (
                         <div 
                             key={col.id} 
-                            onDragOver={e => e.preventDefault()} 
-                            onDrop={() => draggedTask && handleStatusChange(draggedTask, col.id)}
+                            onDragOver={e => !readOnly && e.preventDefault()} 
+                            onDrop={() => !readOnly && draggedTask && handleStatusChange(draggedTask, col.id)}
                             className="flex-1 min-w-[260px] flex flex-col h-full group"
                         >
                             <div className="flex items-center justify-between mb-5 px-4">
@@ -255,15 +252,15 @@ export const KanbanBoard: React.FC<Props> = ({ organizationId, projectId }) => {
                                 </span>
                             </div>
 
-                            <div className={`flex-1 space-y-4 p-2 rounded-[2.2rem] transition-all duration-500 ${draggedTask ? 'bg-amber-500/5 ring-2 ring-dashed ring-amber-500/10' : 'bg-transparent'}`}>
+                            <div className={`flex-1 space-y-4 p-2 rounded-[2.2rem] transition-all duration-500 ${draggedTask && !readOnly ? 'bg-amber-500/5 ring-2 ring-dashed ring-amber-500/10' : 'bg-transparent'}`}>
                                 {columnsData[col.id]?.map(task => {
                                     const score = (task.gravidade || 1) * (task.urgencia || 1) * (task.tendencia || 1);
                                     return (
                                         <div 
                                             key={task.id} 
-                                            draggable 
-                                            onDragStart={() => setDraggedTask(task)} 
-                                            onDragEnd={() => setDraggedTask(null)}
+                                            draggable={!readOnly}
+                                            onDragStart={() => !readOnly && setDraggedTask(task)} 
+                                            onDragEnd={() => !readOnly && setDraggedTask(null)}
                                             onClick={() => setEditingTaskCtx(task)}
                                             className="glass-card p-6 border-slate-200 dark:border-white/5 hover:border-amber-500/40 cursor-pointer group/card transition-all active:scale-[0.98] shadow-sm"
                                         >
@@ -333,6 +330,7 @@ export const KanbanBoard: React.FC<Props> = ({ organizationId, projectId }) => {
                     organizationId={organizationId}
                     onClose={() => setEditingTaskCtx(null)}
                     onSave={async (updated) => {
+                        if (readOnly) return;
                         const now = new Date().toISOString();
                         const updatePayload: any = {
                             titulo: updated.text,
@@ -348,7 +346,6 @@ export const KanbanBoard: React.FC<Props> = ({ organizationId, projectId }) => {
                             tendencia: updated.gut?.t
                         };
 
-                        // Timestamps update if status changed
                         if (updated.status !== editingTaskCtx.status) {
                             const dateFields: Record<string, string> = {
                                 todo: 'dataafazer',
@@ -367,6 +364,7 @@ export const KanbanBoard: React.FC<Props> = ({ organizationId, projectId }) => {
                         }
                         loadData();
                     }}
+                    readOnly={readOnly}
                 />
             )}
         </div>

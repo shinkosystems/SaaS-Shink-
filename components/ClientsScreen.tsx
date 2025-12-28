@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Users, Search, Plus, Building2, Building, Edit, X, LayoutGrid, ArrowUpRight, Loader2, Target, Zap, TrendingUp } from 'lucide-react';
+import { Users, Search, Plus, Building2, Building, Edit, X, LayoutGrid, ArrowUpRight, Loader2, Target, Zap, TrendingUp, Mail, Lock, Phone, User, Globe, MapPin, Save, DollarSign } from 'lucide-react';
 import { fetchClients, createClient, updateClient } from '../services/clientService';
 import { DbClient } from '../types';
 
@@ -15,6 +15,20 @@ export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [], org
     const [clients, setClients] = useState<DbClient[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+
+    // Form State
+    const [newClient, setNewClient] = useState({
+        nome: '',
+        email: '',
+        senha: '',
+        telefone: '',
+        cnpj: '',
+        endereco: '',
+        valormensal: 0,
+        status: 'Ativo'
+    });
 
     useEffect(() => { 
         if (organizationId) {
@@ -29,6 +43,31 @@ export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [], org
         const data = await fetchClients(organizationId!);
         setClients(data);
         setIsLoading(false);
+    };
+
+    const handleCreateClient = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newClient.email || !newClient.senha || !newClient.nome) {
+            return alert("Nome, Email e Senha são obrigatórios.");
+        }
+
+        setIsSaving(true);
+        try {
+            const success = await createClient(
+                { ...newClient, organizacao: organizationId },
+                newClient.senha
+            );
+            if (success) {
+                alert("Cliente e Login criados com sucesso!");
+                setShowAddModal(false);
+                setNewClient({ nome: '', email: '', senha: '', telefone: '', cnpj: '', endereco: '', valormensal: 0, status: 'Ativo' });
+                loadClients();
+            }
+        } catch (e: any) {
+            alert(e.message || "Erro ao criar cliente.");
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const filteredClients = clients.filter(c => 
@@ -58,9 +97,11 @@ export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [], org
                             className="w-full pl-11 pr-4 py-3.5 bg-white dark:bg-white/5 border border-slate-200 dark:border-[#333] rounded-2xl text-sm text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 transition-all shadow-sm"
                         />
                     </div>
-                    <button className="px-8 py-3.5 bg-white dark:bg-white text-black dark:text-black rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-amber-500 transition-all shadow-soft active:scale-95">
-                        <Plus className="w-4 h-4"/> NOVO CLIENTE
-                    </button>
+                    {userRole !== 'cliente' && (
+                        <button onClick={() => setShowAddModal(true)} className="px-8 py-3.5 bg-white dark:bg-white text-black dark:text-black rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-amber-500 transition-all shadow-soft active:scale-95">
+                            <Plus className="w-4 h-4"/> NOVO CLIENTE
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -79,7 +120,6 @@ export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [], org
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 pb-24">
                     {filteredClients.map(client => (
                         <div key={client.id} className="glass-card p-10 rounded-[2.5rem] flex flex-col justify-between h-[420px] transition-all group relative overflow-hidden">
-                            {/* Decorative Background Blob */}
                             <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full -mr-16 -mt-16 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
                             
                             <div>
@@ -121,6 +161,94 @@ export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [], org
                             </div>
                         </div>
                     ))}
+                </div>
+            )}
+
+            {/* MODAL: NOVO CLIENTE */}
+            {showAddModal && (
+                <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/90 backdrop-blur-2xl animate-in fade-in">
+                    <div className="w-full max-w-2xl bg-white dark:bg-[#0A0A0C] rounded-[3rem] shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden animate-ios-pop flex flex-col max-h-[90vh]">
+                        <form onSubmit={handleCreateClient} className="flex flex-col h-full">
+                            <div className="p-10 pb-4 flex justify-between items-center">
+                                <div>
+                                    <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">Novo <span className="text-amber-500">Parceiro</span>.</h2>
+                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-2">CONFIGURAÇÃO DE ACESSO E CONTRATO</p>
+                                </div>
+                                <button type="button" onClick={() => setShowAddModal(false)} className="p-3 text-slate-400 hover:text-red-500 transition-colors"><X className="w-6 h-6"/></button>
+                            </div>
+
+                            <div className="p-10 pt-6 space-y-8 overflow-y-auto custom-scrollbar flex-1">
+                                {/* Dados de Acesso */}
+                                <div className="space-y-6">
+                                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] flex items-center gap-2 border-b border-slate-100 dark:border-white/5 pb-3">
+                                        <Lock className="w-3.5 h-3.5 text-amber-500"/> Credenciais de Sistema
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Email de Login</label>
+                                            <div className="relative">
+                                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"/>
+                                                <input required type="email" value={newClient.email} onChange={e => setNewClient({...newClient, email: e.target.value})} className="w-full pl-12 pr-4 py-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm font-bold outline-none focus:border-amber-500 transition-all" placeholder="cliente@empresa.com"/>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Senha Inicial</label>
+                                            <div className="relative">
+                                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"/>
+                                                <input required type="password" value={newClient.senha} onChange={e => setNewClient({...newClient, senha: e.target.value})} className="w-full pl-12 pr-4 py-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm font-bold outline-none focus:border-amber-500 transition-all" placeholder="••••••••"/>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Dados Cadastrais */}
+                                <div className="space-y-6">
+                                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] flex items-center gap-2 border-b border-slate-100 dark:border-white/5 pb-3">
+                                        <Building2 className="w-3.5 h-3.5 text-blue-500"/> Informações da Conta
+                                    </h3>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Nome Completo / Razão Social</label>
+                                        <div className="relative">
+                                            <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"/>
+                                            <input required value={newClient.nome} onChange={e => setNewClient({...newClient, nome: e.target.value})} className="w-full pl-12 pr-4 py-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm font-bold outline-none focus:border-amber-500 transition-all" placeholder="Ex: Shinkō Sistemas Ltda"/>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">CNPJ / CPF</label>
+                                            <input value={newClient.cnpj} onChange={e => setNewClient({...newClient, cnpj: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm font-bold outline-none" placeholder="00.000.000/0001-00"/>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Telefone</label>
+                                            <input value={newClient.telefone} onChange={e => setNewClient({...newClient, telefone: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm font-bold outline-none" placeholder="(00) 00000-0000"/>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Contrato */}
+                                <div className="space-y-6">
+                                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] flex items-center gap-2 border-b border-slate-100 dark:border-white/5 pb-3">
+                                        <DollarSign className="w-3.5 h-3.5 text-emerald-500"/> Variáveis Financeiras
+                                    </h3>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Valor do Fee Mensal (R$)</label>
+                                        <div className="relative">
+                                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-black text-slate-400">R$</div>
+                                            <input type="number" value={newClient.valormensal} onChange={e => setNewClient({...newClient, valormensal: Number(e.target.value)})} className="w-full pl-12 pr-4 py-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm font-black outline-none text-emerald-500" placeholder="0,00"/>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="p-10 border-t border-slate-100 dark:border-white/5 flex gap-4 bg-slate-50/50 dark:bg-black/20">
+                                <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">Descartar</button>
+                                <button type="submit" disabled={isSaving} className="flex-[2] py-5 bg-slate-900 dark:bg-white text-white dark:text-black rounded-3xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50">
+                                    {isSaving ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>}
+                                    Sincronizar Login & Cadastro
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             )}
         </div>

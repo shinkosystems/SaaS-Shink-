@@ -68,7 +68,7 @@ const App: React.FC = () => {
   const [view, setViewState] = useState<string>('dashboard');
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeModules, setActiveModules] = useState<string[]>(['projects', 'kanban']); // Default seguro
+  const [activeModules, setActiveModules] = useState<string[]>(['projects', 'kanban']); 
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [showCreateTask, setShowCreateTask] = useState(false);
@@ -197,13 +197,11 @@ const App: React.FC = () => {
           const { data } = await supabase.from('users').select('*').eq('id', userId).single();
           if (data) {
               setUserData({ name: data.nome, email: data.email, avatar: data.avatar_url });
-              setUserRole(data.perfil || 'colaborador');
+              const currentRole = data.perfil || 'colaborador';
+              setUserRole(currentRole);
               setUserOrgId(data.organizacao);
               
               if (data.organizacao) {
-                  // Fallback imediato de módulos se tiver orgId
-                  setActiveModules(prev => prev.length <= 2 ? ['projects', 'kanban', 'calendar'] : prev);
-
                   const { data: orgData } = await supabase.from('organizacoes').select('*').eq('id', data.organizacao).single();
                   
                   if (orgData) {
@@ -219,18 +217,12 @@ const App: React.FC = () => {
                         const modules = await fetchActiveOrgModules(data.organizacao);
                         setActiveModules(modules.length > 0 ? modules : getPlanDefaultModules(orgData.plano || 4));
                     }
-                  } else {
-                      // Se tem ID mas a consulta não retornou nada (ex: RLS ou deletado)
-                      console.warn("Organização não localizada no DB, aplicando modo restrito.");
-                      setActiveModules(['projects', 'kanban']);
                   }
                   
-                  const opps = await fetchOpportunities(data.organizacao);
+                  // Se o usuário for cliente, passamos o seu ID como filtro de cliente
+                  const clientId = currentRole === 'cliente' ? data.id : undefined;
+                  const opps = await fetchOpportunities(data.organizacao, clientId);
                   if (opps) setOpportunities(opps);
-              } else if (data.perfil === 'dono') {
-                  // Caso especial: Dono sem orgId deve ser levado a criar uma
-                  setActiveModules(['ia']); // Só deixa a IA ativa para guiar
-                  setViewState('settings');
               }
               trackUserAccess(userId);
               subscribeToPresence(userId, setOnlineUsers);
@@ -268,8 +260,6 @@ const App: React.FC = () => {
       currentPlan, orgName: orgDetails.name, activeModules, customLogoUrl: orgDetails.logoUrl,
       organizationId: userOrgId
   };
-
-  const isMasterUser = userData?.email === 'peboorba@gmail.com' || userData?.email === 'shinkosystems@gmail.com';
 
   return (
     <div className="flex h-screen w-full bg-[var(--bg-color)] text-slate-900 transition-colors duration-300">
@@ -344,7 +334,7 @@ const App: React.FC = () => {
                         {view === 'intelligence' && <IntelligencePage organizationId={userOrgId || undefined} opportunities={opportunities} />}
                         {view === 'settings' && <SettingsPage theme={theme} onToggleTheme={toggleTheme} onlineUsers={onlineUsers} userOrgId={userOrgId} orgDetails={orgDetails} onUpdateOrgDetails={() => {}} setView={setView} userRole={userRole} userData={userData} activeModules={activeModules} onRefreshModules={() => {}} />}
                         {view === 'profile' && <ProfilePage currentPlan={currentPlan} onRefresh={() => loadUserData(user.id)} />}
-                        {view === 'admin-manager' && isMasterUser && <AdminPage onlineUsers={onlineUsers} />}
+                        {view === 'admin-manager' && (userData?.email === 'peboorba@gmail.com' || userData?.email === 'shinkosystems@gmail.com') && <AdminPage onlineUsers={onlineUsers} />}
                     </>
                 )}
             </Suspense>

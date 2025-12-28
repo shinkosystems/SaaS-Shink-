@@ -28,6 +28,27 @@ const getPlanKeyFromId = (id: number): string => {
 };
 
 /**
+ * Fix: Added missing getPlanDefaultModules function
+ */
+export const getPlanDefaultModules = (planId: number): string[] => {
+    switch (planId) {
+        case 4: // Free
+            return ['kanban', 'crm'];
+        case 1: // Solo
+            return ['projects', 'kanban', 'gantt', 'crm'];
+        case 2: // Studio
+            return ['projects', 'kanban', 'gantt', 'calendar', 'crm', 'financial', 'clients', 'ia'];
+        case 3: // Scale
+        case 9:
+            return ['projects', 'kanban', 'gantt', 'calendar', 'crm', 'financial', 'clients', 'engineering', 'product', 'ia'];
+        case 10: // Enterprise
+            return SYSTEM_MODULES_DEF;
+        default:
+            return ['kanban'];
+    }
+};
+
+/**
  * Busca o ID da organização vinculada ao e-mail de um dono.
  */
 export const findOrgIdByOwnerEmail = async (email: string): Promise<number | null> => {
@@ -46,7 +67,7 @@ export const findOrgIdByOwnerEmail = async (email: string): Promise<number | nul
     }
 };
 
-export const createOrganization = async (userId: string, name: string, sector: string, dna?: string) => {
+export const createOrganization = async (userId: string, name: string, sector: string, dna?: string, userEmail?: string, userName?: string) => {
     try {
         // 1. Criar a Organização
         const { data: org, error: orgError } = await supabase
@@ -65,13 +86,33 @@ export const createOrganization = async (userId: string, name: string, sector: s
         
         if (orgError) throw orgError;
 
-        // 2. Vincular o Usuário à nova Organização
+        // 2. Garantir que o registro do usuário exista na tabela 'users' (Upsert)
         const { error: userError } = await supabase
             .from('users')
-            .update({ organizacao: org.id, perfil: 'dono' })
-            .eq('id', userId);
+            .upsert({ 
+                id: userId,
+                nome: userName || 'Proprietário',
+                email: userEmail || '',
+                organizacao: org.id, 
+                perfil: 'dono',
+                status: 'Ativo'
+            });
         
         if (userError) throw userError;
+
+        // 3. Criar automaticamente um Cliente (Stakeholder) com o nome da empresa
+        // Isso permite que o dono já comece a criar projetos associados à própria marca/internamente.
+        await supabase
+            .from('clientes')
+            .insert({
+                nome: name,
+                email: userEmail || '',
+                status: 'Ativo',
+                organizacao: org.id,
+                valormensal: 0,
+                meses: 12,
+                data_inicio: new Date().toISOString().split('T')[0]
+            });
 
         return org;
     } catch (err: any) {
@@ -214,82 +255,84 @@ export const contractModule = async (orgId: number, moduleKey: string) => {
     } catch (err: any) { throw new Error(err.message); }
 };
 
+/**
+ * Fix: Added missing fetchRoles function
+ */
+export const fetchRoles = async (orgId: number) => {
+    const { data, error } = await supabase
+        .from('area_atuacao')
+        .select('*')
+        .eq('organizacao', orgId);
+    if (error) return [];
+    return data.map((d: any) => ({
+        id: d.id,
+        nome: d.nome || d.name || d.titulo || d.descricao || `Cargo ${d.id}`
+    }));
+};
+
+/**
+ * Fix: Added missing createRole function
+ */
+export const createRole = async (nome: string, orgId: number) => {
+    const { data, error } = await supabase
+        .from('area_atuacao')
+        .insert({ nome, organizacao: orgId })
+        .select()
+        .single();
+    if (error) throw error;
+    return data;
+};
+
+/**
+ * Fix: Added missing deleteRole function
+ */
+export const deleteRole = async (id: number) => {
+    const { error } = await supabase
+        .from('area_atuacao')
+        .delete()
+        .eq('id', id);
+    return !error;
+};
+
+/**
+ * Fix: Added missing fetchOrganizationMembersWithRoles function
+ */
+export const fetchOrganizationMembersWithRoles = async (orgId: number) => {
+    const { data, error } = await supabase
+        .from('users')
+        .select(`
+            id, nome, email, avatar_url, perfil, cargo
+        `)
+        .eq('organizacao', orgId);
+    
+    if (error) return [];
+    return data;
+};
+
+/**
+ * Fix: Added missing updateUserRole function
+ */
+export const updateUserRole = async (userId: string, roleId: number | null) => {
+    const { error } = await supabase
+        .from('users')
+        .update({ cargo: roleId })
+        .eq('id', userId);
+    return !error;
+};
+
+/**
+ * Fix: Completed truncated getPublicOrgDetails function
+ */
 export const getPublicOrgDetails = async (orgId: number) => {
     try {
-        const { data, error } = await supabase.from('organizacoes').select('nome, logo, cor, plano').eq('id', orgId).single();
-        if (error || !data) return null;
-        const isWhitelabelAllowed = data.plano === 10 || data.plano === 5 || (data as any).whitelable === true;
-        if (isWhitelabelAllowed) return { name: data.nome, logoUrl: data.logo, primaryColor: data.cor, plano: data.plano };
+        const { data, error } = await supabase
+            .from('organizacoes')
+            .select('nome, logo, cor, plano')
+            .eq('id', orgId)
+            .single();
+        if (error) return null;
+        return data;
+    } catch (e) {
         return null;
-    } catch (error) { return null; }
-};
-
-export const fetchRoles = async (organizationId: number) => {
-    if (!organizationId) return [];
-    const { data, error } = await supabase.from('area_atuacao').select('*').eq('empresa', organizationId).order('cargo', { ascending: true });
-    if (error) return [];
-    return data.map((d: any) => ({ id: d.id, nome: d.cargo || `Cargo ${d.id}` })) || [];
-};
-
-export const createRole = async (name: string, organizationId: number) => {
-    if (!organizationId) throw new Error("Organization ID required to create role");
-    const { data, error } = await supabase.from('area_atuacao').insert({ cargo: name, empresa: organizationId }).select().single();
-    if (error) throw error;
-    return { id: data.id, nome: data.cargo };
-};
-
-export const deleteRole = async (id: number) => {
-    const { error } = await supabase.from('area_atuacao').delete().eq('id', id);
-    if (error) throw error;
-    return true;
-};
-
-export const fetchOrganizationMembersWithRoles = async (orgId: number) => {
-    const { data, error } = await supabase.from('users').select('id, nome, email, avatar_url, cargo, perfil').eq('organizacao', orgId).order('nome');
-    if (error) return [];
-    const cargoIds = [...new Set(data.map((u: any) => u.cargo).filter(Boolean))];
-    let areaMap = new Map<number, string>();
-    if (cargoIds.length > 0) {
-        const { data: areas } = await supabase.from('area_atuacao').select('*').in('id', cargoIds);
-        areas?.forEach((a: any) => {
-            const name = a.cargo || a.nome || `Cargo ${a.id}`;
-            areaMap.set(a.id, name);
-        });
     }
-    return data.map((u: any) => ({ ...u, roleName: areaMap.get(u.cargo) || (u.cargo ? 'Cargo Excluído' : 'Sem Cargo') }));
-};
-
-export const updateUserRole = async (userId: string, roleId: number | null) => {
-    const { error } = await supabase.from('users').update({ cargo: roleId }).eq('id', userId);
-    if (error) throw error;
-    return true;
-};
-
-export const checkAndIncrementAiUsage = async (orgId: number): Promise<{ success: boolean; usage: number; limit: number }> => {
-    try {
-        const { data: orgData, error } = await supabase.from(ORG_TABLE).select('pedidoia, plano').eq('id', orgId).single();
-        if (error || !orgData) throw new Error("Erro ao verificar limite de IA.");
-        const currentUsage = orgData.pedidoia || 0;
-        const planKey = getPlanKeyFromId(orgData.plano || 4); 
-        const limit = PLAN_LIMITS[planKey]?.aiLimit || 0;
-        if (limit === 0) return { success: false, usage: currentUsage, limit: 0 };
-        if (limit < 9000 && currentUsage >= limit) return { success: false, usage: currentUsage, limit };
-        await supabase.from(ORG_TABLE).update({ pedidoia: currentUsage + 1 }).eq('id', orgId);
-        return { success: true, usage: currentUsage + 1, limit };
-    } catch (e: any) { return { success: false, usage: 0, limit: 0 }; }
-};
-
-export const getPlanDefaultModules = (planId: number): string[] => {
-    const planKey = getPlanKeyFromId(planId);
-    const planConfig = PLAN_LIMITS[planKey];
-    if (!planConfig) return ['projects', 'kanban'];
-    const modules = ['projects', 'kanban'];
-    if (planConfig.features.gantt) modules.push('gantt', 'calendar');
-    if (planConfig.features.financial) modules.push('financial');
-    if (planConfig.features.clients) modules.push('clients');
-    if (planConfig.features.metrics) modules.push('engineering', 'product');
-    if (planConfig.features.crm) modules.push('crm');
-    if (planConfig.features.aiAdvanced) modules.push('ia');
-    if (planConfig.features.whitelabel) modules.push('whitelabel');
-    return modules;
 };

@@ -4,21 +4,35 @@ import { Opportunity, DbProject, RDEStatus, Archetype, IntensityLevel, TadsCrite
 
 const TABLE_NAME = 'projetos';
 
-export const fetchOpportunities = async (organizationId?: number): Promise<Opportunity[] | null> => {
+export const fetchOpportunities = async (organizationId?: number, clientId?: string): Promise<Opportunity[] | null> => {
   if (!supabase) return null;
-  if (organizationId === undefined || organizationId === null) return [];
-
+  
   try {
     let query = supabase
       .from(TABLE_NAME)
       .select(`*, clienteData:clientes(nome, logo_url)`)
-      .eq('organizacao', organizationId)
       .order('prioseis', { ascending: false });
+
+    if (clientId) {
+        // Se for um cliente logado, filtra apenas pelos projetos dele
+        query = query.eq('cliente', clientId);
+    } else if (organizationId !== undefined && organizationId !== null) {
+        // Se for membro da org, filtra pela org
+        query = query.eq('organizacao', organizationId);
+    } else {
+        return [];
+    }
 
     const { data: projects, error } = await query;
     if (error) return null;
 
-    let tasksQuery = supabase.from('tasks').select('*').eq('organizacao', organizationId);
+    // Se não há projetos, retorna vazio
+    if (!projects || projects.length === 0) return [];
+
+    const projectIds = projects.map(p => p.id);
+
+    // Buscar tarefas vinculadas a estes projetos
+    let tasksQuery = supabase.from('tasks').select('*').in('projeto', projectIds);
     const { data: tasks } = await tasksQuery;
 
     let userMap = new Map<string, any>();
@@ -39,6 +53,7 @@ export const fetchOpportunities = async (organizationId?: number): Promise<Oppor
         return mapDbProjectToOpportunity(row, hydratedTasks);
     });
   } catch (err) {
+    console.error("fetchOpportunities error:", err);
     return null;
   }
 };
@@ -58,7 +73,6 @@ export const createOpportunity = async (opp: Opportunity): Promise<Opportunity |
     if (!supabase) return null;
 
     try {
-        // Garantir que temos um organizationId numérico e válido
         const { data: auth } = await supabase.auth.getUser();
         let targetOrgId = opp.organizationId;
 
@@ -73,12 +87,7 @@ export const createOpportunity = async (opp: Opportunity): Promise<Opportunity |
         }
 
         const dbPayload = mapOpportunityToDbProject({ ...opp, organizationId: Number(targetOrgId) });
-        
-        // Remove IDs se existirem para permitir que o banco gere via IDENTITY
-        // O campo id na tabela projetos é BIGINT GENERATED ALWAYS AS IDENTITY
         delete dbPayload.id; 
-        
-        console.log("createOpportunity: Inserindo no banco...", dbPayload);
         
         const { data: projectData, error } = await supabase
             .from(TABLE_NAME)
@@ -86,12 +95,7 @@ export const createOpportunity = async (opp: Opportunity): Promise<Opportunity |
             .select()
             .single();
         
-        if (error) {
-            console.error("createOpportunity: Erro de inserção DB:", error.message, error.details);
-            throw new Error(`Falha no banco: ${error.message}`);
-        }
-
-        console.log("createOpportunity: Sucesso! ID Gerado:", projectData.id);
+        if (error) throw new Error(`Falha no banco: ${error.message}`);
 
         // Provisionamento de tarefas iniciais se houver estrutura BPMN
         if (opp.bpmn?.nodes && opp.bpmn.nodes.length > 0) {
@@ -137,7 +141,7 @@ export const createOpportunity = async (opp: Opportunity): Promise<Opportunity |
         
         return mapDbProjectToOpportunity(projectData, []);
     } catch (err: any) {
-        console.error("createOpportunity: Exceção crítica:", err);
+        console.error("createOpportunity error:", err);
         return null;
     }
 };

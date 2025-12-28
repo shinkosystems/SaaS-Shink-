@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { BpmnTask, BpmnSubTask, Attachment, TaskStatus, Comment } from '../types';
 import { 
@@ -5,7 +6,7 @@ import {
     Save, Calendar, Users, Zap, 
     Plus, User as UserIcon, BrainCircuit, Loader2, Sparkles,
     Tag, Paperclip, MessageSquare, MoreHorizontal, Eye, Share2, 
-    CheckCircle2, ChevronDown, ListTodo, History, FileText, Download, Send
+    CheckCircle2, ChevronDown, ListTodo, History, FileText, Download, Send, Lock
 } from 'lucide-react';
 import { fetchOrgMembers } from '../services/projectService';
 import { generateSubtasksForTask } from '../services/geminiService';
@@ -19,6 +20,7 @@ interface Props {
   onClose: () => void;
   onDelete?: (id: string) => void;
   organizationId?: number;
+  readOnly?: boolean;
 }
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
@@ -30,7 +32,7 @@ const STATUS_LABELS: Record<TaskStatus, string> = {
     backlog: 'Backlog'
 };
 
-export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, onSave, onClose, onDelete, organizationId }) => {
+export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, onSave, onClose, onDelete, organizationId, readOnly }) => {
   const [formData, setFormData] = useState<BpmnTask>({ 
       ...task,
       subtasks: task.subtasks || [],
@@ -87,6 +89,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
   }, [formData.text]);
 
   const handleSync = async () => {
+      if (readOnly) return;
       setIsSaving(true);
       try {
           await onSave(formData);
@@ -99,6 +102,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (readOnly) return;
       const file = e.target.files?.[0];
       if (!file || !organizationId) return;
 
@@ -175,6 +179,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
   };
 
   const handleAddTag = () => {
+      if (readOnly) return;
       const tagInput = prompt("Digite o nome da nova tag:");
       if (tagInput && tagInput.trim()) {
           const newTag = tagInput.trim();
@@ -186,6 +191,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
   };
 
   const handleRemoveTag = (tagToRemove: string) => {
+      if (readOnly) return;
       setFormData(prev => ({
           ...prev,
           tags: (prev.tags || []).filter(t => t !== tagToRemove)
@@ -193,6 +199,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
   };
 
   const handleAddSubtask = (e?: React.FormEvent) => {
+      if (readOnly) return;
       if (e) e.preventDefault();
       const textToAdd = newSubtask.trim();
       if (!textToAdd) return;
@@ -202,6 +209,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
   };
 
   const toggleSubtask = (id: string) => {
+      if (readOnly) return;
       setFormData(prev => ({
           ...prev,
           subtasks: prev.subtasks?.map(s => s.id === id ? { ...s, completed: !s.completed } : s)
@@ -209,6 +217,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
   };
 
   const deleteSubtask = (id: string) => {
+      if (readOnly) return;
       setFormData(prev => ({
           ...prev,
           subtasks: prev.subtasks?.filter(s => s.id !== id)
@@ -216,6 +225,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
   };
 
   const handleAiGenerateChecklist = async () => {
+    if (readOnly) return;
     if (!formData.text) return alert("Título da tarefa é necessário para a IA processar.");
     setIsGeneratingChecklist(true);
     try {
@@ -252,6 +262,12 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                     <Zap className="w-3.5 h-3.5 text-amber-600" />
                     <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest">{nodeTitle}</span>
                 </div>
+                {readOnly && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-xl border border-slate-200 text-slate-400">
+                        <Lock className="w-3 h-3"/>
+                        <span className="text-[9px] font-black uppercase tracking-widest">Read Only</span>
+                    </div>
+                )}
                 <div className="h-4 w-px bg-slate-200"></div>
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ID: {task.dbId || formData.dbId || formData.displayId || '---'}</span>
             </div>
@@ -275,8 +291,9 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                                     ref={titleRef} 
                                     value={formData.text} 
                                     rows={1}
+                                    readOnly={readOnly}
                                     onChange={e => setFormData({...formData, text: e.target.value})}
-                                    className="bg-white dark:bg-white/5 text-3xl font-black text-slate-900 outline-none w-full tracking-tighter leading-[1.2] resize-none focus:ring-8 focus:ring-amber-500/5 rounded-2xl p-4 transition-all border border-transparent focus:border-amber-500/20"
+                                    className={`bg-white dark:bg-white/5 text-3xl font-black text-slate-900 outline-none w-full tracking-tighter leading-[1.2] resize-none rounded-2xl p-4 transition-all border border-transparent ${readOnly ? 'cursor-default' : 'focus:ring-8 focus:ring-amber-500/5 focus:border-amber-500/20'}`}
                                     placeholder="Defina o objetivo da tarefa..."
                                 />
                                 <div className="mt-2 flex items-center gap-2 px-4">
@@ -293,12 +310,14 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                             <div className="flex-1 space-y-5">
                                 <div className="flex justify-between items-center">
                                     <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em]">Descrição Técnica</h3>
-                                    <button 
-                                        onClick={() => setIsEditingDesc(!isEditingDesc)}
-                                        className="px-4 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-[10px] font-black text-slate-600 uppercase tracking-widest transition-all shadow-sm"
-                                    >
-                                        {isEditingDesc ? 'Cancelar' : 'Editar'}
-                                    </button>
+                                    {!readOnly && (
+                                        <button 
+                                            onClick={() => setIsEditingDesc(!isEditingDesc)}
+                                            className="px-4 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-[10px] font-black text-slate-600 uppercase tracking-widest transition-all shadow-sm"
+                                        >
+                                            {isEditingDesc ? 'Cancelar' : 'Editar'}
+                                        </button>
+                                    )}
                                 </div>
                                 {isEditingDesc ? (
                                     <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
@@ -327,22 +346,24 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                             <div className="flex-1 space-y-8">
                                 <div className="flex justify-between items-center">
                                     <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em]">Etapas de Execução</h3>
-                                    <div className="flex gap-3">
-                                        <button 
-                                            onClick={handleAiGenerateChecklist}
-                                            disabled={isGeneratingChecklist}
-                                            className="flex items-center gap-2 px-5 py-2 bg-purple-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg hover:bg-purple-500 disabled:opacity-50"
-                                        >
-                                            {isGeneratingChecklist ? <Loader2 className="w-3 h-3 animate-spin"/> : <Sparkles className="w-3 h-3" />}
-                                            IA Check
-                                        </button>
-                                        <button 
-                                            onClick={() => setFormData(prev => ({...prev, subtasks: []}))}
-                                            className="px-4 py-2 bg-white border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-100 rounded-xl text-[10px] font-black text-slate-600 uppercase tracking-widest transition-all"
-                                        >
-                                            Limpar
-                                        </button>
-                                    </div>
+                                    {!readOnly && (
+                                        <div className="flex gap-3">
+                                            <button 
+                                                onClick={handleAiGenerateChecklist}
+                                                disabled={isGeneratingChecklist}
+                                                className="flex items-center gap-2 px-5 py-2 bg-purple-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg hover:bg-purple-500 disabled:opacity-50"
+                                            >
+                                                {isGeneratingChecklist ? <Loader2 className="w-3 h-3 animate-spin"/> : <Sparkles className="w-3 h-3" />}
+                                                IA Check
+                                            </button>
+                                            <button 
+                                                onClick={() => setFormData(prev => ({...prev, subtasks: []}))}
+                                                className="px-4 py-2 bg-white border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-100 rounded-xl text-[10px] font-black text-slate-600 uppercase tracking-widest transition-all"
+                                            >
+                                                Limpar
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                                 
                                 <div className="space-y-3">
@@ -363,28 +384,33 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                                         <div key={sub.id} className="flex items-center gap-4 group bg-white p-4 rounded-2xl border border-slate-100 hover:border-amber-500/20 transition-all shadow-sm">
                                             <button 
                                                 onClick={() => toggleSubtask(sub.id)}
-                                                className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${sub.completed ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-slate-200 hover:border-amber-500'}`}
+                                                disabled={readOnly}
+                                                className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${sub.completed ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-slate-200 hover:border-amber-500'} ${readOnly ? 'cursor-default' : ''}`}
                                             >
                                                 {sub.completed && <CheckCircle2 className="w-4 h-4 stroke-[3px]" />}
                                             </button>
                                             <span className={`text-sm flex-1 font-bold ${sub.completed ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{sub.text}</span>
-                                            <button onClick={() => deleteSubtask(sub.id)} className="opacity-0 group-hover:opacity-100 p-2 text-slate-300 hover:text-red-500 transition-all">
-                                                <Trash2 className="w-4 h-4"/>
-                                            </button>
+                                            {!readOnly && (
+                                                <button onClick={() => deleteSubtask(sub.id)} className="opacity-0 group-hover:opacity-100 p-2 text-slate-300 hover:text-red-500 transition-all">
+                                                    <Trash2 className="w-4 h-4"/>
+                                                </button>
+                                            )}
                                         </div>
                                     ))}
                                     
-                                    <form onSubmit={handleAddSubtask} className="relative group pt-2">
-                                        <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-amber-500 transition-colors">
-                                            <Plus className="w-4 h-4" />
-                                        </div>
-                                        <input 
-                                            value={newSubtask}
-                                            onChange={e => setNewSubtask(e.target.value)}
-                                            placeholder="Adicionar novo marco técnico..."
-                                            className="w-full bg-white border border-slate-200 hover:border-amber-500/20 focus:border-amber-500 p-4 pl-12 rounded-[1.5rem] text-sm font-bold text-slate-800 outline-none transition-all shadow-sm"
-                                        />
-                                    </form>
+                                    {!readOnly && (
+                                        <form onSubmit={handleAddSubtask} className="relative group pt-2">
+                                            <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-amber-500 transition-colors">
+                                                <Plus className="w-4 h-4" />
+                                            </div>
+                                            <input 
+                                                value={newSubtask}
+                                                onChange={e => setNewSubtask(e.target.value)}
+                                                placeholder="Adicionar novo marco técnico..."
+                                                className="w-full bg-white border border-slate-200 hover:border-amber-500/20 focus:border-amber-500 p-4 pl-12 rounded-[1.5rem] text-sm font-bold text-slate-800 outline-none transition-all shadow-sm"
+                                            />
+                                        </form>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -462,15 +488,16 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                         {/* Responsável */}
                         <div className="space-y-4">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] ml-1">Responsável</label>
-                            <div className="bg-white p-3 rounded-[1.8rem] border border-slate-200 shadow-sm flex items-center gap-4 group hover:border-amber-500/20 transition-all overflow-hidden w-full flex-nowrap">
+                            <div className={`bg-white p-3 rounded-[1.8rem] border border-slate-200 shadow-sm flex items-center gap-4 group transition-all overflow-hidden w-full flex-nowrap ${readOnly ? '' : 'hover:border-amber-500/20'}`}>
                                 <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 overflow-hidden flex items-center justify-center text-xs font-black text-slate-400 shrink-0">
                                     {getAssigneeData()?.nome?.charAt(0) || <UserIcon className="w-5 h-5"/>}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <select 
+                                        disabled={readOnly}
                                         value={formData.assigneeId || ""} 
                                         onChange={e => setFormData({...formData, assigneeId: e.target.value})}
-                                        className="w-full bg-transparent text-xs font-black text-slate-800 uppercase tracking-widest outline-none cursor-pointer truncate pr-4"
+                                        className={`w-full bg-transparent text-xs font-black text-slate-800 uppercase tracking-widest outline-none cursor-pointer truncate pr-4 ${readOnly ? 'appearance-none' : ''}`}
                                     >
                                         <option value="">Ninguém atribuído</option>
                                         {availableUsers.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
@@ -489,6 +516,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                                         <span className="text-[8px] font-black text-slate-400 uppercase">Deadline Final</span>
                                         <input 
                                             type="date"
+                                            readOnly={readOnly}
                                             value={formData.dueDate ? formData.dueDate.split('T')[0] : ''}
                                             onChange={e => setFormData({...formData, dueDate: e.target.value})}
                                             className="w-full bg-transparent text-[11px] font-black text-slate-800 uppercase tracking-widest outline-none cursor-pointer"
@@ -503,6 +531,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                                         <div className="flex items-center gap-2">
                                             <input 
                                                 type="number" 
+                                                readOnly={readOnly}
                                                 value={formData.estimatedHours || 0}
                                                 onChange={e => setFormData({...formData, estimatedHours: Number(e.target.value)})}
                                                 className="w-16 bg-transparent text-sm font-black text-slate-800 outline-none"
@@ -519,9 +548,10 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] ml-1">Estágio Atual</label>
                             <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
                                 <select 
+                                    disabled={readOnly}
                                     value={formData.status}
                                     onChange={e => setFormData({...formData, status: e.target.value as TaskStatus})}
-                                    className="w-full bg-transparent p-3 text-[10px] font-black text-slate-800 uppercase tracking-[0.2em] outline-none cursor-pointer"
+                                    className={`w-full bg-transparent p-3 text-[10px] font-black text-slate-800 uppercase tracking-[0.2em] outline-none cursor-pointer ${readOnly ? 'appearance-none' : ''}`}
                                 >
                                     {Object.entries(STATUS_LABELS).map(([val, label]) => (
                                         <option key={val} value={val}>{label}</option>
@@ -538,18 +568,22 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                                     <div key={t} className="group relative">
                                         <span className="px-4 py-1.5 bg-white text-slate-600 border border-slate-200 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-sm flex items-center gap-2">
                                             {t}
-                                            <button onClick={() => handleRemoveTag(t)} className="opacity-0 group-hover:opacity-100 text-red-500 transition-all">
-                                                <X className="w-3 h-3"/>
-                                            </button>
+                                            {!readOnly && (
+                                                <button onClick={() => handleRemoveTag(t)} className="opacity-0 group-hover:opacity-100 text-red-500 transition-all">
+                                                    <X className="w-3 h-3"/>
+                                                </button>
+                                            )}
                                         </span>
                                     </div>
                                 ))}
-                                <button 
-                                    onClick={handleAddTag}
-                                    className="w-9 h-9 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center hover:bg-amber-500 hover:text-black transition-all border border-slate-200"
-                                >
-                                    <Plus className="w-5 h-5"/>
-                                </button>
+                                {!readOnly && (
+                                    <button 
+                                        onClick={handleAddTag}
+                                        className="w-9 h-9 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center hover:bg-amber-500 hover:text-black transition-all border border-slate-200"
+                                    >
+                                        <Plus className="w-5 h-5"/>
+                                    </button>
+                                )}
                             </div>
                         </div>
 
@@ -570,16 +604,18 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                         )}
 
                         {/* Ações Críticas */}
-                        <div className="space-y-3 pt-6 border-t border-slate-100">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] ml-1">Perigo</label>
-                            <button 
-                                onClick={() => onDelete && onDelete(formData.id)}
-                                className="w-full flex items-center justify-between p-4 bg-red-50 hover:bg-red-500 hover:text-white rounded-[1.5rem] border border-red-100 transition-all group"
-                            >
-                                <span className="text-[10px] font-black uppercase tracking-widest">Arquivar Tarefa</span>
-                                <Trash2 className="w-4 h-4 text-red-300 group-hover:text-white transition-colors"/>
-                            </button>
-                        </div>
+                        {!readOnly && (
+                            <div className="space-y-3 pt-6 border-t border-slate-100">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] ml-1">Perigo</label>
+                                <button 
+                                    onClick={() => onDelete && onDelete(formData.id)}
+                                    className="w-full flex items-center justify-between p-4 bg-red-50 hover:bg-red-500 hover:text-white rounded-[1.5rem] border border-red-100 transition-all group"
+                                >
+                                    <span className="text-[10px] font-black uppercase tracking-widest">Arquivar Tarefa</span>
+                                    <Trash2 className="w-4 h-4 text-red-300 group-hover:text-white transition-colors"/>
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -588,31 +624,37 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
         {/* Footer Master Sync */}
         <div className="px-10 py-8 bg-white border-t border-slate-100 flex justify-between items-center shrink-0">
             <div className="flex gap-6">
-                <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    className="hidden" 
-                    onChange={handleFileUpload} 
-                />
-                <button 
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploading}
-                    className="flex items-center gap-3 px-6 py-4 bg-slate-50 hover:bg-slate-100 rounded-2xl text-[10px] font-black text-slate-500 uppercase tracking-widest border border-slate-200 transition-all disabled:opacity-50 active:scale-95 shadow-sm"
-                >
-                    {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4 text-amber-500" />}
-                    Anexar Ativo
-                </button>
+                {!readOnly && (
+                    <>
+                        <input 
+                            type="file" 
+                            ref={fileInputRef} 
+                            className="hidden" 
+                            onChange={handleFileUpload} 
+                        />
+                        <button 
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isUploading}
+                            className="flex items-center gap-3 px-6 py-4 bg-slate-50 hover:bg-slate-100 rounded-2xl text-[10px] font-black text-slate-500 uppercase tracking-widest border border-slate-200 transition-all disabled:opacity-50 active:scale-95 shadow-sm"
+                        >
+                            {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4 text-amber-500" />}
+                            Anexar Ativo
+                        </button>
+                    </>
+                )}
             </div>
             <div className="flex gap-6 items-center">
-                <button onClick={onClose} className="px-6 py-3 text-[10px] font-black text-slate-400 hover:text-slate-900 uppercase tracking-[0.3em] transition-colors active:scale-95">Descartar</button>
-                <button 
-                    onClick={handleSync} 
-                    disabled={isSaving}
-                    className="flex items-center gap-4 px-12 py-4 bg-amber-500 hover:bg-amber-400 text-black rounded-2xl text-[11px] font-black uppercase tracking-[0.25em] shadow-xl hover:shadow-amber-500/20 active:scale-95 transition-all disabled:opacity-50"
-                >
-                    {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                    Sincronizar Ativo
-                </button>
+                <button onClick={onClose} className="px-6 py-3 text-[10px] font-black text-slate-400 hover:text-slate-900 uppercase tracking-[0.3em] transition-colors active:scale-95">{readOnly ? 'Fechar' : 'Descartar'}</button>
+                {!readOnly && (
+                    <button 
+                        onClick={handleSync} 
+                        disabled={isSaving}
+                        className="flex items-center gap-4 px-12 py-4 bg-amber-500 hover:bg-amber-400 text-black rounded-2xl text-[11px] font-black uppercase tracking-[0.25em] shadow-xl hover:shadow-amber-500/20 active:scale-95 transition-all disabled:opacity-50"
+                    >
+                        {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                        Sincronizar Ativo
+                    </button>
+                )}
             </div>
         </div>
       </div>
