@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Opportunity } from '../types';
 import { Dashboard } from '../components/Dashboard';
@@ -10,9 +9,10 @@ interface Props {
     onNavigate: (view: string) => void;
     user: any;
     theme: 'light' | 'dark';
+    onGuruPrompt?: (prompt: string) => void;
 }
 
-export const DashboardPage: React.FC<Props> = ({ opportunities, onOpenProject, onNavigate, user, theme }) => {
+export const DashboardPage: React.FC<Props> = ({ opportunities, onOpenProject, onNavigate, user, theme, onGuruPrompt }) => {
     const [userData, setUserData] = useState<{ name: string } | undefined>();
 
     useEffect(() => {
@@ -24,7 +24,7 @@ export const DashboardPage: React.FC<Props> = ({ opportunities, onOpenProject, o
     }, [user]);
 
     return (
-        <div className="h-full overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-transparent px-4">
+        <div className="h-full overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-transparent px-4 md:px-8 lg:px-12">
             <Dashboard 
                 opportunities={opportunities} 
                 onNavigate={onNavigate} 
@@ -33,6 +33,7 @@ export const DashboardPage: React.FC<Props> = ({ opportunities, onOpenProject, o
                 theme={theme} 
                 userData={userData}
                 onOpenCreate={() => onNavigate('create-project')}
+                onGuruPrompt={onGuruPrompt}
             />
         </div>
     );

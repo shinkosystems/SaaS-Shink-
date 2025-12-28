@@ -1,13 +1,11 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-    ArrowRight, Sparkles, Play, 
-    Zap, Target, BrainCircuit, ShieldCheck, 
-    Check, ChevronRight, BarChart3, Layers,
-    Terminal, GitBranch, MessageSquare, Users,
-    Globe, Lock, Cpu, DollarSign, Activity, Send,
-    Settings, LayoutGrid, Calendar, TrendingUp, Code2, Palette, GanttChartSquare, Briefcase, Plus, Minus,
-    CheckCircle, Rocket, Fingerprint, Database, Workflow, Loader2, BarChart, FileText, Smartphone
+    ArrowRight, Sparkles, Target, BrainCircuit, ShieldCheck, 
+    Check, ChevronRight, BarChart3, Layers, Code2, Palette, 
+    GanttChartSquare, Briefcase, Plus, DollarSign, LayoutGrid,
+    TrendingUp, Zap, MousePointer2, Smartphone, Shield, Activity,
+    Gauge, Search, Terminal, Workflow
 } from 'lucide-react';
 import { CasesGallery } from './CasesGallery';
 
@@ -16,7 +14,6 @@ interface Props {
   onOpenBlog?: () => void;
   customName?: string;
   customLogo?: string | null;
-  customColor?: string;
 }
 
 const LOGO_URL = "https://zjssfnbcboibqeoubeou.supabase.co/storage/v1/object/public/fotoperfil/fotoperfil/1%20(1).png";
@@ -28,27 +25,32 @@ export const LandingPage: React.FC<Props> = ({ onEnter, onOpenBlog, customName, 
 
   // --- MODULAR PRICING STATE ---
   const [billingCycle, setBillingCycle] = useState<'monthly'|'yearly'>('monthly');
-  const [selectedModules, setSelectedModules] = useState<string[]>([]);
+  const [selectedModules, setSelectedModules] = useState<string[]>(['projects', 'kanban']);
   const [userCount, setUserCount] = useState(5); 
 
   const getBasePlan = (users: number) => {
-      if (users === 1) return { name: 'Core Solo', price: 89.90 };
-      if (users <= 5) return { name: 'Core Studio', price: 297.90 };
-      return { name: 'Core Scale', price: 899.90 };
+      if (users === 1) return { name: 'Core Solo', price: 89.90, id: 'solo' };
+      if (users <= 5) return { name: 'Core Studio', price: 297.90, id: 'studio' };
+      if (users <= 15) return { name: 'Core Scale', price: 899.90, id: 'scale' };
+      return { name: 'Enterprise', price: 6500.00, id: 'enterprise' };
   };
 
   const currentBase = getBasePlan(userCount);
   
   const AVAILABLE_MODULES = [
-      { id: 'gantt', label: 'Cronograma Gantt', price: 29.90, icon: GanttChartSquare, desc: 'Linha do tempo visual e dependências técnicas.' },
-      { id: 'financial', label: 'Gestão Financeira', price: 39.90, icon: DollarSign, desc: 'Fluxo de caixa, MRR e automação de faturamento.' },
-      { id: 'crm', label: 'CRM de Vendas', price: 49.90, icon: TrendingUp, desc: 'Pipeline visual e gestão de contratos e leads.' },
-      { id: 'ia', label: 'Shinkō Guru AI', price: 59.90, icon: BrainCircuit, desc: 'Seu CTO Virtual para análise de viabilidade e escopo.' },
-      { id: 'engineering', label: 'Engenharia (DORA)', price: 69.90, icon: Code2, desc: 'Métricas de elite: Lead Time, Cycle Time e Throughput.' },
-      { id: 'whitelabel', label: 'White Label', price: 1500.00, icon: Palette, desc: 'Sua marca, suas cores. Experiência 100% personalizada.' }
+      { id: 'projects', label: 'Gestão de Projetos', price: 0, icon: Briefcase, desc: 'Portfólio e lista de ativos.', core: true },
+      { id: 'kanban', label: 'Kanban Board', price: 0, icon: LayoutGrid, desc: 'Fluxo visual de tarefas.', core: true },
+      { id: 'gantt', label: 'Cronograma Gantt', price: 29.90, icon: GanttChartSquare, desc: 'Linha do tempo e dependências.' },
+      { id: 'financial', label: 'Gestão Financeira', price: 39.90, icon: DollarSign, desc: 'Fluxo de caixa e MRR.' },
+      { id: 'crm', label: 'CRM de Vendas', price: 49.90, icon: TrendingUp, desc: 'Pipeline e prospecção ativa.' },
+      { id: 'ia', label: 'Shinkō Guru AI', price: 59.90, icon: BrainCircuit, desc: 'Análise de viabilidade via IA.' },
+      { id: 'engineering', label: 'Engenharia (DORA)', price: 69.90, icon: Code2, desc: 'Métricas de elite de dev.' },
+      { id: 'whitelabel', label: 'White Label', price: 1500.00, icon: Palette, desc: 'Personalização total da marca.' }
   ];
 
   const toggleModule = (id: string) => {
+      const mod = AVAILABLE_MODULES.find(m => m.id === id);
+      if (mod?.core) return;
       setSelectedModules(prev => 
           prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]
       );
@@ -57,6 +59,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter, onOpenBlog, customName, 
   const calculateTotal = () => {
       const modulesTotal = selectedModules.reduce((acc, modId) => {
           const mod = AVAILABLE_MODULES.find(m => m.id === modId);
+          if (mod?.core) return acc;
           return acc + (mod ? mod.price : 0);
       }, 0);
       const totalMonthly = currentBase.price + modulesTotal;
@@ -83,19 +86,19 @@ export const LandingPage: React.FC<Props> = ({ onEnter, onOpenBlog, customName, 
       </div>
 
       {/* --- HEADER --- */}
-      <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md border-b border-white/5 bg-[#020202]/80">
-          <div className="max-w-7xl mx-auto px-6 h-20 flex justify-between items-center">
+      <nav className="fixed top-0 left-0 right-0 z-[100] backdrop-blur-md border-b border-white/5 bg-[#020202]/80 h-16 md:h-20">
+          <div className="max-w-7xl mx-auto px-6 h-full flex justify-between items-center">
             <div className="flex items-center gap-3 cursor-pointer group" onClick={() => window.scrollTo(0, 0)}>
-                <img src={displayLogo} alt={brandName} className="h-10 w-auto object-contain transition-transform hover:scale-105" />
+                <img src={displayLogo} alt={brandName} className="h-8 md:h-10 w-auto object-contain transition-transform hover:scale-105" />
             </div>
             
             <div className="flex items-center gap-4">
-                <div className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-400 mr-4">
+                <div className="hidden md:flex items-center gap-8 text-[11px] font-black uppercase tracking-widest text-slate-400 mr-4">
                     <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="hover:text-white transition-colors">Home</button>
                     <button onClick={() => setShowCases(true)} className="hover:text-white transition-colors">Cases</button>
-                    {onOpenBlog && <button onClick={onOpenBlog} className="hover:text-white transition-colors">Blog</button>}
+                    {onOpenBlog && <button onClick={onOpenBlog} className="hover:text-white transition-colors">Insights</button>}
                 </div>
-                <button onClick={onEnter} className="group relative px-6 py-2.5 bg-white text-black font-bold text-sm rounded-full hover:bg-slate-200 transition-all shadow-glow-white overflow-hidden">
+                <button onClick={onEnter} className="group relative px-6 py-2.5 bg-white text-black font-black text-xs rounded-full hover:bg-slate-200 transition-all shadow-glow-white overflow-hidden active:scale-95">
                     <span className="relative z-10 flex items-center gap-2">Entrar <ArrowRight className="w-4 h-4"/></span>
                 </button>
             </div>
@@ -105,384 +108,294 @@ export const LandingPage: React.FC<Props> = ({ onEnter, onOpenBlog, customName, 
       <main className="relative z-10 flex flex-col items-center">
           
           {/* --- HERO SECTION --- */}
-          <section className="w-full min-h-screen flex flex-col items-center justify-center text-center px-6 pt-20 relative">
+          <section className="w-full min-h-screen flex flex-col items-center justify-center text-center px-6 pt-24 pb-12 relative overflow-hidden">
             <div className="max-w-5xl mx-auto relative z-10">
-                <img 
-                    src={displayLogo} 
-                    alt="Logo Topo" 
-                    className="h-32 md:h-48 w-auto object-contain mx-auto mb-12 animate-in fade-in zoom-in duration-1000"
-                />
-
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-bold uppercase tracking-widest text-amber-500 mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                    <Sparkles className="w-3 h-3"/> Framework v2.5 Liberado
+                <div className="mb-12 animate-in fade-in zoom-in duration-1000">
+                    <img 
+                        src={displayLogo} 
+                        alt="Logo Shinko" 
+                        className="h-32 md:h-48 lg:h-56 w-auto object-contain mx-auto drop-shadow-[0_0_50px_rgba(245,158,11,0.2)]"
+                    />
                 </div>
 
-                <h1 className="text-5xl md:text-7xl lg:text-8xl font-black mb-8 tracking-tighter leading-[0.95] text-white animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-100">
-                    Engenharia de <br/>
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-orange-500 to-amber-600">Resultados Reais</span>.
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-[0.3em] text-amber-500 mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                    <Sparkles className="w-3.5 h-3.5"/> Framework Shinkō OS v2.5.4
+                </div>
+
+                <h1 className="text-5xl md:text-7xl lg:text-9xl font-black mb-8 tracking-tighter leading-[0.9] text-white animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-100 hero-title">
+                    Inovação com <br/>
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-orange-500 to-amber-600">Precisão Industrial</span>.
                 </h1>
 
-                <p className="text-xl md:text-2xl text-slate-400 max-w-3xl mx-auto mb-12 leading-relaxed font-light animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">
-                    O sistema operacional que substitui "achismos" por <strong>dados</strong>. 
-                    Integre <span className="text-white font-medium">Estratégia</span>, <span className="text-white font-medium">Dev</span> e <span className="text-white font-medium">Financeiro</span>.
+                <p className="text-lg md:text-xl lg:text-2xl text-slate-400 max-w-3xl mx-auto mb-12 leading-relaxed font-medium animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200 px-4">
+                    O sistema operacional que substitui o "feeling" pela <strong>matemática</strong>. 
+                    Mapeie, priorize e escale seus ativos digitais com o framework de elite.
                 </p>
 
-                <div className="flex flex-col sm:flex-row justify-center gap-6 animate-in fade-in zoom-in duration-500 delay-300">
-                    <button onClick={onEnter} className="px-10 py-5 bg-amber-500 hover:bg-amber-400 text-black font-bold text-lg rounded-full flex items-center justify-center gap-3 transition-all hover:scale-105 shadow-[0_0_50px_-10px_rgba(245,158,11,0.4)]">
-                        Começar Agora
+                <div className="flex flex-col sm:flex-row justify-center gap-4 md:gap-6 animate-in fade-in zoom-in duration-500 delay-300">
+                    <button onClick={onEnter} className="px-10 py-5 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs uppercase tracking-widest rounded-2xl flex items-center justify-center gap-3 transition-all hover:scale-105 shadow-[0_0_60px_-15px_rgba(245,158,11,0.6)] active:scale-95">
+                        Acessar Workspace
                     </button>
                     {onOpenBlog && (
-                        <button onClick={onOpenBlog} className="px-10 py-5 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-lg rounded-full flex items-center justify-center gap-3 transition-all hover:scale-105 backdrop-blur-md">
-                            <Layers className="w-5 h-5"/> Ler Artigos
+                        <button onClick={onOpenBlog} className="px-10 py-5 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-black text-xs uppercase tracking-widest rounded-2xl flex items-center justify-center gap-3 transition-all hover:scale-105 backdrop-blur-md">
+                            <Layers className="w-5 h-5"/> Ler Framework
                         </button>
                     )}
                 </div>
             </div>
-            <div className="absolute bottom-10 left-1/2 -translate-x-1/2 animate-bounce opacity-50">
-                <div className="w-6 h-10 border-2 border-white/20 rounded-full flex justify-center pt-2">
-                    <div className="w-1 h-2 bg-white/50 rounded-full"></div>
-                </div>
-            </div>
           </section>
 
-          {/* --- 1. MATRIZ RDE SECTION --- */}
-          <section id="rde" className="w-full py-32 border-t border-white/5 bg-[#050505] overflow-hidden">
-              <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
-                  <div className="order-2 lg:order-1 relative">
-                      <div className="aspect-square rounded-[3rem] bg-gradient-to-br from-slate-900 to-black border border-white/10 relative overflow-hidden shadow-2xl group p-8">
-                          <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:40px_40px]"></div>
-                          <div className="relative h-full w-full border border-white/10 rounded-2xl flex flex-col items-center justify-center">
-                              <Target className="w-20 h-20 text-amber-500 mb-6 animate-pulse"/>
-                              <div className="text-center">
-                                  <div className="text-4xl font-black text-white">9.8</div>
-                                  <div className="text-[10px] font-bold text-amber-500 uppercase tracking-widest mt-1">Score de Prioridade</div>
-                              </div>
-                          </div>
-                      </div>
+          {/* --- PILLARS HIGH FIDELITY --- */}
+          <section className="w-full py-32 md:py-48 bg-[#020202] px-6">
+              <div className="max-w-7xl mx-auto space-y-24">
+                  <div className="text-center space-y-4">
+                      <h2 className="text-5xl md:text-7xl font-black tracking-tighter text-white">Pilares de <span className="text-amber-500">Engenharia</span>.</h2>
+                      <p className="text-slate-400 text-lg md:text-xl max-w-2xl mx-auto font-medium">Arquitetura sistemática para validação e escala de produtos digitais.</p>
                   </div>
-                  <div className="order-1 lg:order-2 space-y-8">
-                      <div className="w-12 h-12 rounded-xl bg-amber-500/20 text-amber-500 flex items-center justify-center border border-amber-500/30">
-                          <Target className="w-6 h-6"/>
-                      </div>
-                      <h2 className="text-4xl md:text-6xl font-black text-white leading-tight">Matriz RDE™ <br/><span className="text-amber-500">Decisões Matemáticas.</span></h2>
-                      <p className="text-lg text-slate-400 leading-relaxed">Pare de priorizar baseado em opiniões. Nosso algoritmo proprietário cruza <strong>Receita</strong>, <strong>Dor Técnica</strong> e <strong>Esforço</strong> para garantir foco total no que traz lucro real.</p>
-                      <ul className="space-y-4">
-                          {['Cálculo automático de PRIO-6', 'Identificação de "Vaca Leiteira" vs "Dreno"', 'Visualização em quadrantes de ação'].map(i => (
-                              <li key={i} className="flex items-center gap-3 text-slate-300 font-medium">
-                                  <CheckCircle className="w-5 h-5 text-amber-500"/> {i}
-                              </li>
-                          ))}
-                      </ul>
-                  </div>
-              </div>
-          </section>
 
-          {/* --- 2. CRONOGRAMA GANTT SECTION --- */}
-          <section id="gantt" className="w-full py-32 border-t border-white/5 bg-[#020202] overflow-hidden">
-              <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
-                  <div className="space-y-8">
-                      <div className="w-12 h-12 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center border border-blue-500/30">
-                          <GanttChartSquare className="w-6 h-6"/>
-                      </div>
-                      <h2 className="text-4xl md:text-6xl font-black text-white leading-tight">Linha do Tempo <br/><span className="text-blue-500">Visão de Longo Prazo.</span></h2>
-                      <p className="text-lg text-slate-400 leading-relaxed">Visualize a carga horária do seu time e as dependências entre tarefas em um gráfico de Gantt moderno e interativo.</p>
-                      <ul className="space-y-4">
-                          {['Gestão visual de prazos e milestones', 'Identificação de gargalos de equipe', 'Arrasta-e-solta para reagendamento'].map(i => (
-                              <li key={i} className="flex items-center gap-3 text-slate-300 font-medium">
-                                  <CheckCircle className="w-5 h-5 text-blue-500"/> {i}
-                              </li>
-                          ))}
-                      </ul>
-                  </div>
-                  <div className="relative">
-                      <div className="aspect-video bg-slate-900 rounded-3xl border border-white/10 p-6 shadow-2xl relative">
-                          <div className="space-y-4">
-                              {[80, 45, 90].map((w, i) => (
-                                  <div key={i} className="h-6 bg-blue-500/20 rounded-md overflow-hidden relative">
-                                      <div className="h-full bg-blue-500 rounded-md shadow-glow" style={{ width: `${w}%`, marginLeft: `${i * 10}%` }}></div>
-                                  </div>
-                              ))}
-                          </div>
-                      </div>
-                  </div>
-              </div>
-          </section>
-
-          {/* --- 3. GESTÃO FINANCEIRA SECTION --- */}
-          <section id="financial" className="w-full py-32 border-t border-white/5 bg-[#050505] overflow-hidden">
-              <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
-                  <div className="order-2 lg:order-1 relative">
-                      <div className="bg-gradient-to-br from-emerald-900/40 to-black rounded-[3rem] p-10 border border-emerald-500/30 shadow-2xl">
-                          <div className="text-xs font-bold text-emerald-500 uppercase tracking-widest mb-4">Fluxo de Caixa Mensal</div>
-                          <div className="text-4xl font-black text-white mb-8">R$ 142.500,00</div>
-                          <div className="flex items-end gap-2 h-32">
-                              {[40, 70, 55, 90, 65, 85].map((h, i) => (
-                                  <div key={i} className="flex-1 bg-emerald-500/20 rounded-t-lg relative group">
-                                      <div className="absolute bottom-0 w-full bg-emerald-500 rounded-t-lg transition-all duration-1000" style={{ height: `${h}%` }}></div>
-                                  </div>
-                              ))}
-                          </div>
-                      </div>
-                  </div>
-                  <div className="order-1 lg:order-2 space-y-8">
-                      <div className="w-12 h-12 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
-                          <DollarSign className="w-6 h-6"/>
-                      </div>
-                      <h2 className="text-4xl md:text-6xl font-black text-white leading-tight">Finanças <br/><span className="text-emerald-500">Métricas SaaS.</span></h2>
-                      <p className="text-lg text-slate-400 leading-relaxed">Transforme seus contratos em dados. Acompanhe MRR, Churn e Fluxo de Caixa integrado diretamente aos seus projetos.</p>
-                      <ul className="space-y-4">
-                          {['Gestão de contratos e parcelas automáticas', 'Dashboard de rentabilidade por projeto', 'Previsão de faturamento (Cash Runway)'].map(i => (
-                              <li key={i} className="flex items-center gap-3 text-slate-300 font-medium">
-                                  <CheckCircle className="w-5 h-5 text-emerald-500"/> {i}
-                              </li>
-                          ))}
-                      </ul>
-                  </div>
-              </div>
-          </section>
-
-          {/* --- 4. CRM DE VENDAS SECTION --- */}
-          <section id="crm" className="w-full py-32 border-t border-white/5 bg-[#020202] overflow-hidden">
-              <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
-                  <div className="space-y-8">
-                      <div className="w-12 h-12 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center border border-orange-500/30">
-                          <TrendingUp className="w-6 h-6"/>
-                      </div>
-                      <h2 className="text-4xl md:text-6xl font-black text-white leading-tight">CRM Vendas <br/><span className="text-orange-500">Pipeline de Elite.</span></h2>
-                      <p className="text-lg text-slate-400 leading-relaxed">Gerencie leads e oportunidades comerciais antes que elas se tornem projetos. Converta mais com visibilidade total do funil.</p>
-                      <ul className="space-y-4">
-                          {['Funil de vendas visual e intuitivo', 'Histórico completo de interações', 'Conversão direta de Deal para Projeto'].map(i => (
-                              <li key={i} className="flex items-center gap-3 text-slate-300 font-medium">
-                                  <CheckCircle className="w-5 h-5 text-orange-500"/> {i}
-                              </li>
-                          ))}
-                      </ul>
-                  </div>
-                  <div className="relative">
-                      <div className="aspect-video bg-[#0a0a0a] rounded-3xl border border-white/10 p-4 shadow-2xl flex gap-4">
-                          {[1, 2, 3].map(col => (
-                              <div key={col} className="flex-1 bg-white/5 rounded-xl p-3 border border-white/5">
-                                  <div className="h-2 w-10 bg-white/10 rounded mb-4"></div>
-                                  <div className="h-16 bg-white/5 rounded-lg mb-2"></div>
-                                  <div className="h-16 bg-white/5 rounded-lg"></div>
-                              </div>
-                          ))}
-                      </div>
-                  </div>
-              </div>
-          </section>
-
-          {/* --- 5. GURU AI SECTION --- */}
-          <section id="ai" className="w-full py-32 border-t border-white/5 bg-[#050505] overflow-hidden">
-              <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
-                  <div className="order-2 lg:order-1 relative">
-                      <div className="aspect-video bg-gradient-to-br from-purple-900/40 to-black rounded-3xl border border-purple-500/30 p-1 shadow-2xl relative overflow-hidden group">
-                          <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
-                          <div className="h-full w-full bg-[#050505] rounded-[22px] flex items-center justify-center flex-col p-10 text-center">
-                              <Loader2 className="w-10 h-10 text-purple-500 animate-spin mb-4"/>
-                              <div className="text-xs font-mono text-purple-400 mb-2">GURU-AI-ENGINE_V2.5</div>
-                              <div className="text-lg font-bold text-white">"Analise a viabilidade do Projeto Alpha"</div>
-                          </div>
-                      </div>
-                  </div>
-                  <div className="order-1 lg:order-2 space-y-8">
-                      <div className="w-12 h-12 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center border border-purple-500/30">
-                          <BrainCircuit className="w-6 h-6"/>
-                      </div>
-                      <h2 className="text-4xl md:text-6xl font-black text-white leading-tight">Guru AI <br/><span className="text-purple-500">Seu CTO Virtual.</span></h2>
-                      <p className="text-lg text-slate-400 leading-relaxed">Nossa inteligência artificial não apenas escreve código; ela entende o <strong>negócio</strong>. Gere cronogramas, escopos técnicos e matrizes de risco em segundos.</p>
-                      <ul className="space-y-4">
-                          {['Geração automática de WBS (BPMN)', 'Análise de viabilidade técnica imediata', 'Sugestão de membros baseada em skills'].map(i => (
-                              <li key={i} className="flex items-center gap-3 text-slate-300 font-medium">
-                                  <CheckCircle className="w-5 h-5 text-purple-500"/> {i}
-                              </li>
-                          ))}
-                      </ul>
-                  </div>
-              </div>
-          </section>
-
-          {/* --- 6. ENGENHARIA DORA SECTION --- */}
-          <section id="engineering" className="w-full py-32 border-t border-white/5 bg-[#020202] overflow-hidden">
-              <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
-                  <div className="space-y-8">
-                      <div className="w-12 h-12 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center border border-blue-500/30">
-                          <Code2 className="w-6 h-6"/>
-                      </div>
-                      <h2 className="text-4xl md:text-6xl font-black text-white leading-tight">Métricas DORA <br/><span className="text-blue-500">Alta Performance.</span></h2>
-                      <p className="text-lg text-slate-400 leading-relaxed">Meça o que realmente importa. Transforme seu time de dev em um centro de performance usando métricas globais de eficiência de software.</p>
-                      <div className="grid grid-cols-2 gap-4">
-                          <div className="p-4 rounded-2xl bg-white/5 border border-white/10 text-center">
-                              <div className="text-3xl font-black text-white mb-1">2.4d</div>
-                              <div className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Lead Time Médio</div>
-                          </div>
-                          <div className="p-4 rounded-2xl bg-white/5 border border-white/10 text-center">
-                              <div className="text-3xl font-black text-white mb-1">98%</div>
-                              <div className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Sucesso de Deploy</div>
-                          </div>
-                      </div>
-                  </div>
-                  <div className="relative">
-                      <div className="aspect-square max-w-md mx-auto relative bg-[#0a0a0a] border border-white/10 rounded-[3rem] p-10 flex flex-col justify-between overflow-hidden shadow-2xl">
-                          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl"></div>
-                          <Activity className="w-10 h-10 text-blue-500 mb-8"/>
-                          <div className="space-y-4">
-                              {[80, 45, 95].map((w, i) => (
-                                  <div key={i} className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                                      <div className="h-full bg-blue-500 rounded-full" style={{ width: `${w}%` }}></div>
-                                  </div>
-                              ))}
-                          </div>
-                          <div className="text-[10px] font-mono text-slate-600 mt-10 uppercase tracking-widest">Real-time Data sync...</div>
-                      </div>
-                  </div>
-              </div>
-          </section>
-
-          {/* --- 7. WHITE LABEL SECTION --- */}
-          <section id="whitelabel" className="w-full py-32 border-t border-white/5 bg-[#050505] overflow-hidden">
-              <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
-                  <div className="order-2 lg:order-1 relative">
-                      <div className="aspect-video bg-white rounded-3xl p-8 shadow-2xl flex items-center justify-center border-4 border-amber-500 animate-in zoom-in duration-700">
-                          <div className="flex flex-col items-center">
-                              <div className="w-20 h-20 bg-slate-900 rounded-2xl mb-4 flex items-center justify-center">
-                                  <Palette className="w-10 h-10 text-white"/>
-                              </div>
-                              <div className="h-4 w-32 bg-slate-200 rounded-full"></div>
-                          </div>
-                      </div>
-                  </div>
-                  <div className="order-1 lg:order-2 space-y-8">
-                      <div className="w-12 h-12 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center border border-pink-500/30">
-                          <Palette className="w-6 h-6"/>
-                      </div>
-                      <h2 className="text-4xl md:text-6xl font-black text-white leading-tight">White Label <br/><span className="text-pink-500">Sua Marca.</span></h2>
-                      <p className="text-lg text-slate-400 leading-relaxed">Personalize toda a experiência da plataforma com seu logotipo, cores e domínio. Ofereça um portal profissional para seus clientes sob sua identidade.</p>
-                      <ul className="space-y-4">
-                          {['Logotipo e Favicon personalizados', 'Paleta de cores customizada', 'Domínio próprio (CNAME)'].map(i => (
-                              <li key={i} className="flex items-center gap-3 text-slate-300 font-medium">
-                                  <CheckCircle className="w-5 h-5 text-pink-500"/> {i}
-                              </li>
-                          ))}
-                      </ul>
-                  </div>
-              </div>
-          </section>
-
-          {/* --- PRICING CALCULATOR SECTION --- */}
-          <section id="pricing" className="w-full py-32 bg-[#020202] border-t border-white/5 relative">
-              <div className="max-w-7xl mx-auto px-6">
-                  <div className="text-center mb-20">
-                      <h2 className="text-4xl md:text-6xl font-black text-white mb-4">Escolha seu <span className="text-amber-500">Arsenal</span></h2>
-                      <p className="text-slate-400 max-w-2xl mx-auto">Comece com o Core e adicione módulos conforme sua empresa escala. Pague apenas pelo que usar.</p>
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
                       
-                      <div className="mt-10 flex items-center justify-center gap-4">
-                          <span className={`text-sm font-bold ${billingCycle === 'monthly' ? 'text-white' : 'text-slate-500'}`}>Mensal</span>
-                          <button 
-                            onClick={() => setBillingCycle(prev => prev === 'monthly' ? 'yearly' : 'monthly')}
-                            className="w-14 h-7 rounded-full bg-white/10 border border-white/10 relative p-1 flex items-center transition-colors"
-                          >
-                              <div className={`w-5 h-5 rounded-full bg-amber-500 shadow-glow transition-all ${billingCycle === 'yearly' ? 'translate-x-7' : 'translate-x-0'}`}></div>
-                          </button>
-                          <span className={`text-sm font-bold ${billingCycle === 'yearly' ? 'text-white' : 'text-slate-500'}`}>
-                              Anual <span className="ml-1 text-[10px] text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">-20% OFF</span>
-                          </span>
+                      {/* PILLAR 1: MATRIZ RDE */}
+                      <div className="flex flex-col gap-8 group">
+                          <div className="aspect-[4/5] rounded-[3.5rem] bg-gradient-to-br from-slate-900 to-black border border-white/10 relative overflow-hidden shadow-2xl p-10 flex flex-col items-center justify-center gap-6 group-hover:border-amber-500/30 transition-all duration-500">
+                              <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:30px_30px]"></div>
+                              <div className="relative w-32 h-32 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shadow-glow-amber animate-pulse">
+                                  <Target className="w-16 h-16 text-amber-500"/>
+                              </div>
+                              <div className="relative text-center">
+                                  <div className="text-6xl font-black text-white tracking-tighter">9.8</div>
+                                  <div className="text-[10px] font-black text-amber-500 uppercase tracking-[0.4em] mt-2">Score PRIO-6™</div>
+                              </div>
+                          </div>
+                          <div className="space-y-4 px-4">
+                              <h3 className="text-3xl font-black text-white tracking-tighter">Matriz <span className="text-amber-500">RDE</span>.</h3>
+                              <p className="text-slate-400 font-medium leading-relaxed">Algoritmo de priorização que elimina o "achismo" técnico cruzando Receita e Dor.</p>
+                              <div className="grid grid-cols-2 gap-3 pt-2">
+                                  <div className="p-4 bg-white/5 border border-white/5 rounded-2xl text-[9px] font-black text-slate-500 uppercase tracking-widest">Impacto Comercial</div>
+                                  <div className="p-4 bg-white/5 border border-white/5 rounded-2xl text-[9px] font-black text-slate-500 uppercase tracking-widest">Time to Market</div>
+                              </div>
+                          </div>
+                      </div>
+
+                      {/* PILLAR 2: CRIVO TADS */}
+                      <div className="flex flex-col gap-8 group">
+                          <div className="aspect-[4/5] rounded-[3.5rem] bg-gradient-to-br from-slate-900 to-black border border-white/10 relative overflow-hidden shadow-2xl p-10 flex flex-col items-center justify-center gap-6 group-hover:border-purple-500/30 transition-all duration-500">
+                              <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:30px_30px]"></div>
+                              <div className="relative w-32 h-32 rounded-full bg-purple-500/10 border border-purple-500/20 flex items-center justify-center shadow-glow-purple">
+                                  <ShieldCheck className="w-16 h-16 text-purple-500"/>
+                              </div>
+                              <div className="relative text-center">
+                                  <div className="text-6xl font-black text-white tracking-tighter">V.2</div>
+                                  <div className="text-[10px] font-black text-purple-500 uppercase tracking-[0.4em] mt-2">Crivo T.A.D.S.</div>
+                              </div>
+                          </div>
+                          <div className="space-y-4 px-4">
+                              <h3 className="text-3xl font-black text-white tracking-tighter">Filtro <span className="text-purple-500">Sistêmico</span>.</h3>
+                              <p className="text-slate-400 font-medium leading-relaxed">Validação de escalabilidade e dor real antes da primeira linha de código ser escrita.</p>
+                              <div className="grid grid-cols-2 gap-3 pt-2">
+                                  <div className="p-4 bg-white/5 border border-white/5 rounded-2xl text-[9px] font-black text-slate-500 uppercase tracking-widest">Escalabilidade</div>
+                                  <div className="p-4 bg-white/5 border border-white/5 rounded-2xl text-[9px] font-black text-slate-500 uppercase tracking-widest">Dor Real Detectada</div>
+                              </div>
+                          </div>
+                      </div>
+
+                      {/* PILLAR 3: ENGENHARIA DORA */}
+                      <div className="flex flex-col gap-8 group">
+                          <div className="aspect-[4/5] rounded-[3.5rem] bg-gradient-to-br from-slate-900 to-black border border-white/10 relative overflow-hidden shadow-2xl p-10 flex flex-col items-center justify-center gap-6 group-hover:border-blue-500/30 transition-all duration-500">
+                              <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:30px_30px]"></div>
+                              <div className="relative w-32 h-32 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shadow-glow-blue">
+                                  <Code2 className="w-16 h-16 text-blue-500"/>
+                              </div>
+                              <div className="relative text-center">
+                                  <div className="text-6xl font-black text-white tracking-tighter">ELITE</div>
+                                  <div className="text-[10px] font-black text-blue-500 uppercase tracking-[0.4em] mt-2">DORA Metrics</div>
+                              </div>
+                          </div>
+                          <div className="space-y-4 px-4">
+                              <h3 className="text-3xl font-black text-white tracking-tighter">Alta <span className="text-blue-500">Performance</span>.</h3>
+                              <p className="text-slate-400 font-medium leading-relaxed">Métricas de elite de engenharia integradas nativamente na gestão de produto.</p>
+                              <div className="grid grid-cols-2 gap-3 pt-2">
+                                  <div className="p-4 bg-white/5 border border-white/5 rounded-2xl text-[9px] font-black text-slate-500 uppercase tracking-widest">Lead Time</div>
+                                  <div className="p-4 bg-white/5 border border-white/5 rounded-2xl text-[9px] font-black text-slate-500 uppercase tracking-widest">Deployment Freq.</div>
+                              </div>
+                          </div>
+                      </div>
+
+                  </div>
+              </div>
+          </section>
+
+          {/* --- MATRIZ RDE DEEP DIVE (RESTORED WITH FULL FIDELITY) --- */}
+          <section id="rde" className="w-full py-24 md:py-48 border-t border-white/5 bg-[#050505] overflow-hidden">
+              <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-24 items-center">
+                  <div className="relative">
+                      <div className="aspect-square rounded-[4rem] bg-gradient-to-br from-slate-900 to-black border border-white/10 relative overflow-hidden shadow-2xl p-12 group">
+                          <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:40px_40px]"></div>
+                          <div className="relative h-full w-full border border-white/10 rounded-[2.5rem] flex flex-col items-center justify-center gap-6 bg-black/40 backdrop-blur-sm group-hover:border-amber-500/30 transition-colors">
+                              <div className="w-40 h-40 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center animate-pulse">
+                                  <Target className="w-20 h-20 text-amber-500"/>
+                              </div>
+                              <div className="text-center">
+                                  <div className="text-7xl font-black text-white tracking-tighter">9.8</div>
+                                  <div className="text-xs font-black text-amber-500 uppercase tracking-[0.4em] mt-3">Score PRIO-6</div>
+                              </div>
+                          </div>
+                          {/* Floating Elements */}
+                          <div className="absolute top-10 right-10 p-4 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-xl animate-bounce duration-[3s]">
+                              <TrendingUp className="w-6 h-6 text-emerald-500"/>
+                          </div>
+                          <div className="absolute bottom-10 left-10 p-4 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-xl animate-bounce duration-[4s]">
+                              <Zap className="w-6 h-6 text-amber-500"/>
+                          </div>
                       </div>
                   </div>
+                  <div className="space-y-10">
+                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-[10px] font-black uppercase tracking-widest text-amber-500">Mapeamento de Valor</div>
+                      <h2 className="text-5xl md:text-7xl font-black text-white leading-tight tracking-tighter">Decisões baseadas em <span className="text-amber-500">Matemática</span>.</h2>
+                      <p className="text-xl text-slate-400 leading-relaxed font-medium">O framework Shinkō elimina o achismo técnico. Cada oportunidade é processada por nosso algoritmo de priorização para garantir que sua equipe ataque apenas o que move o ponteiro do negócio.</p>
+                      
+                      <div className="grid grid-cols-2 gap-6">
+                          <div className="p-8 bg-white/5 rounded-[2rem] border border-white/5 hover:border-white/10 transition-colors">
+                              <div className="text-2xl font-black mb-1">Impacto</div>
+                              <div className="text-[10px] text-slate-500 uppercase font-black tracking-widest">Variável Receita</div>
+                          </div>
+                          <div className="p-8 bg-white/5 rounded-[2rem] border border-white/5 hover:border-white/10 transition-colors">
+                              <div className="text-2xl font-black mb-1">Velocidade</div>
+                              <div className="text-[10px] text-slate-500 uppercase font-black tracking-widest">Time to Market</div>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </section>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                      <div className="lg:col-span-8 space-y-8">
-                          <div className="p-8 rounded-3xl bg-white/5 border border-white/10">
-                              <div className="flex justify-between items-center mb-8">
-                                  <div>
-                                      <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                                          <Users className="w-5 h-5 text-blue-500"/> Core: Tamanho do Time
-                                      </h3>
-                                      <p className="text-xs text-slate-500 mt-1">Inclui Gestão de Projetos, Kanban e Matrizes.</p>
-                                  </div>
-                                  <div className="text-right">
-                                      <div className="text-2xl font-black text-white">{userCount} usuários</div>
-                                      <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{currentBase.name}</div>
-                                  </div>
+          {/* --- CALCULATOR SECTION --- */}
+          <section className="w-full py-24 md:py-48 bg-[#020202] px-6 relative overflow-hidden">
+              <div className="max-w-7xl mx-auto relative z-10">
+                  <div className="text-center mb-24 space-y-4">
+                      <h2 className="text-5xl md:text-8xl font-black tracking-tighter leading-none">Investimento <span className="text-amber-500">Modular</span>.</h2>
+                      <p className="text-slate-400 text-xl max-w-2xl mx-auto font-medium">Pague apenas pela infraestrutura que seu time realmente utiliza.</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 items-start">
+                      {/* Left: Configurator */}
+                      <div className="lg:col-span-7 space-y-12">
+                          
+                          {/* User Slider */}
+                          <div className="glass-panel p-10 rounded-[3rem] border border-white/10 bg-black/40 space-y-8">
+                              <div className="flex justify-between items-center">
+                                  <span className="text-xs font-black uppercase tracking-[0.3em] text-slate-500">Tamanho da Operação</span>
+                                  <span className="text-3xl font-black text-white">{userCount} {userCount === 1 ? 'usuário' : 'usuários'}</span>
                               </div>
                               <input 
-                                type="range" min="1" max="30" step="1" 
-                                value={userCount} onChange={e => setUserCount(parseInt(e.target.value))}
-                                className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white mb-6"
+                                  type="range" min="1" max="30" step="1" 
+                                  value={userCount} 
+                                  onChange={e => setUserCount(parseInt(e.target.value))} 
+                                  className="w-full h-2.5 bg-white/10 rounded-full appearance-none cursor-pointer accent-amber-500" 
                               />
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                  {['Projetos', 'Kanban', 'RDE', 'TADS'].map(f => (
-                                      <div key={f} className="flex items-center gap-2 text-[10px] font-bold text-slate-400">
-                                          <Check className="w-3 h-3 text-emerald-500"/> {f}
-                                      </div>
-                                  ))}
+                              <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">
+                                  <span>Solo (1)</span>
+                                  <span>Studio (5)</span>
+                                  <span>Scale (15)</span>
+                                  <span>Ent. (30+)</span>
                               </div>
                           </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              {AVAILABLE_MODULES.map(mod => {
-                                  const isActive = selectedModules.includes(mod.id);
-                                  return (
-                                      <div 
-                                        key={mod.id} 
-                                        onClick={() => toggleModule(mod.id)}
-                                        className={`p-5 rounded-2xl border transition-all cursor-pointer group ${isActive ? 'bg-amber-500/10 border-amber-500/50 shadow-glow' : 'bg-white/5 border-white/5 hover:border-white/20'}`}
+                          {/* Modules Grid */}
+                          <div className="space-y-6">
+                              <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500 ml-4">Módulos de Engenharia</h3>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                  {AVAILABLE_MODULES.map(mod => (
+                                      <button 
+                                          key={mod.id} 
+                                          onClick={() => toggleModule(mod.id)}
+                                          className={`p-6 md:p-8 rounded-[2rem] border text-left transition-all group relative overflow-hidden flex items-center gap-5 ${selectedModules.includes(mod.id) ? 'bg-amber-500 border-amber-400 text-black shadow-glow-amber' : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'}`}
                                       >
-                                          <div className="flex justify-between items-start mb-3">
-                                              <div className={`p-2.5 rounded-xl ${isActive ? 'bg-amber-500 text-black' : 'bg-white/5 text-slate-400 group-hover:text-white'}`}>
-                                                  <mod.icon className="w-5 h-5"/>
-                                              </div>
-                                              <div className="text-xs font-black text-white">R$ {mod.price.toFixed(2)}</div>
+                                          <div className={`p-4 rounded-2xl ${selectedModules.includes(mod.id) ? 'bg-black/10' : 'bg-white/5 text-slate-500'}`}>
+                                              <mod.icon className="w-6 h-6"/>
                                           </div>
-                                          <h4 className="font-bold text-sm text-white mb-1">{mod.label}</h4>
-                                          <p className="text-[10px] text-slate-500 leading-tight">{mod.desc}</p>
-                                          <div className="mt-4 flex justify-end">
-                                              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${isActive ? 'bg-amber-500 border-amber-500' : 'border-white/10'}`}>
-                                                  {isActive && <Check className="w-3 h-3 text-black"/>}
-                                              </div>
+                                          <div className="flex-1">
+                                              <div className="font-black text-xs uppercase tracking-widest mb-1">{mod.label}</div>
+                                              <div className={`text-[10px] font-bold leading-tight ${selectedModules.includes(mod.id) ? 'text-black/70' : 'text-slate-500'}`}>{mod.desc}</div>
                                           </div>
-                                      </div>
-                                  );
-                              })}
+                                          {mod.core && <span className="absolute top-4 right-6 text-[8px] font-black uppercase tracking-widest opacity-40">Core</span>}
+                                          {!mod.core && !selectedModules.includes(mod.id) && <div className="text-xs font-black">+ R${mod.price.toFixed(0)}</div>}
+                                      </button>
+                                  ))}
+                              </div>
                           </div>
                       </div>
 
-                      <div className="lg:col-span-4 sticky top-24">
-                          <div className="p-8 rounded-3xl bg-white border border-white text-black shadow-2xl relative overflow-hidden group">
-                              <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-8">Resumo</h3>
-                              <div className="space-y-4 mb-10">
-                                  <div className="flex justify-between items-center text-sm font-bold">
-                                      <span>{currentBase.name}</span>
-                                      <span>R$ {currentBase.price.toFixed(2)}</span>
+                      {/* Right: Checkout Summary */}
+                      <div className="lg:col-span-5 sticky top-32">
+                          <div className="bg-white p-12 rounded-[4rem] text-black shadow-[0_40px_100px_-20px_rgba(245,158,11,0.3)] space-y-12 relative overflow-hidden">
+                              <div className="absolute top-0 right-0 w-40 h-40 bg-amber-500/10 rounded-full -mr-20 -mt-20 blur-3xl"></div>
+                              
+                              <div className="space-y-6">
+                                  <div className="flex bg-slate-100 p-1.5 rounded-[1.5rem]">
+                                      <button onClick={() => setBillingCycle('monthly')} className={`flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all ${billingCycle === 'monthly' ? 'bg-white shadow-xl text-black' : 'text-slate-400'}`}>Mensal</button>
+                                      <button onClick={() => setBillingCycle('yearly')} className={`flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all ${billingCycle === 'yearly' ? 'bg-emerald-500 text-white shadow-xl' : 'text-slate-400'}`}>Anual (-20%)</button>
                                   </div>
-                                  {selectedModules.map(id => (
-                                      <div key={id} className="flex justify-between items-center text-[11px] text-slate-500 font-bold">
-                                          <span>+ {AVAILABLE_MODULES.find(m => m.id === id)?.label}</span>
-                                          <span>R$ {AVAILABLE_MODULES.find(m => m.id === id)?.price.toFixed(2)}</span>
+
+                                  <div className="space-y-4 pt-8">
+                                      <div className="flex justify-between items-center text-sm font-bold text-slate-500">
+                                          <span>Plano {currentBase.name}</span>
+                                          <span className="text-black font-black">R$ {currentBase.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                                       </div>
-                                  ))}
+                                      {selectedModules.filter(id => !AVAILABLE_MODULES.find(m => m.id === id)?.core).map(id => {
+                                          const mod = AVAILABLE_MODULES.find(m => m.id === id);
+                                          return (
+                                              <div key={id} className="flex justify-between items-center text-xs font-medium text-slate-400">
+                                                  <span>Módulo {mod?.label}</span>
+                                                  <span className="text-black font-black">+ R$ {mod?.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                              </div>
+                                          );
+                                      })}
+                                  </div>
+
+                                  <div className="pt-10 border-t border-slate-100 flex flex-col items-center">
+                                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Investimento Consolidado</span>
+                                      <div className="text-7xl font-black text-black tracking-tighter mt-3 flex items-baseline">
+                                          <span className="text-2xl mr-2">R$</span>{calculateTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                      </div>
+                                      <span className="text-[10px] font-black text-slate-400 mt-4 uppercase tracking-widest">ciclo {billingCycle === 'monthly' ? 'mensal' : 'anual antecipado'}</span>
+                                  </div>
                               </div>
-                              <div className="border-t border-slate-100 pt-6 mb-8">
-                                  <div className="text-4xl font-black">R$ {calculateTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-                                  <div className="text-xs text-slate-400 font-bold">por mês</div>
-                              </div>
-                              <button onClick={onEnter} className="w-full py-4 bg-black text-white font-black uppercase tracking-widest text-xs rounded-2xl shadow-xl hover:scale-[1.02] transition-all flex items-center justify-center gap-2">
-                                  Ativar Agora <ArrowRight className="w-4 h-4"/>
+
+                              <button onClick={onEnter} className="w-full py-7 bg-black text-white rounded-[2rem] font-black text-xs uppercase tracking-[0.3em] shadow-2xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-4">
+                                  Contratar Workspace <ArrowRight className="w-6 h-6"/>
                               </button>
+
+                              <p className="text-center text-[10px] font-black text-slate-400 uppercase tracking-widest opacity-60">Implementação instantânea • Sem fidelidade</p>
                           </div>
                       </div>
                   </div>
               </div>
           </section>
 
-          {/* --- FOOTER --- */}
-          <footer className="w-full border-t border-white/5 bg-[#020202] py-20 px-6">
-              <div className="max-w-7xl mx-auto text-center">
-                  <img src={displayLogo} alt="Shinkō" className="h-10 w-auto mx-auto mb-8 grayscale opacity-50" />
-                  <p className="text-slate-500 text-sm max-w-sm mx-auto leading-relaxed mb-8">
-                      O sistema operacional para construção de produtos de software de alta performance. Desenvolvido para transformar times em centros de receita.
-                  </p>
-                  <p className="text-slate-700 text-xs italic">© 2025 Shinkō Innovation Framework. Todos os direitos reservados.</p>
+          {/* --- FINAL CTA --- */}
+          <section className="w-full py-48 border-t border-white/5 bg-[#020202] text-center relative overflow-hidden">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(245,158,11,0.1),transparent_70%)]"></div>
+              <div className="max-w-4xl mx-auto space-y-12 px-6 relative z-10">
+                <h2 className="text-6xl md:text-8xl font-black tracking-tighter leading-[0.9]">Mude para a <br/><span className="text-amber-500">Engenharia de Valor</span>.</h2>
+                <p className="text-slate-400 text-xl md:text-2xl max-w-2xl mx-auto font-medium">Junte-se a times que pararam de adivinhar e começaram a construir com precisão industrial.</p>
+                <button onClick={onEnter} className="px-14 py-6 bg-white text-black font-black uppercase tracking-[0.3em] text-xs rounded-full shadow-[0_0_80px_rgba(255,255,255,0.2)] hover:scale-110 active:scale-95 transition-all">
+                    Criar Workspace Agora
+                </button>
+              </div>
+          </section>
+
+          <footer className="w-full border-t border-white/5 bg-[#020202] py-24 px-6 relative z-10">
+              <div className="max-w-7xl mx-auto text-center space-y-16">
+                  <img src={displayLogo} alt="Shinkō" className="h-12 w-auto mx-auto grayscale opacity-40 hover:opacity-100 transition-opacity" />
+                  <div className="flex justify-center gap-12 text-[10px] font-black uppercase tracking-[0.4em] text-slate-600">
+                      <button className="hover:text-white transition-colors">Termos de Uso</button>
+                      <button className="hover:text-white transition-colors">Privacidade</button>
+                      <button className="hover:text-white transition-colors">Framework 2.5</button>
+                  </div>
+                  <div className="space-y-2">
+                      <p className="text-slate-700 text-[10px] font-bold uppercase tracking-widest">© 2026 Shinkō OS. Engenharia de Inovação Industrial.</p>
+                      <p className="text-slate-800 text-[10px] italic">Build Alpha v2.5.4-modular-engine</p>
+                  </div>
               </div>
           </footer>
       </main>

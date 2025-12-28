@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
   <head>
@@ -48,12 +47,12 @@
     <style>
       :root {
         --brand-primary: #F59E0B;
-        --bg-color: #F9FAFB; /* Fundo mais suave que o branco puro */
+        --bg-color: #F9FAFB;
         --surface: #FFFFFF;
         --card-bg: #FFFFFF;
         --card-bg-hover: #FFFFFF;
         --border-color: #E5E7EB;
-        --text-main: #111827; /* Cinza quase preto para melhor contraste */
+        --text-main: #111827;
         --text-muted: #6B7280;
         --input-bg: #FFFFFF;
         --calendar-cell: transparent;
@@ -75,6 +74,7 @@
         color: var(--text-main);
         font-family: "Inter", sans-serif;
         transition: background 0.5s ease, color 0.3s ease;
+        overscroll-behavior-y: none;
       }
 
       body.dark {
@@ -123,6 +123,12 @@
       ::-webkit-scrollbar-track { background: transparent; }
       ::-webkit-scrollbar-thumb { background: rgba(155, 155, 155, 0.2); border-radius: 10px; }
       ::-webkit-scrollbar-thumb:hover { background: rgba(155, 155, 155, 0.4); }
+
+      /* Fix for horizontal tablet hero scaling */
+      @media (max-height: 800px) and (min-width: 1024px) {
+        .hero-title { font-size: 3.5rem !important; }
+        .hero-section { min-height: 85vh !important; padding-top: 100px !important; }
+      }
     </style>
   <script type="importmap">
 {
