@@ -38,7 +38,6 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, activeModules: string
     const isClient = userRole === 'cliente';
     const hasModule = (key: string) => isMaster || activeModules.some(m => m.toLowerCase() === key.toLowerCase());
 
-    // Visão para usuários regulares: Execução + Perfil
     if (!isMaster && userRole !== 'dono') {
         return [
             {
@@ -58,7 +57,6 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, activeModules: string
         ];
     }
 
-    // Visão completa para o usuário mestre ou donos de org
     const groups = [
         {
             title: 'Gestão',
@@ -120,7 +118,7 @@ export const Sidebar: React.FC<Props> = (props) => {
   const menuGroups = getMenuGroups(props.userRole, isAdmin, props.activeModules, props.userData.email, props.organizationId);
 
   return (
-    <aside className="hidden lg:flex flex-col w-64 h-full border-r border-slate-200 dark:border-white/5 bg-white dark:bg-[#0A0A0B] shrink-0">
+    <aside className="hidden xl:flex flex-col w-64 h-full border-r border-slate-200 dark:border-white/5 bg-white dark:bg-[#0A0A0B] shrink-0">
         <div className="h-20 flex items-center justify-between px-6 border-b border-slate-200 dark:border-white/5 shrink-0">
             <Logo customLogoUrl={props.customLogoUrl} orgName={props.orgName} />
             <button 
@@ -201,7 +199,7 @@ export const MobileDrawer: React.FC<Props> = (props) => {
 
     return (
         <>
-            <div className="fixed top-0 left-0 right-0 h-16 lg:hidden z-[1000] border-b border-slate-200 dark:border-white/5 flex items-center px-4 justify-between bg-white dark:bg-[#0A0A0B]">
+            <div className="fixed top-0 left-0 right-0 h-16 xl:hidden z-[1000] border-b border-slate-200 dark:border-white/5 flex items-center px-4 justify-between bg-white dark:bg-[#0A0A0B]">
                 <div className="flex items-center gap-3">
                     <button 
                         onClick={() => props.setIsMobileOpen(true)} 
@@ -225,9 +223,9 @@ export const MobileDrawer: React.FC<Props> = (props) => {
             </div>
 
             {props.isMobileOpen && (
-                <div className="fixed inset-0 z-[2000] lg:hidden">
+                <div className="fixed inset-0 z-[2000] xl:hidden">
                     <div className="absolute inset-0 bg-black/90" onClick={() => props.setIsMobileOpen(false)}></div>
-                    <div className="absolute inset-y-0 left-0 w-[80%] max-w-[300px] bg-white dark:bg-[#0A0A0B] border-r border-slate-200 dark:border-white/5 flex flex-col animate-in slide-in-from-left duration-300">
+                    <div className="absolute inset-y-0 left-0 w-[85%] max-w-[320px] bg-white dark:bg-[#0A0A0B] border-r border-slate-200 dark:border-white/5 flex flex-col animate-in slide-in-from-left duration-300">
                         
                         <div className="h-16 flex items-center justify-between px-6 border-b border-slate-200 dark:border-white/5 shrink-0">
                             <Logo customLogoUrl={props.customLogoUrl} orgName={props.orgName} />

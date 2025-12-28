@@ -69,27 +69,40 @@ export const FinancialScreen: React.FC<Props> = ({ orgType }) => {
     };
 
     return (
-        <div className="w-full h-full flex flex-col animate-in fade-in duration-500 overflow-hidden">
-            <div className="flex justify-center mb-8 shrink-0">
-                <div className="glass-panel p-1 rounded-2xl flex shadow-sm">
+        <div className="w-full min-h-screen flex flex-col animate-in fade-in duration-500 max-w-[1600px] mx-auto p-6 md:p-12">
+            
+            {/* Header em Linha Única */}
+            <div className="flex flex-row justify-between items-center mb-12 shrink-0 border-b border-slate-200 dark:border-white/5 pb-8">
+                <div>
+                    <h1 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">
+                        Saúde <span className="text-amber-500">Financeira</span>.
+                    </h1>
+                    <p className="hidden sm:block text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-2">FLUXO DE CAIXA E RENTABILIDADE</p>
+                </div>
+
+                <div className="glass-panel p-1.5 rounded-[1.8rem] flex shadow-xl border-slate-200 dark:border-white/5 bg-white/60 dark:bg-black/20 backdrop-blur-xl shrink-0">
                     <button 
                         onClick={() => setActiveTab('dashboard')}
-                        className={`flex items-center gap-2 px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'dashboard' ? 'bg-amber-500 text-black shadow-glow-amber' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}
+                        className={`flex items-center gap-3 px-8 py-3 rounded-[1.4rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'dashboard' ? 'bg-amber-500 text-black shadow-glow-amber' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}
                     >
-                        <LayoutDashboard className="w-4 h-4"/> Dashboard
+                        <LayoutDashboard className="w-4 h-4"/> <span className="hidden md:inline">Dashboard</span>
                     </button>
                     <button 
                         onClick={() => setActiveTab('ledger')}
-                        className={`flex items-center gap-2 px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'ledger' ? 'bg-amber-500 text-black shadow-glow-amber' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}
+                        className={`flex items-center gap-3 px-8 py-3 rounded-[1.4rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'ledger' ? 'bg-amber-500 text-black shadow-glow-amber' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}
                     >
-                        <List className="w-4 h-4"/> Lançamentos
+                        <List className="w-4 h-4"/> <span className="hidden md:inline">Lançamentos</span>
                     </button>
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto custom-scrollbar px-1">
+            {/* Conteúdo */}
+            <div className="flex-1 pb-32">
                 {loading ? (
-                    <div className="w-full py-20 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-amber-500"/></div>
+                    <div className="w-full py-40 flex flex-col items-center justify-center gap-4">
+                        <Loader2 className="w-10 h-10 animate-spin text-amber-500"/>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sincronizando Ledger...</span>
+                    </div>
                 ) : (
                     activeTab === 'dashboard' ? (
                         <FinancialDashboard manualTransactions={transactions} orgType={orgType} />

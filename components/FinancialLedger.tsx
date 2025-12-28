@@ -1,8 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { FinancialTransaction } from '../types';
-import { Plus, ArrowUpCircle, ArrowDownCircle, Trash2, Calendar, Tag, DollarSign, Filter, Search, RefreshCw, Lock, ChevronLeft, ChevronRight, XCircle, Edit, User, FileText, CheckCircle2, X, Save, ArrowUpRight, ArrowDownRight } from 'lucide-react';
-import { logEvent } from '../services/analyticsService';
+import { Plus, Trash2, ChevronLeft, ChevronRight, Search, RefreshCw, Edit, FileText, Save, ArrowUpRight, ArrowDownRight, X, DollarSign, Calendar, Tag } from 'lucide-react';
 
 interface Props {
     transactions: FinancialTransaction[];
@@ -30,14 +29,16 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
 
     const handleEditClick = (e: React.MouseEvent, t: FinancialTransaction) => {
         e.stopPropagation();
-        setNewTrans(t);
+        setNewTrans({ ...t });
         setShowModal(true);
     };
 
     const handleDeleteClick = (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
-        onDeleteTransaction(id);
-        if (selectedTrans?.id === id) setSelectedTrans(null);
+        if(confirm("Deseja realmente excluir este lançamento?")) {
+            onDeleteTransaction(id);
+            if (selectedTrans?.id === id) setSelectedTrans(null);
+        }
     }
 
     const handleCreateClick = () => {
@@ -67,7 +68,7 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
                 amount: Number(newTrans.amount),
                 type: newTrans.type as 'inflow' | 'outflow',
                 category: newTrans.category || 'Geral',
-                organizationId: 0
+                organizationId: newTrans.organizationId || 0
             });
         }
         setShowModal(false);
@@ -91,84 +92,89 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
     };
 
     return (
-        <div className="w-full flex flex-col bg-[var(--surface)] rounded-[2.5rem] border border-[var(--border-color)] overflow-hidden shadow-glass backdrop-blur-3xl animate-in fade-in duration-500">
+        <div className="w-full flex flex-col bg-white dark:bg-[#0A0A0C] rounded-[2rem] border border-slate-200 dark:border-white/5 overflow-hidden shadow-soft animate-in fade-in duration-500">
+            
             {/* Toolbar */}
-            <div className="p-6 border-b border-[var(--border-color)] flex flex-col md:flex-row gap-6 justify-between items-center bg-white/5 dark:bg-black/5">
-                <div className="flex gap-4 w-full md:w-auto">
+            <div className="p-6 border-b border-slate-100 dark:border-white/5 flex flex-col lg:flex-row gap-6 justify-between items-center bg-slate-50/30 dark:bg-white/[0.01]">
+                <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
                     <div className="relative flex-1 md:min-w-[280px]">
-                        <Search className="absolute left-4 top-3.5 w-4 h-4 text-slate-500"/>
+                        <Search className="absolute left-4 top-3 w-4 h-4 text-slate-400"/>
                         <input 
                             type="text" 
-                            placeholder="Buscar lançamento..." 
+                            placeholder="Buscar..." 
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
-                            className="w-full pl-12 pr-4 py-3 bg-[var(--input-bg)] border border-[var(--border-color)] rounded-2xl text-xs font-bold text-[var(--text-main)] outline-none focus:border-amber-500/50 transition-all"
+                            className="w-full pl-11 pr-4 py-2.5 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold text-slate-900 dark:text-white outline-none focus:border-amber-500/50 transition-all shadow-inner"
                         />
                     </div>
-                    <div className="flex items-center gap-2 bg-[var(--input-bg)] border border-[var(--border-color)] rounded-2xl px-3">
-                        <button onClick={() => setSelectedYear(y => y-1)} className="p-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded-xl transition-all"><ChevronLeft className="w-4 h-4 text-slate-400"/></button>
-                        <span className="text-xs font-black text-[var(--text-main)] tracking-widest px-2">{selectedYear}</span>
-                        <button onClick={() => setSelectedYear(y => y+1)} className="p-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded-xl transition-all"><ChevronRight className="w-4 h-4 text-slate-400"/></button>
+                    <div className="flex items-center justify-between sm:justify-start gap-1 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-2">
+                        <button onClick={() => setSelectedYear(y => y-1)} className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-all"><ChevronLeft className="w-4 h-4 text-slate-400"/></button>
+                        <span className="text-xs font-black text-slate-900 dark:text-white tracking-widest px-2">{selectedYear}</span>
+                        <button onClick={() => setSelectedYear(y => y+1)} className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-all"><ChevronRight className="w-4 h-4 text-slate-400"/></button>
                     </div>
                 </div>
 
-                <div className="flex gap-3 w-full md:w-auto justify-end">
-                    <div className="flex bg-black/5 dark:bg-white/5 p-1 rounded-2xl border border-[var(--border-color)]">
-                        <button onClick={() => setFilterType('all')} className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${filterType === 'all' ? 'bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500'}`}>Tudo</button>
-                        <button onClick={() => setFilterType('inflow')} className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${filterType === 'inflow' ? 'bg-emerald-500 text-white shadow-lg' : 'text-slate-500'}`}>Entradas</button>
-                        <button onClick={() => setFilterType('outflow')} className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${filterType === 'outflow' ? 'bg-red-500 text-white shadow-lg' : 'text-slate-500'}`}>Saídas</button>
+                <div className="flex flex-wrap gap-3 w-full lg:w-auto justify-center sm:justify-end">
+                    <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-xl border border-slate-200 dark:border-white/10">
+                        <button onClick={() => setFilterType('all')} className={`px-4 py-2 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${filterType === 'all' ? 'bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500'}`}>Tudo</button>
+                        <button onClick={() => setFilterType('inflow')} className={`px-4 py-2 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${filterType === 'inflow' ? 'bg-emerald-500 text-white shadow-lg' : 'text-slate-500'}`}>Entradas</button>
+                        <button onClick={() => setFilterType('outflow')} className={`px-4 py-2 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${filterType === 'outflow' ? 'bg-red-500 text-white shadow-lg' : 'text-slate-500'}`}>Saídas</button>
                     </div>
-                    <button onClick={onSyncContracts} className="p-3 bg-[var(--input-bg)] border border-[var(--border-color)] rounded-2xl hover:bg-white dark:hover:bg-white/5 transition-all">
+                    <button onClick={onSyncContracts} title="Sincronizar Contratos" className="p-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl hover:bg-slate-50 dark:hover:bg-white/10 transition-all">
                         <RefreshCw className={`w-4 h-4 text-slate-400 ${isSyncing ? 'animate-spin' : ''}`}/>
                     </button>
-                    <button onClick={handleCreateClick} className="px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:scale-105 active:scale-95 transition-all shadow-xl">
-                        <Plus className="w-4 h-4"/> Novo Lançamento
+                    <button 
+                        onClick={handleCreateClick} 
+                        className="px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center gap-2 hover:scale-105 active:scale-95 transition-all shadow-xl"
+                    >
+                        <Plus className="w-4 h-4"/> Lançamento
                     </button>
                 </div>
             </div>
 
-            {/* List */}
+            {/* Table Optimized for Space */}
             <div className="overflow-x-auto custom-scrollbar">
-                <table className="w-full text-left">
-                    <thead className="bg-black/5 dark:bg-white/5 text-slate-400 border-b border-[var(--border-color)] text-[10px] font-black uppercase tracking-[0.2em]">
+                <table className="w-full text-left table-auto">
+                    <thead className="bg-slate-50/50 dark:bg-white/[0.02] text-slate-400 border-b border-slate-100 dark:border-white/5 text-[9px] font-black uppercase tracking-[0.2em]">
                         <tr>
-                            <th className="p-6">Data</th>
-                            <th className="p-6">Descrição / Ativo</th>
-                            <th className="p-6 hidden sm:table-cell">Categoria</th>
-                            <th className="p-6 text-right">Valor</th>
-                            <th className="p-6 w-24 text-center">Ações</th>
+                            <th className="px-6 py-4 w-28">Data</th>
+                            <th className="px-6 py-4">Descrição / Ativo</th>
+                            <th className="px-6 py-4 w-32">Categoria</th>
+                            <th className="px-6 py-4 w-40 text-right">Valor</th>
+                            <th className="px-6 py-4 w-24 text-center">Ações</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-[var(--border-color)]">
+                    <tbody className="divide-y divide-slate-100 dark:divide-white/5">
                         {filtered.length === 0 && (
-                            <tr><td colSpan={5} className="p-20 text-center text-slate-400 text-xs font-bold uppercase tracking-widest">Sem lançamentos detectados no período.</td></tr>
+                            <tr><td colSpan={5} className="py-32 text-center text-slate-400 text-xs font-bold uppercase tracking-[0.5em] opacity-40">Sem registros.</td></tr>
                         )}
                         {filtered.map(t => (
                             <tr 
                                 key={t.id} 
-                                onClick={() => setSelectedTrans(t)}
-                                className="hover:bg-slate-50 dark:hover:bg-white/5 group transition-colors cursor-pointer"
+                                className="hover:bg-slate-50/50 dark:hover:bg-white/5 group transition-colors cursor-pointer"
                             >
-                                <td className="p-6 font-black text-xs text-slate-500 uppercase">{new Date(t.date).toLocaleDateString('pt-BR', {day:'2-digit', month:'short'})}</td>
-                                <td className="p-6">
+                                <td className="px-6 py-3 font-black text-[11px] text-slate-500 uppercase whitespace-nowrap">
+                                    {new Date(t.date).toLocaleDateString('pt-BR', {day:'2-digit', month:'short'})}
+                                </td>
+                                <td className="px-6 py-3">
                                     <div className="flex flex-col">
-                                        <div className="font-bold text-[var(--text-main)] flex items-center gap-3">
-                                            {t.isContract && <RefreshCw className="w-3.5 h-3.5 text-emerald-500 animate-spin-slow" />}
-                                            {extractClientInfo(t.description)}
+                                        <div className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                                            {t.isContract && <RefreshCw className="w-3 h-3 text-emerald-500 animate-spin-slow shrink-0" />}
+                                            <span className="truncate max-w-[200px] md:max-w-[400px]">{extractClientInfo(t.description)}</span>
                                         </div>
-                                        {t.isContract && <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1 opacity-60">Recorrência Ativa</span>}
+                                        {t.isContract && <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-0.5 opacity-60">Recorrência</span>}
                                     </div>
                                 </td>
-                                <td className="p-6 hidden sm:table-cell">
-                                    <span className="text-[9px] font-black uppercase tracking-widest bg-black/5 dark:bg-white/5 px-3 py-1.5 rounded-full text-slate-500 border border-[var(--border-color)]">{t.category}</span>
+                                <td className="px-6 py-3">
+                                    <span className="text-[8px] font-black uppercase tracking-widest bg-slate-100 dark:bg-white/5 px-2.5 py-1 rounded-full text-slate-500 border border-slate-200 dark:border-white/10 whitespace-nowrap">{t.category}</span>
                                 </td>
-                                <td className={`p-6 text-right font-black text-lg ${t.type === 'inflow' ? 'text-emerald-500' : 'text-red-500'}`}>
-                                    <span className="text-xs mr-1 opacity-50">R$</span>{t.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                <td className={`px-6 py-3 text-right font-black text-base ${t.type === 'inflow' ? 'text-emerald-500' : 'text-red-500'}`}>
+                                    <span className="text-[10px] mr-1 opacity-50 font-bold">R$</span>{t.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
                                 </td>
-                                <td className="p-6">
-                                    <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={(e) => handleEditClick(e, t)} className="p-2.5 bg-white dark:bg-white/5 text-slate-400 hover:text-amber-500 rounded-xl border border-[var(--border-color)] transition-all"><Edit className="w-4 h-4"/></button>
-                                        <button onClick={(e) => handleDeleteClick(e, t.id)} className="p-2.5 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-xl transition-all"><Trash2 className="w-4 h-4"/></button>
+                                <td className="px-6 py-3">
+                                    <div className="flex justify-center gap-2 opacity-100 xl:opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button onClick={(e) => handleEditClick(e, t)} className="p-2 bg-white dark:bg-white/5 text-slate-400 hover:text-amber-500 rounded-lg border border-slate-200 dark:border-white/10 transition-all"><Edit className="w-4 h-4"/></button>
+                                        <button onClick={(e) => handleDeleteClick(e, t.id)} className="p-2 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-all"><Trash2 className="w-4 h-4"/></button>
                                     </div>
                                 </td>
                             </tr>
@@ -177,133 +183,111 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
                 </table>
             </div>
 
-            {/* DETAIL MODAL - SHINKO GLASS */}
-            {selectedTrans && (
-                <div className="fixed inset-0 z-[600] flex items-center justify-center p-6 bg-black/40 backdrop-blur-xl animate-in fade-in">
-                    <div className="glass-panel w-full max-w-lg rounded-[3rem] shadow-glass border-[var(--border-color)] overflow-hidden relative animate-ios-pop flex flex-col">
-                        <div className="p-8 border-b border-[var(--border-color)] flex justify-between items-center bg-white/5">
-                            <div>
-                                <h3 className="text-xl font-black text-[var(--text-main)] tracking-tighter flex items-center gap-3">
-                                    {selectedTrans.type === 'inflow' ? <ArrowUpRight className="w-6 h-6 text-emerald-500"/> : <ArrowDownRight className="w-6 h-6 text-red-500"/>}
-                                    Detalhes Técnicos
-                                </h3>
-                                <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mt-1">Snapshot Financeiro</p>
-                            </div>
-                            <button onClick={() => setSelectedTrans(null)} className="p-3 hover:bg-white/10 rounded-2xl transition-all"><X className="w-6 h-6 text-slate-400"/></button>
-                        </div>
-
-                        <div className="p-10 space-y-10">
-                            <div className="text-center space-y-4">
-                                <span className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em]">Montante Liquidado</span>
-                                <div className={`text-6xl font-black tracking-tighter leading-none ${selectedTrans.type === 'inflow' ? 'text-emerald-500' : 'text-red-500'}`}>
-                                    <span className="text-2xl mr-2 opacity-50 tracking-normal font-bold">R$</span>
-                                    {selectedTrans.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                                </div>
-                                <div className="inline-flex items-center gap-3 px-5 py-2 bg-black/5 dark:bg-white/5 rounded-full text-[10px] font-black uppercase tracking-widest text-slate-500 border border-[var(--border-color)]">
-                                    <Calendar className="w-4 h-4 text-amber-500"/> {new Date(selectedTrans.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
-                                </div>
-                            </div>
-
-                            <div className="glass-card p-8 border-[var(--border-color)] space-y-6">
-                                <div className="flex items-center gap-5">
-                                    <div className="w-14 h-14 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-500 border border-amber-500/20 shadow-glow-amber">
-                                        {selectedTrans.isContract ? <RefreshCw className="w-7 h-7"/> : <FileText className="w-7 h-7"/>}
-                                    </div>
-                                    <div>
-                                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ativo Relacionado</div>
-                                        <div className="text-lg font-black text-[var(--text-main)] tracking-tight mt-1">{extractClientInfo(selectedTrans.description)}</div>
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-8 pt-4 border-t border-[var(--border-color)]">
-                                    <div>
-                                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Categoria</span>
-                                        <div className="text-sm font-bold text-[var(--text-main)] mt-1">{selectedTrans.category}</div>
-                                    </div>
-                                    <div>
-                                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Vínculo</span>
-                                        <div className="text-sm font-bold text-[var(--text-main)] mt-1">{selectedTrans.isContract ? 'Assinatura Ativa' : 'Pagamento Único'}</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="p-8 border-t border-[var(--border-color)] bg-white/5 flex gap-4">
-                            <button 
-                                onClick={() => { setShowModal(true); setNewTrans(selectedTrans); setSelectedTrans(null); }}
-                                className="flex-1 py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-3 shadow-xl active:scale-95 transition-all"
-                            >
-                                <Edit className="w-4 h-4"/> Editar Lançamento
-                            </button>
-                            <button 
-                                onClick={() => { onDeleteTransaction(selectedTrans.id); setSelectedTrans(null); }}
-                                className="px-6 py-4 bg-red-500/10 text-red-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all"
-                            >
-                                <Trash2 className="w-5 h-5"/>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* CREATE/EDIT MODAL - EXPANDED FOR FULL SCREEN FEELING */}
+            {/* FORM MODAL remains as a high-priority independent pop-up */}
             {showModal && (
-                <div className="fixed inset-0 z-[700] flex items-center justify-center p-6 bg-black/60 backdrop-blur-2xl animate-in fade-in">
-                    <div className="glass-panel w-full max-w-4xl rounded-[3rem] shadow-glass border-[var(--border-color)] overflow-hidden relative animate-ios-pop flex flex-col max-h-[90vh]">
-                        <div className="p-8 border-b border-[var(--border-color)] flex justify-between items-center bg-white/5">
-                            <div>
-                                <h3 className="text-2xl font-black text-[var(--text-main)] tracking-tighter">{newTrans.id ? 'Refinar' : 'Novo'} Lançamento</h3>
-                                <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mt-1">Entrada de Dados Financeiros</p>
-                            </div>
-                            <button onClick={() => setShowModal(false)} className="p-3 hover:bg-white/10 rounded-2xl transition-all"><X className="w-6 h-6 text-slate-400"/></button>
-                        </div>
+                <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xl animate-in fade-in duration-300">
+                    <div className="w-full max-w-lg rounded-[3rem] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] border border-slate-200 dark:border-white/10 bg-white dark:bg-[#0A0A0C] overflow-hidden animate-ios-pop flex flex-col">
                         
-                        <div className="p-10 space-y-10 overflow-y-auto custom-scrollbar">
-                            <div className="flex bg-black/5 dark:bg-white/5 p-1.5 rounded-2xl border border-[var(--border-color)] w-fit mx-auto">
-                                <button onClick={() => setNewTrans({...newTrans, type: 'inflow'})} className={`px-12 py-3 rounded-[1.2rem] text-[10px] font-black uppercase tracking-widest transition-all ${newTrans.type === 'inflow' ? 'bg-emerald-500 text-white shadow-lg' : 'text-slate-500'}`}>Entrada</button>
-                                <button onClick={() => setNewTrans({...newTrans, type: 'outflow'})} className={`px-12 py-3 rounded-[1.2rem] text-[10px] font-black uppercase tracking-widest transition-all ${newTrans.type === 'outflow' ? 'bg-red-500 text-white shadow-lg' : 'text-slate-500'}`}>Saída</button>
+                        <div className="p-10 border-b border-slate-100 dark:border-white/5 flex justify-between items-center bg-slate-50/50 dark:bg-white/5">
+                            <div>
+                                <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter flex items-center gap-4">
+                                    <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center text-black">
+                                        <Plus className="w-6 h-6 stroke-[3px]"/>
+                                    </div>
+                                    {newTrans.id ? 'Editar' : 'Novo'}
+                                </h3>
+                                <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.2em] mt-3 ml-1">LANÇAMENTO DE FLUXO</p>
                             </div>
-                            
+                            <button onClick={() => setShowModal(false)} className="p-3 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-all text-slate-400"><X className="w-7 h-7"/></button>
+                        </div>
+
+                        <div className="p-10 space-y-10 overflow-y-auto max-h-[70vh] custom-scrollbar">
+                            <div className="flex bg-slate-100 dark:bg-white/5 p-1.5 rounded-[1.8rem] border border-slate-200 dark:border-white/10 shadow-inner">
+                                <button 
+                                    onClick={() => setNewTrans({...newTrans, type: 'inflow'})}
+                                    className={`flex-1 py-4 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${newTrans.type === 'inflow' ? 'bg-emerald-500 text-white shadow-lg scale-[1.02]' : 'text-slate-500'}`}
+                                >
+                                    Receita (+)
+                                </button>
+                                <button 
+                                    onClick={() => setNewTrans({...newTrans, type: 'outflow'})}
+                                    className={`flex-1 py-4 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${newTrans.type === 'outflow' ? 'bg-red-500 text-white shadow-lg scale-[1.02]' : 'text-slate-500'}`}
+                                >
+                                    Despesa (-)
+                                </button>
+                            </div>
+
                             <div className="space-y-8">
                                 <div>
-                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-3 block">Identificação do Ativo</label>
-                                    <input type="text" placeholder="Ex: Mensalidade Cliente Alpha" value={newTrans.description} onChange={e => setNewTrans({...newTrans, description: e.target.value})} className="w-full p-6 bg-[var(--input-bg)] border border-[var(--border-color)] rounded-[1.5rem] text-xl font-bold text-[var(--text-main)] outline-none focus:border-amber-500/50 transition-all shadow-inner"/>
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 ml-1">Descrição do Ativo</label>
+                                    <div className="relative group">
+                                        <FileText className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-amber-500 transition-colors" />
+                                        <input 
+                                            value={newTrans.description} 
+                                            onChange={e => setNewTrans({...newTrans, description: e.target.value})}
+                                            placeholder="Ex: Assinatura Shinkō Core..."
+                                            className="w-full pl-14 pr-6 py-5 rounded-[1.5rem] bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm font-bold text-slate-900 dark:text-white outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/5 transition-all shadow-inner"
+                                        />
+                                    </div>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                    <div className="space-y-3">
-                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-2 block">Montante (R$)</label>
-                                        <div className="relative">
-                                            <span className="absolute left-6 top-1/2 -translate-y-1/2 font-black text-slate-400">R$</span>
-                                            <input type="number" placeholder="0,00" value={newTrans.amount || ''} onChange={e => setNewTrans({...newTrans, amount: parseFloat(e.target.value)})} className="w-full p-6 pl-14 bg-[var(--input-bg)] border border-[var(--border-color)] rounded-[1.5rem] text-2xl font-black text-[var(--text-main)] outline-none focus:border-amber-500/50 transition-all shadow-inner"/>
+                                <div className="grid grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 ml-1">Valor Nominal</label>
+                                        <div className="relative group">
+                                            <DollarSign className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-500" />
+                                            <input 
+                                                type="number"
+                                                value={newTrans.amount} 
+                                                onChange={e => setNewTrans({...newTrans, amount: Number(e.target.value)})}
+                                                placeholder="0.00"
+                                                className="w-full pl-14 pr-6 py-5 rounded-[1.5rem] bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xl font-black text-slate-900 dark:text-white outline-none focus:border-amber-500 transition-all shadow-inner"
+                                            />
                                         </div>
                                     </div>
-                                    <div className="space-y-3">
-                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-2 block">Data Fiscal</label>
-                                        <input type="date" value={newTrans.date} onChange={e => setNewTrans({...newTrans, date: e.target.value})} className="w-full p-6 bg-[var(--input-bg)] border border-[var(--border-color)] rounded-[1.5rem] text-lg font-black text-[var(--text-main)] outline-none focus:border-amber-500/50 transition-all uppercase tracking-[0.2em] shadow-inner"/>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 ml-1">Data Fiscal</label>
+                                        <div className="relative group">
+                                            <Calendar className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-amber-500 transition-colors" />
+                                            <input 
+                                                type="date"
+                                                value={newTrans.date} 
+                                                onChange={e => setNewTrans({...newTrans, date: e.target.value})}
+                                                className="w-full pl-14 pr-6 py-5 rounded-[1.5rem] bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm font-bold text-slate-900 dark:text-white outline-none focus:border-amber-500 transition-all uppercase shadow-inner"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div className="space-y-3">
-                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-2 block">Natureza Operacional</label>
-                                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                                        {['Operacional', 'Marketing', 'Vendas', 'Receita Recorrente', 'Infraestrutura'].map(cat => (
-                                            <button
-                                                key={cat}
-                                                onClick={() => setNewTrans({...newTrans, category: cat})}
-                                                className={`p-4 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${newTrans.category === cat ? 'bg-amber-500 border-amber-400 text-black shadow-lg' : 'bg-white/5 border-white/5 text-slate-500 hover:bg-white/10'}`}
-                                            >
-                                                {cat}
-                                            </button>
-                                        ))}
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 ml-1">Categoria do Ativo</label>
+                                    <div className="relative group">
+                                        <Tag className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-amber-500 transition-colors" />
+                                        <select 
+                                            value={newTrans.category} 
+                                            onChange={e => setNewTrans({...newTrans, category: e.target.value})}
+                                            className="w-full pl-14 pr-10 py-5 rounded-[1.5rem] bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm font-bold text-slate-900 dark:text-white outline-none focus:border-amber-500 appearance-none cursor-pointer transition-all shadow-inner"
+                                        >
+                                            <option value="Operacional">Operacional</option>
+                                            <option value="Vendas">Receita de Vendas</option>
+                                            <option value="Infraestrutura">Infraestrutura / Cloud</option>
+                                            <option value="Marketing">Marketing & Ads</option>
+                                            <option value="Pessoal">Pessoal / Salários</option>
+                                            <option value="Impostos">Impostos & Taxas</option>
+                                            <option value="Investimento">Investimento</option>
+                                        </select>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="p-8 border-t border-[var(--border-color)] bg-white/5 flex gap-4 shrink-0">
-                            <button onClick={() => setShowModal(false)} className="flex-1 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">Descartar</button>
-                            <button onClick={handleSave} className="flex-[2] py-5 bg-amber-500 text-black font-black uppercase tracking-[0.2em] text-xs rounded-2xl shadow-glow-amber hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3">
-                                <Save className="w-5 h-5"/> Sincronizar no Caixa
+                        <div className="p-10 border-t border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-white/5 flex gap-6 shrink-0">
+                            <button onClick={() => setShowModal(false)} className="flex-1 py-5 text-[11px] font-black uppercase tracking-[0.3em] text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors active:scale-95">Descartar</button>
+                            <button 
+                                onClick={handleSave}
+                                className="flex-[2] py-5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[1.8rem] font-black text-xs uppercase tracking-widest shadow-2xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-4"
+                            >
+                                <Save className="w-5 h-5"/> Sincronizar Registro
                             </button>
                         </div>
                     </div>

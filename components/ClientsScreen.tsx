@@ -41,28 +41,25 @@ export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [], org
             {/* Header Estratégico */}
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6">
                 <div className="space-y-1">
-                    <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full text-[9px] font-bold text-blue-400 uppercase tracking-widest">
-                        <Users className="w-3 h-3"/> Gestão de Stakeholders
-                    </div>
-                    <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight">
-                        Base de <span className="text-amber-500 font-extrabold">Parceiros.</span>
+                    <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">
+                        Base de <span className="text-amber-500">Stakeholders</span>.
                     </h1>
-                    <p className="text-[#A1A1AA] font-bold uppercase tracking-widest text-[10px] mt-2">Ativos e Contratos Vinculados</p>
+                    <p className="text-slate-400 dark:text-[#A1A1AA] font-black uppercase tracking-[0.3em] text-[10px] mt-2">GESTÃO DE PARCEIROS E ACESSOS EXTERNOS</p>
                 </div>
                 
                 <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
-                    <div className="relative flex-1 sm:w-72">
-                        <Search className="absolute left-4 top-3.5 w-4 h-4 text-slate-500"/>
+                    <div className="relative flex-1 sm:w-80">
+                        <Search className="absolute left-4 top-3.5 w-4 h-4 text-slate-400"/>
                         <input 
                             type="text" 
                             placeholder="Buscar parceiro..." 
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
-                            className="w-full pl-11 pr-4 py-3 bg-white/5 border border-[#333] rounded-xl text-sm text-white outline-none focus:border-amber-500/50 transition-all"
+                            className="w-full pl-11 pr-4 py-3.5 bg-white dark:bg-white/5 border border-slate-200 dark:border-[#333] rounded-2xl text-sm text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 transition-all shadow-sm"
                         />
                     </div>
-                    <button className="px-6 py-3 bg-white text-black rounded-xl font-bold text-[11px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-amber-500 transition-all">
-                        <Plus className="w-4 h-4"/> Novo Cliente
+                    <button className="px-8 py-3.5 bg-white dark:bg-white text-black dark:text-black rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-amber-500 transition-all shadow-soft active:scale-95">
+                        <Plus className="w-4 h-4"/> NOVO CLIENTE
                     </button>
                 </div>
             </div>
@@ -71,52 +68,55 @@ export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [], org
             {isLoading ? (
                 <div className="flex-1 flex flex-col items-center justify-center gap-4 text-slate-400">
                     <Loader2 className="w-10 h-10 animate-spin text-amber-500"/>
-                    <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#A1A1AA]">Sincronizando Relacionamentos...</span>
+                    <span className="text-[10px] font-black uppercase tracking-[0.3em]">Sincronizando Ativos...</span>
                 </div>
             ) : filteredClients.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-center p-16 border border-dashed border-[#333] rounded-2xl">
-                    <Building2 className="w-12 h-12 text-slate-800 mb-4"/>
-                    <h3 className="text-lg font-bold text-slate-500">Nenhum parceiro associado.</h3>
+                <div className="flex-1 flex flex-col items-center justify-center text-center p-20 border-2 border-dashed border-slate-200 dark:border-[#333] rounded-[3rem]">
+                    <Building2 className="w-16 h-16 text-slate-200 dark:text-slate-800 mb-4"/>
+                    <h3 className="text-xl font-black text-slate-400">Nenhum parceiro no portfólio.</h3>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-20">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 pb-24">
                     {filteredClients.map(client => (
-                        <div key={client.id} className="glass-card p-8 rounded-2xl border border-[#333] flex flex-col justify-between h-96 transition-all group">
+                        <div key={client.id} className="glass-card p-10 rounded-[2.5rem] flex flex-col justify-between h-[420px] transition-all group relative overflow-hidden">
+                            {/* Decorative Background Blob */}
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full -mr-16 -mt-16 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                            
                             <div>
-                                <div className="flex justify-between items-start mb-8">
-                                    <div className="w-16 h-16 rounded-2xl bg-white/5 border border-[#333] overflow-hidden flex items-center justify-center">
-                                        {client.logo_url ? <img src={client.logo_url} className="w-full h-full object-cover"/> : <Building2 className="w-8 h-8 text-slate-700"/>}
+                                <div className="flex justify-between items-start mb-10">
+                                    <div className="w-20 h-20 rounded-[1.5rem] bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-[#333] overflow-hidden flex items-center justify-center group-hover:border-amber-500/50 transition-colors shadow-inner">
+                                        {client.logo_url ? <img src={client.logo_url} className="w-full h-full object-cover"/> : <Building2 className="w-10 h-10 text-slate-300 dark:text-slate-700"/>}
                                     </div>
                                     <div className="flex flex-col items-end gap-2">
-                                        <div className={`px-3 py-1 rounded-full text-[8px] font-bold uppercase tracking-widest border ${onlineUsers.includes(client.id) ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-white/5 text-[#A1A1AA] border-[#333]'}`}>
+                                        <div className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border transition-colors ${onlineUsers.includes(client.id) ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-slate-100 dark:bg-white/5 text-slate-400 border-slate-200 dark:border-[#333]'}`}>
                                             {onlineUsers.includes(client.id) ? 'Online' : 'Offline'}
                                         </div>
                                     </div>
                                 </div>
 
-                                <h3 className="text-2xl font-bold text-white group-hover:text-amber-500 transition-colors leading-tight tracking-tight truncate">{client.nome}</h3>
-                                <div className="text-[11px] font-medium text-[#A1A1AA] mt-1 truncate">{client.email}</div>
+                                <h3 className="text-2xl font-black text-slate-900 dark:text-white group-hover:text-amber-500 transition-colors leading-none tracking-tighter truncate">{client.nome}</h3>
+                                <div className="text-[11px] font-bold text-slate-400 dark:text-[#A1A1AA] mt-2 truncate">{client.email}</div>
 
-                                <div className="flex gap-3 mt-6">
-                                    <div className="text-[9px] font-bold text-[#A1A1AA] uppercase tracking-widest px-2.5 py-1 rounded-lg border border-[#333]">
-                                        {client.status || 'Ativo'}
+                                <div className="flex gap-2 mt-8">
+                                    <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest px-3 py-1.5 rounded-xl border border-slate-200 dark:border-[#333] bg-slate-50 dark:bg-transparent">
+                                        {client.status?.toUpperCase() || 'ATIVO'}
                                     </div>
-                                    <div className="text-[9px] font-bold text-[#A1A1AA] uppercase tracking-widest px-2.5 py-1 rounded-lg border border-[#333]">
-                                        {client.numcolaboradores || 1} Time
+                                    <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest px-3 py-1.5 rounded-xl border border-slate-200 dark:border-[#333] bg-slate-50 dark:bg-transparent">
+                                        {client.numcolaboradores || 1} TIME
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="pt-6 mt-6 border-t border-[#333] flex items-center justify-between">
-                                <div>
-                                    <div className="text-[9px] font-bold text-[#A1A1AA] uppercase tracking-wider mb-1">Fee Operacional</div>
-                                    <div className="text-2xl font-bold text-white tracking-tight">
-                                        <span className="text-xs mr-1 text-[#A1A1AA]">R$</span>
+                            <div className="pt-8 mt-8 border-t border-slate-100 dark:border-white/5 flex items-end justify-between relative z-10">
+                                <div className="space-y-1">
+                                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">FEE OPERACIONAL</div>
+                                    <div className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">
+                                        <span className="text-sm mr-1.5 text-slate-300 font-bold">R$</span>
                                         {client.valormensal?.toLocaleString('pt-BR', {minimumFractionDigits: 0})}
                                     </div>
                                 </div>
-                                <button className="w-12 h-12 rounded-xl border border-[#333] hover:bg-white hover:text-black flex items-center justify-center transition-all">
-                                    <ArrowUpRight className="w-6 h-6"/>
+                                <button className="w-14 h-14 rounded-2xl border border-slate-200 dark:border-[#333] hover:bg-slate-900 dark:hover:bg-white hover:text-white dark:hover:text-black flex items-center justify-center transition-all group/btn shadow-soft">
+                                    <ArrowUpRight className="w-7 h-7 group-hover/btn:translate-x-0.5 group-hover/btn:-translate-y-0.5 transition-transform"/>
                                 </button>
                             </div>
                         </div>
