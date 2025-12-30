@@ -46,11 +46,9 @@ export const SettingsScreen: React.FC<Props> = ({
   const [activeTab, setActiveTab] = useState<'general' | 'modules' | 'team' | 'ai'>(initialTab);
   const [roles, setRoles] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
-  const [newRoleName, setNewRoleName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [processingModule, setProcessingModule] = useState<string | null>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
-  
-  const [newOrgData, setNewOrgData] = useState({ name: '', sector: '', dna: '' });
 
   const [editOrg, setEditOrg] = useState({
       name: orgDetails?.name || '',
@@ -92,6 +90,59 @@ export const SettingsScreen: React.FC<Props> = ({
     setMembers(m);
   };
 
+  const handleModuleAction = async (modId: string, isOwned: boolean, price: number, label: string) => {
+    if (!userOrgId || !isAdmin) {
+        if (!isAdmin) alert("Apenas proprietários podem gerenciar módulos.");
+        return;
+    }
+    
+    if (isOwned) {
+        // Opcionalmente: Permitir desativar para limpar a interface
+        if (confirm(`Deseja desativar o módulo ${label}?`)) {
+            setProcessingModule(modId);
+            try {
+                const newModules = activeModules.filter(id => id !== modId);
+                await updateOrgModules(userOrgId, newModules);
+                onRefreshModules();
+            } finally {
+                setProcessingModule(null);
+            }
+        }
+        return;
+    }
+
+    if (price === 0) {
+        // Ativação instantânea de módulo gratuito
+        setProcessingModule(modId);
+        try {
+            const newModules = [...activeModules, modId];
+            await updateOrgModules(userOrgId, newModules);
+            onRefreshModules();
+        } catch (e) {
+            alert("Erro ao ativar módulo.");
+        } finally {
+            setProcessingModule(null);
+        }
+    } else {
+        // Fluxo de contratação
+        if (confirm(`Deseja contratar o módulo ${label} por R$ ${price.toFixed(2)}/mês?`)) {
+            setProcessingModule(modId);
+            try {
+                // Em um cenário real, isso redirecionaria para o checkout do Stripe ou Asaas
+                // Aqui, simulamos a ativação bem-sucedida após "pagamento"
+                const newModules = [...activeModules, modId];
+                await updateOrgModules(userOrgId, newModules);
+                onRefreshModules();
+                alert(`Módulo ${label} contratado com sucesso!`);
+            } catch (e) {
+                alert("Erro no processamento da contratação.");
+            } finally {
+                setProcessingModule(null);
+            }
+        }
+    }
+  };
+
   const handleSaveOrgProfile = async () => {
       setIsSaving(true);
       try {
@@ -104,11 +155,6 @@ export const SettingsScreen: React.FC<Props> = ({
       } finally {
           setIsSaving(false);
       }
-  };
-
-  const handleUpdateMemberRole = async (userId: string, roleId: string) => {
-      await updateUserRole(userId, roleId === "" ? null : Number(roleId));
-      loadTeamData();
   };
 
   const handleSaveAiConfig = async () => {
@@ -133,13 +179,13 @@ export const SettingsScreen: React.FC<Props> = ({
                     Ajustes <span className="text-orange-500">Mestres</span>.
                 </h1>
             </div>
-            <button className="px-8 py-4 bg-white border border-slate-200 dark:border-white/10 rounded-[1.5rem] flex items-center gap-3 text-[11px] font-black uppercase tracking-widest text-slate-900 dark:text-white transition-all shadow-soft hover:bg-slate-50">
+            <button onClick={() => setView('profile')} className="px-8 py-4 bg-white border border-slate-200 dark:border-white/10 rounded-[1.5rem] flex items-center gap-3 text-[11px] font-black uppercase tracking-widest text-slate-900 dark:text-white transition-all shadow-soft hover:bg-slate-50 active:scale-95">
                 <Receipt className="w-4.5 h-4.5 text-orange-500"/> GERENCIAR ASSINATURA
             </button>
         </div>
 
-        {/* Tab Switcher - Match screenshot style */}
-        <div className="flex bg-white dark:bg-white/5 p-1.5 rounded-[2rem] border border-slate-100 dark:border-white/5 w-fit shadow-soft">
+        {/* Tab Switcher */}
+        <div className="flex bg-white dark:bg-white/5 p-1.5 rounded-[2rem] border border-slate-100 dark:border-white/5 w-fit shadow-soft overflow-x-auto no-scrollbar max-w-full">
             {[
                 { id: 'general', label: 'GERAL', icon: Monitor },
                 { id: 'modules', label: 'MARKETPLACE', icon: ShoppingCart },
@@ -149,7 +195,7 @@ export const SettingsScreen: React.FC<Props> = ({
                 <button 
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id as any)}
-                    className={`flex items-center gap-3 px-8 py-3.5 rounded-[1.5rem] text-[11px] font-black uppercase tracking-widest transition-all duration-300 ${activeTab === tab.id ? 'bg-orange-500 text-white shadow-xl scale-105' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
+                    className={`flex items-center gap-3 px-8 py-3.5 rounded-[1.5rem] text-[11px] font-black uppercase tracking-widest transition-all duration-300 whitespace-nowrap ${activeTab === tab.id ? 'bg-orange-500 text-white shadow-xl scale-105' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
                 >
                     {tab.label}
                 </button>
@@ -159,16 +205,23 @@ export const SettingsScreen: React.FC<Props> = ({
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto custom-scrollbar pb-24">
             
-            {/* TAB: MARKETPLACE - VISUAL MATCH WITH SCREENSHOT */}
+            {/* TAB: MARKETPLACE */}
             {activeTab === 'modules' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-4 duration-500">
                     {AVAILABLE_MODULES.map(mod => {
                         const isOwned = activeModules.includes(mod.id);
+                        const isProcessing = processingModule === mod.id;
+                        
                         return (
-                            <div key={mod.id} className="group relative p-10 bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-[2rem] transition-all duration-500 flex flex-col justify-between h-72 hover:border-orange-500/30 hover:shadow-xl shadow-soft">
+                            <button 
+                                key={mod.id} 
+                                onClick={() => handleModuleAction(mod.id, isOwned, mod.price, mod.label)}
+                                disabled={isProcessing}
+                                className={`group relative p-10 bg-white dark:bg-white/5 border rounded-[2rem] transition-all duration-500 flex flex-col justify-between h-80 text-left hover:shadow-xl shadow-soft ${isOwned ? 'border-orange-500/20' : 'border-slate-100 dark:border-white/10 hover:border-orange-500/30'} ${isProcessing ? 'opacity-70 cursor-wait' : ''}`}
+                            >
                                 <div className="flex justify-between items-start">
-                                    <div className={`p-4 rounded-[1.2rem] ${mod.bg} ${mod.color} border border-white/10 shadow-sm`}>
-                                        <mod.icon className="w-6 h-6"/>
+                                    <div className={`p-4 rounded-[1.2rem] ${mod.bg} ${mod.color} border border-white/10 shadow-sm transition-transform group-hover:scale-110`}>
+                                        {isProcessing ? <Loader2 className="w-6 h-6 animate-spin"/> : <mod.icon className="w-6 h-6"/>}
                                     </div>
                                     <div className="flex flex-col items-end gap-2">
                                         {isOwned ? (
@@ -184,21 +237,22 @@ export const SettingsScreen: React.FC<Props> = ({
                                     <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">{mod.desc}</p>
                                 </div>
 
-                                {!isOwned && (
-                                    <button className="mt-4 flex items-center justify-between group/btn pt-4 border-t border-slate-50 dark:border-white/5">
-                                        <span className="text-lg font-black text-slate-900 dark:text-white">R$ {mod.price.toFixed(2)}<span className="text-[10px] text-slate-500">/mês</span></span>
-                                        <div className="w-10 h-10 rounded-full bg-slate-900 dark:bg-white text-white dark:text-black flex items-center justify-center group-hover/btn:bg-orange-500 group-hover/btn:text-white transition-colors">
-                                            <ChevronRight className="w-6 h-6"/>
-                                        </div>
-                                    </button>
-                                )}
-                            </div>
+                                <div className="mt-4 flex items-center justify-between group/btn pt-4 border-t border-slate-50 dark:border-white/5 w-full">
+                                    <span className="text-lg font-black text-slate-900 dark:text-white">
+                                        {mod.price === 0 ? 'GRATUITO' : `R$ ${mod.price.toFixed(2)}`}
+                                        {mod.price > 0 && <span className="text-[10px] text-slate-500 ml-1">/mês</span>}
+                                    </span>
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${isOwned ? 'bg-emerald-500 text-white' : 'bg-slate-900 dark:bg-white text-white dark:text-black group-hover:bg-orange-500 group-hover:text-white'}`}>
+                                        {isOwned ? <Check className="w-5 h-5 stroke-[3px]"/> : <ChevronRight className="w-6 h-6"/>}
+                                    </div>
+                                </div>
+                            </button>
                         );
                     })}
                 </div>
             )}
 
-            {/* Other tabs maintained as standard shinko style */}
+            {/* TAB: GERAL */}
             {activeTab === 'general' && (
                 <div className="max-w-4xl space-y-16 animate-in slide-in-from-left-4">
                     <div className="space-y-6">
@@ -281,7 +335,7 @@ export const SettingsScreen: React.FC<Props> = ({
                 </div>
             )}
 
-            {/* Other tabs: Time and AI */}
+            {/* TAB: TIME */}
             {activeTab === 'team' && (
                 <div className="space-y-12 animate-in fade-in duration-500">
                     <div className="flex justify-between items-center">
@@ -311,6 +365,7 @@ export const SettingsScreen: React.FC<Props> = ({
                 </div>
             )}
 
+            {/* TAB: INTELIGÊNCIA */}
             {activeTab === 'ai' && (
                 <div className="max-w-4xl space-y-12 animate-in slide-in-from-bottom-4 duration-500">
                     <div className="flex items-center gap-6 p-10 bg-purple-50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-900/20 rounded-[3rem] shadow-soft">

@@ -211,13 +211,9 @@ const App: React.FC = () => {
                         aiSector: orgData.setor || '', aiTone: orgData.tomdevoz || '', aiContext: orgData.dna || ''
                     });
 
-                    // ACESSO TOTAL APENAS PARA ORGANIZAÇÃO 3 (SHINKO) OU EMAIL MESTRE PRINCIPAL
-                    if (data.organizacao === 3 || data.email === 'peboorba@gmail.com') {
-                        setActiveModules(SYSTEM_MODULES_DEF);
-                    } else {
-                        const modules = await fetchActiveOrgModules(data.organizacao);
-                        setActiveModules(modules.length > 0 ? modules : getPlanDefaultModules(orgData.plano || 4));
-                    }
+                    // BUSCA MÓDULOS REAIS
+                    const modules = await fetchActiveOrgModules(data.organizacao);
+                    setActiveModules(modules.length > 0 ? modules : getPlanDefaultModules(orgData.plano || 4));
                   }
                   
                   const clientId = currentRole === 'cliente' ? data.id : undefined;
@@ -332,7 +328,7 @@ const App: React.FC = () => {
                         {view === 'financial' && <FinancialPage orgType={orgDetails.name} />}
                         {view === 'clients' && <ClientsPage userRole={userRole} onlineUsers={onlineUsers} organizationId={userOrgId || undefined} onOpenProject={onOpenProject} />}
                         {view === 'intelligence' && <IntelligencePage organizationId={userOrgId || undefined} opportunities={opportunities} />}
-                        {view === 'settings' && <SettingsPage theme={theme} onToggleTheme={toggleTheme} onlineUsers={onlineUsers} userOrgId={userOrgId} orgDetails={orgDetails} onUpdateOrgDetails={() => {}} setView={setView} userRole={userRole} userData={userData} activeModules={activeModules} onRefreshModules={() => {}} />}
+                        {view === 'settings' && <SettingsPage theme={theme} onToggleTheme={toggleTheme} onlineUsers={onlineUsers} userOrgId={userOrgId} orgDetails={orgDetails} onUpdateOrgDetails={() => {}} setView={setView} userRole={userRole} userData={userData} activeModules={activeModules} onRefreshModules={() => loadUserData(user.id)} />}
                         {view === 'profile' && <ProfilePage currentPlan={currentPlan} onRefresh={() => loadUserData(user.id)} />}
                         {view === 'admin-manager' && (userData?.email === 'peboorba@gmail.com') && <AdminPage onlineUsers={onlineUsers} />}
                     </>
