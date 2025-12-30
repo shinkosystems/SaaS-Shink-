@@ -102,20 +102,21 @@ export const SettingsScreen: React.FC<Props> = ({
         return;
     }
 
+    // Prevenção contra cliques múltiplos rápidos
+    if (processingModule) return;
+
     setProcessingModule(modId);
 
     try {
         let newModulesList: string[] = [];
         
         if (currentStatus) {
-            // Fluxo de Desativação
             if (confirm(`Deseja desativar o módulo "${label}"? Esta ação removerá o acesso imediato de toda a equipe.`)) {
                 newModulesList = activeModules.filter(id => id !== modId);
                 await updateOrgModules(userOrgId, newModulesList);
-                onRefreshModules(); // Recarrega dados no App.tsx
+                onRefreshModules(); 
             }
         } else {
-            // Fluxo de Ativação
             if (price > 0) {
                 if (!confirm(`Este é um módulo Premium (R$ ${price.toFixed(2)}/mês). Deseja confirmar a ativação e inclusão no seu próximo ciclo de fatura?`)) {
                     setProcessingModule(null);
@@ -125,12 +126,13 @@ export const SettingsScreen: React.FC<Props> = ({
             
             newModulesList = [...activeModules, modId];
             await updateOrgModules(userOrgId, newModulesList);
-            onRefreshModules(); // Recarrega dados no App.tsx
+            onRefreshModules(); 
         }
     } catch (e: any) {
         console.error("Erro Crítico ao alternar módulo:", e);
-        alert(`Falha técnica na sincronização: ${e.message || 'Erro desconhecido'}. Verifique se o módulo existe no banco.`);
+        alert(`Falha técnica na sincronização: ${e.message || 'Erro desconhecido'}.`);
     } finally {
+        // Garantir que o estado de processamento seja limpo mesmo em erro
         setProcessingModule(null);
     }
   };
@@ -197,7 +199,7 @@ export const SettingsScreen: React.FC<Props> = ({
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto custom-scrollbar pb-24">
             
-            {/* TAB: MARKETPLACE - LIST VIEW WITH SWITCH */}
+            {/* TAB: MARKETPLACE */}
             {activeTab === 'modules' && (
                 <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-500">
                     <div className="bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-[2.5rem] overflow-hidden shadow-soft">
@@ -249,7 +251,7 @@ export const SettingsScreen: React.FC<Props> = ({
                                                 <ElasticSwitch 
                                                     checked={isOwned} 
                                                     onChange={() => handleToggleModule(mod.id, isOwned, mod.price, mod.label)}
-                                                    disabled={isProcessing}
+                                                    disabled={!!processingModule}
                                                 />
                                             </div>
                                         </div>

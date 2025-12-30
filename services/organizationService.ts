@@ -190,20 +190,21 @@ export const updateOrgDetails = async (orgId: number, updates: any) => {
 export const seedSystemModules = async () => {
     try {
         const { data: existing } = await supabase.from('modulos').select('nome');
-        const existingNames = new Set(existing?.map(m => m.nome) || []);
-        const toInsert = SYSTEM_MODULES_DEF.filter(key => !existingNames.has(key)).map(key => ({ nome: key }));
+        const existingNames = new Set(existing?.map(m => m.nome.toLowerCase()) || []);
+        const toInsert = SYSTEM_MODULES_DEF.filter(key => !existingNames.has(key.toLowerCase())).map(key => ({ nome: key }));
         if (toInsert.length > 0) await supabase.from('modulos').insert(toInsert);
     } catch (e) {
-        console.warn("Seeding modules ignored or failed (likely permission related).");
+        console.warn("Seeding modules failed - ignore if not admin.");
     }
 };
 
 export const fetchSystemModuleMap = async (): Promise<Record<string, number>> => {
-    await seedSystemModules();
-    const { data } = await supabase.from('modulos').select('id, nome');
-    if (!data) return {};
+    const { data, error } = await supabase.from('modulos').select('id, nome');
+    if (error || !data) return {};
     const map: Record<string, number> = {};
-    data.forEach(m => { if (m.nome) map[m.nome] = m.id; });
+    data.forEach(m => { 
+        if (m.nome) map[m.nome.toLowerCase()] = m.id; 
+    });
     return map;
 };
 
@@ -213,7 +214,6 @@ export const fetchActiveOrgModules = async (orgId: number): Promise<string[]> =>
         if (error) return []; 
         const modules = data.map((item: any) => item.modulo?.nome).filter(Boolean);
         
-        // Fallback para planos se não houver registros manuais
         if (modules.length === 0) {
              const { data: org } = await supabase.from(ORG_TABLE).select('plano').eq('id', orgId).single();
              if (org?.plano) return getPlanDefaultModules(org.plano);
@@ -225,12 +225,18 @@ export const fetchActiveOrgModules = async (orgId: number): Promise<string[]> =>
 
 export const updateOrgModules = async (orgId: number, moduleKeys: string[]) => {
     try {
-        // Obter mapa de módulos existentes
         const moduleMap = await fetchSystemModuleMap();
         
-        // Converter chaves de string para IDs do banco
+        if (Object.keys(moduleMap).length === 0) {
+            throw new Error("Não foi possível carregar a lista de módulos do sistema. Verifique a tabela 'modulos'.");
+        }
+
         const idsToInsert = moduleKeys
-            .map(k => moduleMap[k])
+            .map(k => {
+                const id = moduleMap[k.toLowerCase()];
+                if (!id) console.warn(`Módulo não encontrado no banco: ${k}`);
+                return id;
+            })
             .filter(id => id !== undefined && id !== null) as number[];
         
         return updateOrgModulesByIds(orgId, idsToInsert);
@@ -242,11 +248,9 @@ export const updateOrgModules = async (orgId: number, moduleKeys: string[]) => {
 
 export const updateOrgModulesByIds = async (orgId: number, moduleIds: number[]) => {
     try {
-        // 1. Remover módulos atuais
         const { error: deleteError } = await supabase.from('organizacao_modulo').delete().eq('organizacao', orgId);
         if (deleteError) throw deleteError;
 
-        // 2. Inserir novos módulos selecionados
         if (moduleIds.length > 0) {
             const payload = moduleIds.map(modId => ({ 
                 organizacao: orgId, 
