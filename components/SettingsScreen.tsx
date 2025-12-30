@@ -5,10 +5,11 @@ import {
     Briefcase, Plus, Trash2, Check, User, BrainCircuit, Sparkles, BookOpen, 
     Fingerprint, Loader2, AlertTriangle, Lock, Copy, CheckCircle, LayoutGrid, 
     DollarSign, Code2, BarChart3, Calendar, TrendingUp, ShieldCheck, ShoppingCart, 
-    CreditCard, ExternalLink, Receipt, X, Image as ImageIcon, FileText, ArrowRight, ChevronRight,
+    Receipt, X, Image as ImageIcon, FileText, ArrowRight, ChevronRight,
     UserPlus, Mail, Shield, Zap, Rocket, Building, MonitorSmartphone, Activity
 } from 'lucide-react';
 import { fetchRoles, createRole, deleteRole, fetchOrganizationMembersWithRoles, updateUserRole, updateOrgModules, createOrganization, SYSTEM_MODULES_DEF } from '../services/organizationService';
+import { ElasticSwitch } from './ElasticSwitch';
 import { supabase } from '../services/supabaseClient';
 
 interface Props {
@@ -28,16 +29,16 @@ interface Props {
 }
 
 const AVAILABLE_MODULES = [
-    { id: 'projects', label: 'Gestão de Projetos', desc: 'Portfólio e lista.', icon: Briefcase, price: 0, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-    { id: 'kanban', label: 'Kanban Board', desc: 'Gestão visual de tarefas.', icon: LayoutGrid, price: 0, color: 'text-blue-500', bg: 'bg-blue-50' },
-    { id: 'calendar', label: 'Agenda & Prazos', desc: 'Visualização mensal/semanal.', icon: Calendar, price: 0, color: 'text-teal-500', bg: 'bg-teal-50' },
-    { id: 'assets', label: 'Gestão de Ativos', desc: 'Infraestrutura e performance.', icon: MonitorSmartphone, price: 29.90, color: 'text-indigo-500', bg: 'bg-indigo-50' }, 
-    { id: 'crm', label: 'Vendas CRM', desc: 'Pipeline e contratos.', icon: TrendingUp, price: 49.90, color: 'text-orange-500', bg: 'bg-orange-50' }, 
-    { id: 'financial', label: 'Finanças & MRR', desc: 'Fluxo de caixa e recorrência.', icon: DollarSign, price: 39.90, color: 'text-emerald-600', bg: 'bg-emerald-50' }, 
-    { id: 'ia', label: 'Inteligência (Guru)', desc: 'Seu CTO Virtual (IA).', icon: BrainCircuit, price: 59.90, color: 'text-purple-500', bg: 'bg-purple-50' },
-    { id: 'engineering', label: 'Engenharia (DORA)', desc: 'Métricas de performance.', icon: Code2, price: 69.90, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { id: 'product', label: 'Métricas de Produto', desc: 'Analytics e engajamento.', icon: BarChart3, price: 69.90, color: 'text-pink-500', bg: 'bg-pink-50' },
-    { id: 'clients', label: 'Stakeholders', desc: 'Portal externo do cliente.', icon: Users, price: 39.90, color: 'text-amber-600', bg: 'bg-amber-50' },
+    { id: 'projects', label: 'Gestão de Projetos', desc: 'Portfólio e lista de ativos estratégicos.', icon: Briefcase, price: 0, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+    { id: 'kanban', label: 'Kanban Board', desc: 'Gestão visual de tarefas e fluxos técnicos.', icon: LayoutGrid, price: 0, color: 'text-blue-500', bg: 'bg-blue-50' },
+    { id: 'calendar', label: 'Agenda & Prazos', desc: 'Visualização cronológica de marcos e entregas.', icon: Calendar, price: 0, color: 'text-teal-500', bg: 'bg-teal-50' },
+    { id: 'assets', label: 'Gestão de Ativos', desc: 'Monitoramento de infraestrutura e performance.', icon: MonitorSmartphone, price: 29.90, color: 'text-indigo-500', bg: 'bg-indigo-50' }, 
+    { id: 'crm', label: 'Vendas CRM', desc: 'Pipeline comercial e gestão de contratos.', icon: TrendingUp, price: 49.90, color: 'text-orange-500', bg: 'bg-orange-50' }, 
+    { id: 'financial', label: 'Finanças & MRR', desc: 'Fluxo de caixa, DRE e métricas de recorrência.', icon: DollarSign, price: 39.90, color: 'text-emerald-600', bg: 'bg-emerald-50' }, 
+    { id: 'ia', label: 'Inteligência (Guru)', desc: 'Assistente COO/CTO Virtual via IA Generativa.', icon: BrainCircuit, price: 59.90, color: 'text-purple-500', bg: 'bg-purple-50' },
+    { id: 'engineering', label: 'Engenharia (DORA)', desc: 'Métricas de elite para times de desenvolvimento.', icon: Code2, price: 69.90, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { id: 'product', label: 'Métricas de Produto', desc: 'Analytics comportamental e taxas de adoção.', icon: BarChart3, price: 69.90, color: 'text-pink-500', bg: 'bg-pink-50' },
+    { id: 'clients', label: 'Stakeholders', desc: 'Portal externo para transparência com clientes.', icon: Users, price: 39.90, color: 'text-amber-600', bg: 'bg-amber-50' },
 ];
 
 export const SettingsScreen: React.FC<Props> = ({ 
@@ -90,56 +91,39 @@ export const SettingsScreen: React.FC<Props> = ({
     setMembers(m);
   };
 
-  const handleModuleAction = async (modId: string, isOwned: boolean, price: number, label: string) => {
+  const handleToggleModule = async (modId: string, currentStatus: boolean, price: number, label: string) => {
     if (!userOrgId || !isAdmin) {
         if (!isAdmin) alert("Apenas proprietários podem gerenciar módulos.");
         return;
     }
-    
-    if (isOwned) {
-        // Opcionalmente: Permitir desativar para limpar a interface
-        if (confirm(`Deseja desativar o módulo ${label}?`)) {
-            setProcessingModule(modId);
-            try {
+
+    setProcessingModule(modId);
+
+    try {
+        if (currentStatus) {
+            // Desativar
+            if (confirm(`Deseja desativar o módulo ${label}?`)) {
                 const newModules = activeModules.filter(id => id !== modId);
                 await updateOrgModules(userOrgId, newModules);
                 onRefreshModules();
-            } finally {
-                setProcessingModule(null);
             }
-        }
-        return;
-    }
-
-    if (price === 0) {
-        // Ativação instantânea de módulo gratuito
-        setProcessingModule(modId);
-        try {
+        } else {
+            // Ativar
+            if (price > 0) {
+                if (!confirm(`Este é um módulo pago (R$ ${price.toFixed(2)}/mês). Deseja confirmar a ativação e cobrança?`)) {
+                    setProcessingModule(null);
+                    return;
+                }
+            }
             const newModules = [...activeModules, modId];
             await updateOrgModules(userOrgId, newModules);
             onRefreshModules();
-        } catch (e) {
-            alert("Erro ao ativar módulo.");
-        } finally {
-            setProcessingModule(null);
         }
-    } else {
-        // Fluxo de contratação
-        if (confirm(`Deseja contratar o módulo ${label} por R$ ${price.toFixed(2)}/mês?`)) {
-            setProcessingModule(modId);
-            try {
-                // Em um cenário real, isso redirecionaria para o checkout do Stripe ou Asaas
-                // Aqui, simulamos a ativação bem-sucedida após "pagamento"
-                const newModules = [...activeModules, modId];
-                await updateOrgModules(userOrgId, newModules);
-                onRefreshModules();
-                alert(`Módulo ${label} contratado com sucesso!`);
-            } catch (e) {
-                alert("Erro no processamento da contratação.");
-            } finally {
-                setProcessingModule(null);
-            }
-        }
+    } catch (e) {
+        console.error("Erro ao alternar módulo:", e);
+        alert("Falha técnica ao sincronizar módulo. Verifique sua conexão.");
+    } finally {
+        setProcessingModule(null);
     }
   };
 
@@ -205,50 +189,77 @@ export const SettingsScreen: React.FC<Props> = ({
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto custom-scrollbar pb-24">
             
-            {/* TAB: MARKETPLACE */}
+            {/* TAB: MARKETPLACE - LIST VIEW WITH SWITCH */}
             {activeTab === 'modules' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-4 duration-500">
-                    {AVAILABLE_MODULES.map(mod => {
-                        const isOwned = activeModules.includes(mod.id);
-                        const isProcessing = processingModule === mod.id;
-                        
-                        return (
-                            <button 
-                                key={mod.id} 
-                                onClick={() => handleModuleAction(mod.id, isOwned, mod.price, mod.label)}
-                                disabled={isProcessing}
-                                className={`group relative p-10 bg-white dark:bg-white/5 border rounded-[2rem] transition-all duration-500 flex flex-col justify-between h-80 text-left hover:shadow-xl shadow-soft ${isOwned ? 'border-orange-500/20' : 'border-slate-100 dark:border-white/10 hover:border-orange-500/30'} ${isProcessing ? 'opacity-70 cursor-wait' : ''}`}
-                            >
-                                <div className="flex justify-between items-start">
-                                    <div className={`p-4 rounded-[1.2rem] ${mod.bg} ${mod.color} border border-white/10 shadow-sm transition-transform group-hover:scale-110`}>
-                                        {isProcessing ? <Loader2 className="w-6 h-6 animate-spin"/> : <mod.icon className="w-6 h-6"/>}
-                                    </div>
-                                    <div className="flex flex-col items-end gap-2">
-                                        {isOwned ? (
-                                            <span className="px-3 py-1 rounded-lg bg-emerald-50 text-emerald-600 text-[9px] font-black uppercase tracking-widest border border-emerald-100">ATIVO</span>
-                                        ) : (
-                                            <span className="px-3 py-1 rounded-lg bg-slate-50 text-slate-400 text-[9px] font-black uppercase tracking-widest border border-slate-100">DISPONÍVEL</span>
-                                        )}
-                                    </div>
+                <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-500">
+                    <div className="bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-[2.5rem] overflow-hidden shadow-soft">
+                        <div className="p-8 border-b border-slate-50 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.02]">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <h3 className="text-xl font-black text-slate-900 dark:text-white">Ativos Operacionais</h3>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Configure as funcionalidades do seu Workspace</p>
                                 </div>
+                                <span className="px-4 py-1.5 rounded-full bg-orange-50 text-orange-600 text-[9px] font-black uppercase tracking-widest border border-orange-100">
+                                    {activeModules.length} ATIVOS
+                                </span>
+                            </div>
+                        </div>
 
-                                <div className="space-y-1">
-                                    <h3 className="text-xl font-black text-slate-900 dark:text-white">{mod.label}</h3>
-                                    <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">{mod.desc}</p>
-                                </div>
+                        <div className="divide-y divide-slate-50 dark:divide-white/5">
+                            {AVAILABLE_MODULES.map(mod => {
+                                const isOwned = activeModules.includes(mod.id);
+                                const isProcessing = processingModule === mod.id;
+                                
+                                return (
+                                    <div key={mod.id} className="p-8 flex items-center justify-between hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-all group">
+                                        <div className="flex items-center gap-6 flex-1 min-w-0">
+                                            <div className={`p-4 rounded-2xl ${mod.bg} ${mod.color} border border-white/10 shadow-sm transition-transform group-hover:scale-105`}>
+                                                {isProcessing ? <Loader2 className="w-6 h-6 animate-spin"/> : <mod.icon className="w-6 h-6"/>}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-3">
+                                                    <h4 className="text-base font-black text-slate-900 dark:text-white">{mod.label}</h4>
+                                                    {mod.price > 0 && (
+                                                        <span className="text-[9px] font-black text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded border border-emerald-100 dark:border-emerald-500/20">PREMIUM</span>
+                                                    )}
+                                                </div>
+                                                <p className="text-[11px] text-slate-500 font-medium leading-relaxed truncate md:whitespace-normal">{mod.desc}</p>
+                                            </div>
+                                        </div>
 
-                                <div className="mt-4 flex items-center justify-between group/btn pt-4 border-t border-slate-50 dark:border-white/5 w-full">
-                                    <span className="text-lg font-black text-slate-900 dark:text-white">
-                                        {mod.price === 0 ? 'GRATUITO' : `R$ ${mod.price.toFixed(2)}`}
-                                        {mod.price > 0 && <span className="text-[10px] text-slate-500 ml-1">/mês</span>}
-                                    </span>
-                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${isOwned ? 'bg-emerald-500 text-white' : 'bg-slate-900 dark:bg-white text-white dark:text-black group-hover:bg-orange-500 group-hover:text-white'}`}>
-                                        {isOwned ? <Check className="w-5 h-5 stroke-[3px]"/> : <ChevronRight className="w-6 h-6"/>}
+                                        <div className="flex items-center gap-8 ml-6 shrink-0">
+                                            <div className="text-right hidden sm:block">
+                                                <div className="text-sm font-black text-slate-900 dark:text-white">
+                                                    {mod.price === 0 ? 'Incluso' : `R$ ${mod.price.toFixed(2)}/mês`}
+                                                </div>
+                                                <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Custo Operacional</div>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <span className={`text-[9px] font-black uppercase tracking-widest ${isOwned ? 'text-orange-500' : 'text-slate-400'}`}>
+                                                    {isOwned ? 'ATIVO' : 'OFF'}
+                                                </span>
+                                                <ElasticSwitch 
+                                                    checked={isOwned} 
+                                                    onChange={() => handleToggleModule(mod.id, isOwned, mod.price, mod.label)}
+                                                    disabled={isProcessing}
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-                            </button>
-                        );
-                    })}
+                                );
+                            })}
+                        </div>
+                    </div>
+                    
+                    <div className="p-8 bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/20 rounded-[2rem] flex items-center gap-6">
+                        <div className="p-3 bg-amber-500 rounded-2xl text-white shadow-lg"><Sparkles className="w-6 h-6"/></div>
+                        <div>
+                            <h4 className="text-sm font-black text-amber-900 dark:text-amber-400 uppercase tracking-widest">Dica Estratégica</h4>
+                            <p className="text-[11px] text-amber-700 dark:text-amber-500 font-medium leading-relaxed mt-1">
+                                Ative apenas os ativos necessários para o seu ciclo atual de inovação. Você pode alternar a qualquer momento sem custos de cancelamento.
+                            </p>
+                        </div>
+                    </div>
                 </div>
             )}
 
