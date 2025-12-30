@@ -80,9 +80,11 @@ const App: React.FC = () => {
     const saved = localStorage.getItem('shinko_theme');
     return (saved as 'light' | 'dark') || 'light';
   });
+  // Fix: use useState hook correctly instead of using the setter name as the initializer
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [showBlog, setShowBlog] = useState(false);
   const [blogPostSlug, setBlogPostSlug] = useState<string | null>(null);
+  // Fix: use useState hook correctly instead of using the setter name as the initializer
   const [orgDetails, setOrgDetails] = useState({ 
       name: '', limit: 1, logoUrl: null, primaryColor: '#F59E0B', aiSector: '', aiTone: '', aiContext: '' 
   });
@@ -208,13 +210,9 @@ const App: React.FC = () => {
                         aiSector: orgData.setor || '', aiTone: orgData.tomdevoz || '', aiContext: orgData.dna || ''
                     });
 
-                    // ACESSO TOTAL PARA ORGANIZAÇÃO 3 (SHINKO) OU EMAILS MESTRES
-                    if (data.organizacao === 3 || data.email === 'peboorba@gmail.com' || data.email === 'shinkosystems@gmail.com') {
-                        setActiveModules(SYSTEM_MODULES_DEF);
-                    } else {
-                        const modules = await fetchActiveOrgModules(data.organizacao);
-                        setActiveModules(modules.length > 0 ? modules : getPlanDefaultModules(orgData.plano || 4));
-                    }
+                    // BUSCA MÓDULOS REAIS SEM OVERRIDE HARCODED
+                    const modules = await fetchActiveOrgModules(data.organizacao);
+                    setActiveModules(modules.length > 0 ? modules : getPlanDefaultModules(orgData.plano || 4));
                   }
                   const opps = await fetchOpportunities(data.organizacao);
                   if (opps) setOpportunities(opps);

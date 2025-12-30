@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { 
     LayoutDashboard, List, Calendar, Settings,
@@ -33,9 +34,9 @@ interface Props {
 }
 
 const getMenuGroups = (userRole: string, isAdmin: boolean, activeModules: string[] = [], userEmail?: string, orgId?: number | null) => {
-    const isMaster = userEmail === 'peboorba@gmail.com' || userEmail === 'shinkosystems@gmail.com' || orgId === 3;
+    const isMaster = userEmail === 'peboorba@gmail.com';
     const isClient = userRole === 'cliente';
-    const hasModule = (key: string) => isMaster || activeModules.some(m => m.toLowerCase() === key.toLowerCase());
+    const hasModule = (key: string) => activeModules.some(m => m.toLowerCase() === key.toLowerCase());
 
     if (!isMaster && userRole !== 'dono') {
         return [
@@ -88,7 +89,7 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, activeModules: string
         { id: 'profile', label: 'Meu Perfil', icon: User },
         { id: 'settings', label: 'Ajustes', icon: Settings }
     ];
-    if (userEmail === 'peboorba@gmail.com' || userEmail === 'shinkosystems@gmail.com') systemItems.push({ id: 'admin-manager', label: 'Controle Root', icon: Shield });
+    if (userEmail === 'peboorba@gmail.com') systemItems.push({ id: 'admin-manager', label: 'Controle Root', icon: Shield });
     groups.push({ title: 'Sistema', items: systemItems });
 
     return groups;
@@ -123,7 +124,7 @@ const Logo = ({ customLogoUrl, orgName, size = 'small' }: { customLogoUrl?: stri
 };
 
 export const Sidebar: React.FC<Props> = (props) => {
-  const isMaster = props.userData.email === 'peboorba@gmail.com' || props.userData.email === 'shinkosystems@gmail.com';
+  const isMaster = props.userData.email === 'peboorba@gmail.com';
   const isAdmin = isMaster || props.userRole === 'dono'; 
   const menuGroups = getMenuGroups(props.userRole, isAdmin, props.activeModules, props.userData.email, props.organizationId);
 
@@ -199,17 +200,17 @@ export const Sidebar: React.FC<Props> = (props) => {
                     <div className="text-[11px] font-bold text-slate-900 dark:text-white truncate">{props.userData.name}</div>
                     <div className="text-[7px] font-black text-amber-500 uppercase tracking-widest">{props.currentPlan?.replace('plan_', '').toUpperCase() || 'FREE'}</div>
                 </div>
-                <button onClick={(e) => { e.stopPropagation(); props.onLogout(); }} className="p-1 text-slate-400 hover:text-red-500 transition-all">
+                <button onClick={(e) => { e.stopPropagation(); props.onLogout(); }} className="text-slate-400 hover:text-red-500 transition-all">
                     <LogOut className="w-3 h-3"/>
                 </button>
             </div>
         </div>
-    </aside>
+  </aside>
   );
 };
 
 export const MobileDrawer: React.FC<Props> = (props) => {
-    const isMaster = props.userData.email === 'peboorba@gmail.com' || props.userData.email === 'shinkosystems@gmail.com';
+    const isMaster = props.userData.email === 'peboorba@gmail.com';
     const isAdmin = isMaster || props.userRole === 'dono';
     const menuGroups = getMenuGroups(props.userRole, isAdmin, props.activeModules, props.userData.email, props.organizationId);
 

@@ -1,7 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { Opportunity } from '../types';
 import { Dashboard } from '../components/Dashboard';
 import { supabase } from '../services/supabaseClient';
+import { fetchActiveOrgModules } from '../services/organizationService';
 
 interface Props {
     opportunities: Opportunity[];
@@ -14,11 +16,24 @@ interface Props {
 
 export const DashboardPage: React.FC<Props> = ({ opportunities, onOpenProject, onNavigate, user, theme, onGuruPrompt }) => {
     const [userData, setUserData] = useState<{ name: string } | undefined>();
+    const [billingDate, setBillingDate] = useState<string | undefined>();
+    const [activeModules, setActiveModules] = useState<string[]>([]);
 
     useEffect(() => {
         if (user) {
-            supabase.from('users').select('nome').eq('id', user.id).single().then(({ data }) => {
-                if (data) setUserData({ name: data.nome });
+            // Load Basic User Info
+            supabase.from('users').select('nome, organizacao').eq('id', user.id).single().then(({ data }) => {
+                if (data) {
+                    setUserData({ name: data.nome });
+                    if (data.organizacao) {
+                        // Load Organization Billing Date
+                        supabase.from('organizacoes').select('vencimento').eq('id', data.organizacao).single().then(({ data: orgData }) => {
+                            if (orgData?.vencimento) setBillingDate(orgData.vencimento);
+                        });
+                        // Load Active Modules
+                        fetchActiveOrgModules(data.organizacao).then(setActiveModules);
+                    }
+                }
             });
         }
     }, [user]);
@@ -34,6 +49,8 @@ export const DashboardPage: React.FC<Props> = ({ opportunities, onOpenProject, o
                 userData={userData}
                 onOpenCreate={() => onNavigate('create-project')}
                 onGuruPrompt={onGuruPrompt}
+                billingDate={billingDate}
+                activeModules={activeModules}
             />
         </div>
     );

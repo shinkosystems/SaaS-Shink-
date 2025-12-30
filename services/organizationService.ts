@@ -7,7 +7,7 @@ const LOGO_BUCKET = 'fotoperfil';
 
 // System Modules Definition
 export const SYSTEM_MODULES_DEF = [
-    'projects', 'kanban', 'gantt', 'calendar', 'crm', 'financial', 'clients', 'engineering', 'product', 'ia', 'whitelabel'
+    'projects', 'kanban', 'gantt', 'calendar', 'crm', 'financial', 'clients', 'engineering', 'product', 'ia', 'whitelabel', 'assets'
 ];
 
 // Helper to determine plan string from ID
@@ -27,9 +27,6 @@ const getPlanKeyFromId = (id: number): string => {
     }
 };
 
-/**
- * Fix: Added missing getPlanDefaultModules function
- */
 export const getPlanDefaultModules = (planId: number): string[] => {
     switch (planId) {
         case 4: // Free
@@ -40,7 +37,7 @@ export const getPlanDefaultModules = (planId: number): string[] => {
             return ['projects', 'kanban', 'gantt', 'calendar', 'crm', 'financial', 'clients', 'ia'];
         case 3: // Scale
         case 9:
-            return ['projects', 'kanban', 'gantt', 'calendar', 'crm', 'financial', 'clients', 'engineering', 'product', 'ia'];
+            return ['projects', 'kanban', 'gantt', 'calendar', 'crm', 'financial', 'clients', 'engineering', 'product', 'ia', 'assets'];
         case 10: // Enterprise
             return SYSTEM_MODULES_DEF;
         default:
@@ -69,7 +66,6 @@ export const findOrgIdByOwnerEmail = async (email: string): Promise<number | nul
 
 export const createOrganization = async (userId: string, name: string, sector: string, dna?: string, userEmail?: string, userName?: string) => {
     try {
-        // 1. Criar a Organização
         const { data: org, error: orgError } = await supabase
             .from(ORG_TABLE)
             .insert({ 
@@ -86,7 +82,6 @@ export const createOrganization = async (userId: string, name: string, sector: s
         
         if (orgError) throw orgError;
 
-        // 2. Garantir que o registro do usuário exista na tabela 'users' (Upsert)
         const { error: userError } = await supabase
             .from('users')
             .upsert({ 
@@ -100,8 +95,6 @@ export const createOrganization = async (userId: string, name: string, sector: s
         
         if (userError) throw userError;
 
-        // 3. Criar automaticamente um Cliente (Stakeholder) com o nome da empresa
-        // Isso permite que o dono já comece a criar projetos associados à própria marca/internamente.
         await supabase
             .from('clientes')
             .insert({
@@ -150,7 +143,6 @@ export const uploadAvatar = async (userId: string, file: File) => {
         const { data } = supabase.storage.from(LOGO_BUCKET).getPublicUrl(fileName);
         const publicUrl = data.publicUrl;
 
-        // Atualizar a tabela de usuários com a nova URL
         const { error: updateError } = await supabase
             .from('users')
             .update({ avatar_url: publicUrl })
@@ -217,7 +209,15 @@ export const fetchActiveOrgModules = async (orgId: number): Promise<string[]> =>
     try {
         const { data, error } = await supabase.from('organizacao_modulo').select('modulo (nome)').eq('organizacao', orgId);
         if (error) return []; 
-        return data.map((item: any) => item.modulo?.nome).filter(Boolean);
+        const modules = data.map((item: any) => item.modulo?.nome).filter(Boolean);
+        
+        // Fallback para planos se não houver registros manuais
+        if (modules.length === 0) {
+             const { data: org } = await supabase.from(ORG_TABLE).select('plano').eq('id', orgId).single();
+             if (org?.plano) return getPlanDefaultModules(org.plano);
+        }
+
+        return modules;
     } catch (e) { return []; }
 };
 
@@ -243,49 +243,28 @@ export const updateOrgModulesByIds = async (orgId: number, moduleIds: number[]) 
     } catch (err: any) { throw new Error(err.message); }
 };
 
-export const contractModule = async (orgId: number, moduleKey: string) => {
-    try {
-        const moduleMap = await fetchSystemModuleMap();
-        const moduleId = moduleMap[moduleKey];
-        if (!moduleId) throw new Error("Módulo inválido.");
-        const { data: existing } = await supabase.from('organizacao_modulo').select('id').eq('organizacao', orgId).eq('modulo', moduleId).single();
-        if (existing) return { success: true, msg: "Já contratado" };
-        await supabase.from('organizacao_modulo').insert({ organizacao: orgId, modulo: moduleId });
-        return { success: true };
-    } catch (err: any) { throw new Error(err.message); }
-};
-
-/**
- * Fix: Added missing fetchRoles function
- */
 export const fetchRoles = async (orgId: number) => {
     const { data, error } = await supabase
         .from('area_atuacao')
         .select('*')
-        .eq('organizacao', orgId);
+        .eq('empresa', orgId);
     if (error) return [];
     return data.map((d: any) => ({
         id: d.id,
-        nome: d.nome || d.name || d.titulo || d.descricao || `Cargo ${d.id}`
+        nome: d.cargo || `Cargo ${d.id}`
     }));
 };
 
-/**
- * Fix: Added missing createRole function
- */
 export const createRole = async (nome: string, orgId: number) => {
     const { data, error } = await supabase
         .from('area_atuacao')
-        .insert({ nome, organizacao: orgId })
+        .insert({ cargo: nome, empresa: orgId })
         .select()
         .single();
     if (error) throw error;
     return data;
 };
 
-/**
- * Fix: Added missing deleteRole function
- */
 export const deleteRole = async (id: number) => {
     const { error } = await supabase
         .from('area_atuacao')
@@ -294,24 +273,16 @@ export const deleteRole = async (id: number) => {
     return !error;
 };
 
-/**
- * Fix: Added missing fetchOrganizationMembersWithRoles function
- */
 export const fetchOrganizationMembersWithRoles = async (orgId: number) => {
     const { data, error } = await supabase
         .from('users')
-        .select(`
-            id, nome, email, avatar_url, perfil, cargo
-        `)
+        .select(`id, nome, email, avatar_url, perfil, cargo`)
         .eq('organizacao', orgId);
     
     if (error) return [];
     return data;
 };
 
-/**
- * Fix: Added missing updateUserRole function
- */
 export const updateUserRole = async (userId: string, roleId: number | null) => {
     const { error } = await supabase
         .from('users')
@@ -320,9 +291,6 @@ export const updateUserRole = async (userId: string, roleId: number | null) => {
     return !error;
 };
 
-/**
- * Fix: Completed truncated getPublicOrgDetails function
- */
 export const getPublicOrgDetails = async (orgId: number) => {
     try {
         const { data, error } = await supabase

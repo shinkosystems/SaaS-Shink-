@@ -67,9 +67,6 @@ export const getCurrentUserPlan = async (userId: string): Promise<string> => {
         const { data: userProfile } = await supabase.from('users').select('organizacao, perfil, email').eq('id', userId).single();
         if (!userProfile) return 'plan_free';
 
-        // Override Super Admin
-        if (userProfile.email === 'peboorba@gmail.com' || userProfile.email === 'shinkosystems@gmail.com') return 'plan_enterprise';
-
         if (userProfile.organizacao) {
             const { data: orgData } = await supabase.from('organizacoes').select('plano').eq('id', userProfile.organizacao).single();
             if (orgData && orgData.plano) return mapDbPlanIdToString(orgData.plano);

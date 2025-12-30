@@ -211,7 +211,8 @@ const App: React.FC = () => {
                         aiSector: orgData.setor || '', aiTone: orgData.tomdevoz || '', aiContext: orgData.dna || ''
                     });
 
-                    if (data.organizacao === 3 || data.email === 'peboorba@gmail.com' || data.email === 'shinkosystems@gmail.com') {
+                    // ACESSO TOTAL APENAS PARA ORGANIZAÇÃO 3 (SHINKO) OU EMAIL MESTRE PRINCIPAL
+                    if (data.organizacao === 3 || data.email === 'peboorba@gmail.com') {
                         setActiveModules(SYSTEM_MODULES_DEF);
                     } else {
                         const modules = await fetchActiveOrgModules(data.organizacao);
@@ -219,7 +220,6 @@ const App: React.FC = () => {
                     }
                   }
                   
-                  // Se o usuário for cliente, passamos o seu ID como filtro de cliente
                   const clientId = currentRole === 'cliente' ? data.id : undefined;
                   const opps = await fetchOpportunities(data.organizacao, clientId);
                   if (opps) setOpportunities(opps);
@@ -334,7 +334,7 @@ const App: React.FC = () => {
                         {view === 'intelligence' && <IntelligencePage organizationId={userOrgId || undefined} opportunities={opportunities} />}
                         {view === 'settings' && <SettingsPage theme={theme} onToggleTheme={toggleTheme} onlineUsers={onlineUsers} userOrgId={userOrgId} orgDetails={orgDetails} onUpdateOrgDetails={() => {}} setView={setView} userRole={userRole} userData={userData} activeModules={activeModules} onRefreshModules={() => {}} />}
                         {view === 'profile' && <ProfilePage currentPlan={currentPlan} onRefresh={() => loadUserData(user.id)} />}
-                        {view === 'admin-manager' && (userData?.email === 'peboorba@gmail.com' || userData?.email === 'shinkosystems@gmail.com') && <AdminPage onlineUsers={onlineUsers} />}
+                        {view === 'admin-manager' && (userData?.email === 'peboorba@gmail.com') && <AdminPage onlineUsers={onlineUsers} />}
                     </>
                 )}
             </Suspense>
