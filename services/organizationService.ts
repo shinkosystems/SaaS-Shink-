@@ -193,7 +193,9 @@ export const seedSystemModules = async () => {
         const existingNames = new Set(existing?.map(m => m.nome) || []);
         const toInsert = SYSTEM_MODULES_DEF.filter(key => !existingNames.has(key)).map(key => ({ nome: key }));
         if (toInsert.length > 0) await supabase.from('modulos').insert(toInsert);
-    } catch (e) {}
+    } catch (e) {
+        console.warn("Seeding modules ignored or failed (likely permission related).");
+    }
 };
 
 export const fetchSystemModuleMap = async (): Promise<Record<string, number>> => {
@@ -223,24 +225,41 @@ export const fetchActiveOrgModules = async (orgId: number): Promise<string[]> =>
 
 export const updateOrgModules = async (orgId: number, moduleKeys: string[]) => {
     try {
-        await seedSystemModules();
-        const { data: allModules } = await supabase.from('modulos').select('id, nome');
-        if (!allModules) throw new Error("System modules not found.");
-        const moduleMap = new Map(allModules.map(m => [m.nome, m.id]));
-        const idsToInsert = moduleKeys.map(k => moduleMap.get(k)).filter(Boolean) as number[];
+        // Obter mapa de módulos existentes
+        const moduleMap = await fetchSystemModuleMap();
+        
+        // Converter chaves de string para IDs do banco
+        const idsToInsert = moduleKeys
+            .map(k => moduleMap[k])
+            .filter(id => id !== undefined && id !== null) as number[];
+        
         return updateOrgModulesByIds(orgId, idsToInsert);
-    } catch (err: any) { throw new Error(err.message); }
+    } catch (err: any) { 
+        console.error("Erro em updateOrgModules:", err.message);
+        throw new Error(err.message); 
+    }
 };
 
 export const updateOrgModulesByIds = async (orgId: number, moduleIds: number[]) => {
     try {
-        await supabase.from('organizacao_modulo').delete().eq('organizacao', orgId);
+        // 1. Remover módulos atuais
+        const { error: deleteError } = await supabase.from('organizacao_modulo').delete().eq('organizacao', orgId);
+        if (deleteError) throw deleteError;
+
+        // 2. Inserir novos módulos selecionados
         if (moduleIds.length > 0) {
-            const payload = moduleIds.map(modId => ({ organizacao: orgId, modulo: modId }));
-            await supabase.from('organizacao_modulo').insert(payload);
+            const payload = moduleIds.map(modId => ({ 
+                organizacao: orgId, 
+                modulo: modId 
+            }));
+            const { error: insertError } = await supabase.from('organizacao_modulo').insert(payload);
+            if (insertError) throw insertError;
         }
         return { success: true };
-    } catch (err: any) { throw new Error(err.message); }
+    } catch (err: any) { 
+        console.error("Erro em updateOrgModulesByIds:", err.message);
+        throw new Error(err.message); 
+    }
 };
 
 export const fetchRoles = async (orgId: number) => {

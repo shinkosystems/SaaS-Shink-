@@ -92,36 +92,44 @@ export const SettingsScreen: React.FC<Props> = ({
   };
 
   const handleToggleModule = async (modId: string, currentStatus: boolean, price: number, label: string) => {
-    if (!userOrgId || !isAdmin) {
-        if (!isAdmin) alert("Apenas proprietários podem gerenciar módulos.");
+    if (!userOrgId) {
+        alert("Sua organização não foi identificada corretamente. Tente recarregar a página.");
+        return;
+    }
+    
+    if (!isAdmin) {
+        alert("Apenas proprietários podem gerenciar módulos e ativos operacionais.");
         return;
     }
 
     setProcessingModule(modId);
 
     try {
+        let newModulesList: string[] = [];
+        
         if (currentStatus) {
-            // Desativar
-            if (confirm(`Deseja desativar o módulo ${label}?`)) {
-                const newModules = activeModules.filter(id => id !== modId);
-                await updateOrgModules(userOrgId, newModules);
-                onRefreshModules();
+            // Fluxo de Desativação
+            if (confirm(`Deseja desativar o módulo "${label}"? Esta ação removerá o acesso imediato de toda a equipe.`)) {
+                newModulesList = activeModules.filter(id => id !== modId);
+                await updateOrgModules(userOrgId, newModulesList);
+                onRefreshModules(); // Recarrega dados no App.tsx
             }
         } else {
-            // Ativar
+            // Fluxo de Ativação
             if (price > 0) {
-                if (!confirm(`Este é um módulo pago (R$ ${price.toFixed(2)}/mês). Deseja confirmar a ativação e cobrança?`)) {
+                if (!confirm(`Este é um módulo Premium (R$ ${price.toFixed(2)}/mês). Deseja confirmar a ativação e inclusão no seu próximo ciclo de fatura?`)) {
                     setProcessingModule(null);
                     return;
                 }
             }
-            const newModules = [...activeModules, modId];
-            await updateOrgModules(userOrgId, newModules);
-            onRefreshModules();
+            
+            newModulesList = [...activeModules, modId];
+            await updateOrgModules(userOrgId, newModulesList);
+            onRefreshModules(); // Recarrega dados no App.tsx
         }
-    } catch (e) {
-        console.error("Erro ao alternar módulo:", e);
-        alert("Falha técnica ao sincronizar módulo. Verifique sua conexão.");
+    } catch (e: any) {
+        console.error("Erro Crítico ao alternar módulo:", e);
+        alert(`Falha técnica na sincronização: ${e.message || 'Erro desconhecido'}. Verifique se o módulo existe no banco.`);
     } finally {
         setProcessingModule(null);
     }
@@ -359,7 +367,7 @@ export const SettingsScreen: React.FC<Props> = ({
                         {members.map(member => (
                             <div key={member.id} className="bg-white dark:bg-white/5 p-6 rounded-[2rem] border border-slate-100 dark:border-white/10 flex items-center justify-between shadow-soft hover:border-orange-500/20 transition-all">
                                 <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-slate-50 dark:bg-black/40 border border-slate-100 overflow-hidden flex items-center justify-center">
+                                    <div className="w-12 h-12 rounded-2xl bg-slate-50 dark:bg-black/40 border border-slate-100 overflow-hidden flex items-center justify-center text-xs font-black text-slate-400 shrink-0">
                                         {member.avatar_url ? <img src={member.avatar_url} className="w-full h-full object-cover"/> : <User className="w-5 h-5 text-slate-300"/>}
                                     </div>
                                     <div>
