@@ -1,6 +1,7 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Opportunity, DbTask } from '../types';
-import { fetchAllTasks, updateTask, fetchAssignableUsers } from '../services/projectService';
+import { fetchAllTasks, updateTask, fetchOrgMembers } from '../services/projectService';
 import { optimizeSchedule } from '../services/geminiService';
 import { TaskDetailModal } from './TaskDetailModal';
 import { 
@@ -25,6 +26,7 @@ export const GanttView: React.FC<Props> = ({
     const [tasks, setTasks] = useState<DbTask[]>([]);
     const [loading, setLoading] = useState(false);
     const [isOptimizing, setIsOptimizing] = useState(false);
+    const [optimizationLog, setOptimizationLog] = useState<string>('');
     const [viewDate, setViewDate] = useState(new Date());
     const [editingTaskCtx, setEditingTaskCtx] = useState<any | null>(null);
 
@@ -42,23 +44,52 @@ export const GanttView: React.FC<Props> = ({
     const handleOptimize = async () => {
         if (!organizationId) return;
         setIsOptimizing(true);
+        setOptimizationLog('Guru analisando portfólio...');
+        
         try {
-            const devs = await fetchAssignableUsers(organizationId);
+            // 1. Buscar membros reais da organização
+            const team = await fetchOrgMembers(organizationId);
+            
+            // 2. Filtrar apenas tarefas pendentes
             const pendingTasks = tasks.filter(t => t.status !== 'done' && t.status !== 'approval');
-            const tasksForAi = pendingTasks.map(t => ({
-                id: t.id, 
-                titulo: t.titulo, 
-                duracaohoras: t.duracaohoras, 
-                responsavel: t.responsavel
-            }));
-            const updates = await optimizeSchedule(tasksForAi, devs);
-            if (updates && updates.length > 0) {
-                for (const update of updates) {
-                    await updateTask(update.id, { datainicio: update.startDate, datafim: update.dueDate });
-                }
-                loadData();
+            
+            if (pendingTasks.length === 0) {
+                setOptimizationLog('Nenhuma tarefa pendente para otimizar.');
+                setTimeout(() => setIsOptimizing(false), 2000);
+                return;
             }
-        } catch (e) { alert("Erro ao otimizar cronograma."); } finally { setIsOptimizing(false); }
+
+            setOptimizationLog(`Calculando performance para ${pendingTasks.length} ativos...`);
+            
+            // 3. Rodar IA
+            const updates = await optimizeSchedule(pendingTasks, team);
+            
+            if (updates && updates.length > 0) {
+                setOptimizationLog(`Sincronizando ${updates.length} alocações...`);
+                
+                // 4. Persistir atualizações (Batch simulated as updates)
+                await Promise.all(updates.map(update => 
+                    updateTask(update.id, { 
+                        datainicio: update.startDate, 
+                        datafim: update.dueDate,
+                        responsavel: update.assigneeId
+                    })
+                ));
+                
+                setOptimizationLog('Cronograma Inteligente Aplicado!');
+                await loadData();
+            } else {
+                setOptimizationLog('O Guru não encontrou melhorias necessárias no momento.');
+            }
+        } catch (e) { 
+            console.error(e);
+            setOptimizationLog("Falha na sincronização via IA."); 
+        } finally { 
+            setTimeout(() => {
+                setIsOptimizing(false);
+                setOptimizationLog('');
+            }, 3000);
+        }
     };
 
     const daysInMonth = useMemo(() => {
@@ -106,8 +137,16 @@ export const GanttView: React.FC<Props> = ({
     };
 
     return (
-        <div className="flex flex-col h-full bg-slate-50 dark:bg-[#020203] rounded-[2.5rem] border border-slate-200 dark:border-white/10 overflow-hidden shadow-2xl animate-in fade-in duration-500">
+        <div className="flex flex-col h-full bg-slate-50 dark:bg-[#020203] rounded-[2.5rem] border border-slate-200 dark:border-white/10 overflow-hidden shadow-2xl animate-in fade-in duration-500 relative">
             
+            {/* AI Optimization HUD */}
+            {isOptimizing && (
+                <div className="absolute top-0 left-0 right-0 z-[100] bg-purple-600 text-white px-6 py-4 flex items-center justify-center gap-4 animate-in slide-in-from-top-full duration-500 shadow-2xl">
+                    <Loader2 className="w-5 h-5 animate-spin"/>
+                    <span className="text-xs font-black uppercase tracking-[0.2em]">{optimizationLog}</span>
+                </div>
+            )}
+
             <div className="flex flex-col md:flex-row items-center justify-between p-6 border-b border-slate-200 dark:border-white/5 bg-white/80 dark:bg-[#0a0a0c]/80 backdrop-blur-xl gap-6 shrink-0 z-50">
                 <div className="flex items-center gap-4">
                     <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-2xl border border-slate-200 dark:border-white/10 shadow-inner">

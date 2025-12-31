@@ -123,7 +123,6 @@ export const askGuru = async (question: string, context: string): Promise<{ text
     }
 };
 
-// ... (Resto das funções mantidas conforme original)
 export const analyzeOpportunity = async (title: string, description: string, orgType?: string): Promise<string> => {
   const ai = getAiClient();
   if (!ai) return "⚠️ Erro: API Key não encontrada.";
@@ -153,7 +152,7 @@ export const generateDashboardInsight = async (contextSummary: string): Promise<
 export const generateSubtasksForTask = async (taskTitle: string, context: string, orgType?: string, teamMembers?: any[]): Promise<any[]> => {
     const ai = getAiClient();
     if (!ai) return [];
-    const prompt = `Crie checklist para: ${taskTitle}. Contexto: ${context}.`;
+    const prompt = `Crie checklist para: ${taskTitle}. Contexto: ${context}. Membros disponíveis: ${JSON.stringify(teamMembers)}`;
     try {
         const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
             model: 'gemini-3-pro-preview',
@@ -180,7 +179,7 @@ export const generateSubtasksForTask = async (taskTitle: string, context: string
 export const generateBpmn = async (title: string, description: string, archetype: string, docsContext?: string, orgType?: string, availableRoles?: any[]): Promise<any> => {
     const ai = getAiClient();
     if (!ai) return null;
-    const prompt = `Gere fluxo WBS para ${title} (${archetype}). Contexto: ${description}. Retorne JSON com lanes e nodes.`;
+    const prompt = `Gere fluxo WBS para ${title} (${archetype}). Contexto: ${description}. Retorne JSON com lanes e nodes. Use os cargos: ${JSON.stringify(availableRoles)}`;
     try {
         const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
             model: 'gemini-3-pro-preview',
@@ -191,16 +190,67 @@ export const generateBpmn = async (title: string, description: string, archetype
     } catch (e) { return null; }
 };
 
-export const optimizeSchedule = async (tasks: any[], availableDevelopers: any[], globalCapacity: number = 8): Promise<any[]> => {
+/**
+ * AI Smart Schedule Engine
+ * Analisa carga, GUT e responsáveis para otimizar o cronograma da organização.
+ */
+export const optimizeSchedule = async (tasks: any[], availableTeam: any[], globalCapacity: number = 8): Promise<any[]> => {
     const ai = getAiClient();
-    if (!ai) return [];
-    const prompt = `Otimize datas para estas tarefas: ${JSON.stringify(tasks)}.`;
+    if (!ai || tasks.length === 0) return [];
+
+    const systemInstruction = `
+        Você é o Arquiteto de Operações Shinkō. Sua missão é otimizar o cronograma técnico da organização.
+        
+        CRITÉRIOS DE OTIMIZAÇÃO:
+        1. Priorize tarefas com maior Score GUT (Gravidade x Urgência x Tendência).
+        2. Balanceie a carga de trabalho entre os membros disponíveis: ${JSON.stringify(availableTeam)}.
+        3. Cada membro tem capacidade de ${globalCapacity} horas por dia útil.
+        4. Defina datainicio e datafim (YYYY-MM-DD) respeitando a duração de cada tarefa.
+        5. Se uma tarefa já tem responsável, tente mantê-lo a menos que haja sobrecarga crítica (>150% capacidade).
+        6. Projete as entregas para começarem a partir de hoje (${new Date().toISOString().split('T')[0]}).
+
+        SAÍDA:
+        Retorne um array JSON de objetos contendo apenas: { id: number, startDate: string, dueDate: string, assigneeId: string }.
+    `;
+
+    const prompt = `
+        TASKS PARA OTIMIZAR:
+        ${JSON.stringify(tasks.map(t => ({
+            id: t.id,
+            titulo: t.titulo,
+            duracaohoras: t.duracaohoras || 2,
+            gut_score: (t.gravidade || 1) * (t.urgencia || 1) * (t.tendencia || 1),
+            responsavel_atual: t.responsavel
+        })))}
+    `;
+
     try {
         const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
             model: 'gemini-3-pro-preview',
             contents: prompt,
-            config: { responseMimeType: "application/json" }
+            config: { 
+                systemInstruction,
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            id: { type: Type.NUMBER },
+                            startDate: { type: Type.STRING },
+                            dueDate: { type: Type.STRING },
+                            assigneeId: { type: Type.STRING }
+                        },
+                        required: ["id", "startDate", "dueDate", "assigneeId"]
+                    }
+                }
+            }
         }));
-        return JSON.parse(response.text || "[]");
-    } catch (e) { return []; }
+
+        const result = JSON.parse(response.text || "[]");
+        return Array.isArray(result) ? result : [];
+    } catch (e) {
+        console.error("AI Scheduling Error:", e);
+        return [];
+    }
 };

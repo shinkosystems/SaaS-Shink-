@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Opportunity, DbTask } from '../types';
-import { fetchAllTasks, updateTask, syncTaskChecklist } from '../services/projectService';
+import { fetchAllTasks, updateTask, syncTaskChecklist, fetchOrgMembers } from '../services/projectService';
 import { fetchOrganizationDetails } from '../services/organizationService';
 import { optimizeSchedule } from '../services/geminiService';
 import { TaskDetailModal } from './TaskDetailModal';
@@ -55,18 +56,42 @@ export const CalendarView: React.FC<Props> = ({
         setIsOptimizing(true);
         setOptimizationStep('Guru analisando carga técnica...');
         try {
+            const team = await fetchOrgMembers(organizationId);
             const pendingTasks = tasks.filter(t => !t.sutarefa && t.status !== 'done' && t.status !== 'approval');
-            if (pendingTasks.length === 0) { setOptimizationStep('Nada para otimizar.'); setTimeout(() => setIsOptimizing(false), 2000); return; }
-            const optimizedSchedule = await optimizeSchedule(pendingTasks, [], Math.floor(orgCapacity * 0.7));
+            
+            if (pendingTasks.length === 0) { 
+                setOptimizationStep('Nada para otimizar.'); 
+                setTimeout(() => setIsOptimizing(false), 2000); 
+                return; 
+            }
+
+            const optimizedSchedule = await optimizeSchedule(pendingTasks, team, Math.floor(orgCapacity / (team.length || 1)));
+            
             if (optimizedSchedule && optimizedSchedule.length > 0) {
                 setOptimizationStep(`Equilibrando ${optimizedSchedule.length} tarefas...`);
-                for (const item of optimizedSchedule) {
-                    await updateTask(item.id, { datainicio: item.startDate, datafim: item.dueDate });
-                }
+                
+                await Promise.all(optimizedSchedule.map(item => 
+                    updateTask(item.id, { 
+                        datainicio: item.startDate, 
+                        datafim: item.dueDate,
+                        responsavel: item.assigneeId
+                    })
+                ));
+                
                 await loadTasks();
                 setOptimizationStep(`Cronograma Sincronizado!`);
-            } else setOptimizationStep("Operação já otimizada.");
-        } catch (error) { setOptimizationStep("Erro na IA."); } finally { setTimeout(() => { setIsOptimizing(false); setOptimizationStep(''); }, 3000); }
+            } else {
+                setOptimizationStep("Operação já otimizada.");
+            }
+        } catch (error) { 
+            console.error(error);
+            setOptimizationStep("Erro na IA."); 
+        } finally { 
+            setTimeout(() => { 
+                setIsOptimizing(false); 
+                setOptimizationStep(''); 
+            }, 3000); 
+        }
     };
 
     const handleNavigate = (direction: 'prev' | 'next') => {
