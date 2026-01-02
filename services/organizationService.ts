@@ -10,29 +10,12 @@ export const SYSTEM_MODULES_DEF = [
     'projects', 'kanban', 'gantt', 'calendar', 'crm', 'financial', 'clients', 'engineering', 'product', 'ia', 'whitelabel', 'assets'
 ];
 
-// Helper to determine plan string from ID
-const getPlanKeyFromId = (id: number): string => {
-    switch (id) {
-        case 4: return 'plan_free';
-        case 1: return 'plan_solo';
-        case 2: return 'plan_studio';
-        case 3: return 'plan_scale';
-        case 9: return 'plan_scale'; 
-        case 5: return 'plan_agency'; 
-        case 10: return 'plan_enterprise';
-        case 11: return 'plan_solo_yearly';
-        case 12: return 'plan_studio_yearly';
-        case 13: return 'plan_scale_yearly';
-        default: return 'plan_free';
-    }
-};
-
 export const getPlanDefaultModules = (planId: number): string[] => {
     switch (planId) {
         case 4: // Free
-            return ['kanban', 'crm'];
+            return ['kanban', 'crm', 'ia'];
         case 1: // Solo
-            return ['projects', 'kanban', 'gantt', 'crm'];
+            return ['projects', 'kanban', 'gantt', 'crm', 'ia'];
         case 2: // Studio
             return ['projects', 'kanban', 'gantt', 'calendar', 'crm', 'financial', 'clients', 'ia'];
         case 3: // Scale
@@ -41,7 +24,7 @@ export const getPlanDefaultModules = (planId: number): string[] => {
         case 10: // Enterprise
             return SYSTEM_MODULES_DEF;
         default:
-            return ['kanban'];
+            return ['kanban', 'ia'];
     }
 };
 
@@ -228,15 +211,11 @@ export const updateOrgModules = async (orgId: number, moduleKeys: string[]) => {
         const moduleMap = await fetchSystemModuleMap();
         
         if (Object.keys(moduleMap).length === 0) {
-            throw new Error("Não foi possível carregar a lista de módulos do sistema. Verifique a tabela 'modulos'.");
+            throw new Error("Não foi possível carregar a lista de módulos do sistema.");
         }
 
         const idsToInsert = moduleKeys
-            .map(k => {
-                const id = moduleMap[k.toLowerCase()];
-                if (!id) console.warn(`Módulo não encontrado no banco: ${k}`);
-                return id;
-            })
+            .map(k => moduleMap[k.toLowerCase()])
             .filter(id => id !== undefined && id !== null) as number[];
         
         return updateOrgModulesByIds(orgId, idsToInsert);

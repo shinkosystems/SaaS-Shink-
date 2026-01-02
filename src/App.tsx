@@ -68,7 +68,7 @@ const App: React.FC = () => {
   const [view, setViewState] = useState<string>('dashboard');
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeModules, setActiveModules] = useState<string[]>(['projects', 'kanban']); 
+  const [activeModules, setActiveModules] = useState<string[]>(['ia', 'projects', 'kanban']); 
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [showCreateTask, setShowCreateTask] = useState(false);
@@ -211,7 +211,6 @@ const App: React.FC = () => {
                         aiSector: orgData.setor || '', aiTone: orgData.tomdevoz || '', aiContext: orgData.dna || ''
                     });
 
-                    // BUSCA MÓDULOS REAIS
                     const modules = await fetchActiveOrgModules(data.organizacao);
                     setActiveModules(modules.length > 0 ? modules : getPlanDefaultModules(orgData.plano || 4));
                   }
@@ -224,7 +223,7 @@ const App: React.FC = () => {
               subscribeToPresence(userId, setOnlineUsers);
           }
       } catch (e) { 
-          console.error("Falha ao carregar perfil do usuário:", e);
+          console.error("Erro no carregamento:", e);
           setDbStatus('disconnected'); 
       } finally { 
           setLoading(false); 
@@ -298,7 +297,7 @@ const App: React.FC = () => {
                                 await loadUserData(user.id);
                                 onOpenProject(newOpp);
                             } else {
-                                alert("Falha ao salvar o projeto. Verifique sua conexão.");
+                                alert("Falha ao salvar o projeto.");
                                 setView('dashboard');
                             }
                         }}
