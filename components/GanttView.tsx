@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Opportunity, DbTask } from '../types';
-import { fetchAllTasks, updateTask, fetchOrgMembers } from '../services/projectService';
+import { fetchAllTasks, updateTask, syncTaskChecklist, fetchOrgMembers } from '../services/projectService';
 import { optimizeSchedule } from '../services/geminiService';
 import { TaskDetailModal } from './TaskDetailModal';
 import { 
@@ -18,10 +18,11 @@ interface Props {
   organizationId?: number;
   activeModules?: string[];
   customPrimaryColor?: string;
+  readOnly?: boolean;
 }
 
 export const GanttView: React.FC<Props> = ({ 
-    opportunities, onSelectOpportunity, onTaskUpdate, userRole, projectId, organizationId, activeModules, customPrimaryColor 
+    opportunities, onSelectOpportunity, onTaskUpdate, userRole, projectId, organizationId, activeModules, customPrimaryColor, readOnly 
 }) => {
     const [tasks, setTasks] = useState<DbTask[]>([]);
     const [loading, setLoading] = useState(false);
@@ -43,8 +44,10 @@ export const GanttView: React.FC<Props> = ({
 
     const handleOptimize = async () => {
         if (!organizationId) return;
+        if (readOnly) return;
+
         setIsOptimizing(true);
-        setOptimizationLog('Guru analisando portfólio...');
+        setOptimizationLog('Guru analisando carga técnica...');
         
         try {
             const team = await fetchOrgMembers(organizationId);
@@ -56,11 +59,11 @@ export const GanttView: React.FC<Props> = ({
                 return;
             }
 
-            setOptimizationLog(`Calculando performance...`);
+            setOptimizationLog(`Calculando performance ótima...`);
             const updates = await optimizeSchedule(pendingTasks, team);
             
             if (updates && updates.length > 0) {
-                setOptimizationLog(`Sincronizando alocações...`);
+                setOptimizationLog(`Sincronizando ${updates.length} alocações...`);
                 await Promise.all(updates.map(update => 
                     updateTask(update.id, { 
                         datainicio: update.startDate, 
@@ -74,7 +77,8 @@ export const GanttView: React.FC<Props> = ({
                 setOptimizationLog('Cronograma já otimizado.');
             }
         } catch (e) { 
-            setOptimizationLog("Falha na sincronização."); 
+            console.error(e);
+            setOptimizationLog("Falha na sincronização via IA."); 
         } finally { 
             setTimeout(() => {
                 setIsOptimizing(false);
@@ -111,10 +115,48 @@ export const GanttView: React.FC<Props> = ({
         const date = new Date(dateStr);
         const monthStart = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
         const monthEnd = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0);
+        
         if (date < monthStart && !isEnd) return 2; 
         if (date > monthEnd && isEnd) return daysInMonth.length + 2;
         if (date < monthStart || date > monthEnd) return null;
+        
         return date.getDate() + 1 + (isEnd ? 1 : 0);
+    };
+
+    const handleTaskClick = (task: DbTask) => {
+        // Hidratar o objeto para o modal de detalhes
+        const hydrated = {
+            id: task.id.toString(),
+            dbId: task.id,
+            text: task.titulo,
+            description: task.descricao,
+            status: task.status as any,
+            completed: task.status === 'done',
+            estimatedHours: task.duracaohoras,
+            dueDate: task.datafim || task.dataproposta,
+            startDate: task.datainicio || task.dataproposta,
+            assigneeId: task.responsavel,
+            gut: { g: task.gravidade, u: task.urgencia, t: task.tendencia },
+            createdAt: task.createdat,
+            attachments: task.anexos || [],
+            subtasks: tasks
+                .filter(t => (t.tarefamae === task.id || t.tarefa === task.id) && t.sutarefa)
+                .map(t => ({
+                    id: t.id.toString(),
+                    text: t.titulo,
+                    completed: t.status === 'done',
+                    dbId: t.id
+                })),
+            lifecycle: {
+                created: task.createdat,
+                todo: task.dataafazer,
+                doing: task.datafazendo,
+                review: task.datarevisao,
+                approval: task.dataaprovacao,
+                done: task.dataconclusao
+            }
+        };
+        setEditingTaskCtx({ task: hydrated, projectData: task.projetoData });
     };
 
     return (
@@ -140,7 +182,11 @@ export const GanttView: React.FC<Props> = ({
                     </div>
                 </div>
                 
-                <button onClick={handleOptimize} disabled={isOptimizing} className="flex items-center gap-3 px-8 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-purple-500/20 disabled:opacity-50">
+                <button 
+                    onClick={handleOptimize} 
+                    disabled={isOptimizing || readOnly} 
+                    className="flex items-center gap-3 px-8 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-purple-500/20 disabled:opacity-50"
+                >
                     {isOptimizing ? <Loader2 className="w-4 h-4 animate-spin"/> : <Zap className="w-4 h-4"/>} IA Smart Schedule
                 </button>
             </div>
@@ -149,12 +195,12 @@ export const GanttView: React.FC<Props> = ({
                 <div className="min-w-[1400px]">
                     <div className="sticky top-0 z-40 grid border-b border-slate-200 dark:border-white/5 bg-slate-50/95 dark:bg-[#0a0a0c]/95 backdrop-blur-xl" style={{ gridTemplateColumns: `280px repeat(${daysInMonth.length}, 1fr)` }}>
                         <div className="p-6 border-r border-slate-200 dark:border-white/5 sticky left-0 z-50 bg-slate-50 dark:bg-[#0a0a0c]">
-                            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Iniciativas</span>
+                            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Roadmap / Ativos</span>
                         </div>
                         {daysInMonth.map(d => (
-                            <div key={d.toISOString()} className={`h-20 border-r border-slate-200 dark:border-white/5 flex flex-col items-center justify-center`}>
+                            <div key={d.toISOString()} className={`h-20 border-r border-slate-200 dark:border-white/5 flex flex-col items-center justify-center ${new Date().toDateString() === d.toDateString() ? 'bg-amber-500/5' : ''}`}>
                                 <span className={`text-[8px] font-black uppercase text-slate-400`}>{d.toLocaleDateString('pt-BR', { weekday: 'short' })}</span>
-                                <span className={`text-sm font-black mt-1`}>{d.getDate()}</span>
+                                <span className={`text-sm font-black mt-1 ${new Date().toDateString() === d.toDateString() ? 'text-amber-500' : ''}`}>{d.getDate()}</span>
                             </div>
                         ))}
                     </div>
@@ -165,7 +211,7 @@ export const GanttView: React.FC<Props> = ({
                                 <div className="grid border-b border-slate-200 dark:border-white/10 bg-slate-100/50 dark:bg-white/[0.02] sticky top-20 z-10" style={{ gridTemplateColumns: `280px repeat(${daysInMonth.length}, 1fr)` }}>
                                     <div className="p-4 border-r border-slate-200 dark:border-white/10 sticky left-0 z-20 bg-slate-100 dark:bg-[#111113] flex items-center gap-3">
                                         <div className="w-1.5 h-6 rounded-full" style={{ backgroundColor: project.color }}></div>
-                                        <span className="text-[11px] font-black uppercase truncate">{project.name}</span>
+                                        <span className="text-[11px] font-black uppercase truncate text-slate-700 dark:text-slate-300">{project.name}</span>
                                     </div>
                                     {daysInMonth.map((_, idx) => <div key={idx} className="border-r border-slate-200 dark:border-white/[0.03] h-12"></div>)}
                                 </div>
@@ -173,15 +219,31 @@ export const GanttView: React.FC<Props> = ({
                                 {project.tasks.map(task => {
                                     const startCol = getGridColumn(task.datainicio || task.dataproposta);
                                     const endCol = getGridColumn(task.datafim || task.dataproposta, true);
+                                    const isDone = task.status === 'done';
+
                                     return (
-                                        <div key={task.id} className="grid border-b border-slate-100 dark:border-white/5 hover:bg-slate-50 h-14 relative" style={{ gridTemplateColumns: `280px repeat(${daysInMonth.length}, 1fr)` }}>
+                                        <div key={task.id} className="grid border-b border-slate-100 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-white/[0.01] h-14 relative group" style={{ gridTemplateColumns: `280px repeat(${daysInMonth.length}, 1fr)` }}>
                                             <div className="p-4 border-r border-slate-200 dark:border-white/10 sticky left-0 z-20 bg-white dark:bg-[#020203] flex items-center overflow-hidden">
-                                                <span className="text-[11px] font-bold text-slate-600 truncate pl-4">{task.titulo}</span>
+                                                <span 
+                                                    className="text-[11px] font-bold text-slate-600 dark:text-slate-400 truncate pl-4 cursor-pointer hover:text-amber-500 transition-colors"
+                                                    onClick={() => handleTaskClick(task)}
+                                                >
+                                                    {task.titulo}
+                                                </span>
                                             </div>
+                                            {daysInMonth.map((_, idx) => <div key={idx} className="border-r border-slate-100 dark:border-white/[0.03] h-full"></div>)}
                                             {startCol && endCol && (
-                                                <div className={`absolute top-1/2 -translate-y-1/2 h-6 rounded-full z-10 border border-white/10 flex items-center shadow-lg bg-amber-500/20 text-amber-500 border-amber-500/20`} style={{ gridColumnStart: startCol, gridColumnEnd: endCol, left: '4px', right: '4px', position: 'relative', marginLeft: '-280px' }}>
+                                                <div 
+                                                    onClick={() => handleTaskClick(task)}
+                                                    className={`absolute top-1/2 -translate-y-1/2 h-7 rounded-full z-10 border border-white/10 flex items-center shadow-lg cursor-pointer transition-all hover:scale-[1.01] active:scale-95 ${isDone ? 'bg-emerald-500/20 text-emerald-500 border-emerald-500/20' : 'bg-amber-500/20 text-amber-500 border-amber-500/20'}`} 
+                                                    style={{ gridColumnStart: startCol, gridColumnEnd: endCol, left: '4px', right: '4px', position: 'relative', marginLeft: '-280px' }}
+                                                >
                                                     <div className="relative z-10 w-full px-3 flex items-center justify-between">
-                                                        <span className="text-[9px] font-black uppercase truncate">{task.titulo}</span>
+                                                        <span className="text-[9px] font-black uppercase truncate drop-shadow-sm text-slate-900 dark:text-white">{task.titulo}</span>
+                                                        <div className="flex items-center gap-1">
+                                                            <div className="w-1 h-1 rounded-full bg-current"></div>
+                                                            <span className="text-[8px] font-black opacity-0 group-hover:opacity-100 transition-opacity">Abrir</span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             )}
@@ -193,6 +255,50 @@ export const GanttView: React.FC<Props> = ({
                     </div>
                 </div>
             </div>
+
+            {editingTaskCtx && (
+                <TaskDetailModal 
+                    task={editingTaskCtx.task}
+                    nodeTitle={editingTaskCtx.projectData?.nome || 'Tarefa'}
+                    opportunityTitle={editingTaskCtx.projectData?.nome}
+                    organizationId={organizationId}
+                    onClose={() => setEditingTaskCtx(null)}
+                    onSave={async (updated) => {
+                        const now = new Date().toISOString();
+                        const updatePayload: any = { 
+                            titulo: updated.text, 
+                            descricao: updated.description, 
+                            status: updated.status,
+                            responsavel: updated.assigneeId,
+                            duracaohoras: updated.estimatedHours,
+                            datafim: updated.dueDate,
+                            datainicio: updated.startDate,
+                            gravidade: updated.gut?.g,
+                            urgencia: updated.gut?.u,
+                            tendencia: updated.gut?.t
+                        };
+                        
+                        if (updated.status !== editingTaskCtx.task.status) {
+                            const dateFields: Record<string, string> = {
+                                todo: 'dataafazer',
+                                doing: 'datafazendo',
+                                review: 'datarevisao',
+                                approval: 'dataaprovacao',
+                                done: 'dataconclusao'
+                            };
+                            const field = dateFields[updated.status];
+                            if (field) updatePayload[field] = now;
+                        }
+
+                        await updateTask(Number(updated.id), updatePayload);
+                        if (updated.subtasks && organizationId) {
+                            await syncTaskChecklist(Number(updated.id), updated.subtasks, organizationId, Number(editingTaskCtx.task.projectId), updated.assigneeId);
+                        }
+                        loadData();
+                    }}
+                    readOnly={readOnly}
+                />
+            )}
         </div>
     );
 };
