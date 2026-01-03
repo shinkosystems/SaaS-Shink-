@@ -20,7 +20,7 @@ export const MetaController: React.FC<MetaProps> = ({
     url, 
     type = 'website' 
 }) => {
-    const defaultTitle = "Shinkō OS | Sistema de Engenharia de Inovação";
+    const defaultTitle = "Shinkō OS";
     const defaultDesc = "A plataforma definitiva para gerenciar projetos, ativos e performance de engenharia com precisão industrial.";
     
     useEffect(() => {

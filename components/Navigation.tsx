@@ -114,7 +114,7 @@ const Logo = ({ customLogoUrl, orgName, size = 'small' }: { customLogoUrl?: stri
                     </div>
                     <div className={`flex flex-col items-center ${isLarge ? 'mt-2' : ''}`}>
                         <span className={`${isLarge ? 'text-base font-black' : 'font-bold text-sm'} tracking-tighter text-slate-900 dark:text-white leading-none`}>
-                            {orgName || 'Shinkō'}
+                            {orgName || 'Shinkō OS'}
                         </span>
                         <span className={`${isLarge ? 'text-[7px]' : 'text-[6px]'} font-black uppercase tracking-widest text-amber-500 mt-1`}>OS 26</span>
                     </div>

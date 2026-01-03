@@ -1,6 +1,7 @@
+
 {
   "name": "Shinkō OS",
-  "short_name": "Shinkō",
+  "short_name": "Shinkō OS",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#09090b",
