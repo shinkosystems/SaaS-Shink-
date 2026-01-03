@@ -19,6 +19,7 @@ export interface AdminUser {
     orgColaboradores?: number;
     acessos?: number;
     ultimo_acesso?: string;
+    ativo?: boolean;
 }
 
 export interface GlobalMetrics {
@@ -89,9 +90,14 @@ export const fetchGlobalMetrics = async (startDate?: string, endDate?: string): 
     }
 };
 
-export const fetchAllOwners = async (): Promise<AdminUser[]> => {
+export const fetchAllUsers = async (): Promise<AdminUser[]> => {
     try {
-        const { data: users, error: userError } = await supabase.from('users').select('*').eq('perfil', 'dono').order('acessos', { ascending: false });
+        // Removido filtro de perfil para trazer TODOS os usuários
+        const { data: users, error: userError } = await supabase
+            .from('users')
+            .select('*')
+            .order('acessos', { ascending: false });
+            
         if (userError || !users) return [];
 
         const orgIds = [...new Set(users.map((u: any) => u.organizacao).filter(Boolean))];
@@ -115,6 +121,7 @@ export const fetchAllOwners = async (): Promise<AdminUser[]> => {
                 organizacao: u.organizacao,
                 perfil: u.perfil,
                 status: u.status,
+                ativo: u.ativo,
                 planName: planMap.get(currentPlanId) || 'Free',
                 currentPlanId: currentPlanId,
                 orgName: org.nome || 'N/A',
@@ -128,7 +135,7 @@ export const fetchAllOwners = async (): Promise<AdminUser[]> => {
 
 export const updateGlobalClientData = async (data: any): Promise<{ success: boolean, msg?: string }> => {
     try {
-        await supabase.from('users').update({ nome: data.userName, status: data.userStatus }).eq('id', data.userId);
+        await supabase.from('users').update({ nome: data.userName, status: data.userStatus, ativo: data.userAtivo }).eq('id', data.userId);
         await supabase.from('organizacoes').update({ nome: data.orgName, colaboradores: data.orgLimit, plano: data.planId }).eq('id', data.orgId);
         return { success: true };
     } catch (err: any) { return { success: false, msg: err.message }; }
@@ -182,13 +189,16 @@ export const approveSubscription = async (transactionId: string, orgId: number):
             await updateOrgModulesByIds(orgId, moduleIds);
         }
 
-        // 4. Salvar histórico
+        // 4. ATUALIZAR TODOS OS USUÁRIOS DA ORGANIZAÇÃO PARA ATIVO = TRUE
+        await supabase.from('users').update({ ativo: true }).eq('organizacao', orgId);
+
+        // 5. Salvar histórico
         await supabase.from('cliente_plano').insert({
             organizacao: orgId,
             plano: meta.planId || 4,
             datainicio: new Date().toISOString().split('T')[0],
             datafim: newExpiry.toISOString().split('T')[0],
-            dono: transData.metadata?.userId || null // Tentamos pegar o UID se disponível
+            dono: transData.metadata?.userId || null 
         });
 
         return { success: true };

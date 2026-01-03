@@ -15,16 +15,16 @@ interface Props {
 }
 
 export const DashboardPage: React.FC<Props> = ({ opportunities, onOpenProject, onNavigate, user, theme, onGuruPrompt }) => {
-    const [userData, setUserData] = useState<{ name: string } | undefined>();
+    const [userData, setUserData] = useState<{ name: string, role: string } | undefined>();
     const [billingDate, setBillingDate] = useState<string | undefined>();
     const [activeModules, setActiveModules] = useState<string[]>([]);
 
     useEffect(() => {
         if (user) {
             // Load Basic User Info
-            supabase.from('users').select('nome, organizacao').eq('id', user.id).single().then(({ data }) => {
+            supabase.from('users').select('nome, organizacao, perfil').eq('id', user.id).single().then(({ data }) => {
                 if (data) {
-                    setUserData({ name: data.nome });
+                    setUserData({ name: data.nome, role: data.perfil });
                     if (data.organizacao) {
                         // Load Organization Billing Date
                         supabase.from('organizacoes').select('vencimento').eq('id', data.organizacao).single().then(({ data: orgData }) => {
@@ -51,6 +51,7 @@ export const DashboardPage: React.FC<Props> = ({ opportunities, onOpenProject, o
                 onGuruPrompt={onGuruPrompt}
                 billingDate={billingDate}
                 activeModules={activeModules}
+                userRole={userData?.role}
             />
         </div>
     );

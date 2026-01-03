@@ -67,12 +67,16 @@ const AuthScreen: React.FC<Props> = ({ onClose, customLogoUrl, customOrgName }) 
         if (signUpData.user) {
             // Se for nova organização, criamos agora
             if (orgFlow === 'new') {
-                await createOrganization(signUpData.user.id, newOrgName, 'Tecnologia');
+                await createOrganization(signUpData.user.id, newOrgName, 'Tecnologia', '', email, name);
             } else {
                 // Se estiver entrando, vinculamos ao ID localizado
                 const { error: updateError } = await supabase
                     .from('users')
-                    .update({ organizacao: targetOrgId, perfil: 'colaborador' })
+                    .update({ 
+                        organizacao: targetOrgId, 
+                        perfil: 'colaborador',
+                        ativo: true // Solicitação: Novo usuário ativo por padrão
+                    })
                     .eq('id', signUpData.user.id);
                 
                 if (updateError) console.error("Erro ao vincular organização:", updateError);

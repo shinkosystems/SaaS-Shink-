@@ -7,6 +7,7 @@ import {
     ChevronRight, FileText, ArrowRight, BookOpen, Layers, Sparkles, 
     Clock, Share2, Bookmark, MessageSquare, Newspaper
 } from 'lucide-react';
+import { MetaController } from './MetaController';
 
 interface Props {
     onBack: () => void;
@@ -52,7 +53,6 @@ export const InsightCenter: React.FC<Props> = ({ onBack, onEnter, initialPostSlu
         }
     };
 
-    // Add handleDownloadClick to fix missing reference error
     const handleDownloadClick = () => {
         setShowLeadModal(true);
     };
@@ -79,7 +79,6 @@ export const InsightCenter: React.FC<Props> = ({ onBack, onEnter, initialPostSlu
         return matchesSearch && matchesTag;
     });
 
-    // Add string[] type annotation to fix toUpperCase unknown error
     const allTags: string[] = Array.from(new Set(posts.flatMap(p => p.tags || [])));
 
     if (loading) {
@@ -96,6 +95,14 @@ export const InsightCenter: React.FC<Props> = ({ onBack, onEnter, initialPostSlu
 
     return (
         <div className="fixed inset-0 z-[200] bg-[#020203] text-white flex flex-col overflow-hidden selection:bg-amber-500 selection:text-black">
+            {/* Meta Controller for Article or Blog Home */}
+            <MetaController 
+                title={selectedPost ? (selectedPost.seo_title || selectedPost.title) : "Blog de Engenharia & Valor"}
+                description={selectedPost ? (selectedPost.seo_description || selectedPost.content?.substring(0, 160)) : "Insights sobre inovação, SaaS e arquitetura de elite."}
+                image={selectedPost?.og_image || selectedPost?.cover_image}
+                type={selectedPost ? 'article' : 'website'}
+            />
+
             {/* Background Architecture */}
             <div className="fixed inset-0 pointer-events-none">
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-full bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.05)_0%,transparent_50%)]"></div>
@@ -306,9 +313,9 @@ export const InsightCenter: React.FC<Props> = ({ onBack, onEnter, initialPostSlu
                 </main>
             </div>
 
-            {/* PASS ACCESS MODAL (LEAD) */}
+            {/* Pass Acess Modal (Lead) */}
             {showLeadModal && (
-                <div className="fixed inset-0 z-[500] flex items-center justify-center p-6 bg-black/90 backdrop-blur-2xl animate-in fade-in">
+                <div className="fixed inset-0 z-[500] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl animate-in fade-in">
                     <div className="w-full max-w-lg bg-[#0A0A0C] rounded-[3.5rem] p-12 shadow-[0_0_100px_rgba(245,158,11,0.15)] relative border border-amber-500/20 overflow-hidden animate-ios-pop">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full -mr-16 -mt-16 blur-3xl"></div>
                         

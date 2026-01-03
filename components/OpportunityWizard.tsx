@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { Opportunity, Archetype, IntensityLevel, RDEStatus, TadsCriteria, getTerminology } from '../types';
-import { ArrowLeft, Check, Loader2, Target, ShieldCheck, Zap, DollarSign, BrainCircuit, LayoutGrid, Sparkles, X, ChevronRight, Layers, Gauge, ShieldAlert, Info } from 'lucide-react';
+import { Opportunity, Archetype, IntensityLevel, RDEStatus, TadsCriteria, getTerminology, ProjectStatus } from '../types';
+import { ArrowLeft, Check, Loader2, Target, ShieldCheck, Zap, DollarSign, BrainCircuit, LayoutGrid, Sparkles, X, ChevronRight, Layers, Gauge, ShieldAlert, Info, PlayCircle, Timer } from 'lucide-react';
 
 interface Props {
   initialData?: Partial<Opportunity>;
@@ -37,6 +37,12 @@ const STEPS = [
     { id: 3, label: 'Crivo Técnico', icon: ShieldCheck }
 ];
 
+const STATUS_OPTIONS: { value: ProjectStatus; label: string }[] = [
+    { value: 'Future', label: 'Mapear como Oportunidade (Backlog)' },
+    { value: 'Negotiation', label: 'Mapear como Negociação (Comercial)' },
+    { value: 'Active', label: 'Ativar Imediatamente (Execução)' }
+];
+
 export default function OpportunityWizard({ initialData, onSave, onCancel, orgType, customLogoUrl }: Props) {
   const [step, setStep] = useState(0);
   const terms = getTerminology(orgType);
@@ -68,7 +74,7 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
           prioScore: prioScore,
           tadsScore: tadsScore,
           createdAt: initialData?.createdAt || new Date().toISOString(),
-          status: initialData?.status || 'Future'
+          status: formData.status || 'Future'
       } as Opportunity);
       setIsSaving(false);
   };
@@ -131,7 +137,7 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                                 <Sparkles className="w-6 h-6 lg:w-8 lg:h-8"/>
                             </div>
                             <h3 className="text-4xl lg:text-6xl font-black text-[var(--text-main)] tracking-tighter leading-[1.1]">Onde está o <br/><span className="text-amber-500">Valor?</span></h3>
-                            <p className="text-slate-500 dark:text-slate-400 text-base lg:text-xl font-medium max-w-lg">Defina o nome e o contexto estratégico do seu novo projeto.</p>
+                            <p className="text-slate-500 dark:text-slate-400 text-base lg:text-xl font-medium max-w-lg">Defina o nome, contexto e o estado inicial do seu ativo.</p>
                         </div>
                         <div className="space-y-8 lg:space-y-10">
                             <div>
@@ -144,6 +150,25 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                                     className="w-full bg-[var(--input-bg)] border border-[var(--border-color)] rounded-[1.5rem] lg:rounded-[2rem] p-6 lg:p-8 text-2xl lg:text-4xl font-black text-[var(--text-main)] outline-none focus:border-amber-500/50 transition-all shadow-inner"
                                 />
                             </div>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
+                                <div>
+                                    <label className="text-[8px] lg:text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-3 block ml-1">Estado de Governança</label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        {STATUS_OPTIONS.map(opt => (
+                                            <button
+                                                key={opt.value}
+                                                type="button"
+                                                onClick={() => setFormData({...formData, status: opt.value})}
+                                                className={`p-4 rounded-2xl border text-[10px] font-black uppercase tracking-widest transition-all ${formData.status === opt.value ? 'bg-amber-500 border-amber-400 text-black shadow-lg scale-105' : 'bg-white/5 border-white/10 text-slate-500 hover:bg-white/10'}`}
+                                            >
+                                                {opt.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
                             <div>
                                 <label className="text-[8px] lg:text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-3 block ml-1">Escopo e Missão</label>
                                 <textarea 
@@ -272,7 +297,7 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                                 >
                                     <div className="max-w-[80%] lg:max-w-[85%]">
                                         <div className={`text-sm lg:text-xl font-black uppercase tracking-tight mb-1 lg:mb-2 ${formData.tads?.[item.key as keyof TadsCriteria] ? 'text-black' : 'text-[var(--text-main)]'}`}>{item.label}</div>
-                                        <div className={`text-[10px] lg:text-sm font-medium leading-relaxed ${formData.tads?.[item.key as keyof TadsCriteria] ? 'text-black/70' : 'text-slate-500 dark:text-slate-400'}`}>{item.desc}</div>
+                                        <div className={`text-[10px] lg:sm font-medium leading-relaxed ${formData.tads?.[item.key as keyof TadsCriteria] ? 'text-black/70' : 'text-slate-500 dark:text-slate-400'}`}>{item.desc}</div>
                                     </div>
                                     <div className={`w-10 h-10 lg:w-14 lg:h-14 rounded-xl lg:rounded-2xl flex items-center justify-center border-2 transition-all ${formData.tads?.[item.key as keyof TadsCriteria] ? 'bg-black text-emerald-500 border-black' : 'border-slate-200 dark:border-white/10 group-hover:border-amber-500/50 shadow-sm'}`}>
                                         {formData.tads?.[item.key as keyof TadsCriteria] && <Check className="w-5 h-5 lg:w-8 lg:h-8 stroke-[4px]"/>}

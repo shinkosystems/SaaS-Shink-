@@ -5,7 +5,7 @@ import {
     LogOut, Sun, Moon, Briefcase, TrendingUp,
     Users, DollarSign, Shield, Sparkles, Menu, X, ChevronRight,
     Code2, BarChart3, Plus, Microscope, Activity, CheckSquare, Lightbulb,
-    User
+    User, Box, GanttChart
 } from 'lucide-react';
 import { PLAN_LIMITS } from '../types';
 import { fetchOrganizationDetails } from '../services/organizationService';
@@ -61,7 +61,8 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, activeModules: string
         {
             title: 'Gestão',
             items: [
-                { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }
+                { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+                { id: 'ecosystem', label: 'Ecossistema', icon: Box }
             ]
         },
         {
@@ -130,12 +131,14 @@ export const Sidebar: React.FC<Props> = (props) => {
 
   return (
     <aside className="hidden lg:flex flex-col w-64 h-full border-r border-slate-200 dark:border-white/5 bg-white dark:bg-[#0A0A0B] shrink-0 overflow-hidden">
-        <div className="h-10 flex items-center justify-end px-6 shrink-0">
+        <div className="h-14 flex items-center justify-end px-6 shrink-0 pt-2">
             <button 
                 onClick={props.onOpenFeedback}
-                className="p-1.5 text-amber-500 hover:bg-amber-500/10 rounded-lg transition-all"
+                title="Central de Insights"
+                className="p-2.5 bg-amber-500 hover:bg-amber-400 text-black rounded-2xl shadow-glow-amber hover:scale-110 active:scale-95 transition-all animate-pulse relative z-50 group"
             >
-                <Lightbulb className="w-3.5 h-3.5"/>
+                <Lightbulb className="w-5 h-5 stroke-[2.5px] group-hover:rotate-12 transition-transform"/>
+                <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 border-2 border-white dark:border-[#0A0A0B] rounded-full"></span>
             </button>
         </div>
 
@@ -186,7 +189,7 @@ export const Sidebar: React.FC<Props> = (props) => {
                 >
                     {props.theme === 'dark' ? <Sun className="w-3.5 h-3.5"/> : <Moon className="w-3.5 h-3.5"/>}
                 </button>
-                <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest">Build 2.5.1</span>
+                <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest">Build 2.5.5</span>
             </div>
 
             <div 

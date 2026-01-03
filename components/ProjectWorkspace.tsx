@@ -1,13 +1,13 @@
 
-// Add useState hook to React imports
-import React, { useState } from 'react';
-import { Opportunity, BpmnTask, ProjectStatus } from '../types';
+import React, { useState, useEffect } from 'react';
+import { Opportunity, BpmnTask, DbTask } from '../types';
 import { KanbanBoard } from './KanbanBoard';
 import { GanttView } from './GanttView';
 import { CalendarView } from './CalendarView';
 import OpportunityDetail from './OpportunityDetail'; 
 import BpmnBuilder from './BpmnBuilder';
-import { ArrowLeft, LayoutDashboard, Trello, GanttChartSquare, Calendar as CalendarIcon, Edit, Workflow, ChevronRight, Sparkles, Lock } from 'lucide-react';
+import { ArrowLeft, LayoutDashboard, Trello, GanttChartSquare, Calendar as CalendarIcon, Edit, Workflow, ChevronRight, Sparkles, Lock, Loader2 } from 'lucide-react';
+import { fetchAllTasks } from '../services/projectService';
 
 interface Props {
   opportunity: Opportunity;
@@ -45,8 +45,29 @@ type Tab = 'overview' | 'bpms' | 'kanban' | 'calendar' | 'gantt';
 
 export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdate, onEdit, onDelete, userRole, currentPlan, isSharedMode, activeModules, customLogoUrl, orgName }) => {
   const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const [projectTasks, setProjectTasks] = useState<DbTask[]>([]);
+  const [loadingTasks, setLoadingTasks] = useState(false);
+
   const isClient = userRole === 'cliente';
   const readOnly = isClient || isSharedMode;
+
+  useEffect(() => {
+    loadProjectTasks();
+  }, [opportunity.id]);
+
+  const loadProjectTasks = async () => {
+    if (!opportunity.organizationId) return;
+    setLoadingTasks(true);
+    try {
+        const all = await fetchAllTasks(opportunity.organizationId);
+        const filtered = all.filter(t => t.projeto?.toString() === (opportunity.dbProjectId?.toString() || opportunity.id));
+        setProjectTasks(filtered);
+    } catch (e) {
+        console.error("Erro ao carregar tarefas do projeto:", e);
+    } finally {
+        setLoadingTasks(false);
+    }
+  };
 
   const tabs = [
       { id: 'overview', label: 'Geral', icon: LayoutDashboard, moduleId: 'projects' },
@@ -85,6 +106,7 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
           </div>
           
           <div className="flex gap-2">
+              {loadingTasks && <Loader2 className="w-5 h-5 animate-spin text-amber-500 mr-4 mt-2" />}
               {readOnly ? (
                   <div className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-white/5 text-slate-400 rounded-xl text-[10px] font-black uppercase tracking-widest border border-slate-200 dark:border-white/10">
                       <Lock className="w-3 h-3"/> Somente Leitura
@@ -146,13 +168,12 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
           {activeTab === 'kanban' && (
               <div className="h-full p-4 lg:p-8 overflow-y-auto custom-scrollbar">
                   <KanbanBoard 
+                      tasks={projectTasks}
                       onSelectOpportunity={() => {}} 
                       userRole={userRole}
-                      projectId={opportunity.dbProjectId?.toString() || opportunity.id}
                       organizationId={opportunity.organizationId} 
-                      currentPlan={currentPlan}
-                      activeModules={activeModules}
                       readOnly={readOnly}
+                      onRefresh={loadProjectTasks}
                   />
               </div>
           )}
@@ -160,9 +181,10 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
           {activeTab === 'gantt' && (
               <div className="h-full p-4 lg:p-8 overflow-hidden">
                   <GanttView 
+                      tasks={projectTasks}
                       opportunities={[opportunity]} 
                       onSelectOpportunity={() => {}} 
-                      onTaskUpdate={() => {}} 
+                      onTaskUpdate={loadProjectTasks} 
                       userRole={userRole}
                       projectId={opportunity.dbProjectId?.toString() || opportunity.id}
                       organizationId={opportunity.organizationId}
@@ -174,9 +196,10 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
           {activeTab === 'calendar' && (
               <div className="h-full p-4 lg:p-8 overflow-y-auto custom-scrollbar">
                   <CalendarView 
+                      tasks={projectTasks}
                       opportunities={[opportunity]} 
                       onSelectOpportunity={() => {}} 
-                      onTaskUpdate={() => {}} 
+                      onTaskUpdate={loadProjectTasks} 
                       userRole={userRole}
                       projectId={opportunity.dbProjectId?.toString() || opportunity.id}
                       organizationId={opportunity.organizationId}

@@ -14,10 +14,8 @@ export const fetchOpportunities = async (organizationId?: number, clientId?: str
       .order('prioseis', { ascending: false });
 
     if (clientId) {
-        // Se for um cliente logado, filtra apenas pelos projetos dele
         query = query.eq('cliente', clientId);
     } else if (organizationId !== undefined && organizationId !== null) {
-        // Se for membro da org, filtra pela org
         query = query.eq('organizacao', organizationId);
     } else {
         return [];
@@ -26,12 +24,10 @@ export const fetchOpportunities = async (organizationId?: number, clientId?: str
     const { data: projects, error } = await query;
     if (error) return null;
 
-    // Se não há projetos, retorna vazio
     if (!projects || projects.length === 0) return [];
 
     const projectIds = projects.map(p => p.id);
 
-    // Buscar tarefas vinculadas a estes projetos
     let tasksQuery = supabase.from('tasks').select('*').in('projeto', projectIds);
     const { data: tasks } = await tasksQuery;
 
@@ -81,10 +77,7 @@ export const createOpportunity = async (opp: Opportunity): Promise<Opportunity |
             targetOrgId = u?.organizacao;
         }
 
-        if (!targetOrgId) {
-            console.error("createOpportunity: Falha ao identificar organização.");
-            return null;
-        }
+        if (!targetOrgId) return null;
 
         const dbPayload = mapOpportunityToDbProject({ ...opp, organizationId: Number(targetOrgId) });
         delete dbPayload.id; 
@@ -97,7 +90,6 @@ export const createOpportunity = async (opp: Opportunity): Promise<Opportunity |
         
         if (error) throw new Error(`Falha no banco: ${error.message}`);
 
-        // Provisionamento de tarefas iniciais se houver estrutura BPMN
         if (opp.bpmn?.nodes && opp.bpmn.nodes.length > 0) {
             const defaultAssignee = auth.user?.id;
             for (const node of opp.bpmn.nodes) {
@@ -174,9 +166,7 @@ export const deleteOpportunity = async (id: string | number): Promise<boolean> =
         }
         const { error } = await supabase.from(TABLE_NAME).delete().eq('id', numericId);
         return !error;
-    } catch (err) { 
-        return false; 
-    }
+    } catch (err) { return false; }
 };
 
 const mapDbProjectToOpportunity = (row: DbProject, tasks: DbTask[] = []): Opportunity => {
@@ -189,6 +179,9 @@ const mapDbProjectToOpportunity = (row: DbProject, tasks: DbTask[] = []): Opport
     };
 
     const bpmnStructure = row.bpmn_structure || { lanes: [], nodes: [], edges: [] };
+    
+    // Tenta ler o status específico do JSONB, se não houver, usa o boolean legado
+    const savedStatus = (bpmnStructure as any).status || (row.projoport ? 'Future' : 'Active');
 
     return {
         id: row.id.toString(),
@@ -206,7 +199,7 @@ const mapDbProjectToOpportunity = (row: DbProject, tasks: DbTask[] = []): Opport
         tads: tads,
         tadsScore: Object.values(tads).filter(Boolean).length * 2, 
         evidence: { clientsAsk: [], clientsSuffer: [], wontPay: [] },
-        status: row.projoport ? 'Future' : 'Active',
+        status: savedStatus,
         createdAt: row.created_at,
         bpmn: bpmnStructure,
         dbProjectId: row.id,
@@ -216,6 +209,9 @@ const mapDbProjectToOpportunity = (row: DbProject, tasks: DbTask[] = []): Opport
 };
 
 const mapOpportunityToDbProject = (opp: Opportunity): any => {
+    // Sincroniza o status para dentro da estrutura BPMN para persistência total
+    const updatedBpmn = { ...opp.bpmn, status: opp.status };
+
     return {
         nome: opp.title || 'Sem Título',
         descricao: opp.description || '',
@@ -233,8 +229,8 @@ const mapOpportunityToDbProject = (opp: Opportunity): any => {
         tadsrecorrencia: !!opp.tads?.recurring,
         tadsvelocidade: !!opp.tads?.mvpSpeed,
         organizacao: Number(opp.organizationId), 
-        projoport: opp.status === 'Future' || opp.status === 'Negotiation' || opp.status === 'Frozen',
-        bpmn_structure: opp.bpmn || {},
+        projoport: opp.status !== 'Active', // Active é falso (é projeto), outros são verdadeiro (é oportunidade)
+        bpmn_structure: updatedBpmn,
         contexto_ia: opp.docsContext || '',
         cor: opp.color || '#F59E0B'
     };

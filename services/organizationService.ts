@@ -73,7 +73,8 @@ export const createOrganization = async (userId: string, name: string, sector: s
                 email: userEmail || '',
                 organizacao: org.id, 
                 perfil: 'dono',
-                status: 'Ativo'
+                status: 'Ativo',
+                ativo: true // Solicitação: Novo usuário ativo por padrão
             });
         
         if (userError) throw userError;

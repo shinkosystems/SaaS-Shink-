@@ -1,5 +1,4 @@
 
-
 import Stripe from 'https://esm.sh/stripe@14.21.0'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -78,7 +77,18 @@ Deno.serve(async (req) => {
                 console.error('[Webhook] Erro ao atualizar organização:', orgError)
                 return new Response('Database Error (Org Update)', { status: 500 })
             }
-            console.log(`[Webhook] Organização ${orgId} atualizada com plano ${planId} e limite ${updatePayload.colaboradores}.`)
+
+            // 3. REATIVAR TODOS OS USUÁRIOS DA ORGANIZAÇÃO (Solicitação: Ativo = True)
+            const { error: userActiveError } = await supabase
+                .from('users')
+                .update({ ativo: true })
+                .eq('organizacao', parseInt(orgId));
+
+            if (userActiveError) {
+                console.error('[Webhook] Erro ao reativar usuários:', userActiveError);
+            }
+
+            console.log(`[Webhook] Organização ${orgId} atualizada com plano ${planId} e usuários reativados.`)
         } else {
             console.warn('[Webhook] OrgID não encontrado nos metadados. Apenas histórico foi salvo.')
         }

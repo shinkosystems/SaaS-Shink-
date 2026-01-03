@@ -157,9 +157,10 @@ export const Sidebar: React.FC<Props> = (props) => {
             <button 
                 type="button"
                 onClick={props.onOpenFeedback}
-                className="p-2 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/20 text-amber-500 dark:text-amber-400 transition-colors relative z-50 cursor-pointer"
+                title="Sugerir Melhoria"
+                className="p-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-black shadow-glow-amber hover:scale-110 transition-all relative z-50 cursor-pointer animate-pulse group"
             >
-                <Lightbulb className="w-5 h-5"/>
+                <Lightbulb className="w-5 h-5 stroke-[2.5px] group-hover:rotate-12 transition-transform"/>
             </button>
         </div>
 

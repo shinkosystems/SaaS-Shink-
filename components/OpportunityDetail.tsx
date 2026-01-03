@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
-import { Opportunity, BpmnTask } from '../types';
+
+import React, { useState, useRef, useEffect } from 'react';
+import { Opportunity, BpmnTask, ProjectStatus } from '../types';
 import { TaskDetailModal } from './TaskDetailModal';
 import { 
     Activity, Target, Zap, DollarSign, Calendar, Clock, Lock, 
     ArrowLeft, MoreHorizontal, FileText, Edit2, Check, X, 
-    ChevronDown, ChevronUp, Layers, Rocket, ShieldCheck, TrendingUp, Trash2
+    ChevronDown, ChevronUp, Layers, Rocket, ShieldCheck, TrendingUp, Trash2,
+    PlayCircle, PauseCircle, Timer, Archive, CheckCircle2
 } from 'lucide-react';
 import { updateTask, deleteTask } from '../services/projectService';
 
@@ -19,15 +21,43 @@ interface Props {
   isSharedMode?: boolean;
 }
 
+const STATUS_OPTIONS: { value: ProjectStatus; label: string; color: string; icon: any }[] = [
+    { value: 'Active', label: 'EM EXECUÇÃO', color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20', icon: PlayCircle },
+    { value: 'Negotiation', label: 'NEGOCIAÇÃO', color: 'text-blue-500 bg-blue-500/10 border-blue-500/20', icon: DollarSign },
+    { value: 'Future', label: 'OPORTUNIDADE', color: 'text-amber-500 bg-amber-500/10 border-amber-500/20', icon: Timer },
+    { value: 'Frozen', label: 'CONGELADO', color: 'text-slate-400 bg-slate-400/10 border-slate-400/20', icon: PauseCircle },
+    { value: 'Archived', label: 'ARQUIVADO', color: 'text-red-400 bg-red-400/10 border-red-400/20', icon: Archive }
+];
+
 const OpportunityDetail: React.FC<Props> = ({ 
     opportunity, onClose, onDelete, onUpdate, userRole
 }) => {
     const [isEditingDesc, setIsEditingDesc] = useState(false);
     const [descText, setDescText] = useState(opportunity.description || '');
+    const [isStatusMenuOpen, setIsStatusMenuOpen] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
     
     const totalTasks = opportunity.bpmn?.nodes?.reduce((acc, node) => acc + node.checklist.length, 0) || 0;
     const completedTasks = opportunity.bpmn?.nodes?.reduce((acc, node) => acc + node.checklist.filter(t => t.status === 'done').length, 0) || 0;
     const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+    // Fecha o menu ao clicar fora
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setIsStatusMenuOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const handleStatusSelect = (newStatus: string) => {
+        if (userRole === 'cliente') return;
+        setIsStatusMenuOpen(false);
+        const updatedOpp = { ...opportunity, status: newStatus };
+        onUpdate(updatedOpp);
+    };
 
     const handleSaveDescription = async () => {
         setIsEditingDesc(false);
@@ -56,33 +86,68 @@ const OpportunityDetail: React.FC<Props> = ({
         </div>
     );
 
+    const currentStatusObj = STATUS_OPTIONS.find(s => s.value === opportunity.status) || STATUS_OPTIONS[2];
+
     return (
         <div className="max-w-7xl mx-auto p-6 md:p-12 space-y-10 animate-in slide-in-from-bottom-4 duration-500">
             
             {/* Header Contexto */}
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 pb-8 border-b border-slate-200 dark:border-[#333]">
-                <div className="space-y-2 w-full">
-                    <div className="flex items-center gap-2">
-                        <span className="shrink-0 px-2.5 py-0.5 bg-amber-500/10 text-amber-500 rounded-lg text-[8px] font-bold uppercase tracking-widest border border-amber-500/20">
+                <div className="space-y-4 w-full">
+                    <div className="flex items-center gap-3">
+                        
+                        {/* SELETOR DE STATUS CUSTOMIZADO (SOLICITAÇÃO) */}
+                        <div className="relative" ref={menuRef}>
+                            <button 
+                                onClick={() => userRole !== 'cliente' && setIsStatusMenuOpen(!isStatusMenuOpen)}
+                                className={`flex items-center gap-3 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${currentStatusObj.color} hover:scale-[1.02] active:scale-[0.98]`}
+                            >
+                                <currentStatusObj.icon className="w-3.5 h-3.5" />
+                                {currentStatusObj.label}
+                                <ChevronDown className={`w-3 h-3 transition-transform duration-300 ${isStatusMenuOpen ? 'rotate-180' : ''}`} />
+                            </button>
+
+                            {isStatusMenuOpen && (
+                                <div className="absolute top-full left-0 mt-2 w-64 bg-white/95 dark:bg-[#1A1A1E] backdrop-blur-3xl rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden z-[500] animate-in fade-in zoom-in-95 duration-200 p-1.5">
+                                    {STATUS_OPTIONS.map(opt => (
+                                        <button
+                                            key={opt.value}
+                                            onClick={() => handleStatusSelect(opt.value)}
+                                            className={`w-full flex items-center justify-between px-5 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${opportunity.status === opt.value ? 'bg-[#007AFF] text-white' : 'text-slate-700 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/5'}`}
+                                        >
+                                            <span className="flex items-center gap-3">
+                                                <opt.icon className={`w-4 h-4 ${opportunity.status === opt.value ? 'text-white' : 'text-slate-400'}`} />
+                                                {opt.label}
+                                            </span>
+                                            {opportunity.status === opt.value && <Check className="w-4 h-4 stroke-[4px]" />}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <span className="shrink-0 px-3 py-1.5 bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 rounded-xl text-[9px] font-black uppercase tracking-widest border border-slate-200 dark:border-white/5">
                             {opportunity.archetype}
                         </span>
-                        <span className="text-[10px] font-bold text-slate-500 dark:text-[#A1A1AA] uppercase tracking-widest flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                              • {new Date(opportunity.createdAt).toLocaleDateString()}
                         </span>
                     </div>
-                    <h1 className="text-3xl lg:text-5xl font-bold text-slate-900 dark:text-white tracking-tight leading-tight">{opportunity.title}</h1>
+                    <h1 className="text-4xl lg:text-6xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">{opportunity.title}</h1>
                 </div>
                 <div className="flex items-center gap-3 w-full lg:w-auto">
-                    <div className="flex-1 lg:flex-none flex items-center gap-3 p-3 border border-slate-200 dark:border-[#333] rounded-2xl">
-                         <TrendingUp className="w-4 h-4 text-emerald-500"/>
+                    <div className="flex-1 lg:flex-none flex items-center gap-4 p-4 border border-slate-200 dark:border-[#333] rounded-[1.5rem] bg-white dark:bg-white/[0.02]">
+                         <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                            <TrendingUp className="w-5 h-5"/>
+                         </div>
                          <div>
-                             <div className="text-[8px] font-bold text-slate-500 dark:text-[#A1A1AA] uppercase tracking-widest">Saúde Técnica</div>
-                             <div className="text-[11px] font-bold text-slate-900 dark:text-white">Alta Performance</div>
+                             <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Score de Saúde</div>
+                             <div className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">Alta Performance</div>
                          </div>
                     </div>
                     {userRole !== 'cliente' && (
-                        <button onClick={handleDelete} className="p-3 border border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white rounded-xl transition-all shadow-lg active:scale-95">
-                            <Trash2 className="w-5 h-5"/>
+                        <button onClick={handleDelete} className="p-4 border border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white rounded-2xl transition-all shadow-lg active:scale-95">
+                            <Trash2 className="w-6 h-6"/>
                         </button>
                     )}
                 </div>
@@ -90,37 +155,39 @@ const OpportunityDetail: React.FC<Props> = ({
 
             {/* Grid de Métricas */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <MetricCard label="PRIO-6 Score" value={opportunity.prioScore.toFixed(1)} icon={Target} color="bg-purple-500" subValue="Matemática" />
-                <MetricCard label="Progresso" value={`${progress}%`} icon={Activity} color="bg-blue-500" subValue={`${completedTasks}/${totalTasks}`} />
-                <MetricCard label="Velocidade" value={`${opportunity.velocity}/5`} icon={Zap} color="bg-amber-500" subValue="Time to MVP" />
-                <MetricCard label="Receita" value={`${opportunity.revenue}/5`} icon={DollarSign} color="bg-emerald-500" subValue="Comercial" />
+                <MetricCard label="PRIO-6 Score" value={opportunity.prioScore.toFixed(1)} icon={Target} color="bg-purple-500" subValue="Matemática de Valor" />
+                <MetricCard label="Entrega Técnica" value={`${progress}%`} icon={CheckCircle2} color="bg-emerald-500" subValue={`${completedTasks}/${totalTasks} Tasks`} />
+                <MetricCard label="Time to MVP" value={`${opportunity.velocity}/5`} icon={Zap} color="bg-amber-500" subValue="Velocidade de Saída" />
+                <MetricCard label="Impacto Financeiro" value={`${opportunity.revenue}/5`} icon={DollarSign} color="bg-blue-500" subValue="Variável Receita" />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Contexto Estratégico */}
                 <div className="lg:col-span-2 space-y-6">
-                    <div className="glass-card rounded-2xl overflow-hidden border border-slate-200 dark:border-[#333]">
-                        <div className="px-6 py-4 border-b border-slate-200 dark:border-[#333] flex justify-between items-center bg-slate-100/50 dark:bg-white/5">
-                            <h3 className="text-[9px] font-bold text-slate-500 dark:text-[#A1A1AA] uppercase tracking-[0.2em] flex items-center gap-2">
-                                <FileText className="w-4 h-4 text-amber-500"/> Contexto Estratégico
+                    <div className="glass-card rounded-[2.5rem] overflow-hidden border border-slate-200 dark:border-[#333] shadow-soft">
+                        <div className="px-8 py-5 border-b border-slate-200 dark:border-[#333] flex justify-between items-center bg-slate-50/50 dark:bg-white/5">
+                            <h3 className="text-[10px] font-black text-slate-500 dark:text-[#A1A1AA] uppercase tracking-[0.3em] flex items-center gap-3">
+                                <FileText className="w-4 h-4 text-amber-500"/> Missão Estratégica
                             </h3>
                             {!isEditingDesc && (
-                                <button onClick={() => setIsEditingDesc(true)} className="px-3 py-1.5 border border-slate-300 dark:border-[#333] text-slate-700 dark:text-white hover:bg-slate-900 dark:hover:bg-white hover:text-white dark:hover:text-black rounded-lg text-[9px] font-bold uppercase tracking-widest transition-all">
-                                    Editar
+                                <button onClick={() => setIsEditingDesc(true)} className="px-5 py-2 border border-slate-300 dark:border-[#333] text-slate-700 dark:text-white hover:bg-slate-900 dark:hover:bg-white hover:text-white dark:hover:text-black rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
+                                    Refinar Texto
                                 </button>
                             )}
                         </div>
-                        <div className="p-8">
+                        <div className="p-10">
                             {isEditingDesc ? (
                                 <div className="space-y-6">
-                                    <textarea value={descText} onChange={(e) => setDescText(e.target.value)} className="w-full h-80 p-5 rounded-xl text-base leading-relaxed text-slate-900 dark:text-white bg-slate-50 dark:bg-white/5 outline-none border border-amber-500/30 resize-none shadow-inner" autoFocus />
-                                    <div className="flex justify-end gap-3">
-                                        <button onClick={() => setIsEditingDesc(false)} className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-[#A1A1AA]">Descartar</button>
-                                        <button onClick={handleSaveDescription} className="px-6 py-2 bg-amber-500 text-black rounded-lg font-bold text-[10px] uppercase tracking-widest">Sincronizar</button>
+                                    <textarea value={descText} onChange={(e) => setDescText(e.target.value)} className="w-full h-80 p-8 rounded-[2rem] text-lg leading-relaxed text-slate-900 dark:text-white bg-slate-50 dark:bg-white/5 outline-none border border-amber-500/30 resize-none shadow-inner font-medium" autoFocus />
+                                    <div className="flex justify-end gap-4">
+                                        <button onClick={() => setIsEditingDesc(false)} className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Descartar</button>
+                                        <button onClick={handleSaveDescription} className="px-10 py-3 bg-slate-900 dark:bg-white text-white dark:text-black rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl">Sincronizar Ativo</button>
                                     </div>
                                 </div>
                             ) : (
-                                <p className="text-base lg:text-lg text-slate-600 dark:text-[#A1A1AA] leading-relaxed font-medium whitespace-pre-line">{opportunity.description || "Iniciativa sem contexto estratégico mapeado."}</p>
+                                <p className="text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium whitespace-pre-line">
+                                    {opportunity.description || "Iniciativa sem contexto estratégico mapeado."}
+                                </p>
                             )}
                         </div>
                     </div>
@@ -128,33 +195,34 @@ const OpportunityDetail: React.FC<Props> = ({
 
                 {/* Sidebar Metadados */}
                 <div className="space-y-6">
-                    <div className="glass-card p-8 rounded-2xl border border-slate-200 dark:border-[#333] space-y-6">
-                        <h3 className="text-[10px] font-bold text-slate-500 dark:text-[#A1A1AA] uppercase tracking-[0.2em] flex items-center gap-2 border-b border-slate-200 dark:border-[#333] pb-4">
-                            <ShieldCheck className="w-4 h-4 text-emerald-500"/> Crivo T.A.D.S.
+                    <div className="glass-card p-8 rounded-[2.5rem] border border-slate-200 dark:border-[#333] space-y-8 shadow-soft">
+                        <h3 className="text-[10px] font-black text-slate-500 dark:text-[#A1A1AA] uppercase tracking-[0.3em] flex items-center gap-3 border-b border-slate-100 dark:border-white/5 pb-5">
+                            <ShieldCheck className="w-4 h-4 text-emerald-500"/> Validação T.A.D.S.
                         </h3>
-                        <div className="space-y-3">
+                        <div className="space-y-4">
                             {Object.entries(opportunity.tads || {}).map(([key, value]) => (
-                                <div key={key} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 dark:border-[#333] group hover:border-slate-300 dark:hover:border-white/20 transition-all">
-                                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-[#A1A1AA]">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
-                                    {value ? <Check className="w-3.5 h-3.5 text-emerald-500 stroke-[4px]"/> : <span className="text-[8px] font-bold text-slate-300 dark:text-slate-700 uppercase">OFF</span>}
+                                <div key={key} className="flex items-center justify-between p-4 rounded-2xl border border-slate-50 dark:border-[#333] bg-slate-50/50 dark:bg-transparent group hover:border-amber-500/30 transition-all">
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-[#A1A1AA]">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
+                                    {value ? <Check className="w-4 h-4 text-emerald-500 stroke-[4px]"/> : <div className="w-1.5 h-1.5 rounded-full bg-slate-200 dark:bg-slate-800"></div>}
                                 </div>
                             ))}
                         </div>
                     </div>
 
-                    <div className="glass-card p-8 rounded-2xl border border-slate-200 dark:border-[#333] bg-gradient-to-br from-amber-500/[0.02] to-transparent">
-                        <h3 className="text-[10px] font-bold text-slate-500 dark:text-[#A1A1AA] uppercase tracking-[0.2em] mb-6">Governança</h3>
-                        <div className="space-y-4">
+                    <div className="glass-card p-8 rounded-[2.5rem] border border-slate-200 dark:border-[#333] bg-slate-900 text-white relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full -mr-16 -mt-16 blur-3xl opacity-50"></div>
+                        <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-8 relative z-10">Governança Industrial</h3>
+                        <div className="space-y-6 relative z-10">
                             {[
                                 { label: 'Arquétipo', val: opportunity.archetype, icon: Rocket },
-                                { label: 'Intensidade', val: `L${opportunity.intensity}`, icon: Zap },
-                                { label: 'ID', val: opportunity.id.substring(0, 8), mono: true, icon: Lock }
+                                { label: 'Intensidade', val: `Nível L${opportunity.intensity}`, icon: Zap },
+                                { label: 'Ativo ID', val: opportunity.id.substring(0, 8).toUpperCase(), mono: true, icon: Lock }
                             ].map((i, idx) => (
-                                <div key={idx} className="flex justify-between items-center border-b border-slate-100 dark:border-[#333] pb-3">
-                                    <span className="text-[9px] font-bold text-slate-500 dark:text-[#A1A1AA] uppercase tracking-widest flex items-center gap-2">
-                                        <i.icon className="w-3.5 h-3.5"/> {i.label}
+                                <div key={idx} className="flex justify-between items-center border-b border-white/5 pb-4">
+                                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-3">
+                                        <i.icon className="w-3.5 h-3.5 text-amber-500"/> {i.label}
                                     </span>
-                                    <span className={`text-[10px] font-bold text-slate-900 dark:text-white ${i.mono ? 'font-mono opacity-50' : ''}`}>{i.val}</span>
+                                    <span className={`text-[11px] font-black ${i.mono ? 'font-mono text-amber-500/80' : 'text-white'}`}>{i.val}</span>
                                 </div>
                             ))}
                         </div>

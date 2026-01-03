@@ -24,6 +24,7 @@ import { IntelligencePage } from './pages/IntelligencePage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { AdminPage } from './pages/AdminPage';
+import { EcosystemPage } from './pages/EcosystemPage';
 
 // Utility Components
 import AuthScreen from './components/AuthScreen';
@@ -35,7 +36,8 @@ import { GuruFab } from './components/GuruFab';
 import { FeedbackModal } from './components/FeedbackModal';
 import { LandingPage } from './components/LandingPage';
 import { InsightCenter } from './components/InsightCenter';
-import { Loader2 } from 'lucide-react';
+import { MetaController } from './components/MetaController';
+import { Loader2, AlertCircle, Zap, ArrowRight, CreditCard } from 'lucide-react';
 
 const ROUTES: Record<string, string> = {
     'dashboard': '/',
@@ -51,7 +53,8 @@ const ROUTES: Record<string, string> = {
     'intelligence': '/intelligence',
     'settings': '/settings',
     'profile': '/profile',
-    'admin-manager': '/admin'
+    'admin-manager': '/admin',
+    'ecosystem': '/ecosystem'
 };
 
 const REVERSE_ROUTES: Record<string, string> = Object.entries(ROUTES).reduce((acc, [key, value]) => {
@@ -68,36 +71,46 @@ const App: React.FC = () => {
   const [view, setViewState] = useState<string>('dashboard');
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeModules, setActiveModules] = useState<string[]>([]);
+  const [activeModules, setActiveModules] = useState<string[]>(['ia', 'projects', 'kanban']); 
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [selectedProject, setSelectedProjectState] = useState<Opportunity | null>(null);
   const [editingOpportunity, setEditingOpportunity] = useState<Opportunity | null>(null);
+  const [guruInitialPrompt, setGuruInitialPrompt] = useState<string | null>(null);
+  const [isUserActive, setIsUserActive] = useState<boolean>(true);
   
   const [theme, setTheme] = useState<'light'|'dark'>(() => {
     const saved = localStorage.getItem('shinko_theme');
     return (saved as 'light' | 'dark') || 'light';
   });
-  // Fix: use useState hook correctly instead of using the setter name as the initializer
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [showBlog, setShowBlog] = useState(false);
   const [blogPostSlug, setBlogPostSlug] = useState<string | null>(null);
-  // Fix: use useState hook correctly instead of using the setter name as the initializer
   const [orgDetails, setOrgDetails] = useState({ 
       name: '', limit: 1, logoUrl: null, primaryColor: '#F59E0B', aiSector: '', aiTone: '', aiContext: '' 
   });
   const [dbStatus, setDbStatus] = useState<'connected'|'disconnected'>('connected');
 
+  const [pageMeta, setPageMeta] = useState<{title?: string, description?: string, image?: string}>({});
+
   const handleRouting = async () => {
       let path = window.location.pathname;
-      if (path.startsWith('/blog')) {
+      if (path === '/') {
+          setPageMeta({ title: 'Home', description: 'Sistema Operacional para Framework Shinkō' });
+      } else if (path.startsWith('/blog')) {
           const slug = path.split('/')[2];
           setShowBlog(true);
           setBlogPostSlug(slug || null);
           return;
-      } else { setShowBlog(false); }
+      } else { 
+          setShowBlog(false); 
+          const viewKey = REVERSE_ROUTES[path];
+          if (viewKey) {
+              setPageMeta({ title: viewKey.charAt(0).toUpperCase() + viewKey.slice(1) });
+          }
+      }
 
       if (path === '/project/new') {
           setViewState('create-project');
@@ -113,6 +126,7 @@ const App: React.FC = () => {
 
           const opp = await fetchOpportunityById(projectId);
           if (opp) {
+              setPageMeta({ title: opp.title, description: opp.description?.substring(0, 160) });
               if (subAction === 'edit') {
                   setEditingOpportunity(opp);
                   setSelectedProjectState(null);
@@ -198,11 +212,14 @@ const App: React.FC = () => {
           const { data } = await supabase.from('users').select('*').eq('id', userId).single();
           if (data) {
               setUserData({ name: data.nome, email: data.email, avatar: data.avatar_url });
-              setUserRole(data.perfil || 'colaborador');
+              const currentRole = data.perfil || 'colaborador';
+              setUserRole(currentRole);
               setUserOrgId(data.organizacao);
+              setIsUserActive(data.ativo !== false); 
               
               if (data.organizacao) {
                   const { data: orgData } = await supabase.from('organizacoes').select('*').eq('id', data.organizacao).single();
+                  
                   if (orgData) {
                     setCurrentPlan(mapDbPlanIdToString(orgData.plano || 4));
                     setOrgDetails({
@@ -210,17 +227,23 @@ const App: React.FC = () => {
                         aiSector: orgData.setor || '', aiTone: orgData.tomdevoz || '', aiContext: orgData.dna || ''
                     });
 
-                    // BUSCA MÓDULOS REAIS SEM OVERRIDE HARCODED
                     const modules = await fetchActiveOrgModules(data.organizacao);
                     setActiveModules(modules.length > 0 ? modules : getPlanDefaultModules(orgData.plano || 4));
                   }
-                  const opps = await fetchOpportunities(data.organizacao);
+                  
+                  const clientId = currentRole === 'cliente' ? data.id : undefined;
+                  const opps = await fetchOpportunities(data.organizacao, clientId);
                   if (opps) setOpportunities(opps);
               }
               trackUserAccess(userId);
               subscribeToPresence(userId, setOnlineUsers);
           }
-      } catch (e) { setDbStatus('disconnected'); } finally { setLoading(false); }
+      } catch (e) { 
+          console.error("Erro no carregamento:", e);
+          setDbStatus('disconnected'); 
+      } finally { 
+          setLoading(false); 
+      }
   };
 
   const toggleTheme = () => {
@@ -231,9 +254,48 @@ const App: React.FC = () => {
       if (showBlog) return ( <InsightCenter initialPostSlug={blogPostSlug} onBack={() => { setShowBlog(false); navigateTo('/'); }} onEnter={() => setShowAuth(true)} /> );
       return (
           <>
+            <MetaController title="Home" description="Shinkō OS - Gestão de Inovação de Alta Performance" />
             <LandingPage onEnter={() => setShowAuth(true)} customName={orgDetails.name} onOpenBlog={() => { setShowBlog(true); navigateTo('/blog'); }} />
             {showAuth && <AuthScreen onClose={() => setShowAuth(false)} onGuestLogin={() => {}} customOrgName={orgDetails.name} />}
           </>
+      );
+  }
+
+  if (!isUserActive && user && !loading) {
+      return (
+          <div className="fixed inset-0 z-[5000] bg-white dark:bg-[#020203] flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-700">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(239,68,68,0.08),transparent_50%)] pointer-events-none"></div>
+              <div className="w-24 h-24 rounded-[2rem] bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500 mb-8 shadow-2xl animate-bounce">
+                  <AlertCircle className="w-12 h-12"/>
+              </div>
+              <h1 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white tracking-tighter leading-none mb-6">
+                  Sua assinatura <br/><span className="text-red-500">expirou</span>.
+              </h1>
+              <p className="text-slate-500 dark:text-slate-400 text-lg max-w-md font-medium mb-12">
+                  A conta <span className="text-slate-900 dark:text-white font-bold">{orgDetails.name}</span> atingiu o final do ciclo contratado. Renove agora para reativar sua engenharia de valor.
+              </p>
+              
+              <div className="flex flex-col sm:flex-row gap-4">
+                <button 
+                    onClick={() => setView('profile')} 
+                    className="px-10 py-5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 transition-all hover:scale-105 shadow-xl active:scale-95"
+                >
+                    <CreditCard className="w-5 h-5"/> Ver Planos de Renovação
+                </button>
+                <button 
+                    onClick={() => supabase.auth.signOut()} 
+                    className="px-10 py-5 bg-white/5 border border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 rounded-2xl font-black text-xs uppercase tracking-widest transition-all hover:bg-red-500/10 hover:text-red-500"
+                >
+                    Sair da Conta
+                </button>
+              </div>
+
+              <div className="mt-20 flex flex-col items-center gap-4">
+                  <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      <Zap className="w-3.5 h-3.5 text-amber-500"/> Seus dados estão seguros e criptografados.
+                  </div>
+              </div>
+          </div>
       );
   }
 
@@ -249,14 +311,13 @@ const App: React.FC = () => {
       organizationId: userOrgId
   };
 
-  const isMasterUser = userData?.email === 'peboorba@gmail.com' || userData?.email === 'shinkosystems@gmail.com';
-
   return (
     <div className="flex h-screen w-full bg-[var(--bg-color)] text-slate-900 transition-colors duration-300">
+        <MetaController {...pageMeta} />
         {view !== 'create-project' && !editingOpportunity && <Sidebar {...commonProps} />}
         {view !== 'create-project' && !editingOpportunity && <MobileDrawer {...commonProps} />}
         
-        <main className={`flex-1 overflow-hidden relative ${view !== 'create-project' && !editingOpportunity ? 'pt-20 lg:pt-0' : ''}`}>
+        <main className={`flex-1 overflow-hidden relative pt-16 lg:pt-0`}>
             <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-amber-500 w-8 h-8"/></div>}>
                 {editingOpportunity ? (
                     <OpportunityWizard 
@@ -273,7 +334,12 @@ const App: React.FC = () => {
                 ) : selectedProject ? (
                     <ProjectWorkspace 
                         opportunity={selectedProject} onBack={() => setSelectedProjectState(null)}
-                        onUpdate={(opp) => updateOpportunity(opp).then(() => loadUserData(user.id))}
+                        onUpdate={(opp) => {
+                            // ATUALIZAÇÃO REATIVA DO ESTADO LOCAL
+                            setSelectedProjectState(opp);
+                            setOpportunities(prev => prev.map(o => o.id === opp.id ? opp : o));
+                            updateOpportunity(opp).then(() => loadUserData(user.id));
+                        }}
                         onEdit={(opp) => onEditProject(opp)} 
                         onDelete={(id) => deleteOpportunity(id).then(() => setSelectedProjectState(null))}
                         userRole={userRole} currentPlan={currentPlan} activeModules={activeModules}
@@ -292,7 +358,7 @@ const App: React.FC = () => {
                                 await loadUserData(user.id);
                                 onOpenProject(newOpp);
                             } else {
-                                alert("Falha ao salvar o projeto. Verifique sua conexão.");
+                                alert("Falha ao salvar o projeto.");
                                 setView('dashboard');
                             }
                         }}
@@ -300,7 +366,11 @@ const App: React.FC = () => {
                     />
                 ) : (
                     <>
-                        {view === 'dashboard' && <DashboardPage opportunities={opportunities} onOpenProject={onOpenProject} onNavigate={setView} user={user} theme={theme} />}
+                        {view === 'dashboard' && <DashboardPage 
+                            opportunities={opportunities} onOpenProject={onOpenProject} 
+                            onNavigate={setView} user={user} theme={theme} 
+                            onGuruPrompt={(p) => setGuruInitialPrompt(p)}
+                        />}
                         {view === 'framework-system' && <FrameworkPage orgName={orgDetails.name} onBack={() => setView('dashboard')} onSaveToProject={async (opp) => {
                             const newOpp = await createOpportunity({ ...opp, organizationId: userOrgId || undefined });
                             if (newOpp) {
@@ -318,9 +388,10 @@ const App: React.FC = () => {
                         {view === 'financial' && <FinancialPage orgType={orgDetails.name} />}
                         {view === 'clients' && <ClientsPage userRole={userRole} onlineUsers={onlineUsers} organizationId={userOrgId || undefined} onOpenProject={onOpenProject} />}
                         {view === 'intelligence' && <IntelligencePage organizationId={userOrgId || undefined} opportunities={opportunities} />}
-                        {view === 'settings' && <SettingsPage theme={theme} onToggleTheme={toggleTheme} onlineUsers={onlineUsers} userOrgId={userOrgId} orgDetails={orgDetails} onUpdateOrgDetails={() => {}} setView={setView} userRole={userRole} userData={userData} activeModules={activeModules} onRefreshModules={() => {}} />}
+                        {view === 'settings' && <SettingsPage theme={theme} onToggleTheme={toggleTheme} onlineUsers={onlineUsers} userOrgId={userOrgId} orgDetails={orgDetails} onUpdateOrgDetails={() => {}} setView={setView} userRole={userRole} userData={userData} activeModules={activeModules} onRefreshModules={() => loadUserData(user.id)} />}
                         {view === 'profile' && <ProfilePage currentPlan={currentPlan} onRefresh={() => loadUserData(user.id)} />}
-                        {view === 'admin-manager' && isMasterUser && <AdminPage onlineUsers={onlineUsers} />}
+                        {view === 'admin-manager' && (userData?.email === 'peboorba@gmail.com') && <AdminPage onlineUsers={onlineUsers} />}
+                        {view === 'ecosystem' && <EcosystemPage organizationId={userOrgId} userRole={userRole} />}
                     </>
                 )}
             </Suspense>
@@ -333,7 +404,14 @@ const App: React.FC = () => {
             setShowCreateTask(false);
         }} userRole={userRole} />}
         {showFeedback && user && <FeedbackModal userId={user.id} onClose={() => setShowFeedback(false)} />}
-        {user && userRole !== 'cliente' && activeModules.includes('ia') && <GuruFab opportunities={opportunities} user={user} organizationId={userOrgId || undefined} onAction={(aid) => aid === 'create_task' ? setShowCreateTask(true) : setView(aid.replace('nav_', ''))} />}
+        {user && userRole !== 'cliente' && activeModules.includes('ia') && (
+            <GuruFab 
+                opportunities={opportunities} user={user} organizationId={userOrgId || undefined} 
+                onAction={(aid) => aid === 'create_task' ? setShowCreateTask(true) : setView(aid.replace('nav_', ''))} 
+                externalPrompt={guruInitialPrompt}
+                onExternalPromptConsumed={() => setGuruInitialPrompt(null)}
+            />
+        )}
         <NpsSurvey userId={user?.id} userRole={userRole} />
     </div>
   );
