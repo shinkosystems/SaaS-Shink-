@@ -5,7 +5,7 @@ import { PLAN_LIMITS } from '../types';
 const ORG_TABLE = 'organizacoes';
 const LOGO_BUCKET = 'fotoperfil'; 
 
-// System Modules Definition
+// Definição técnica dos módulos do sistema (coluna 'nome' da tabela 'modulos')
 export const SYSTEM_MODULES_DEF = [
     'projects', 'kanban', 'gantt', 'calendar', 'crm', 'financial', 'clients', 'engineering', 'product', 'ia', 'whitelabel', 'assets'
 ];
@@ -28,9 +28,6 @@ export const getPlanDefaultModules = (planId: number): string[] => {
     }
 };
 
-/**
- * Busca o ID da organização vinculada ao e-mail de um dono.
- */
 export const findOrgIdByOwnerEmail = async (email: string): Promise<number | null> => {
     try {
         const { data, error } = await supabase
@@ -55,7 +52,7 @@ export const createOrganization = async (userId: string, name: string, sector: s
                 nome: name, 
                 setor: sector, 
                 dna: dna || '',
-                plano: 4, // Default Free
+                plano: 4, 
                 colaboradores: 1,
                 pedidoia: 0,
                 cor: '#F59E0B'
@@ -74,7 +71,7 @@ export const createOrganization = async (userId: string, name: string, sector: s
                 organizacao: org.id, 
                 perfil: 'dono',
                 status: 'Ativo',
-                ativo: true // Solicitação: Novo usuário ativo por padrão
+                ativo: true 
             });
         
         if (userError) throw userError;
@@ -88,7 +85,9 @@ export const createOrganization = async (userId: string, name: string, sector: s
                 organizacao: org.id,
                 valormensal: 0,
                 meses: 12,
-                data_inicio: new Date().toISOString().split('T')[0]
+                data_inicio: new Date().toISOString().split('T')[0],
+                contrato: 'Draft',
+                logo_url: ''
             });
 
         return org;
@@ -117,23 +116,12 @@ export const uploadAvatar = async (userId: string, file: File) => {
     try {
         const fileExt = file.name.split('.').pop();
         const fileName = `fotoperfil/avatar-${userId}-${Date.now()}.${fileExt}`;
-        
-        const { error: uploadError } = await supabase.storage
-            .from(LOGO_BUCKET)
-            .upload(fileName, file, { upsert: true });
-        
+        const { error: uploadError } = await supabase.storage.from(LOGO_BUCKET).upload(fileName, file, { upsert: true });
         if (uploadError) throw uploadError;
-
         const { data } = supabase.storage.from(LOGO_BUCKET).getPublicUrl(fileName);
         const publicUrl = data.publicUrl;
-
-        const { error: updateError } = await supabase
-            .from('users')
-            .update({ avatar_url: publicUrl })
-            .eq('id', userId);
-
+        const { error: updateError } = await supabase.from('users').update({ avatar_url: publicUrl }).eq('id', userId);
         if (updateError) throw updateError;
-
         return publicUrl;
     } catch (error: any) {
         throw new Error(`Erro no upload da foto: ${error.message}`);
@@ -142,11 +130,7 @@ export const uploadAvatar = async (userId: string, file: File) => {
 
 export const fetchOrganizationDetails = async (orgId: number) => {
     try {
-        const { data, error } = await supabase
-            .from(ORG_TABLE)
-            .select('*')
-            .eq('id', orgId)
-            .single();
+        const { data, error } = await supabase.from(ORG_TABLE).select('*').eq('id', orgId).single();
         if (error && error.code !== 'PGRST116') console.error(`Error fetching organization details:`, error);
         return data;
     } catch (err) { return null; }
@@ -161,25 +145,12 @@ export const updateOrgDetails = async (orgId: number, updates: any) => {
     if (updates.aiSector !== undefined) payload.setor = updates.aiSector; 
     if (updates.aiTone !== undefined) payload.tomdevoz = updates.aiTone;
     if (updates.aiContext !== undefined) payload.dna = updates.aiContext;
-
     if (Object.keys(payload).length === 0) return { success: true };
-
     try {
         const { data, error } = await supabase.from(ORG_TABLE).update(payload).eq('id', orgId).select();
         if (error) throw new Error(error.message);
         return { success: true, data };
     } catch (err: any) { throw new Error(err.message); }
-};
-
-export const seedSystemModules = async () => {
-    try {
-        const { data: existing } = await supabase.from('modulos').select('nome');
-        const existingNames = new Set(existing?.map(m => m.nome.toLowerCase()) || []);
-        const toInsert = SYSTEM_MODULES_DEF.filter(key => !existingNames.has(key.toLowerCase())).map(key => ({ nome: key }));
-        if (toInsert.length > 0) await supabase.from('modulos').insert(toInsert);
-    } catch (e) {
-        console.warn("Seeding modules failed - ignore if not admin.");
-    }
 };
 
 export const fetchSystemModuleMap = async (): Promise<Record<string, number>> => {
@@ -194,9 +165,22 @@ export const fetchSystemModuleMap = async (): Promise<Record<string, number>> =>
 
 export const fetchActiveOrgModules = async (orgId: number): Promise<string[]> => {
     try {
-        const { data, error } = await supabase.from('organizacao_modulo').select('modulo (nome)').eq('organizacao', orgId);
-        if (error) return []; 
-        const modules = data.map((item: any) => item.modulo?.nome).filter(Boolean);
+        // Query explicitando o join com a tabela 'modulos' oficial
+        const { data, error } = await supabase
+            .from('organizacao_modulo')
+            .select(`
+                modulos (
+                    nome
+                )
+            `)
+            .eq('organizacao', orgId);
+
+        if (error) {
+            console.error("Erro ao buscar módulos ativos:", error.message);
+            return []; 
+        }
+
+        const modules = data?.map((item: any) => item.modulos?.nome).filter(Boolean) || [];
         
         if (modules.length === 0) {
              const { data: org } = await supabase.from(ORG_TABLE).select('plano').eq('id', orgId).single();
@@ -204,15 +188,17 @@ export const fetchActiveOrgModules = async (orgId: number): Promise<string[]> =>
         }
 
         return modules;
-    } catch (e) { return []; }
+    } catch (e) { 
+        console.error("Exceção ao carregar módulos ativos:", e);
+        return []; 
+    }
 };
 
 export const updateOrgModules = async (orgId: number, moduleKeys: string[]) => {
     try {
         const moduleMap = await fetchSystemModuleMap();
-        
         if (Object.keys(moduleMap).length === 0) {
-            throw new Error("Não foi possível carregar a lista de módulos do sistema.");
+            throw new Error("Não foi possível carregar o catálogo de módulos do sistema.");
         }
 
         const idsToInsert = moduleKeys
@@ -221,36 +207,52 @@ export const updateOrgModules = async (orgId: number, moduleKeys: string[]) => {
         
         return updateOrgModulesByIds(orgId, idsToInsert);
     } catch (err: any) { 
-        console.error("Erro em updateOrgModules:", err.message);
         throw new Error(err.message); 
     }
 };
 
 export const updateOrgModulesByIds = async (orgId: number, moduleIds: number[]) => {
     try {
-        const { error: deleteError } = await supabase.from('organizacao_modulo').delete().eq('organizacao', orgId);
+        // 1. Limpar vínculos antigos da organização
+        const { error: deleteError } = await supabase
+            .from('organizacao_modulo')
+            .delete()
+            .eq('organizacao', orgId);
+        
         if (deleteError) throw deleteError;
 
+        // 2. Inserir novos vínculos.
+        // IMPORTANTE: Como a coluna 'modulo2' ainda é NOT NULL no banco,
+        // mas está descontinuada, o SQL 'ALTER TABLE... DROP NOT NULL' deve ser executado.
+        // O payload abaixo foca apenas na coluna correta 'modulo'.
         if (moduleIds.length > 0) {
             const payload = moduleIds.map(modId => ({ 
                 organizacao: orgId, 
-                modulo: modId 
+                modulo: modId
+                // modulo2: null -- Isso causará erro se o DROP NOT NULL não for executado.
             }));
-            const { error: insertError } = await supabase.from('organizacao_modulo').insert(payload);
-            if (insertError) throw insertError;
+            
+            const { error: insertError } = await supabase
+                .from('organizacao_modulo')
+                .insert(payload);
+            
+            if (insertError) {
+                // Tratamento amigável para o erro de constraint enquanto o usuário não roda o SQL
+                if (insertError.message.includes('modulo2')) {
+                    throw new Error("Erro de Banco: A coluna legada 'modulo2' ainda está como obrigatória. Por favor, execute o script SQL de ajuste enviado pelo Guru.");
+                }
+                throw insertError;
+            }
         }
         return { success: true };
     } catch (err: any) { 
-        console.error("Erro em updateOrgModulesByIds:", err.message);
+        console.error("Erro técnico na sincronização de módulos:", err.message);
         throw new Error(err.message); 
     }
 };
 
 export const fetchRoles = async (orgId: number) => {
-    const { data, error } = await supabase
-        .from('area_atuacao')
-        .select('*')
-        .eq('empresa', orgId);
+    const { data, error } = await supabase.from('area_atuacao').select('*').eq('empresa', orgId);
     if (error) return [];
     return data.map((d: any) => ({
         id: d.id,
@@ -259,51 +261,31 @@ export const fetchRoles = async (orgId: number) => {
 };
 
 export const createRole = async (nome: string, orgId: number) => {
-    const { data, error } = await supabase
-        .from('area_atuacao')
-        .insert({ cargo: nome, empresa: orgId })
-        .select()
-        .single();
+    const { data, error } = await supabase.from('area_atuacao').insert({ cargo: nome, empresa: orgId }).select().single();
     if (error) throw error;
     return data;
 };
 
 export const deleteRole = async (id: number) => {
-    const { error } = await supabase
-        .from('area_atuacao')
-        .delete()
-        .eq('id', id);
+    const { error } = await supabase.from('area_atuacao').delete().eq('id', id);
     return !error;
 };
 
 export const fetchOrganizationMembersWithRoles = async (orgId: number) => {
-    const { data, error } = await supabase
-        .from('users')
-        .select(`id, nome, email, avatar_url, perfil, cargo`)
-        .eq('organizacao', orgId);
-    
+    const { data, error } = await supabase.from('users').select(`id, nome, email, avatar_url, perfil, cargo`).eq('organizacao', orgId);
     if (error) return [];
     return data;
 };
 
 export const updateUserRole = async (userId: string, roleId: number | null) => {
-    const { error } = await supabase
-        .from('users')
-        .update({ cargo: roleId })
-        .eq('id', userId);
+    const { error } = await supabase.from('users').update({ cargo: roleId }).eq('id', userId);
     return !error;
 };
 
 export const getPublicOrgDetails = async (orgId: number) => {
     try {
-        const { data, error } = await supabase
-            .from('organizacoes')
-            .select('nome, logo, cor, plano')
-            .eq('id', orgId)
-            .single();
+        const { data, error } = await supabase.from('organizacoes').select('nome, logo, cor, plano').eq('id', orgId).single();
         if (error) return null;
         return data;
-    } catch (e) {
-        return null;
-    }
+    } catch (e) { return null; }
 };

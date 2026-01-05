@@ -60,15 +60,15 @@ export const fetchGlobalMetrics = async (startDate?: string, endDate?: string): 
         let activeClients = 0;
         let avgTicket = 0;
 
-        const { data: historyData } = await supabase.from('cliente_plano').select('valor, datainicio, datafim, dono').lte('datainicio', end.toISOString());
+        const { data: historyData } = await supabase.from('cliente_plano').select('valor, datainicio, datafim, organizacao').lte('datainicio', end.toISOString());
         if (historyData) {
             const activeInPeriod = historyData.filter(h => {
                 const hStart = new Date(h.datainicio);
                 const hEnd = h.datafim ? new Date(h.datafim) : new Date('2099-12-31');
                 return hStart <= end && hEnd >= start;
             });
-            activeClients = new Set(activeInPeriod.map(h => h.dono)).size;
-            totalMrr = historyData.reduce((acc, h) => acc + (h.valor || 0), 0) / 12; // Média simples
+            activeClients = new Set(activeInPeriod.map(h => h.organizacao)).size;
+            totalMrr = historyData.reduce((acc, h) => acc + (h.valor || 0), 0) / 12; 
             avgTicket = activeClients > 0 ? totalMrr / activeClients : 0;
         }
 
@@ -92,7 +92,6 @@ export const fetchGlobalMetrics = async (startDate?: string, endDate?: string): 
 
 export const fetchAllUsers = async (): Promise<AdminUser[]> => {
     try {
-        // Removido filtro de perfil para trazer TODOS os usuários
         const { data: users, error: userError } = await supabase
             .from('users')
             .select('*')
@@ -184,12 +183,12 @@ export const approveSubscription = async (transactionId: string, orgId: number):
 
         await supabase.from('organizacoes').update(orgUpdate).eq('id', orgId);
 
-        // 3. Liberar Módulos
+        // 3. Liberar Módulos (Usando a tabela modulos v1 agora - coluna 'modulo')
         if (moduleIds && Array.isArray(moduleIds) && moduleIds.length > 0) {
             await updateOrgModulesByIds(orgId, moduleIds);
         }
 
-        // 4. ATUALIZAR TODOS OS USUÁRIOS DA ORGANIZAÇÃO PARA ATIVO = TRUE
+        // 4. Reativar usuários
         await supabase.from('users').update({ ativo: true }).eq('organizacao', orgId);
 
         // 5. Salvar histórico
@@ -197,8 +196,7 @@ export const approveSubscription = async (transactionId: string, orgId: number):
             organizacao: orgId,
             plano: meta.planId || 4,
             datainicio: new Date().toISOString().split('T')[0],
-            datafim: newExpiry.toISOString().split('T')[0],
-            dono: transData.metadata?.userId || null 
+            datafim: newExpiry.toISOString().split('T')[0]
         });
 
         return { success: true };
