@@ -5,7 +5,7 @@ import { PLAN_LIMITS } from '../types';
 const ORG_TABLE = 'organizacoes';
 const LOGO_BUCKET = 'fotoperfil'; 
 
-// Definição técnica dos módulos do sistema (coluna 'nome' da tabela 'modulos')
+// Definição técnica dos módulos do sistema (deve bater com a coluna 'nome' da tabela 'modulos')
 export const SYSTEM_MODULES_DEF = [
     'projects', 'kanban', 'gantt', 'calendar', 'crm', 'financial', 'clients', 'engineering', 'product', 'ia', 'whitelabel', 'assets'
 ];
@@ -221,15 +221,11 @@ export const updateOrgModulesByIds = async (orgId: number, moduleIds: number[]) 
         
         if (deleteError) throw deleteError;
 
-        // 2. Inserir novos vínculos.
-        // IMPORTANTE: Como a coluna 'modulo2' ainda é NOT NULL no banco,
-        // mas está descontinuada, o SQL 'ALTER TABLE... DROP NOT NULL' deve ser executado.
-        // O payload abaixo foca apenas na coluna correta 'modulo'.
+        // 2. Inserir novos vínculos usando a coluna correta 'modulo'
         if (moduleIds.length > 0) {
             const payload = moduleIds.map(modId => ({ 
                 organizacao: orgId, 
                 modulo: modId
-                // modulo2: null -- Isso causará erro se o DROP NOT NULL não for executado.
             }));
             
             const { error: insertError } = await supabase
@@ -237,9 +233,9 @@ export const updateOrgModulesByIds = async (orgId: number, moduleIds: number[]) 
                 .insert(payload);
             
             if (insertError) {
-                // Tratamento amigável para o erro de constraint enquanto o usuário não roda o SQL
+                // Se o erro ainda for 'modulo2', é porque o SQL de DROP NOT NULL não foi executado.
                 if (insertError.message.includes('modulo2')) {
-                    throw new Error("Erro de Banco: A coluna legada 'modulo2' ainda está como obrigatória. Por favor, execute o script SQL de ajuste enviado pelo Guru.");
+                    throw new Error("Erro de Banco: A coluna legada 'modulo2' ainda está como obrigatória. Por favor, execute o script SQL de ajuste enviado pelo Guru no Editor SQL do Supabase.");
                 }
                 throw insertError;
             }
@@ -284,7 +280,7 @@ export const updateUserRole = async (userId: string, roleId: number | null) => {
 
 export const getPublicOrgDetails = async (orgId: number) => {
     try {
-        const { data, error } = await supabase.from('organizacoes').select('nome, logo, cor, plano').eq('id', orgId).single();
+        const { data, error } = await supabase.from('organizacoes').select('nome, logo, core, plano').eq('id', orgId).single();
         if (error) return null;
         return data;
     } catch (e) { return null; }
