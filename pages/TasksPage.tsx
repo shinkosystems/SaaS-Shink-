@@ -18,9 +18,10 @@ interface Props {
     userRole: string;
     organizationId?: number;
     initialSubView?: 'kanban' | 'gantt' | 'calendar' | 'workload';
+    tasksVersion?: number;
 }
 
-export const TasksPage: React.FC<Props> = ({ opportunities, onOpenProject, userRole, organizationId, initialSubView = 'kanban' }) => {
+export const TasksPage: React.FC<Props> = ({ opportunities, onOpenProject, userRole, organizationId, initialSubView = 'kanban', tasksVersion = 0 }) => {
     const [subView, setSubView] = useState<'kanban' | 'gantt' | 'calendar' | 'workload'>(initialSubView as any);
     const [tasks, setTasks] = useState<DbTask[]>([]);
     const [loading, setLoading] = useState(true);
@@ -45,7 +46,7 @@ export const TasksPage: React.FC<Props> = ({ opportunities, onOpenProject, userR
             fetchOrgMembers(organizationId).then(setMembers);
             fetchProjects(organizationId).then(setProjects);
         }
-    }, [organizationId]);
+    }, [organizationId, tasksVersion]); // Adicionado tasksVersion como dependência
 
     const loadData = async () => {
         setLoading(true);
@@ -216,7 +217,7 @@ export const TasksPage: React.FC<Props> = ({ opportunities, onOpenProject, userR
             </div>
 
             <div className="flex-1 flex flex-col overflow-hidden relative">
-                {/* BARRA DE NAVEGAÇÃO DE PERÍODO (SOLICITAÇÃO 1) */}
+                {/* BARRA DE NAVEGAÇÃO DE PERÍODO */}
                 {filterTime !== 'custom' && (
                     <div className="px-6 md:px-8 py-3 bg-white dark:bg-[#0a0a0c] border-b border-slate-200 dark:border-white/5 flex items-center justify-between shrink-0">
                         <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-xl border border-slate-200 dark:border-white/10">

@@ -80,6 +80,7 @@ const App: React.FC = () => {
   const [editingOpportunity, setEditingOpportunity] = useState<Opportunity | null>(null);
   const [guruInitialPrompt, setGuruInitialPrompt] = useState<string | null>(null);
   const [isUserActive, setIsUserActive] = useState<boolean>(true);
+  const [tasksVersion, setTasksVersion] = useState(0); 
   
   const [theme, setTheme] = useState<'light'|'dark'>(() => {
     const saved = localStorage.getItem('shinko_theme');
@@ -335,7 +336,6 @@ const App: React.FC = () => {
                     <ProjectWorkspace 
                         opportunity={selectedProject} onBack={() => setSelectedProjectState(null)}
                         onUpdate={(opp) => {
-                            // ATUALIZAÇÃO REATIVA DO ESTADO LOCAL
                             setSelectedProjectState(opp);
                             setOpportunities(prev => prev.map(o => o.id === opp.id ? opp : o));
                             updateOpportunity(opp).then(() => loadUserData(user.id));
@@ -380,9 +380,9 @@ const App: React.FC = () => {
                         }} />}
                         {view === 'list' && <ProjectsPage opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} onRefresh={() => loadUserData(user.id)} />}
                         
-                        {view === 'kanban' && <TasksPage initialSubView="kanban" opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} />}
-                        {view === 'calendar' && <TasksPage initialSubView="calendar" opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} />}
-                        {view === 'gantt' && <TasksPage initialSubView="gantt" opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} />}
+                        {view === 'kanban' && <TasksPage initialSubView="kanban" opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} tasksVersion={tasksVersion} />}
+                        {view === 'calendar' && <TasksPage initialSubView="calendar" opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} tasksVersion={tasksVersion} />}
+                        {view === 'gantt' && <TasksPage initialSubView="gantt" opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} tasksVersion={tasksVersion} />}
                         
                         {view === 'crm' && <CrmPage organizationId={userOrgId || undefined} />}
                         {view === 'financial' && <FinancialPage orgType={orgDetails.name} />}
@@ -399,7 +399,21 @@ const App: React.FC = () => {
 
         {showCreateTask && <QuickTaskModal opportunities={opportunities} onClose={() => setShowCreateTask(false)} onSave={async (task, pid) => {
             if (!userOrgId || !user) return;
-            await createTask({...task, projeto: pid ? Number(pid) : null, responsavel: task.assigneeId || user.id, organizacao: userOrgId});
+            // MAPEAMENTO CORRETO: task.text do modal vira titulo no DB
+            await createTask({
+                titulo: task.text,
+                descricao: task.description,
+                status: task.status || 'todo',
+                responsavel: task.assigneeId || user.id,
+                projeto: pid ? Number(pid) : null,
+                organizacao: userOrgId,
+                duracaohoras: task.estimatedHours,
+                datafim: task.dueDate,
+                gravidade: task.gut?.g,
+                urgencia: task.gut?.u,
+                tendencia: task.gut?.t
+            });
+            setTasksVersion(v => v + 1); 
             loadUserData(user.id);
             setShowCreateTask(false);
         }} userRole={userRole} />}
