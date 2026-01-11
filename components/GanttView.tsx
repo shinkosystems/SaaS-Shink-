@@ -2,7 +2,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Opportunity, DbTask } from '../types';
 import { fetchAllTasks, updateTask, syncTaskChecklist, fetchOrgMembers } from '../services/projectService';
-import { optimizeSchedule } from '../services/geminiService';
 import { TaskDetailModal } from './TaskDetailModal';
 import { 
     ChevronLeft, ChevronRight, RefreshCw, Zap, Loader2, 
@@ -10,7 +9,7 @@ import {
 } from 'lucide-react';
 
 interface Props {
-  tasks: DbTask[]; // Recebe tarefas filtradas
+  tasks: DbTask[];
   opportunities: Opportunity[];
   onSelectOpportunity: (opp: Opportunity) => void;
   onTaskUpdate: () => void;
@@ -25,32 +24,8 @@ interface Props {
 export const GanttView: React.FC<Props> = ({ 
     tasks, opportunities, onSelectOpportunity, onTaskUpdate, userRole, projectId, organizationId, activeModules, customPrimaryColor, readOnly 
 }) => {
-    const [loading, setLoading] = useState(false);
-    const [isOptimizing, setIsOptimizing] = useState(false);
-    const [optimizationLog, setOptimizationLog] = useState<string>('');
     const [viewDate, setViewDate] = useState(new Date());
     const [editingTaskCtx, setEditingTaskCtx] = useState<any | null>(null);
-
-    const handleOptimize = async () => {
-        if (!organizationId) return;
-        if (readOnly) return;
-        setIsOptimizing(true);
-        setOptimizationLog('Guru analisando carga técnica...');
-        try {
-            const team = await fetchOrgMembers(organizationId);
-            const pendingTasks = tasks.filter(t => t.status !== 'done' && t.status !== 'approval');
-            if (pendingTasks.length === 0) { setOptimizationLog('Nenhuma tarefa pendente.'); setTimeout(() => setIsOptimizing(false), 2000); return; }
-            setOptimizationLog(`Calculando performance ótima...`);
-            const updates = await optimizeSchedule(pendingTasks, team);
-            if (updates && updates.length > 0) {
-                setOptimizationLog(`Sincronizando ${updates.length} alocações...`);
-                await Promise.all(updates.map(update => updateTask(update.id, { datainicio: update.startDate, datafim: update.dueDate, responsavel: update.assigneeId })));
-                setOptimizationLog('Cronograma Inteligente Aplicado!');
-                onTaskUpdate();
-            } else { setOptimizationLog('Cronograma já otimizado.'); }
-        } catch (e) { setOptimizationLog("Falha na sincronização via IA."); } 
-        finally { setTimeout(() => { setIsOptimizing(false); setOptimizationLog(''); }, 3000); }
-    };
 
     const daysInMonth = useMemo(() => {
         const year = viewDate.getFullYear();
@@ -99,13 +74,6 @@ export const GanttView: React.FC<Props> = ({
 
     return (
         <div className="flex flex-col h-full bg-slate-50 dark:bg-[#020203] rounded-[2.5rem] border border-slate-200 dark:border-white/10 overflow-hidden relative">
-            {isOptimizing && (
-                <div className="absolute top-0 left-0 right-0 z-[100] bg-purple-600 text-white px-6 py-4 flex items-center justify-center gap-4 animate-in slide-in-from-top-full duration-500 shadow-2xl">
-                    <Loader2 className="w-5 h-5 animate-spin"/>
-                    <span className="text-xs font-black uppercase tracking-[0.2em]">{optimizationLog}</span>
-                </div>
-            )}
-
             <div className="flex flex-col md:flex-row items-center justify-between p-6 border-b border-slate-200 dark:border-white/5 bg-white/80 dark:bg-[#0a0a0c]/80 backdrop-blur-xl gap-6 shrink-0 z-50">
                 <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-2xl border border-slate-200 dark:border-white/10 shadow-inner">
                     <button onClick={() => setViewDate(new Date(viewDate.setMonth(viewDate.getMonth() - 1)))} className="p-2 hover:bg-white dark:hover:bg-white/5 rounded-xl transition-all shadow-sm"><ChevronLeft className="w-5 h-5 text-slate-500"/></button>
@@ -115,10 +83,6 @@ export const GanttView: React.FC<Props> = ({
                     </div>
                     <button onClick={() => setViewDate(new Date(viewDate.setMonth(viewDate.getMonth() + 1)))} className="p-2 hover:bg-white dark:hover:bg-white/5 rounded-xl transition-all shadow-sm"><ChevronRight className="w-5 h-5 text-slate-500"/></button>
                 </div>
-                
-                <button onClick={handleOptimize} disabled={isOptimizing || readOnly} className="flex items-center gap-3 px-8 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-purple-500/20 disabled:opacity-50">
-                    {isOptimizing ? <Loader2 className="w-4 h-4 animate-spin"/> : <Zap className="w-4 h-4"/>} IA Smart Schedule
-                </button>
             </div>
 
             <div className="flex-1 overflow-auto custom-scrollbar bg-white dark:bg-black/20 relative">

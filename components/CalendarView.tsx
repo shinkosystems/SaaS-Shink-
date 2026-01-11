@@ -2,12 +2,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Opportunity, DbTask } from '../types';
 import { updateTask, fetchOrgMembers } from '../services/projectService';
-import { optimizeSchedule } from '../services/geminiService';
 import { TaskDetailModal } from './TaskDetailModal';
 import { ChevronLeft, ChevronRight, Sparkles, Loader2, CheckCircle2, ArrowRight } from 'lucide-react';
 
 interface Props {
-  tasks: DbTask[]; // Recebe tarefas filtradas
+  tasks: DbTask[]; 
   opportunities: Opportunity[];
   onSelectOpportunity: (opp: Opportunity) => void;
   onTaskUpdate: () => void;
@@ -21,27 +20,9 @@ type ViewMode = 'day' | 'week' | 'month';
 export const CalendarView: React.FC<Props> = ({ 
     tasks, opportunities, onSelectOpportunity, onTaskUpdate, userRole, projectId, organizationId 
 }) => {
-    const [isOptimizing, setIsOptimizing] = useState(false);
-    const [optimizationStep, setOptimizationStep] = useState<string>('');
     const [currentDate, setCurrentDate] = useState(new Date());
     const [viewMode, setViewMode] = useState<ViewMode>('month');
     const [editingTaskCtx, setEditingTaskCtx] = useState<any | null>(null);
-
-    const handleOptimizeWorkload = async () => {
-        if (!organizationId) return;
-        setIsOptimizing(true);
-        setOptimizationStep('Guru analisando carga técnica...');
-        try {
-            const team = await fetchOrgMembers(organizationId);
-            const pendingTasks = tasks.filter(t => !t.sutarefa && t.status !== 'done');
-            if (pendingTasks.length === 0) { setOptimizationStep('Nada para otimizar.'); setTimeout(() => setIsOptimizing(false), 2000); return; }
-            const optimized = await optimizeSchedule(pendingTasks, team);
-            if (optimized && optimized.length > 0) {
-                await Promise.all(optimized.map(item => updateTask(item.id, { datainicio: item.startDate, datafim: item.dueDate, responsavel: item.assigneeId })));
-                onTaskUpdate(); setOptimizationStep(`Cronograma Sincronizado!`);
-            } else { setOptimizationStep("Operação já otimizada."); }
-        } catch (error) { setOptimizationStep("Erro na IA."); } finally { setTimeout(() => { setIsOptimizing(false); setOptimizationStep(''); }, 3000); }
-    };
 
     const handleNavigate = (direction: 'prev' | 'next') => {
         const newDate = new Date(currentDate);
@@ -79,25 +60,16 @@ export const CalendarView: React.FC<Props> = ({
 
     return (
         <div className="flex flex-col h-full bg-white dark:bg-[#050507] rounded-[2.5rem] overflow-hidden shadow-glass border border-slate-200 dark:border-white/10 relative">
-            {isOptimizing && (
-                <div className="absolute top-0 left-0 right-0 z-50 bg-purple-600 text-white px-4 py-3 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-3 shadow-lg">
-                    {optimizationStep.includes('Sincronizado') ? <CheckCircle2 className="w-4 h-4"/> : <Loader2 className="w-4 h-4 animate-spin"/>}
-                    {optimizationStep}
-                </div>
-            )}
             <div className="flex flex-col md:flex-row items-center justify-between p-6 border-b border-slate-200 dark:border-white/5 gap-6 shrink-0">
                 <div className="flex bg-slate-100 dark:bg-white/5 p-1.5 rounded-2xl shadow-inner">
                     {['day', 'week', 'month'].map(m => (
                         <button key={m} onClick={() => setViewMode(m as any)} className={`px-6 py-2 text-[10px] font-black uppercase rounded-xl ${viewMode === m ? 'bg-white dark:bg-white/10 text-slate-900 dark:text-white' : 'text-slate-500'}`}>{m === 'day' ? 'Dia' : m === 'week' ? 'Semana' : 'Mês'}</button>
                     ))}
                 </div>
-                <div className="flex items-center gap-4">
-                    <button onClick={handleOptimizeWorkload} className="flex items-center gap-2 px-6 py-3 bg-purple-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-purple-500/20"><Sparkles className="w-4 h-4"/> Otimizar IA</button>
-                    <div className="flex items-center gap-2">
-                        <button onClick={() => handleNavigate('prev')} className="p-2.5 hover:bg-slate-100 rounded-xl"><ChevronLeft className="w-5 h-5"/></button>
-                        <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest w-48 text-center">{currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</h2>
-                        <button onClick={() => handleNavigate('next')} className="p-2.5 hover:bg-slate-100 rounded-xl"><ChevronRight className="w-5 h-5"/></button>
-                    </div>
+                <div className="flex items-center gap-2">
+                    <button onClick={() => handleNavigate('prev')} className="p-2.5 hover:bg-slate-100 rounded-xl"><ChevronLeft className="w-5 h-5"/></button>
+                    <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest w-48 text-center">{currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</h2>
+                    <button onClick={() => handleNavigate('next')} className="p-2.5 hover:bg-slate-100 rounded-xl"><ChevronRight className="w-5 h-5"/></button>
                 </div>
             </div>
             <div className="flex-1 overflow-y-auto custom-scrollbar">

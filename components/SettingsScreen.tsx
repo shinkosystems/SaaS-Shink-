@@ -8,7 +8,7 @@ import {
     Receipt, X, Image as ImageIcon, FileText, ArrowRight, ChevronRight,
     UserPlus, Mail, Shield, Zap, Rocket, Building, MonitorSmartphone, Activity
 } from 'lucide-react';
-import { fetchRoles, createRole, deleteRole, fetchOrganizationMembersWithRoles, updateUserRole, updateOrgModules, createOrganization, SYSTEM_MODULES_DEF } from '../services/organizationService';
+import { fetchRoles, createRole, deleteRole, fetchOrganizationMembersWithRoles, updateUserRole, updateOrgModules, createOrganization, SYSTEM_MODULES_DEF, updateOrgDetails } from '../services/organizationService';
 import { ElasticSwitch } from './ElasticSwitch';
 import { supabase } from '../services/supabaseClient';
 
@@ -32,13 +32,9 @@ const AVAILABLE_MODULES = [
     { id: 'projects', label: 'Gestão de Projetos', desc: 'Portfólio e lista de ativos estratégicos.', icon: Briefcase, price: 0, color: 'text-emerald-500', bg: 'bg-emerald-50' },
     { id: 'kanban', label: 'Kanban Board', desc: 'Gestão visual de tarefas e fluxos técnicos.', icon: LayoutGrid, price: 0, color: 'text-blue-500', bg: 'bg-blue-50' },
     { id: 'calendar', label: 'Agenda & Prazos', desc: 'Visualização cronológica de marcos e entregas.', icon: Calendar, price: 0, color: 'text-teal-500', bg: 'bg-teal-50' },
-    { id: 'assets', label: 'Gestão de Ativos', desc: 'Monitoramento de infraestrutura e performance.', icon: MonitorSmartphone, price: 29.90, color: 'text-indigo-500', bg: 'bg-indigo-50' }, 
     { id: 'crm', label: 'Vendas CRM', desc: 'Pipeline comercial e gestão de contratos.', icon: TrendingUp, price: 49.90, color: 'text-orange-500', bg: 'bg-orange-50' }, 
     { id: 'financial', label: 'Finanças & MRR', desc: 'Fluxo de caixa, DRE e métricas de recorrência.', icon: DollarSign, price: 39.90, color: 'text-emerald-600', bg: 'bg-emerald-50' }, 
     { id: 'ia', label: 'Inteligência (Guru)', desc: 'Assistente COO/CTO Virtual via IA Generativa.', icon: BrainCircuit, price: 59.90, color: 'text-purple-500', bg: 'bg-purple-50' },
-    { id: 'engineering', label: 'Engenharia (DORA)', desc: 'Métricas de elite para times de desenvolvimento.', icon: Code2, price: 69.90, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { id: 'product', label: 'Métricas de Produto', desc: 'Analytics comportamental e taxas de adoção.', icon: BarChart3, price: 69.90, color: 'text-pink-500', bg: 'bg-pink-50' },
-    { id: 'clients', label: 'Stakeholders', desc: 'Portal externo para transparência com clientes.', icon: Users, price: 39.90, color: 'text-amber-600', bg: 'bg-amber-50' },
 ];
 
 export const SettingsScreen: React.FC<Props> = ({ 
@@ -48,38 +44,17 @@ export const SettingsScreen: React.FC<Props> = ({
   const [roles, setRoles] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
-  const [processingModule, setProcessingModule] = useState<string | null>(null);
-  const logoInputRef = useRef<HTMLInputElement>(null);
-
-  const [editOrg, setEditOrg] = useState({
-      name: orgDetails?.name || '',
-      sector: orgDetails?.aiSector || '',
-      primaryColor: orgDetails?.primaryColor || '#F59E0B',
-      logoFile: null as File | null,
-      logoPreview: orgDetails?.logoUrl || null
-  });
+  const [newRoleName, setNewRoleName] = useState('');
 
   const [aiConfig, setAiConfig] = useState({
       sector: orgDetails?.aiSector || '',
       tone: orgDetails?.aiTone || '',
-      context: orgDetails?.aiContext || ''
+      dna: orgDetails?.aiContext || ''
   });
-
-  const isAdmin = userRole === 'dono';
 
   useEffect(() => {
     if (userOrgId) loadTeamData();
   }, [userOrgId]);
-
-  useEffect(() => {
-    setEditOrg(prev => ({
-        ...prev,
-        name: orgDetails?.name || '',
-        sector: orgDetails?.aiSector || '',
-        primaryColor: orgDetails?.primaryColor || '#F59E0B',
-        logoPreview: orgDetails?.logoUrl || null
-    }));
-  }, [orgDetails]);
 
   const loadTeamData = async () => {
     if (!userOrgId) return;
@@ -91,108 +66,120 @@ export const SettingsScreen: React.FC<Props> = ({
     setMembers(m);
   };
 
-  const handleToggleModule = async (modId: string, currentStatus: boolean, price: number, label: string) => {
-    if (!userOrgId) {
-        alert("Sua organização não foi identificada corretamente.");
-        return;
-    }
-    
-    if (!isAdmin) {
-        alert("Apenas proprietários podem gerenciar módulos.");
-        return;
-    }
-
-    if (processingModule) return;
-    setProcessingModule(modId);
-
-    try {
-        let newModulesList: string[] = [];
-        
-        if (currentStatus) {
-            if (confirm(`Deseja desativar o módulo "${label}"?`)) {
-                newModulesList = activeModules.filter(id => id !== modId);
-                await updateOrgModules(userOrgId, newModulesList);
-                onRefreshModules(); 
-            }
-        } else {
-            if (price > 0) {
-                if (!confirm(`Este é um módulo Premium (R$ ${price.toFixed(2)}/mês). Confirmar ativação?`)) {
-                    setProcessingModule(null);
-                    return;
-                }
-            }
-            
-            newModulesList = [...activeModules, modId];
-            await updateOrgModules(userOrgId, newModulesList);
-            onRefreshModules(); 
-        }
-    } catch (e: any) {
-        console.error("Erro ao alternar módulo:", e);
-        // Exibe o erro de forma clara, priorizando a mensagem amigável vinda do service
-        alert(e.message || "Erro técnico na sincronização de módulos.");
-    } finally {
-        setProcessingModule(null);
-    }
+  const handleCreateRole = async () => {
+      if (!newRoleName.trim() || !userOrgId) return;
+      await createRole(newRoleName, userOrgId);
+      setNewRoleName('');
+      loadTeamData();
   };
 
-  const handleSaveOrgProfile = async () => {
+  const handleSaveAi = async () => {
+      if (!userOrgId) return;
       setIsSaving(true);
-      try {
-          await onUpdateOrgDetails({
-              name: editOrg.name,
-              aiSector: editOrg.sector,
-              primaryColor: editOrg.primaryColor,
-              logoFile: editOrg.logoFile
-          });
-      } finally {
-          setIsSaving(false);
-      }
-  };
-
-  const handleSaveAiConfig = async () => {
-      setIsSaving(true);
-      await onUpdateOrgDetails({
-          aiSector: aiConfig.sector,
-          aiTone: aiConfig.tone,
-          aiContext: aiConfig.context
-      });
+      await updateOrgDetails(userOrgId, { aiSector: aiConfig.sector, aiTone: aiConfig.tone, aiContext: aiConfig.dna });
       setIsSaving(false);
+      alert("DNA Industrial atualizado!");
   };
 
   return (
-    <div className="flex flex-col h-full animate-in fade-in duration-700 max-w-7xl mx-auto p-4 md:p-8 space-y-8 md:space-y-12">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 pt-4">
-            <div className="space-y-3">
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-orange-50 border border-orange-100 rounded-full text-[10px] font-black text-orange-600 uppercase tracking-widest">
-                    <Settings className="w-3.5 h-3.5"/> SISTEMA OPERACIONAL
-                </div>
-                <h1 className="text-5xl md:text-7xl font-black text-slate-900 dark:text-white leading-none tracking-tighter">
-                    Ajustes <span className="text-orange-500">Mestres</span>.
-                </h1>
+    <div className="flex flex-col h-full animate-in fade-in duration-700 max-w-7xl mx-auto p-4 md:p-8 space-y-12">
+        <div className="space-y-3 pt-4">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-orange-50 border border-orange-100 rounded-full text-[10px] font-black text-orange-600 uppercase tracking-widest">
+                <Settings className="w-3.5 h-3.5"/> SISTEMA OPERACIONAL
             </div>
-            <button onClick={() => setView('profile')} className="px-8 py-4 bg-white border border-slate-200 dark:border-white/10 rounded-[1.5rem] flex items-center gap-3 text-[11px] font-black uppercase tracking-widest text-slate-900 dark:text-white transition-all shadow-soft hover:bg-slate-50 active:scale-95">
-                <Receipt className="w-4.5 h-4.5 text-orange-500"/> GERENCIAR ASSINATURA
-            </button>
+            <h1 className="text-5xl md:text-7xl font-black text-slate-900 dark:text-white tracking-tighter">Ajustes <span className="text-orange-500">Mestres</span>.</h1>
         </div>
 
-        <div className="flex bg-white dark:bg-white/5 p-1.5 rounded-[2rem] border border-slate-100 dark:border-white/5 w-fit shadow-soft overflow-x-auto no-scrollbar max-w-full">
+        <div className="flex bg-white dark:bg-white/5 p-1.5 rounded-[2rem] border border-slate-100 dark:border-white/5 w-fit shadow-soft">
             {[
-                { id: 'general', label: 'GERAL', icon: Monitor },
-                { id: 'modules', label: 'MARKETPLACE', icon: ShoppingCart },
-                { id: 'team', label: 'TIME', icon: Users },
-                { id: 'ai', label: 'INTELIGÊNCIA', icon: BrainCircuit }
+                { id: 'general', label: 'GERAL' },
+                { id: 'modules', label: 'MARKETPLACE' },
+                { id: 'team', label: 'TIME' },
+                { id: 'ai', label: 'INTELIGÊNCIA' }
             ].map(tab => (
-                <button 
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id as any)}
-                    className={`flex items-center gap-3 px-8 py-3.5 rounded-[1.5rem] text-[11px] font-black uppercase tracking-widest transition-all duration-300 whitespace-nowrap ${activeTab === tab.id ? 'bg-orange-500 text-white shadow-xl scale-105' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
-                >
-                    {tab.label}
-                </button>
+                <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`px-8 py-3.5 rounded-[1.5rem] text-[11px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-orange-500 text-white shadow-xl scale-105' : 'text-slate-400 hover:text-slate-600'}`}>{tab.label}</button>
             ))}
         </div>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar pb-24">
+        <div className="flex-1 overflow-y-auto custom-scrollbar pb-32">
+            {activeTab === 'team' && (
+                <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-500">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div className="lg:col-span-2 space-y-6">
+                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Gestão de Acesso</h3>
+                            <div className="space-y-3">
+                                {members.map(m => (
+                                    <div key={m.id} className="p-6 bg-white dark:bg-white/5 border border-slate-100 dark:border-white/5 rounded-3xl flex items-center justify-between">
+                                        <div className="flex items-center gap-5">
+                                            <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-white/5 flex items-center justify-center font-black text-slate-500">{m.nome.charAt(0)}</div>
+                                            <div>
+                                                <div className="text-sm font-black text-slate-900 dark:text-white">{m.nome}</div>
+                                                <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{m.perfil} • {roles.find(r => r.id === m.cargo)?.nome || 'Sem Cargo'}</div>
+                                            </div>
+                                        </div>
+                                        <select value={m.cargo || ''} onChange={e => updateUserRole(m.id, parseInt(e.target.value)).then(loadTeamData)} className="bg-slate-50 dark:bg-black/20 border border-slate-100 dark:border-white/10 rounded-xl p-2 text-[10px] font-black uppercase">
+                                            <option value="">Cargo...</option>
+                                            {roles.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}
+                                        </select>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="space-y-6">
+                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Cargos & Estrutura</h3>
+                            <div className="bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 p-6 rounded-[2.5rem] space-y-4">
+                                <div className="flex gap-2">
+                                    <input value={newRoleName} onChange={e => setNewRoleName(e.target.value)} placeholder="Novo Cargo..." className="flex-1 bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-xl p-3 text-xs font-bold outline-none" />
+                                    <button onClick={handleCreateRole} className="p-3 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl"><Plus className="w-4 h-4"/></button>
+                                </div>
+                                <div className="space-y-2">
+                                    {roles.map(r => (
+                                        <div key={r.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-50 dark:border-white/5 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                                            <span>{r.nome}</span>
+                                            <button onClick={() => deleteRole(r.id).then(loadTeamData)}><Trash2 className="w-3.5 h-3.5 text-red-500/50 hover:text-red-500"/></button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'ai' && (
+                <div className="max-w-3xl space-y-10 animate-in slide-in-from-bottom-4 duration-500">
+                    <div className="space-y-2">
+                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">DNA Industrial da IA</h3>
+                        <p className="text-slate-500 text-sm font-medium">Configure como o Guru AI deve se comportar no seu Workspace.</p>
+                    </div>
+
+                    <div className="bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-[3rem] p-10 space-y-8">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Setor de Atuação</label>
+                            <input value={aiConfig.sector} onChange={e => setAiConfig({...aiConfig, sector: e.target.value})} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 p-5 rounded-2xl text-base font-black outline-none focus:border-orange-500 transition-all" placeholder="Ex: Software / Fintech / Consultoria" />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Tom de Voz</label>
+                            <select value={aiConfig.tone} onChange={e => setAiConfig({...aiConfig, tone: e.target.value})} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 p-5 rounded-2xl text-sm font-black outline-none uppercase tracking-widest">
+                                <option value="Tecnico">🤖 Engenheiro / Técnico</option>
+                                <option value="Estrategico">🎯 Estratégico / COO</option>
+                                <option value="Vendas">💰 Comercial / Growth</option>
+                                <option value="Apoio">🤝 Parceiro / Suporte</option>
+                            </select>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Contexto Mestre (Diferencial Competitivo)</label>
+                            <textarea value={aiConfig.dna} onChange={e => setAiConfig({...aiConfig, dna: e.target.value})} className="w-full h-48 bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 p-5 rounded-2xl text-base font-medium outline-none resize-none" placeholder="Explique qual o diferencial técnico ou estratégico da sua empresa..." />
+                        </div>
+
+                        <button onClick={handleSaveAi} disabled={isSaving} className="w-full py-5 bg-slate-900 dark:bg-white text-white dark:text-black rounded-[1.8rem] font-black text-xs uppercase tracking-widest shadow-xl flex items-center justify-center gap-3">
+                            {isSaving ? <Loader2 className="w-5 h-5 animate-spin"/> : <Zap className="w-5 h-5"/>} SINCRONIZAR DNA
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {activeTab === 'modules' && (
                 <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-500">
                     <div className="bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-[2.5rem] overflow-hidden shadow-soft">
@@ -211,64 +198,26 @@ export const SettingsScreen: React.FC<Props> = ({
                         <div className="divide-y divide-slate-50 dark:divide-white/5">
                             {AVAILABLE_MODULES.map(mod => {
                                 const isOwned = activeModules.includes(mod.id);
-                                const isProcessing = processingModule === mod.id;
-                                
                                 return (
                                     <div key={mod.id} className="p-8 flex items-center justify-between hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-all group">
-                                        <div className="flex items-center gap-6 flex-1 min-w-0">
-                                            <div className={`p-4 rounded-2xl ${mod.bg} ${mod.color} border border-white/10 shadow-sm transition-transform group-hover:scale-105`}>
-                                                {isProcessing ? <Loader2 className="w-6 h-6 animate-spin"/> : <mod.icon className="w-6 h-6"/>}
+                                        <div className="flex items-center gap-6">
+                                            <div className={`p-4 rounded-2xl ${mod.bg} ${mod.color} border border-white/10 shadow-sm`}>
+                                                <mod.icon className="w-6 h-6"/>
                                             </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-3">
-                                                    <h4 className="text-base font-black text-slate-900 dark:text-white">{mod.label}</h4>
-                                                    {mod.price > 0 && (
-                                                        <span className="text-[9px] font-black text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded border border-emerald-100 dark:border-emerald-500/20">PREMIUM</span>
-                                                    )}
-                                                </div>
-                                                <p className="text-[11px] text-slate-500 font-medium leading-relaxed truncate md:whitespace-normal">{mod.desc}</p>
+                                            <div>
+                                                <h4 className="text-base font-black text-slate-900 dark:text-white">{mod.label}</h4>
+                                                <p className="text-[11px] text-slate-500 font-medium">{mod.desc}</p>
                                             </div>
                                         </div>
-
-                                        <div className="flex items-center gap-8 ml-6 shrink-0">
-                                            <div className="text-right hidden sm:block">
-                                                <div className="text-sm font-black text-slate-900 dark:text-white">
-                                                    {mod.price === 0 ? 'Incluso' : `R$ ${mod.price.toFixed(2)}/mês`}
-                                                </div>
-                                                <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Custo Operacional</div>
-                                            </div>
-                                            <div className="flex items-center gap-3">
-                                                <span className={`text-[9px] font-black uppercase tracking-widest ${isOwned ? 'text-orange-500' : 'text-slate-400'}`}>
-                                                    {isOwned ? 'ATIVO' : 'OFF'}
-                                                </span>
-                                                <ElasticSwitch 
-                                                    checked={isOwned} 
-                                                    onChange={() => handleToggleModule(mod.id, isOwned, mod.price, mod.label)}
-                                                    disabled={!!processingModule}
-                                                />
-                                            </div>
+                                        <div className="flex items-center gap-3">
+                                            <span className={`text-[9px] font-black uppercase tracking-widest ${isOwned ? 'text-orange-500' : 'text-slate-400'}`}>
+                                                {isOwned ? 'ATIVO' : 'OFF'}
+                                            </span>
+                                            <ElasticSwitch checked={isOwned} onChange={() => {}} />
                                         </div>
                                     </div>
                                 );
                             })}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {activeTab === 'general' && (
-                <div className="max-w-4xl space-y-16 animate-in slide-in-from-left-4">
-                    <div className="space-y-6">
-                        <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.4em] flex items-center gap-2">
-                            <Monitor className="w-4 h-4" /> EXPERIÊNCIA DE USO
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl">
-                            <button onClick={onToggleTheme} className={`p-8 rounded-[2.5rem] border transition-all flex flex-col items-center gap-4 shadow-soft ${theme === 'light' ? 'bg-white border-orange-500/50 text-orange-600' : 'bg-white/5 border-white/5 text-slate-500'}`}>
-                                <Sun className="w-8 h-8"/> <span className="text-[10px] font-black uppercase tracking-widest">MODO CLARO</span>
-                            </button>
-                            <button onClick={onToggleTheme} className={`p-8 rounded-[2.5rem] border transition-all flex flex-col items-center gap-4 shadow-soft ${theme === 'dark' ? 'bg-slate-900 border-orange-500/30 text-white shadow-glow-amber' : 'bg-black/10 border-white/5 text-slate-500'}`}>
-                                <Moon className="w-8 h-8"/> <span className="text-[10px] font-black uppercase tracking-widest">MODO ESCURO</span>
-                            </button>
                         </div>
                     </div>
                 </div>
