@@ -224,12 +224,59 @@ export const generateSubtasksForTask = async (taskTitle: string, context: string
 export const generateBpmn = async (title: string, description: string, archetype: string, docsContext?: string, orgType?: string, availableRoles?: any[]): Promise<any> => {
     const ai = getAiClient();
     if (!ai) return null;
+
+    const systemInstruction = `
+        Você é o Arquiteto de Processos Shinkō. 
+        Sua missão é converter uma estratégia em um fluxo técnico de execução (WBS - Work Breakdown Structure).
+        Crie de 4 a 6 colunas (nodes) lógicas para o arquétipo ${archetype}.
+        Cada coluna deve ter uma lista de tarefas (checklist) com estimativas de horas.
+    `;
+
+    const prompt = `
+        PROJETO: ${title}
+        MISSÃO: ${description}
+        ARQUÉTIPO: ${archetype}
+        EQUIPE DISPONÍVEL (CARGOS): ${JSON.stringify(availableRoles)}
+    `;
+
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-3-pro-preview',
-            contents: `WBS para ${title}. Use: ${JSON.stringify(availableRoles)}`,
-            config: { responseMimeType: "application/json" }
+            contents: prompt,
+            config: { 
+                systemInstruction,
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        nodes: {
+                            type: Type.ARRAY,
+                            items: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    id: { type: Type.STRING },
+                                    label: { type: Type.STRING, description: "Nome da etapa/coluna" },
+                                    checklist: {
+                                        type: Type.ARRAY,
+                                        items: {
+                                            type: Type.OBJECT,
+                                            properties: {
+                                                text: { type: Type.STRING, description: "Título da tarefa" },
+                                                estimatedHours: { type: Type.NUMBER },
+                                                description: { type: Type.STRING }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         });
         return JSON.parse(response.text || "{}");
-    } catch (e) { return null; }
+    } catch (e) { 
+        console.error("BPMN Generation Error:", e);
+        return null; 
+    }
 };

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Opportunity, BpmnNode, BpmnTask } from '../types';
 import { TaskDetailModal } from './TaskDetailModal';
@@ -51,24 +52,40 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
             );
 
             if (result && result.nodes) {
-                const newNodes = result.nodes.map((n: any) => ({
-                    ...n,
-                    checklist: n.checklist.map((t: any) => ({
-                        ...t,
+                // Garantir IDs únicos e estrutura correta para o frontend
+                const hydratedNodes = result.nodes.map((n: any, nIdx: number) => ({
+                    id: n.id || `node-${nIdx}-${Date.now()}`,
+                    label: n.label,
+                    checklist: (n.checklist || []).map((t: any, tIdx: number) => ({
                         id: crypto.randomUUID(),
+                        text: t.text,
+                        description: t.description || '',
                         status: 'todo',
-                        completed: false
+                        completed: false,
+                        estimatedHours: Number(t.estimatedHours) || 2
                     }))
                 }));
                 
-                setNodes(newNodes);
+                setNodes(hydratedNodes);
+                
+                // Salvar automaticamente a nova estrutura
+                const updatedBpmn = { 
+                    ...opportunity.bpmn, 
+                    nodes: hydratedNodes, 
+                    lanes: result.lanes || [], 
+                    edges: result.edges || [] 
+                };
+
                 await onUpdate({
                     ...opportunity,
-                    bpmn: { ...opportunity.bpmn, nodes: newNodes, lanes: result.lanes || [], edges: result.edges || [] }
+                    bpmn: updatedBpmn
                 } as any);
+            } else {
+                alert("A IA não retornou um fluxo válido. Tente refinar a descrição do projeto.");
             }
         } catch (e) {
-            alert("Erro ao gerar fluxo via IA.");
+            console.error("Erro na geração de fluxo IA:", e);
+            alert("Erro ao gerar fluxo via IA. Verifique sua conexão ou tente novamente.");
         } finally {
             setIsGenerating(false);
         }
@@ -105,14 +122,11 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
             return n;
         });
 
-        // 1. Atualizar Estado Local IMEDIATAMENTE para feedback visual
         setNodes(newNodes);
         
-        // 2. Persistir no JSON do Projeto (Estrutura visual contendo checklist/subtarefas)
         const updatedOpp = { ...opportunity, bpmn: { ...opportunity.bpmn, nodes: newNodes } } as any;
         await onUpdate(updatedOpp);
 
-        // 3. Sincronizar com Tabela de Tasks se houver ID de banco
         if (updatedTask.dbId) {
             const now = new Date().toISOString();
             const updatePayload: any = {
@@ -122,7 +136,7 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
                 responsavel: updatedTask.assigneeId,
                 duracaohoras: updatedTask.estimatedHours,
                 datafim: updatedTask.dueDate,
-                anexos: updatedTask.attachments // Importante: passar o array de anexos para o serviço packAttachments
+                anexos: updatedTask.attachments 
             };
 
             if (updatedTask.status !== editingTask.task.status) {
@@ -139,7 +153,6 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
 
             await updateTask(updatedTask.dbId, updatePayload);
 
-            // Sincronizar checklist (subtarefas)
             if (updatedTask.subtasks && opportunity.organizationId) {
                 await syncTaskChecklist(
                     updatedTask.dbId, 
@@ -172,7 +185,7 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
                         className="flex-1 md:flex-none whitespace-nowrap flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shadow-lg disabled:opacity-50"
                     >
                         {isGenerating ? <Loader className="w-3.5 h-3.5 animate-spin"/> : <BrainCircuit className="w-3.5 h-3.5"/>}
-                        <span className="hidden sm:inline">Gerar Fluxo</span>
+                        <span className="hidden sm:inline">{isGenerating ? 'Calculando...' : 'Gerar Fluxo IA'}</span>
                         <span className="sm:hidden">IA Flow</span>
                     </button>
                     
@@ -211,17 +224,17 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
                                         <span className="text-[8px] font-black px-2 py-0.5 bg-amber-500/10 text-amber-500 rounded-lg">{node.checklist.length}</span>
                                     </div>
                                     
-                                    <div className="p-2 space-y-2 max-h-[450px] overflow-y-auto custom-scrollbar">
+                                    <div className="p-2 space-y-2 max-h-[450px] overflow-y-auto custom-scrollbar px-1">
                                         {node.checklist.map(task => (
                                             <div 
                                                 key={task.id} 
                                                 onClick={() => handleTaskClick(task, node)}
-                                                className="p-4 bg-white/5 border border-white/5 rounded-2xl hover:border-amber-500/40 cursor-pointer shadow-sm group transition-all active:scale-[0.97]"
+                                                className="p-4 bg-white dark:bg-[#111] border border-white/5 rounded-2xl hover:border-amber-500/40 cursor-pointer shadow-sm group transition-all active:scale-[0.97]"
                                             >
                                                 <p className={`text-[11px] font-bold leading-relaxed mb-4 ${task.status === 'done' ? 'text-slate-500 line-through' : 'text-slate-800 dark:text-slate-200'}`}>
                                                     {task.text}
                                                 </p>
-                                                <div className="flex justify-between items-center pt-3 border-t border-white/5">
+                                                <div className="flex justify-between items-center pt-3 border-t border-slate-100 dark:border-white/5">
                                                     <div className="flex items-center gap-1.5">
                                                         <Clock className="w-3 h-3 text-slate-400"/>
                                                         <span className="text-[8px] font-black uppercase text-slate-400">
@@ -268,5 +281,4 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
     );
 };
 
-// Fixed: Added default export
 export default BpmnBuilder;
