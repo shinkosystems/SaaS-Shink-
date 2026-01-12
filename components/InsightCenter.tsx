@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { CmsPost } from '../types';
 import { fetchCmsPosts, captureLead, fetchCmsPostBySlug } from '../services/cmsService';
@@ -8,6 +7,7 @@ import {
     Clock, Share2, Bookmark, MessageSquare, Newspaper
 } from 'lucide-react';
 import { MetaController } from './MetaController';
+import { AdSenseBlock } from './AdSenseBlock';
 
 interface Props {
     onBack: () => void;
@@ -95,7 +95,6 @@ export const InsightCenter: React.FC<Props> = ({ onBack, onEnter, initialPostSlu
 
     return (
         <div className="fixed inset-0 z-[200] bg-[#020203] text-white flex flex-col overflow-hidden selection:bg-amber-500 selection:text-black">
-            {/* Meta Controller for Article or Blog Home */}
             <MetaController 
                 title={selectedPost ? (selectedPost.seo_title || selectedPost.title) : "Blog de Engenharia & Valor"}
                 description={selectedPost ? (selectedPost.seo_description || selectedPost.content?.substring(0, 160)) : "Insights sobre inovação, SaaS e arquitetura de elite."}
@@ -103,13 +102,11 @@ export const InsightCenter: React.FC<Props> = ({ onBack, onEnter, initialPostSlu
                 type={selectedPost ? 'article' : 'website'}
             />
 
-            {/* Background Architecture */}
             <div className="fixed inset-0 pointer-events-none">
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-full bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.05)_0%,transparent_50%)]"></div>
                 <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.02] mix-blend-overlay"></div>
             </div>
 
-            {/* Premium Navbar */}
             <nav className="h-20 shrink-0 border-b border-white/5 bg-black/40 backdrop-blur-3xl z-[100] px-6 lg:px-12">
                 <div className="max-w-[1600px] mx-auto h-full flex justify-between items-center">
                     <div className="flex items-center gap-8">
@@ -139,7 +136,6 @@ export const InsightCenter: React.FC<Props> = ({ onBack, onEnter, initialPostSlu
             </nav>
 
             <div className="flex-1 flex overflow-hidden">
-                {/* EXPLORER SIDEBAR */}
                 {!selectedPost && (
                     <aside className="w-96 shrink-0 border-r border-white/5 bg-black/20 hidden xl:flex flex-col overflow-y-auto custom-scrollbar">
                         <div className="p-10 space-y-12">
@@ -157,6 +153,9 @@ export const InsightCenter: React.FC<Props> = ({ onBack, onEnter, initialPostSlu
                                     className="w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-amber-500/50 text-sm font-medium transition-all"
                                 />
                             </div>
+
+                            {/* ADSENSE SIDEBAR AD */}
+                            <AdSenseBlock slot="XXXXXXXXXX1" format="rectangle" />
 
                             <div className="space-y-6">
                                 <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 flex items-center gap-2">
@@ -184,10 +183,8 @@ export const InsightCenter: React.FC<Props> = ({ onBack, onEnter, initialPostSlu
                     </aside>
                 )}
 
-                {/* CONTENT STAGE */}
-                <main className="flex-1 overflow-y-auto custom-scrollbar bg-[#020203]">
+                <main className="flex-1 overflow-y-auto custom-scrollbar bg-[#020203] relative">
                     {selectedPost ? (
-                        /* IMMERSIVE READING MODE */
                         <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
                             <header className="relative h-[60vh] min-h-[500px] w-full flex items-end">
                                 <div className="absolute inset-0">
@@ -213,6 +210,9 @@ export const InsightCenter: React.FC<Props> = ({ onBack, onEnter, initialPostSlu
                                     className="prose-shinko text-slate-300 leading-relaxed text-xl"
                                     dangerouslySetInnerHTML={{ __html: selectedPost.content || '' }}
                                 />
+
+                                {/* ADSENSE ARTICLE CONTENT AD */}
+                                <AdSenseBlock slot="XXXXXXXXXX2" className="my-16" />
 
                                 {selectedPost.download_url && (
                                     <div className="mt-32 p-1 rounded-[3rem] bg-gradient-to-br from-amber-500 via-orange-600 to-amber-700 shadow-2xl">
@@ -248,7 +248,6 @@ export const InsightCenter: React.FC<Props> = ({ onBack, onEnter, initialPostSlu
                             </div>
                         </div>
                     ) : (
-                        /* MODERN BENTO LIST */
                         <div className="p-6 md:p-12 lg:p-20 max-w-7xl mx-auto space-y-20 animate-in fade-in duration-1000">
                             <div className="flex flex-col md:flex-row justify-between items-end gap-10">
                                 <div className="space-y-4">
@@ -313,9 +312,8 @@ export const InsightCenter: React.FC<Props> = ({ onBack, onEnter, initialPostSlu
                 </main>
             </div>
 
-            {/* Pass Acess Modal (Lead) */}
             {showLeadModal && (
-                <div className="fixed inset-0 z-[500] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl animate-in fade-in">
+                <div className="fixed inset-0 z-[500] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl animate-in fade-in duration-300">
                     <div className="w-full max-w-lg bg-[#0A0A0C] rounded-[3.5rem] p-12 shadow-[0_0_100px_rgba(245,158,11,0.15)] relative border border-amber-500/20 overflow-hidden animate-ios-pop">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full -mr-16 -mt-16 blur-3xl"></div>
                         

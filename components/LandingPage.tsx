@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
     ArrowRight, Sparkles, Target, BrainCircuit, ShieldCheck, 
@@ -8,6 +7,7 @@ import {
     Gauge, Search, Terminal, Workflow
 } from 'lucide-react';
 import { CasesGallery } from './CasesGallery';
+import { AdSenseBlock } from './AdSenseBlock';
 
 interface Props {
   onEnter: () => void;
@@ -23,7 +23,6 @@ export const LandingPage: React.FC<Props> = ({ onEnter, onOpenBlog, customName, 
   const brandName = customName || "Shinkō OS";
   const displayLogo = customLogo || LOGO_URL;
 
-  // --- MODULAR PRICING STATE ---
   const [billingCycle, setBillingCycle] = useState<'monthly'|'yearly'>('monthly');
   const [selectedModules, setSelectedModules] = useState<string[]>(['projects', 'kanban']);
   const [userCount, setUserCount] = useState(5); 
@@ -77,7 +76,6 @@ export const LandingPage: React.FC<Props> = ({ onEnter, onOpenBlog, customName, 
         />
       )}
 
-      {/* --- BACKGROUND ENGINE --- */}
       <div className="fixed inset-0 w-full h-full overflow-hidden pointer-events-none">
           <div className="absolute top-[-10%] left-[20%] w-[500px] h-[500px] bg-amber-600/10 rounded-full blur-[120px] mix-blend-screen animate-pulse"></div>
           <div className="absolute bottom-[10%] right-[10%] w-[600px] h-[600px] bg-purple-900/10 rounded-full blur-[120px] mix-blend-screen animate-pulse animation-delay-2000"></div>
@@ -85,7 +83,6 @@ export const LandingPage: React.FC<Props> = ({ onEnter, onOpenBlog, customName, 
           <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
       </div>
 
-      {/* --- HEADER --- */}
       <nav className="fixed top-0 left-0 right-0 z-[100] backdrop-blur-md border-b border-white/5 bg-[#020202]/80 h-16 md:h-20">
           <div className="max-w-7xl mx-auto px-6 h-full flex justify-between items-center">
             <div className="flex items-center gap-3 cursor-pointer group" onClick={() => window.scrollTo(0, 0)}>
@@ -106,33 +103,23 @@ export const LandingPage: React.FC<Props> = ({ onEnter, onOpenBlog, customName, 
       </nav>
 
       <main className="relative z-10 flex flex-col items-center">
-          
-          {/* --- HERO SECTION --- */}
           <section className="w-full min-h-screen flex flex-col items-center justify-center text-center px-6 pt-24 pb-12 relative overflow-hidden">
             <div className="max-w-5xl mx-auto relative z-10">
                 <div className="mb-12 animate-in fade-in zoom-in duration-1000">
-                    <img 
-                        src={displayLogo} 
-                        alt="Logo Shinko" 
-                        className="h-32 md:h-48 lg:h-56 w-auto object-contain mx-auto drop-shadow-[0_0_50px_rgba(245,158,11,0.2)]"
-                    />
+                    <img src={displayLogo} alt="Logo Shinko" className="h-32 md:h-48 lg:h-56 w-auto object-contain mx-auto drop-shadow-[0_0_50px_rgba(245,158,11,0.2)]" />
                 </div>
-
-                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-[0.3em] text-amber-500 mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-[0.3em] text-amber-500 mb-8">
                     <Sparkles className="w-3.5 h-3.5"/> Framework Shinkō OS v2.5.4
                 </div>
-
-                <h1 className="text-5xl md:text-7xl lg:text-9xl font-black mb-8 tracking-tighter leading-[0.9] text-white animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-100 hero-title">
+                <h1 className="text-5xl md:text-7xl lg:text-9xl font-black mb-8 tracking-tighter leading-[0.9] text-white hero-title">
                     Inovação com <br/>
                     <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-orange-500 to-amber-600">Precisão Industrial</span>.
                 </h1>
-
-                <p className="text-lg md:text-xl lg:text-2xl text-slate-400 max-w-3xl mx-auto mb-12 leading-relaxed font-medium animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200 px-4">
+                <p className="text-lg md:text-xl lg:text-2xl text-slate-400 max-w-3xl mx-auto mb-12 leading-relaxed font-medium px-4">
                     O sistema operacional que substitui o "feeling" pela <strong>matemática</strong>. 
                     Mapeie, priorize e escale seus ativos digitais com o framework de elite.
                 </p>
-
-                <div className="flex flex-col sm:flex-row justify-center gap-4 md:gap-6 animate-in fade-in zoom-in duration-500 delay-300">
+                <div className="flex flex-col sm:flex-row justify-center gap-4 md:gap-6">
                     <button onClick={onEnter} className="px-10 py-5 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs uppercase tracking-widest rounded-2xl flex items-center justify-center gap-3 transition-all hover:scale-105 shadow-[0_0_60px_-15px_rgba(245,158,11,0.6)] active:scale-95">
                         Acessar Workspace
                     </button>
@@ -145,17 +132,13 @@ export const LandingPage: React.FC<Props> = ({ onEnter, onOpenBlog, customName, 
             </div>
           </section>
 
-          {/* --- PILLARS HIGH FIDELITY --- */}
           <section className="w-full py-32 md:py-48 bg-[#020202] px-6">
               <div className="max-w-7xl mx-auto space-y-24">
                   <div className="text-center space-y-4">
                       <h2 className="text-5xl md:text-7xl font-black tracking-tighter text-white">Pilares de <span className="text-amber-500">Engenharia</span>.</h2>
                       <p className="text-slate-400 text-lg md:text-xl max-w-2xl mx-auto font-medium">Arquitetura sistemática para validação e escala de produtos digitais.</p>
                   </div>
-
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-                      
-                      {/* PILLAR 1: MATRIZ RDE */}
                       <div className="flex flex-col gap-8 group">
                           <div className="aspect-[4/5] rounded-[3.5rem] bg-gradient-to-br from-slate-900 to-black border border-white/10 relative overflow-hidden shadow-2xl p-10 flex flex-col items-center justify-center gap-6 group-hover:border-amber-500/30 transition-all duration-500">
                               <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:30px_30px]"></div>
@@ -170,14 +153,9 @@ export const LandingPage: React.FC<Props> = ({ onEnter, onOpenBlog, customName, 
                           <div className="space-y-4 px-4">
                               <h3 className="text-3xl font-black text-white tracking-tighter">Matriz <span className="text-amber-500">RDE</span>.</h3>
                               <p className="text-slate-400 font-medium leading-relaxed">Algoritmo de priorização que elimina o "achismo" técnico cruzando Receita e Dor.</p>
-                              <div className="grid grid-cols-2 gap-3 pt-2">
-                                  <div className="p-4 bg-white/5 border border-white/5 rounded-2xl text-[9px] font-black text-slate-500 uppercase tracking-widest">Impacto Comercial</div>
-                                  <div className="p-4 bg-white/5 border border-white/5 rounded-2xl text-[9px] font-black text-slate-500 uppercase tracking-widest">Time to Market</div>
-                              </div>
                           </div>
                       </div>
 
-                      {/* PILLAR 2: CRIVO TADS */}
                       <div className="flex flex-col gap-8 group">
                           <div className="aspect-[4/5] rounded-[3.5rem] bg-gradient-to-br from-slate-900 to-black border border-white/10 relative overflow-hidden shadow-2xl p-10 flex flex-col items-center justify-center gap-6 group-hover:border-purple-500/30 transition-all duration-500">
                               <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:30px_30px]"></div>
@@ -192,14 +170,9 @@ export const LandingPage: React.FC<Props> = ({ onEnter, onOpenBlog, customName, 
                           <div className="space-y-4 px-4">
                               <h3 className="text-3xl font-black text-white tracking-tighter">Filtro <span className="text-purple-500">Sistêmico</span>.</h3>
                               <p className="text-slate-400 font-medium leading-relaxed">Validação de escalabilidade e dor real antes da primeira linha de código ser escrita.</p>
-                              <div className="grid grid-cols-2 gap-3 pt-2">
-                                  <div className="p-4 bg-white/5 border border-white/5 rounded-2xl text-[9px] font-black text-slate-500 uppercase tracking-widest">Escalabilidade</div>
-                                  <div className="p-4 bg-white/5 border border-white/5 rounded-2xl text-[9px] font-black text-slate-500 uppercase tracking-widest">Dor Real Detectada</div>
-                              </div>
                           </div>
                       </div>
 
-                      {/* PILLAR 3: ENGENHARIA DORA */}
                       <div className="flex flex-col gap-8 group">
                           <div className="aspect-[4/5] rounded-[3.5rem] bg-gradient-to-br from-slate-900 to-black border border-white/10 relative overflow-hidden shadow-2xl p-10 flex flex-col items-center justify-center gap-6 group-hover:border-blue-500/30 transition-all duration-500">
                               <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:30px_30px]"></div>
@@ -214,19 +187,13 @@ export const LandingPage: React.FC<Props> = ({ onEnter, onOpenBlog, customName, 
                           <div className="space-y-4 px-4">
                               <h3 className="text-3xl font-black text-white tracking-tighter">Alta <span className="text-blue-500">Performance</span>.</h3>
                               <p className="text-slate-400 font-medium leading-relaxed">Métricas de elite de engenharia integradas nativamente na gestão de produto.</p>
-                              <div className="grid grid-cols-2 gap-3 pt-2">
-                                  <div className="p-4 bg-white/5 border border-white/5 rounded-2xl text-[9px] font-black text-slate-500 uppercase tracking-widest">Lead Time</div>
-                                  <div className="p-4 bg-white/5 border border-white/5 rounded-2xl text-[9px] font-black text-slate-500 uppercase tracking-widest">Deployment Freq.</div>
-                              </div>
                           </div>
                       </div>
-
                   </div>
               </div>
           </section>
 
-          {/* --- MATRIZ RDE DEEP DIVE (RESTORED WITH FULL FIDELITY) --- */}
-          <section id="rde" className="w-full py-24 md:py-48 border-t border-white/5 bg-[#050505] overflow-hidden">
+          <section className="w-full py-24 md:py-48 border-t border-white/5 bg-[#050505] overflow-hidden">
               <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-24 items-center">
                   <div className="relative">
                       <div className="aspect-square rounded-[4rem] bg-gradient-to-br from-slate-900 to-black border border-white/10 relative overflow-hidden shadow-2xl p-12 group">
@@ -240,35 +207,21 @@ export const LandingPage: React.FC<Props> = ({ onEnter, onOpenBlog, customName, 
                                   <div className="text-xs font-black text-amber-500 uppercase tracking-[0.4em] mt-3">Score PRIO-6</div>
                               </div>
                           </div>
-                          {/* Floating Elements */}
-                          <div className="absolute top-10 right-10 p-4 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-xl animate-bounce duration-[3s]">
-                              <TrendingUp className="w-6 h-6 text-emerald-500"/>
-                          </div>
-                          <div className="absolute bottom-10 left-10 p-4 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-xl animate-bounce duration-[4s]">
-                              <Zap className="w-6 h-6 text-amber-500"/>
-                          </div>
                       </div>
                   </div>
                   <div className="space-y-10">
                       <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-[10px] font-black uppercase tracking-widest text-amber-500">Mapeamento de Valor</div>
                       <h2 className="text-5xl md:text-7xl font-black text-white leading-tight tracking-tighter">Decisões baseadas em <span className="text-amber-500">Matemática</span>.</h2>
-                      <p className="text-xl text-slate-400 leading-relaxed font-medium">O framework Shinkō elimina o achismo técnico. Cada oportunidade é processada por nosso algoritmo de priorização para garantir que sua equipe ataque apenas o que move o ponteiro do negócio.</p>
-                      
-                      <div className="grid grid-cols-2 gap-6">
-                          <div className="p-8 bg-white/5 rounded-[2rem] border border-white/5 hover:border-white/10 transition-colors">
-                              <div className="text-2xl font-black mb-1">Impacto</div>
-                              <div className="text-[10px] text-slate-500 uppercase font-black tracking-widest">Variável Receita</div>
-                          </div>
-                          <div className="p-8 bg-white/5 rounded-[2rem] border border-white/5 hover:border-white/10 transition-colors">
-                              <div className="text-2xl font-black mb-1">Velocidade</div>
-                              <div className="text-[10px] text-slate-500 uppercase font-black tracking-widest">Time to Market</div>
-                          </div>
-                      </div>
+                      <p className="text-xl text-slate-400 leading-relaxed font-medium">O framework Shinkō elimina o achismo técnico. Cada oportunidade é processada por nosso algoritmo de priorização.</p>
                   </div>
               </div>
           </section>
 
-          {/* --- CALCULATOR SECTION --- */}
+          {/* LANDING PAGE ADSENSE FOOTER BLOCK */}
+          <section className="w-full max-w-7xl px-6">
+              <AdSenseBlock slot="XXXXXXXXXX3" format="auto" className="rounded-[3rem]" />
+          </section>
+
           <section className="w-full py-24 md:py-48 bg-[#020202] px-6 relative overflow-hidden">
               <div className="max-w-7xl mx-auto relative z-10">
                   <div className="text-center mb-24 space-y-4">
@@ -277,39 +230,20 @@ export const LandingPage: React.FC<Props> = ({ onEnter, onOpenBlog, customName, 
                   </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 items-start">
-                      {/* Left: Configurator */}
                       <div className="lg:col-span-7 space-y-12">
-                          
-                          {/* User Slider */}
                           <div className="glass-panel p-10 rounded-[3rem] border border-white/10 bg-black/40 space-y-8">
                               <div className="flex justify-between items-center">
                                   <span className="text-xs font-black uppercase tracking-[0.3em] text-slate-500">Tamanho da Operação</span>
                                   <span className="text-3xl font-black text-white">{userCount} {userCount === 1 ? 'usuário' : 'usuários'}</span>
                               </div>
-                              <input 
-                                  type="range" min="1" max="30" step="1" 
-                                  value={userCount} 
-                                  onChange={e => setUserCount(parseInt(e.target.value))} 
-                                  className="w-full h-2.5 bg-white/10 rounded-full appearance-none cursor-pointer accent-amber-500" 
-                              />
-                              <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">
-                                  <span>Solo (1)</span>
-                                  <span>Studio (5)</span>
-                                  <span>Scale (15)</span>
-                                  <span>Ent. (30+)</span>
-                              </div>
+                              <input type="range" min="1" max="30" step="1" value={userCount} onChange={e => setUserCount(parseInt(e.target.value))} className="w-full h-2.5 bg-white/10 rounded-full appearance-none cursor-pointer accent-amber-500" />
                           </div>
 
-                          {/* Modules Grid */}
                           <div className="space-y-6">
                               <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500 ml-4">Módulos de Engenharia</h3>
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                   {AVAILABLE_MODULES.map(mod => (
-                                      <button 
-                                          key={mod.id} 
-                                          onClick={() => toggleModule(mod.id)}
-                                          className={`p-6 md:p-8 rounded-[2rem] border text-left transition-all group relative overflow-hidden flex items-center gap-5 ${selectedModules.includes(mod.id) ? 'bg-amber-500 border-amber-400 text-black shadow-glow-amber' : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'}`}
-                                      >
+                                      <button key={mod.id} onClick={() => toggleModule(mod.id)} className={`p-6 md:p-8 rounded-[2rem] border text-left transition-all group relative overflow-hidden flex items-center gap-5 ${selectedModules.includes(mod.id) ? 'bg-amber-500 border-amber-400 text-black shadow-glow-amber' : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'}`}>
                                           <div className={`p-4 rounded-2xl ${selectedModules.includes(mod.id) ? 'bg-black/10' : 'bg-white/5 text-slate-500'}`}>
                                               <mod.icon className="w-6 h-6"/>
                                           </div>
@@ -317,67 +251,34 @@ export const LandingPage: React.FC<Props> = ({ onEnter, onOpenBlog, customName, 
                                               <div className="font-black text-xs uppercase tracking-widest mb-1">{mod.label}</div>
                                               <div className={`text-[10px] font-bold leading-tight ${selectedModules.includes(mod.id) ? 'text-black/70' : 'text-slate-500'}`}>{mod.desc}</div>
                                           </div>
-                                          {mod.core && <span className="absolute top-4 right-6 text-[8px] font-black uppercase tracking-widest opacity-40">Core</span>}
-                                          {!mod.core && !selectedModules.includes(mod.id) && <div className="text-xs font-black">+ R${mod.price.toFixed(0)}</div>}
                                       </button>
                                   ))}
                               </div>
                           </div>
                       </div>
 
-                      {/* Right: Checkout Summary */}
                       <div className="lg:col-span-5 sticky top-32">
-                          <div className="bg-white p-12 rounded-[4rem] text-black shadow-[0_40px_100px_-20px_rgba(245,158,11,0.3)] space-y-12 relative overflow-hidden">
+                          <div className="bg-white p-12 rounded-[4rem] text-black shadow-2xl space-y-12 relative overflow-hidden">
                               <div className="absolute top-0 right-0 w-40 h-40 bg-amber-500/10 rounded-full -mr-20 -mt-20 blur-3xl"></div>
-                              
-                              <div className="space-y-6">
-                                  <div className="flex bg-slate-100 p-1.5 rounded-[1.5rem]">
-                                      <button onClick={() => setBillingCycle('monthly')} className={`flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all ${billingCycle === 'monthly' ? 'bg-white shadow-xl text-black' : 'text-slate-400'}`}>Mensal</button>
-                                      <button onClick={() => setBillingCycle('yearly')} className={`flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all ${billingCycle === 'yearly' ? 'bg-emerald-500 text-white shadow-xl' : 'text-slate-400'}`}>Anual (-20%)</button>
-                                  </div>
-
-                                  <div className="space-y-4 pt-8">
-                                      <div className="flex justify-between items-center text-sm font-bold text-slate-500">
-                                          <span>Plano {currentBase.name}</span>
-                                          <span className="text-black font-black">R$ {currentBase.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                      </div>
-                                      {selectedModules.filter(id => !AVAILABLE_MODULES.find(m => m.id === id)?.core).map(id => {
-                                          const mod = AVAILABLE_MODULES.find(m => m.id === id);
-                                          return (
-                                              <div key={id} className="flex justify-between items-center text-xs font-medium text-slate-400">
-                                                  <span>Módulo {mod?.label}</span>
-                                                  <span className="text-black font-black">+ R$ {mod?.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                              </div>
-                                          );
-                                      })}
-                                  </div>
-
-                                  <div className="pt-10 border-t border-slate-100 flex flex-col items-center">
-                                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Investimento Consolidado</span>
-                                      <div className="text-7xl font-black text-black tracking-tighter mt-3 flex items-baseline">
-                                          <span className="text-2xl mr-2">R$</span>{calculateTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                      </div>
-                                      <span className="text-[10px] font-black text-slate-400 mt-4 uppercase tracking-widest">ciclo {billingCycle === 'monthly' ? 'mensal' : 'anual antecipado'}</span>
+                              <div className="pt-10 border-t border-slate-100 flex flex-col items-center">
+                                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Investimento Consolidado</span>
+                                  <div className="text-7xl font-black text-black tracking-tighter mt-3 flex items-baseline">
+                                      <span className="text-2xl mr-2">R$</span>{calculateTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                   </div>
                               </div>
-
                               <button onClick={onEnter} className="w-full py-7 bg-black text-white rounded-[2rem] font-black text-xs uppercase tracking-[0.3em] shadow-2xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-4">
                                   Contratar Workspace <ArrowRight className="w-6 h-6"/>
                               </button>
-
-                              <p className="text-center text-[10px] font-black text-slate-400 uppercase tracking-widest opacity-60">Implementação instantânea • Sem fidelidade</p>
                           </div>
                       </div>
                   </div>
               </div>
           </section>
 
-          {/* --- FINAL CTA --- */}
           <section className="w-full py-48 border-t border-white/5 bg-[#020202] text-center relative overflow-hidden">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(245,158,11,0.1),transparent_70%)]"></div>
               <div className="max-w-4xl mx-auto space-y-12 px-6 relative z-10">
                 <h2 className="text-6xl md:text-8xl font-black tracking-tighter leading-[0.9]">Mude para a <br/><span className="text-amber-500">Engenharia de Valor</span>.</h2>
-                <p className="text-slate-400 text-xl md:text-2xl max-w-2xl mx-auto font-medium">Junte-se a times que pararam de adivinhar e começaram a construir com precisão industrial.</p>
                 <button onClick={onEnter} className="px-14 py-6 bg-white text-black font-black uppercase tracking-[0.3em] text-xs rounded-full shadow-[0_0_80px_rgba(255,255,255,0.2)] hover:scale-110 active:scale-95 transition-all">
                     Criar Workspace Agora
                 </button>
@@ -391,10 +292,6 @@ export const LandingPage: React.FC<Props> = ({ onEnter, onOpenBlog, customName, 
                       <button className="hover:text-white transition-colors">Termos de Uso</button>
                       <button className="hover:text-white transition-colors">Privacidade</button>
                       <button className="hover:text-white transition-colors">Framework 2.5</button>
-                  </div>
-                  <div className="space-y-2">
-                      <p className="text-slate-700 text-[10px] font-bold uppercase tracking-widest">© 2026 Shinkō OS. Engenharia de Inovação Industrial.</p>
-                      <p className="text-slate-800 text-[10px] italic">Build Alpha v2.5.4-modular-engine</p>
                   </div>
               </div>
           </footer>

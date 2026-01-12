@@ -1,4 +1,3 @@
-
 export interface SuccessMilestone {
     id: string;
     label: string;
@@ -222,6 +221,9 @@ export interface SubscriptionPlan {
     features: string[];
     recommended: boolean;
     cycle: 'MONTHLY' | 'YEARLY';
+    colabtotal: number;
+    meses: number;
+    descricao_raw?: string;
 }
 
 export interface AsaasSubscription {

@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { 
     Settings, Sun, Moon, Palette, Building2, UploadCloud, Save, Monitor, Users, 
@@ -6,11 +5,14 @@ import {
     Fingerprint, Loader2, AlertTriangle, Lock, Copy, CheckCircle, LayoutGrid, 
     DollarSign, Code2, BarChart3, Calendar, TrendingUp, ShieldCheck, ShoppingCart, 
     Receipt, X, Image as ImageIcon, FileText, ArrowRight, ChevronRight,
-    UserPlus, Mail, Shield, Zap, Rocket, Building, MonitorSmartphone, Activity
+    UserPlus, Mail, Shield, Zap, Rocket, Building, MonitorSmartphone, Activity,
+    Gem, CheckCircle2, Clock, Crown, CreditCard
 } from 'lucide-react';
 import { fetchRoles, createRole, deleteRole, fetchOrganizationMembersWithRoles, updateUserRole, updateOrgModules, createOrganization, SYSTEM_MODULES_DEF, updateOrgDetails } from '../services/organizationService';
+import { fetchSubscriptionPlans } from '../services/asaasService';
 import { ElasticSwitch } from './ElasticSwitch';
 import { supabase } from '../services/supabaseClient';
+import { SubscriptionPlan } from '../types';
 
 interface Props {
   theme: 'dark' | 'light';
@@ -25,7 +27,7 @@ interface Props {
   currentPlan?: string;
   activeModules: string[];
   onRefreshModules: () => void;
-  initialTab?: 'general' | 'modules' | 'team' | 'ai';
+  initialTab?: 'general' | 'modules' | 'team' | 'ai' | 'plans';
 }
 
 const AVAILABLE_MODULES = [
@@ -38,12 +40,15 @@ const AVAILABLE_MODULES = [
 ];
 
 export const SettingsScreen: React.FC<Props> = ({ 
-    theme, onToggleTheme, onlineUsers, userOrgId, orgDetails, onUpdateOrgDetails, setView, userRole, userData, currentPlan, activeModules, onRefreshModules, initialTab = 'modules'
+    theme, onToggleTheme, onlineUsers, userOrgId, orgDetails, onUpdateOrgDetails, setView, userRole, userData, currentPlan, activeModules, onRefreshModules, initialTab = 'general'
 }) => {
-  const [activeTab, setActiveTab] = useState<'general' | 'modules' | 'team' | 'ai'>(initialTab);
+  const isOwner = userRole === 'dono';
+  const [activeTab, setActiveTab] = useState<'general' | 'modules' | 'team' | 'ai' | 'plans'>(initialTab);
   const [roles, setRoles] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
+  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingPlans, setIsLoadingPlans] = useState(false);
   const [newRoleName, setNewRoleName] = useState('');
 
   const [aiConfig, setAiConfig] = useState({
@@ -56,6 +61,12 @@ export const SettingsScreen: React.FC<Props> = ({
     if (userOrgId) loadTeamData();
   }, [userOrgId]);
 
+  useEffect(() => {
+    if (activeTab === 'plans' && isOwner) {
+        loadPlans();
+    }
+  }, [activeTab, isOwner]);
+
   const loadTeamData = async () => {
     if (!userOrgId) return;
     const [r, m] = await Promise.all([
@@ -64,6 +75,13 @@ export const SettingsScreen: React.FC<Props> = ({
     ]);
     setRoles(r);
     setMembers(m);
+  };
+
+  const loadPlans = async () => {
+      setIsLoadingPlans(true);
+      const data = await fetchSubscriptionPlans();
+      setPlans(data);
+      setIsLoadingPlans(false);
   };
 
   const handleCreateRole = async () => {
@@ -81,6 +99,15 @@ export const SettingsScreen: React.FC<Props> = ({
       alert("DNA Industrial atualizado!");
   };
 
+  // Filtra as abas: apenas donos vêem a aba de Planos
+  const tabs = [
+      { id: 'general', label: 'GERAL' },
+      { id: 'modules', label: 'MARKETPLACE' },
+      ...(isOwner ? [{ id: 'plans', label: 'PLANOS' }] : []),
+      { id: 'team', label: 'TIME' },
+      { id: 'ai', label: 'INTELIGÊNCIA' }
+  ];
+
   return (
     <div className="flex flex-col h-full animate-in fade-in duration-700 max-w-7xl mx-auto p-4 md:p-8 space-y-12">
         <div className="space-y-3 pt-4">
@@ -90,18 +117,87 @@ export const SettingsScreen: React.FC<Props> = ({
             <h1 className="text-5xl md:text-7xl font-black text-slate-900 dark:text-white tracking-tighter">Ajustes <span className="text-orange-500">Mestres</span>.</h1>
         </div>
 
-        <div className="flex bg-white dark:bg-white/5 p-1.5 rounded-[2rem] border border-slate-100 dark:border-white/5 w-fit shadow-soft">
-            {[
-                { id: 'general', label: 'GERAL' },
-                { id: 'modules', label: 'MARKETPLACE' },
-                { id: 'team', label: 'TIME' },
-                { id: 'ai', label: 'INTELIGÊNCIA' }
-            ].map(tab => (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`px-8 py-3.5 rounded-[1.5rem] text-[11px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-orange-500 text-white shadow-xl scale-105' : 'text-slate-400 hover:text-slate-600'}`}>{tab.label}</button>
+        <div className="flex bg-white dark:bg-white/5 p-1.5 rounded-[2rem] border border-slate-100 dark:border-white/5 w-fit shadow-soft overflow-x-auto no-scrollbar max-w-full">
+            {tabs.map(tab => (
+                <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`px-8 py-3.5 rounded-[1.5rem] text-[11px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-orange-500 text-white shadow-xl scale-105' : 'text-slate-400 hover:text-slate-600'}`}>{tab.label}</button>
             ))}
         </div>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar pb-32">
+            {activeTab === 'plans' && isOwner && (
+                <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-500">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+                        <div className="space-y-2">
+                            <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Gestão de Escala</h3>
+                            <p className="text-slate-500 text-sm font-medium">Controle sua assinatura e capacidade operacional do time.</p>
+                        </div>
+                        <div className="flex items-center gap-3 px-4 py-2 bg-orange-50 border border-orange-100 rounded-2xl">
+                             <CreditCard className="w-4 h-4 text-orange-600"/>
+                             <span className="text-[10px] font-black text-orange-700 uppercase tracking-widest">Plano Atual: {currentPlan?.replace('plan_', '').toUpperCase() || 'FREE'}</span>
+                        </div>
+                    </div>
+
+                    {isLoadingPlans ? (
+                        <div className="py-20 flex flex-col items-center justify-center gap-4">
+                            <Loader2 className="w-8 h-8 animate-spin text-orange-500"/>
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sincronizando Catálogo Industrial...</span>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {plans.map(plan => (
+                                <div key={plan.id} className={`glass-card p-8 rounded-[3rem] flex flex-col justify-between min-h-[550px] relative overflow-hidden transition-all group border-2 ${plan.recommended ? 'border-orange-500 bg-orange-500/[0.03] shadow-2xl scale-[1.02]' : 'border-slate-100 dark:border-white/5 bg-white dark:bg-white/[0.01]'}`}>
+                                    {plan.recommended && (
+                                        <div className="absolute top-6 right-[-35px] rotate-45 bg-orange-500 text-white text-[9px] font-black uppercase py-1.5 px-10 shadow-xl z-20">RECOMENDADO</div>
+                                    )}
+                                    
+                                    <div>
+                                        <div className="flex justify-between items-start mb-8">
+                                            <div className={`p-4 rounded-2xl ${plan.recommended ? 'bg-orange-500 text-white' : 'bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-white'} border border-white/10 shadow-sm transition-transform group-hover:scale-110`}>
+                                                {plan.meses >= 12 ? <Crown className="w-7 h-7"/> : <Zap className="w-7 h-7"/>}
+                                            </div>
+                                            <div className="px-4 py-1.5 bg-slate-100 dark:bg-white/5 rounded-full text-[10px] font-black uppercase text-slate-500 border border-slate-200 dark:border-white/10">
+                                                {plan.meses === 12 ? 'Faturamento Anual' : 'Ciclo Mensal'}
+                                            </div>
+                                        </div>
+
+                                        <h4 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter mb-4">{plan.name}</h4>
+                                        
+                                        <div className="flex items-baseline gap-1 mb-8">
+                                            <span className="text-lg font-bold text-slate-400">R$</span>
+                                            <span className="text-6xl font-black text-slate-900 dark:text-white tracking-tighter">{plan.price.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}</span>
+                                            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-2">/ {plan.meses === 12 ? 'ano' : 'mês'}</span>
+                                        </div>
+
+                                        <div className="space-y-6 mb-10">
+                                            <div className="flex items-center gap-3 p-4 bg-emerald-500/10 rounded-2xl border border-emerald-500/20">
+                                                <Users className="w-5 h-5 text-emerald-600"/>
+                                                <span className="text-[11px] font-black uppercase text-emerald-700 tracking-wider">Capacidade: Até {plan.colabtotal} Colaboradores</span>
+                                            </div>
+                                            
+                                            <div className="space-y-3">
+                                                {plan.features.map((feature, idx) => (
+                                                    <div key={idx} className="flex items-center gap-3 text-xs font-bold text-slate-600 dark:text-slate-400">
+                                                        <CheckCircle2 className="w-4 h-4 text-orange-500 shrink-0"/>
+                                                        {feature}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <button 
+                                        disabled={currentPlan === plan.id}
+                                        className={`w-full py-5 rounded-[1.8rem] font-black text-[11px] uppercase tracking-[0.25em] transition-all shadow-xl active:scale-95 ${currentPlan === plan.id ? 'bg-slate-100 dark:bg-white/5 text-slate-400 cursor-default border border-slate-200 dark:border-white/10' : plan.recommended ? 'bg-orange-500 text-white hover:bg-orange-600 shadow-orange-500/20' : 'bg-slate-900 dark:bg-white text-white dark:text-black'}`}
+                                    >
+                                        {currentPlan === plan.id ? 'Plano Ativo' : 'Contratar Agora'}
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
             {activeTab === 'team' && (
                 <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-500">
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -111,7 +207,9 @@ export const SettingsScreen: React.FC<Props> = ({
                                 {members.map(m => (
                                     <div key={m.id} className="p-6 bg-white dark:bg-white/5 border border-slate-100 dark:border-white/5 rounded-3xl flex items-center justify-between">
                                         <div className="flex items-center gap-5">
-                                            <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-white/5 flex items-center justify-center font-black text-slate-500">{m.nome.charAt(0)}</div>
+                                            <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-white/5 flex items-center justify-center font-black text-xs text-slate-500">
+                                                {m.avatar_url ? <img src={m.avatar_url} className="w-full h-full object-cover rounded-2xl" /> : m.nome.charAt(0)}
+                                            </div>
                                             <div>
                                                 <div className="text-sm font-black text-slate-900 dark:text-white">{m.nome}</div>
                                                 <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{m.perfil} • {roles.find(r => r.id === m.cargo)?.nome || 'Sem Cargo'}</div>
@@ -218,6 +316,30 @@ export const SettingsScreen: React.FC<Props> = ({
                                     </div>
                                 );
                             })}
+                        </div>
+                    </div>
+                </div>
+            )}
+            
+            {activeTab === 'general' && (
+                <div className="max-w-3xl space-y-10 animate-in slide-in-from-bottom-4 duration-500">
+                    <div className="space-y-2">
+                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Preferências do Sistema</h3>
+                        <p className="text-slate-500 text-sm font-medium">Ajustes visuais e de interface global.</p>
+                    </div>
+
+                    <div className="bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-[3rem] p-10 space-y-8">
+                         <div className="flex items-center justify-between p-6 bg-slate-50 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-white dark:bg-white/10 rounded-2xl shadow-sm">
+                                    {theme === 'dark' ? <Moon className="w-5 h-5 text-orange-500"/> : <Sun className="w-5 h-5 text-orange-500"/>}
+                                </div>
+                                <div>
+                                    <div className="text-sm font-black text-slate-900 dark:text-white">Modo de Exibição</div>
+                                    <div className="text-[10px] font-bold text-slate-400 uppercase">Alternar entre Light e Dark</div>
+                                </div>
+                            </div>
+                            <ElasticSwitch checked={theme === 'dark'} onChange={onToggleTheme} />
                         </div>
                     </div>
                 </div>
