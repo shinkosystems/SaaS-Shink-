@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { fetchProjects, fetchAllTasks, updateTask, deleteTask } from '../services/projectService';
 import { fetchTransactions, getOperationalRates } from '../services/financialService';
-import { DbProject, FinancialTransaction, DbTask, Opportunity, BpmnTask } from '../types';
+import { DbProject, FinancialTransaction, DbTask, Opportunity, BpmnTask, TaskStatus } from '../types';
 import { TaskDetailModal } from '../components/TaskDetailModal';
 import { 
     Layers, Activity, Clock, 
@@ -24,6 +24,16 @@ const CATEGORY_STYLES: Record<string, string> = {
     'Primária-Lógica': 'bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400 border-violet-200 dark:border-violet-800/50',
     'Primária-Marketing': 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800/50',
 };
+
+const STATUS_OPTIONS = [
+    { value: 'all', label: 'TUDO' },
+    { value: 'backlog', label: 'BACKLOG' },
+    { value: 'todo', label: 'A FAZER' },
+    { value: 'doing', label: 'EXECUTANDO' },
+    { value: 'review', label: 'REVISÃO' },
+    { value: 'approval', label: 'APROVAÇÃO' },
+    { value: 'done', label: 'CONCLUÍDO' }
+];
 
 const DEFAULT_PROFIT_MARGIN = 0.35; 
 
@@ -70,6 +80,7 @@ export const ValueChainDashboard: React.FC<Props> = ({ organizationId }) => {
     
     const [timeRange, setTimeRange] = useState<TimeRange>('month');
     const [viewDate, setViewDate] = useState(new Date());
+    const [processStatusFilter, setProcessStatusFilter] = useState<string>('all');
 
     useEffect(() => {
         if (organizationId) {
@@ -115,10 +126,16 @@ export const ValueChainDashboard: React.FC<Props> = ({ organizationId }) => {
             return d >= start && d <= end;
         });
 
-        const periodKanban = kanbanTasks.filter(t => {
+        // Filtragem Base por Tempo
+        let periodKanban = kanbanTasks.filter(t => {
             const d = new Date(t.datafim || t.dataproposta);
             return d >= start && d <= end;
         });
+
+        // Filtragem Adicional por Status (se aplicável)
+        if (processStatusFilter !== 'all') {
+            periodKanban = periodKanban.filter(t => t.status === processStatusFilter);
+        }
 
         const totalRevenue = periodTrans.filter(t => t.type === 'inflow').reduce((acc, t) => acc + t.amount, 0);
         const totalOutflow = periodTrans.filter(t => t.type === 'outflow').reduce((acc, t) => acc + t.amount, 0);
@@ -197,7 +214,7 @@ export const ValueChainDashboard: React.FC<Props> = ({ organizationId }) => {
             globalFutureProfit, globalBilledProfit, globalActiveCost,
             label: start.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric', day: timeRange === 'day' ? '2-digit' : undefined }).toUpperCase()
         };
-    }, [kanbanTasks, transactions, viewDate, timeRange, rates, projects]);
+    }, [kanbanTasks, transactions, viewDate, timeRange, rates, projects, processStatusFilter]);
 
     const selectedProjectData = useMemo(() => {
         if (!selectedProjectId) return null;
@@ -262,6 +279,23 @@ export const ValueChainDashboard: React.FC<Props> = ({ organizationId }) => {
                 </div>
             </header>
 
+            {/* Sub-Header: Filtro de Status para Aba Processos */}
+            {activeTab === 'processes' && (
+                <div className="flex justify-center md:justify-end animate-in fade-in slide-in-from-top-2 duration-500">
+                    <div className="flex bg-white dark:bg-white/5 p-1 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm overflow-x-auto no-scrollbar">
+                        {STATUS_OPTIONS.map(opt => (
+                            <button 
+                                key={opt.value} 
+                                onClick={() => setProcessStatusFilter(opt.value)}
+                                className={`px-5 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${processStatusFilter === opt.value ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-md scale-105' : 'text-slate-400 hover:text-slate-600'}`}
+                            >
+                                {opt.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Top Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-white/5 shadow-soft group">
@@ -298,7 +332,7 @@ export const ValueChainDashboard: React.FC<Props> = ({ organizationId }) => {
                                 <div className="flex items-center gap-4">
                                     <div className={`w-3 h-3 rounded-full ${CATEGORY_STYLES[cat.category].split(' ')[0]}`}></div>
                                     <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-[0.2em]">{cat.category}</h3>
-                                    <span className="text-[10px] font-bold text-slate-400">{cat.tasks.length} processos ativos</span>
+                                    <span className="text-[10px] font-bold text-slate-400">{cat.tasks.length} processos encontrados</span>
                                 </div>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -336,6 +370,12 @@ export const ValueChainDashboard: React.FC<Props> = ({ organizationId }) => {
                             </div>
                         </div>
                     ))}
+                    {stats.categoryMetrics.every(c => c.tasks.length === 0) && (
+                        <div className="flex flex-col items-center justify-center py-40 text-center opacity-40">
+                            <Filter className="w-16 h-16 mb-4 text-slate-300" />
+                            <h3 className="text-xl font-black uppercase tracking-widest">Nenhum processo neste filtro</h3>
+                        </div>
+                    )}
                 </div>
             ) : activeTab === 'projects' ? (
                 <div className="space-y-12 pb-24">

@@ -3,7 +3,7 @@ import React from 'react';
 import { 
     LayoutDashboard, List, Calendar, User, Settings, 
     PlusCircle, LogOut, Sun, Moon, Briefcase, 
-    TrendingUp, DollarSign, Users, Shield, Layers, Box, Menu, X, Sparkles, Lightbulb
+    TrendingUp, DollarSign, Users, Shield, Layers, Box, Menu, X, Sparkles, Lightbulb, FileText
 } from 'lucide-react';
 
 interface Props {
@@ -52,6 +52,13 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, activeModules: string
                 { id: 'crm', label: 'CRM / Vendas', icon: TrendingUp },
                 { id: 'financial', label: 'Financeiro', icon: DollarSign },
                 { id: 'clients', label: 'Stakeholders', icon: Users },
+            ]
+        },
+        {
+            title: 'Recursos',
+            items: [
+                { id: 'assets', label: 'Arquivos & Assets', icon: FileText },
+                { id: 'intelligence', label: 'Inteligência', icon: Sparkles },
             ]
         }
     ];

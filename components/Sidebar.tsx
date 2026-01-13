@@ -4,7 +4,7 @@ import {
     LayoutDashboard, List, Calendar, User, Settings, Search, 
     PlusCircle, LogOut, Sun, Moon, CreditCard, ChevronRight,
     Menu, X, Briefcase, BarChart3, Code2, Users, DollarSign,
-    Shield, Layers, Sparkles, Lightbulb, TrendingUp
+    Shield, Layers, Sparkles, Lightbulb, TrendingUp, FileText
 } from 'lucide-react';
 import { PLAN_LIMITS } from '../types';
 import { fetchOrganizationDetails } from '../services/organizationService';
@@ -40,6 +40,7 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, currentPlan: string =
             title: 'Gestão',
             items: [
                 { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+                { id: 'value-chain', label: 'Cadeia de Valor', icon: Layers }
             ]
         },
         {
@@ -59,10 +60,10 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, currentPlan: string =
             ]
         },
         {
-            title: 'Inteligência',
+            title: 'Recursos',
             items: [
-                { id: 'product', label: 'Métricas Produto', icon: BarChart3 },
-                { id: 'dev-metrics', label: 'Engenharia', icon: Code2 }
+                { id: 'assets', label: 'Arquivos & Assets', icon: FileText },
+                { id: 'intelligence', label: 'Inteligência', icon: Sparkles }
             ]
         }
     ];
@@ -129,7 +130,7 @@ export const Sidebar: React.FC<Props> = (props) => {
         </div>
 
         <div className="p-4 pb-2 space-y-2">
-            <button onClick={props.onOpenCreate} className="w-full h-11 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all">
+            <button onClick={props.onOpenCreate} className="w-full h-11 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-lg hover:scale-[1.02] active:scale-98 transition-all">
                 <PlusCircle className="w-4 h-4" /> Novo Projeto
             </button>
             <button onClick={props.onOpenCreateTask} className="w-full h-10 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/10 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all">

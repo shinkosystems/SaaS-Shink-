@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, Suspense } from 'react';
 import { supabase } from './services/supabaseClient';
-import { Opportunity } from './types';
+import { Opportunity, BpmnTask } from './types';
 import { fetchOpportunities, createOpportunity, updateOpportunity, deleteOpportunity, fetchOpportunityById } from './services/opportunityService';
 import { createTask } from './services/projectService';
 import { updateOrgDetails, fetchActiveOrgModules, getPlanDefaultModules } from './services/organizationService';
@@ -25,6 +26,7 @@ import { ProfilePage } from './pages/ProfilePage';
 import { AdminPage } from './pages/AdminPage';
 import { EcosystemPage } from './pages/EcosystemPage';
 import { ValueChainDashboard } from './pages/ValueChainDashboard';
+import { AssetsPage } from './pages/AssetsPage';
 
 // Utility Components
 import AuthScreen from './components/AuthScreen';
@@ -52,6 +54,7 @@ const ROUTES: Record<string, string> = {
     'financial': '/finance',
     'clients': '/clients',
     'intelligence': '/intelligence',
+    'assets': '/assets',
     'settings': '/settings',
     'profile': '/profile',
     'admin-manager': '/admin'
@@ -330,6 +333,7 @@ const App: React.FC = () => {
                         {view === 'value-chain' && <ValueChainDashboard organizationId={userOrgId || undefined} />}
                         {view === 'ecosystem' && <EcosystemPage organizationId={userOrgId || undefined} userRole={userRole} />}
                         {view === 'intelligence' && <IntelligencePage organizationId={userOrgId || undefined} opportunities={opportunities} />}
+                        {view === 'assets' && <AssetsPage organizationId={userOrgId || undefined} />}
                         {view === 'settings' && <SettingsPage theme={theme} onToggleTheme={toggleTheme} onlineUsers={onlineUsers} userOrgId={userOrgId} orgDetails={orgDetails} onUpdateOrgDetails={() => {}} setView={setView} userRole={userRole} userData={userData} activeModules={activeModules} onRefreshModules={() => loadUserData(user.id)} />}
                         {view === 'profile' && <ProfilePage currentPlan={currentPlan} onRefresh={() => loadUserData(user.id)} />}
                         {view === 'admin-manager' && (userData?.email === 'peboorba@gmail.com') && <AdminPage onlineUsers={onlineUsers} />}
