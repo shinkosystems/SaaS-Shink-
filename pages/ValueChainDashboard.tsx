@@ -3,14 +3,13 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { fetchProjects, fetchAllTasks, updateTask, deleteTask } from '../services/projectService';
 import { fetchTransactions, getOperationalRates } from '../services/financialService';
 import { DbProject, FinancialTransaction, DbTask, Opportunity, BpmnTask } from '../types';
-import { QuickTaskModal } from '../components/QuickTaskModal';
 import { TaskDetailModal } from '../components/TaskDetailModal';
 import { 
     Layers, Activity, Clock, 
     Briefcase, ExternalLink, 
     Plus, TrendingUp, Zap, Target, ArrowUpRight, DollarSign,
     PieChart, BarChart3, ChevronRight, AlertTriangle, CheckCircle2, Save, RefreshCw,
-    Calendar, ChevronLeft, Users, Filter, ArrowRight, TrendingDown, Hourglass, Receipt, Coins, Loader2
+    Calendar, ChevronLeft, Users, Filter, ArrowRight, TrendingDown, Hourglass, Receipt, Coins, Loader2, X, ListTodo
 } from 'lucide-react';
 
 interface Props {
@@ -18,12 +17,12 @@ interface Props {
 }
 
 const CATEGORY_STYLES: Record<string, string> = {
-    'Apoio-Adm': 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
-    'Apoio-Gestão': 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400',
-    'Primária-Modelagem': 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
-    'Primária-Interface': 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400',
-    'Primária-Lógica': 'bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400',
-    'Primária-Marketing': 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400',
+    'Apoio-Adm': 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700',
+    'Apoio-Gestão': 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700',
+    'Primária-Modelagem': 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800/50',
+    'Primária-Interface': 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800/50',
+    'Primária-Lógica': 'bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400 border-violet-200 dark:border-violet-800/50',
+    'Primária-Marketing': 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800/50',
 };
 
 const DEFAULT_PROFIT_MARGIN = 0.35; 
@@ -65,6 +64,8 @@ export const ValueChainDashboard: React.FC<Props> = ({ organizationId }) => {
     const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedTask, setSelectedTask] = useState<DbTask | null>(null);
+    const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+    const [selectedPillar, setSelectedPillar] = useState<string | null>(null);
     const [rates, setRates] = useState<any>(null);
     
     const [timeRange, setTimeRange] = useState<TimeRange>('month');
@@ -121,13 +122,12 @@ export const ValueChainDashboard: React.FC<Props> = ({ organizationId }) => {
 
         const totalRevenue = periodTrans.filter(t => t.type === 'inflow').reduce((acc, t) => acc + t.amount, 0);
         const totalOutflow = periodTrans.filter(t => t.type === 'outflow').reduce((acc, t) => acc + t.amount, 0);
-        const totalKanbanHours = periodKanban.reduce((acc, t) => acc + (t.duracaohoras || 2), 0);
+        
+        const hourlyRate = rates?.totalRate || 0;
 
         let globalFutureProfit = 0;
         let globalBilledProfit = 0;
         let globalActiveCost = 0;
-
-        const hourlyRate = rates?.totalRate || 0;
 
         const categoryMetrics = Object.keys(CATEGORY_STYLES).map(pillar => {
             const pillarTasks = periodKanban.filter(t => KANBAN_TO_PILLAR[t.category || 'Gestão'] === pillar);
@@ -169,6 +169,14 @@ export const ValueChainDashboard: React.FC<Props> = ({ organizationId }) => {
             const projProfit = expectedMonthlyRev - projCost;
             const projMargin = expectedMonthlyRev > 0 ? (projProfit / expectedMonthlyRev) * 100 : 0;
 
+            // Breakdown por pilar para este projeto específico
+            const pillarBreakdown = Object.keys(CATEGORY_STYLES).map(pillar => {
+                const pTasks = projTasks.filter(t => KANBAN_TO_PILLAR[t.category || 'Gestão'] === pillar);
+                const pHours = pTasks.reduce((acc, t) => acc + (t.duracaohoras || 2), 0);
+                const pCost = pHours * hourlyRate;
+                return { pillar, hours: pHours, cost: pCost, tasks: pTasks };
+            });
+
             return {
                 id: proj.id,
                 name: proj.nome,
@@ -177,19 +185,29 @@ export const ValueChainDashboard: React.FC<Props> = ({ organizationId }) => {
                 expectedMonthlyRev,
                 profit: projProfit,
                 margin: projMargin,
-                status: proj.projoport ? 'Future' : 'Active'
+                status: proj.projoport ? 'Future' : 'Active',
+                pillarBreakdown
             };
         }).sort((a, b) => b.cost - a.cost);
 
-        const technicalMargin = totalRevenue > 0 ? ((totalRevenue - totalOutflow) / totalRevenue) * 100 : 0;
-
         return { 
-            totalRevenue, totalOutflow, totalKanbanHours,
-            technicalMargin, categoryMetrics, projectMetrics,
+            totalRevenue, totalOutflow, 
+            categoryMetrics, projectMetrics,
             globalFutureProfit, globalBilledProfit, globalActiveCost,
             label: start.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric', day: timeRange === 'day' ? '2-digit' : undefined }).toUpperCase()
         };
     }, [kanbanTasks, transactions, viewDate, timeRange, rates, projects]);
+
+    const selectedProjectData = useMemo(() => {
+        if (!selectedProjectId) return null;
+        return stats.projectMetrics.find(p => p.id === selectedProjectId);
+    }, [selectedProjectId, stats.projectMetrics]);
+
+    const pillarTasks = useMemo(() => {
+        if (!selectedPillar || !selectedProjectData) return [];
+        const pillar = selectedProjectData.pillarBreakdown.find(pb => pb.pillar === selectedPillar);
+        return pillar?.tasks || [];
+    }, [selectedPillar, selectedProjectData]);
 
     const convertDbTaskToBpmn = (t: DbTask): BpmnTask => ({
         id: t.id.toString(),
@@ -220,7 +238,7 @@ export const ValueChainDashboard: React.FC<Props> = ({ organizationId }) => {
                 <div className="flex flex-wrap items-center gap-4">
                     <div className="flex bg-white dark:bg-white/5 p-1 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm">
                         {['day', 'week', 'month', 'year'].map(r => (
-                            <button key={r} onClick={() => setTimeRange(r as any)} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${timeRange === r ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-md scale-105' : 'text-slate-400 hover:text-slate-600'}`}>{r === 'day' ? 'Dia' : r === 'week' ? 'Sem' : r === 'month' ? 'Mês' : 'Ano'}</button>
+                            <button key={r} onClick={() => setTimeRange(r as any)} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${timeRange === r ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-md scale-105' : 'text-slate-400 hover:text-slate-600'}`}>{r === 'day' ? 'Dia' : r === 'week' ? 'Sem' : r === 'month' ? 'Mês' : r === 'year' ? 'Ano' : ''}</button>
                         ))}
                     </div>
 
@@ -231,9 +249,9 @@ export const ValueChainDashboard: React.FC<Props> = ({ organizationId }) => {
                     </div>
 
                     <div className="flex bg-white dark:bg-white/5 p-1 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm">
-                        <button onClick={() => setActiveTab('processes')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'processes' ? 'bg-amber-500 text-black shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>Processos</button>
+                        <button onClick={() => {setActiveTab('processes'); setSelectedProjectId(null); setSelectedPillar(null);}} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'processes' ? 'bg-amber-500 text-black shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>Processos</button>
                         <button onClick={() => setActiveTab('projects')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'projects' ? 'bg-amber-500 text-black shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>Projetos</button>
-                        <button onClick={() => setActiveTab('profitability')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'profitability' ? 'bg-amber-500 text-black shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>Pillars</button>
+                        <button onClick={() => {setActiveTab('profitability'); setSelectedProjectId(null); setSelectedPillar(null);}} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'profitability' ? 'bg-amber-500 text-black shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>Pillars</button>
                     </div>
                 </div>
             </header>
@@ -314,44 +332,138 @@ export const ValueChainDashboard: React.FC<Props> = ({ organizationId }) => {
                     ))}
                 </div>
             ) : activeTab === 'projects' ? (
-                <div className="space-y-6 pb-24">
-                     <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-white/5 overflow-hidden shadow-soft">
-                        <table className="w-full text-left">
-                            <thead className="bg-slate-50 dark:bg-white/[0.02] border-b border-slate-100 dark:border-white/10">
-                                <tr>
-                                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Projeto</th>
-                                    <th className="px-4 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Esforço Real (h)</th>
-                                    <th className="px-4 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Custo ABC Real</th>
-                                    <th className="px-4 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Receita Mensal</th>
-                                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Margem de Lucro</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50 dark:divide-white/5">
-                                {stats.projectMetrics.map(proj => (
-                                    <tr key={proj.id} className="group hover:bg-slate-50 dark:hover:bg-white/[0.01] transition-colors">
-                                        <td className="px-8 py-6">
-                                            <div className="flex flex-col">
-                                                <span className="text-xs font-black text-slate-900 dark:text-white uppercase">{proj.name}</span>
-                                                <span className={`text-[8px] font-bold uppercase mt-1 ${proj.status === 'Active' ? 'text-emerald-500' : 'text-amber-500'}`}>{proj.status}</span>
+                <div className="space-y-12 pb-24">
+                    {selectedProjectData ? (
+                        <div className="space-y-10 animate-in fade-in slide-in-from-left-4 duration-500">
+                             <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-6">
+                                    <button onClick={() => {setSelectedProjectId(null); setSelectedPillar(null);}} className="p-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl text-slate-500 hover:text-amber-500 transition-all shadow-sm">
+                                        <ChevronLeft className="w-6 h-6"/>
+                                    </button>
+                                    <div>
+                                        <div className="text-[10px] font-black text-amber-500 uppercase tracking-[0.4em] mb-1">Análise Deep Dive</div>
+                                        <h2 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">{selectedProjectData.name}</h2>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    <div className="text-right">
+                                        <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Esforço Total</div>
+                                        <div className="text-2xl font-black text-slate-900 dark:text-white">{selectedProjectData.hours}h</div>
+                                    </div>
+                                    <div className="w-px h-10 bg-slate-200 dark:bg-white/10"></div>
+                                    <div className="text-right">
+                                        <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Custo ABC Real</div>
+                                        <div className="text-2xl font-black text-rose-500">{formatCurrency(selectedProjectData.cost)}</div>
+                                    </div>
+                                </div>
+                             </div>
+
+                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {selectedProjectData.pillarBreakdown.map(p => (
+                                    <div 
+                                        key={p.pillar} 
+                                        onClick={() => setSelectedPillar(p.pillar === selectedPillar ? null : p.pillar)}
+                                        className={`glass-card p-8 rounded-[2.5rem] border ${CATEGORY_STYLES[p.pillar]} flex flex-col justify-between h-48 transition-all hover:scale-[1.02] cursor-pointer ${selectedPillar === p.pillar ? 'ring-2 ring-amber-500 ring-offset-4 dark:ring-offset-black shadow-2xl' : ''}`}
+                                    >
+                                        <div>
+                                            <div className="flex justify-between items-start mb-6">
+                                                <div className="text-[10px] font-black uppercase tracking-widest opacity-70">{p.pillar}</div>
+                                                <div className="text-[9px] font-black px-2 py-1 bg-black/5 rounded-lg">{((p.cost / (selectedProjectData.cost || 1)) * 100).toFixed(0)}% do peso</div>
                                             </div>
-                                        </td>
-                                        <td className="px-4 py-6 text-center"><span className="text-sm font-black text-slate-700 dark:text-slate-300">{proj.hours}h</span></td>
-                                        <td className="px-4 py-6 text-center text-xs font-bold text-rose-500">{formatCurrency(proj.cost)}</td>
-                                        <td className="px-4 py-6 text-center text-xs font-bold text-emerald-500">{formatCurrency(proj.expectedMonthlyRev)}</td>
-                                        <td className="px-8 py-6 text-right">
-                                            <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-black uppercase border transition-all ${proj.margin >= 40 ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : proj.margin > 0 ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
-                                                {proj.margin.toFixed(1)}% {proj.profit > 0 ? 'ROI' : 'LOS'}
+                                            <div className="text-3xl font-black tracking-tighter">{formatCurrency(p.cost)}</div>
+                                            <div className="text-[9px] font-bold uppercase mt-1 opacity-60">Custo ABC Consumido</div>
+                                        </div>
+                                        <div className="pt-4 border-t border-black/5 flex justify-between items-center">
+                                            <div className="flex items-center gap-2">
+                                                <Clock className="w-3.5 h-3.5 opacity-50"/>
+                                                <span className="text-sm font-black">{p.hours}h</span>
                                             </div>
-                                        </td>
-                                    </tr>
+                                            <span className="text-[8px] font-black uppercase opacity-40">Ver Detalhes <ArrowRight className="w-2.5 h-2.5 inline ml-1"/></span>
+                                        </div>
+                                    </div>
                                 ))}
-                            </tbody>
-                        </table>
-                    </div>
+                             </div>
+
+                             {/* Drill-down de Tarefas do Pilar */}
+                             {selectedPillar && (
+                                 <div className="mt-12 space-y-8 animate-in fade-in slide-in-from-top-4 duration-500">
+                                     <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/10 pb-6">
+                                         <div className="flex items-center gap-4">
+                                             <div className={`w-3 h-10 rounded-full ${CATEGORY_STYLES[selectedPillar].split(' ')[0]}`}></div>
+                                             <div>
+                                                <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Ativos de {selectedPillar}</h3>
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">Auditória de Engenharia Industrial</p>
+                                             </div>
+                                         </div>
+                                         <span className="text-xs font-black px-4 py-2 bg-slate-100 dark:bg-white/5 rounded-2xl text-slate-500">{pillarTasks.length} tarefas mapeadas</span>
+                                     </div>
+
+                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                         {pillarTasks.map(task => (
+                                             <div key={task.id} onClick={() => setSelectedTask(task)} className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/5 rounded-[1.8rem] p-6 hover:shadow-xl hover:border-amber-500/30 transition-all cursor-pointer group">
+                                                 <div className="flex justify-between items-start mb-4">
+                                                     <span className="text-[8px] font-black uppercase text-slate-400">ID: {task.id}</span>
+                                                     <div className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${task.status === 'done' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>{task.status}</div>
+                                                 </div>
+                                                 <h4 className="text-sm font-bold text-slate-800 dark:text-white leading-relaxed mb-6 group-hover:text-amber-500 transition-colors line-clamp-2">{task.titulo}</h4>
+                                                 <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-white/5">
+                                                     <div className="flex items-center gap-2">
+                                                         <Clock className="w-3.5 h-3.5 text-slate-300"/>
+                                                         <span className="text-[10px] font-black text-slate-400">{task.duracaohoras || 2}h</span>
+                                                     </div>
+                                                     <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-amber-500 transition-colors"/>
+                                                 </div>
+                                             </div>
+                                         ))}
+                                         {pillarTasks.length === 0 && (
+                                             <div className="col-span-full py-20 text-center border-2 border-dashed border-slate-200 dark:border-white/5 rounded-[2.5rem]">
+                                                 <ListTodo className="w-12 h-12 text-slate-200 dark:text-white/5 mx-auto mb-4"/>
+                                                 <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Nenhum ativo alocado neste pilar ainda.</p>
+                                             </div>
+                                         )}
+                                     </div>
+                                 </div>
+                             )}
+                        </div>
+                    ) : (
+                        <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-white/5 overflow-hidden shadow-soft animate-in fade-in duration-700">
+                            <table className="w-full text-left">
+                                <thead className="bg-slate-50 dark:bg-white/[0.02] border-b border-slate-100 dark:border-white/10">
+                                    <tr>
+                                        <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Projeto</th>
+                                        <th className="px-4 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Esforço Real (h)</th>
+                                        <th className="px-4 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Custo ABC Real</th>
+                                        <th className="px-4 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Receita Mensal</th>
+                                        <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Margem de Lucro</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50 dark:divide-white/5">
+                                    {stats.projectMetrics.map(proj => (
+                                        <tr key={proj.id} onClick={() => setSelectedProjectId(proj.id)} className="group hover:bg-slate-50 dark:hover:bg-white/[0.01] transition-colors cursor-pointer">
+                                            <td className="px-8 py-6">
+                                                <div className="flex flex-col">
+                                                    <span className="text-xs font-black text-slate-900 dark:text-white uppercase group-hover:text-amber-500 transition-colors">{proj.name}</span>
+                                                    <span className={`text-[8px] font-bold uppercase mt-1 ${proj.status === 'Active' ? 'text-emerald-500' : 'text-amber-500'}`}>{proj.status}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-6 text-center"><span className="text-sm font-black text-slate-700 dark:text-slate-300">{proj.hours}h</span></td>
+                                            <td className="px-4 py-6 text-center text-xs font-bold text-rose-500">{formatCurrency(proj.cost)}</td>
+                                            <td className="px-4 py-6 text-center text-xs font-bold text-emerald-500">{formatCurrency(proj.expectedMonthlyRev)}</td>
+                                            <td className="px-8 py-6 text-right">
+                                                <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-black uppercase border transition-all ${proj.margin >= 40 ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : proj.margin > 0 ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
+                                                    {proj.margin.toFixed(1)}% {proj.profit > 0 ? 'ROI' : 'LOS'}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
                 </div>
             ) : (
                 <div className="space-y-6 pb-24">
-                     <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-white/5 overflow-hidden shadow-soft">
+                     <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-white/5 overflow-hidden shadow-soft animate-in fade-in duration-700">
                         <table className="w-full text-left">
                             <thead className="bg-slate-50 dark:bg-white/[0.02] border-b border-slate-100 dark:border-white/10">
                                 <tr>

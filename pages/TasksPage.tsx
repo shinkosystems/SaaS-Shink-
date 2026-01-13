@@ -8,7 +8,7 @@ import { Opportunity, DbTask } from '../types';
 import { 
     Trello, GanttChartSquare, Calendar as CalendarIcon, Users as UsersIcon, 
     Filter, Search, X, ChevronDown, ListTodo, PlayCircle, CheckCircle2, 
-    ClipboardCheck, Archive, Target, Zap, Loader2, Briefcase
+    ClipboardCheck, Archive, Target, Zap, Loader2, Briefcase, Activity
 } from 'lucide-react';
 import { fetchAllTasks, fetchOrgMembers, fetchProjects, updateTask } from '../services/projectService';
 import { optimizeSchedule } from '../services/geminiService';
@@ -22,6 +22,14 @@ interface Props {
     tasksVersion?: number;
 }
 
+const STATUS_OPTIONS = [
+    { value: 'todo', label: 'BACKLOG' },
+    { value: 'doing', label: 'EM EXECUÇÃO' },
+    { value: 'review', label: 'REVISÃO' },
+    { value: 'approval', label: 'APROVAÇÃO' },
+    { value: 'done', label: 'CONCLUÍDO' }
+];
+
 export const TasksPage: React.FC<Props> = ({ opportunities, onOpenProject, userRole, organizationId, initialSubView = 'kanban', tasksVersion = 0 }) => {
     const [subView, setSubView] = useState<'kanban' | 'gantt' | 'calendar' | 'workload'>(initialSubView as any);
     const [tasks, setTasks] = useState<DbTask[]>([]);
@@ -33,6 +41,7 @@ export const TasksPage: React.FC<Props> = ({ opportunities, onOpenProject, userR
     const [viewDate, setViewDate] = useState(new Date());
     const [filterProject, setFilterProject] = useState('');
     const [filterAssignee, setFilterAssignee] = useState('');
+    const [filterStatus, setFilterStatus] = useState('');
     const [minGut, setMinGut] = useState(0);
 
     const [members, setMembers] = useState<any[]>([]);
@@ -68,7 +77,6 @@ export const TasksPage: React.FC<Props> = ({ opportunities, onOpenProject, userR
             const optimized = await optimizeSchedule(pendingTasks, members);
             
             if (optimized && optimized.length > 0) {
-                // Atualiza sequencialmente ou em paralelo
                 await Promise.all(optimized.map(item => 
                     updateTask(Number(item.id), { 
                         datainicio: item.startDate, 
@@ -93,7 +101,6 @@ export const TasksPage: React.FC<Props> = ({ opportunities, onOpenProject, userR
     const filteredTasks = useMemo(() => {
         const searchLower = searchTerm.toLowerCase();
         return tasks.filter(t => {
-            // Busca expandida: Título, Descrição ou ID
             const matchesSearch = 
                 t.titulo.toLowerCase().includes(searchLower) || 
                 (t.descricao && t.descricao.toLowerCase().includes(searchLower)) || 
@@ -101,10 +108,12 @@ export const TasksPage: React.FC<Props> = ({ opportunities, onOpenProject, userR
                 
             const matchesProject = !filterProject || t.projeto?.toString() === filterProject;
             const matchesAssignee = !filterAssignee || t.responsavel === filterAssignee;
+            const matchesStatus = !filterStatus || t.status === filterStatus;
             const score = (t.gravidade || 1) * (t.urgencia || 1) * (t.tendencia || 1);
-            return matchesSearch && matchesProject && matchesAssignee && score >= minGut;
+            
+            return matchesSearch && matchesProject && matchesAssignee && matchesStatus && score >= minGut;
         });
-    }, [tasks, searchTerm, filterProject, filterAssignee, minGut]);
+    }, [tasks, searchTerm, filterProject, filterAssignee, filterStatus, minGut]);
 
     return (
         <div className="h-full flex flex-col bg-slate-50 dark:bg-transparent overflow-hidden">
@@ -148,7 +157,7 @@ export const TasksPage: React.FC<Props> = ({ opportunities, onOpenProject, userR
 
                 <div className="flex flex-wrap items-center gap-4">
                     {/* Filtro por Projeto */}
-                    <div className="flex items-center gap-3 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-1.5 rounded-xl min-w-[200px]">
+                    <div className="flex items-center gap-3 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-1.5 rounded-xl min-w-[180px]">
                         <Briefcase className="w-4 h-4 text-slate-400 ml-2" />
                         <select 
                             value={filterProject} 
@@ -158,6 +167,21 @@ export const TasksPage: React.FC<Props> = ({ opportunities, onOpenProject, userR
                             <option value="">TODOS OS PROJETOS</option>
                             {projects.map(p => (
                                 <option key={p.id} value={p.id} className="dark:bg-slate-900">{p.nome.toUpperCase()}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* NOVO: Filtro por Estágio */}
+                    <div className="flex items-center gap-3 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-1.5 rounded-xl min-w-[160px]">
+                        <Activity className="w-4 h-4 text-slate-400 ml-2" />
+                        <select 
+                            value={filterStatus} 
+                            onChange={e => setFilterStatus(e.target.value)} 
+                            className="bg-transparent border-none outline-none text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-white flex-1 cursor-pointer"
+                        >
+                            <option value="">TODOS ESTÁGIOS</option>
+                            {STATUS_OPTIONS.map(opt => (
+                                <option key={opt.value} value={opt.value} className="dark:bg-slate-900">{opt.label}</option>
                             ))}
                         </select>
                     </div>
