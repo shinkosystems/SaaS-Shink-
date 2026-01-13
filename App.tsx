@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, Suspense, useMemo } from 'react';
 import { supabase } from './services/supabaseClient';
 import { Opportunity, BpmnTask } from './types';
@@ -21,7 +20,7 @@ import { CrmPage } from './pages/CrmPage';
 import { FinancialPage } from './pages/FinancialPage';
 import { ClientsPage } from './pages/ClientsPage';
 import { IntelligencePage } from './pages/IntelligencePage';
-import { SettingsPage } from './pages/SettingsPage';
+import { SettingsPage } from './pages/SettingsPage'; // Certifique-se que o arquivo exporta como SettingsPage ou mude para SettingsScreen se renomeou o export
 import { ProfilePage } from './pages/ProfilePage';
 import { AdminPage } from './pages/AdminPage';
 import { EcosystemPage } from './pages/EcosystemPage';
@@ -89,15 +88,28 @@ const App: React.FC = () => {
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [showBlog, setShowBlog] = useState(false);
   const [blogPostSlug, setBlogPostSlug] = useState<string | null>(null);
+  
+  // Estado orgDetails atualizado com campos do Asaas
   const [orgDetails, setOrgDetails] = useState({ 
-      name: '', limit: 1, logoUrl: null, primaryColor: '#F59E0B', aiSector: '', aiTone: '', aiContext: '' 
+      name: '', 
+      limit: 1, 
+      logoUrl: null, 
+      primaryColor: '#F59E0B', 
+      aiSector: '', 
+      aiTone: '', 
+      aiContext: '',
+      cpf_cnpj: '',
+      cep: '',
+      endereco_numero: ''
   });
+  
   const [dbStatus, setDbStatus] = useState<'connected'|'disconnected'>('connected');
-
   const [pageMeta, setPageMeta] = useState<{title?: string, description?: string, image?: string}>({});
 
   const handleRouting = async () => {
       let path = window.location.pathname;
+      if (window.location.protocol === 'blob:' || window.location.hostname.includes('usercontent.goog')) return;
+
       if (path === '/') {
           setPageMeta({ title: 'Home', description: 'Sistema Operacional para Framework Shinkō' });
       } else if (path.startsWith('/blog')) {
@@ -107,10 +119,6 @@ const App: React.FC = () => {
           return;
       } else { 
           setShowBlog(false); 
-          const viewKey = REVERSE_ROUTES[path];
-          if (viewKey) {
-              setPageMeta({ title: viewKey.charAt(0).toUpperCase() + viewKey.slice(1) });
-          }
       }
 
       if (path === '/project/new') {
@@ -127,31 +135,28 @@ const App: React.FC = () => {
 
           const opp = await fetchOpportunityById(projectId);
           if (opp) {
-              setPageMeta({ title: opp.title, description: opp.description?.substring(0, 160) });
               if (subAction === 'edit') {
                   setEditingOpportunity(opp);
-                  setSelectedProjectState(null);
                   setViewState('edit-project');
               } else {
                   setSelectedProjectState(opp);
-                  setEditingOpportunity(null);
                   setViewState('project-view');
               }
-          } else setView('dashboard');
+          }
           return;
       }
 
       const mappedView = REVERSE_ROUTES[path];
       if (mappedView) setViewState(mappedView);
-      else setViewState('dashboard');
   };
 
   const navigateTo = (path: string) => {
       try { 
-        window.history.pushState({}, '', path); 
-        handleRouting(); 
+        if (window.location.protocol !== 'blob:' && !window.location.hostname.includes('usercontent.goog')) {
+          window.history.pushState({}, '', path); 
+        }
       } catch (e) { 
-        console.warn("Routing blocked:", e); 
+        console.warn("Navegação visual limitada.");
       }
   };
 
@@ -160,7 +165,8 @@ const App: React.FC = () => {
       setSelectedProjectState(null); 
       setEditingOpportunity(null);
       setIsMobileOpen(false);
-      navigateTo(ROUTES[newView] || '/');
+      const path = ROUTES[newView] || '/';
+      navigateTo(path);
   };
 
   const onOpenProject = (opp: Opportunity) => {
@@ -177,13 +183,8 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const root = document.documentElement;
-    if (theme === 'dark') {
-        root.classList.add('dark');
-        root.classList.remove('light');
-    } else {
-        root.classList.add('light');
-        root.classList.remove('dark');
-    }
+    if (theme === 'dark') { root.classList.add('dark'); root.classList.remove('light'); }
+    else { root.classList.add('light'); root.classList.remove('dark'); }
     localStorage.setItem('shinko_theme', theme);
   }, [theme]);
 
@@ -219,13 +220,22 @@ const App: React.FC = () => {
               setIsUserActive(data.ativo !== false); 
               
               if (data.organizacao) {
+                  // Carregando dados da organização incluindo campos de faturamento
                   const { data: orgData } = await supabase.from('organizacoes').select('*').eq('id', data.organizacao).single();
                   
                   if (orgData) {
                     setCurrentPlan(mapDbPlanIdToString(orgData.plano || 4));
                     setOrgDetails({
-                        name: orgData.nome, limit: orgData.colaboradores, logoUrl: orgData.logo, primaryColor: orgData.cor || '#F59E0B',
-                        aiSector: orgData.setor || '', aiTone: orgData.tomdevoz || '', aiContext: orgData.dna || ''
+                        name: orgData.nome, 
+                        limit: orgData.colaboradores, 
+                        logoUrl: orgData.logo, 
+                        primaryColor: orgData.cor || '#F59E0B',
+                        aiSector: orgData.setor || '', 
+                        aiTone: orgData.tomdevoz || '', 
+                        aiContext: orgData.dna || '',
+                        cpf_cnpj: orgData.cpf_cnpj || '',
+                        cep: orgData.cep || '',
+                        endereco_numero: orgData.endereco_numero || ''
                     });
 
                     const modules = await fetchActiveOrgModules(data.organizacao);
@@ -247,12 +257,10 @@ const App: React.FC = () => {
       }
   };
 
-  const toggleTheme = () => {
-      setTheme(prev => prev === 'light' ? 'dark' : 'light');
-  };
+  const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
 
   if (!user && !loading) {
-      if (showBlog) return ( <InsightCenter initialPostSlug={blogPostSlug} onBack={() => { setShowBlog(false); navigateTo('/'); }} onEnter={() => setShowAuth(true)} /> );
+      if (showBlog) return ( <InsightCenter initialPostSlug={blogPostSlug} onBack={() => { setShowBlog(false); setView('dashboard'); }} onEnter={() => setShowAuth(true)} /> );
       return (
           <>
             <MetaController title="Home" description="Shinkō OS - Gestão de Inovação de Alta Performance" />
@@ -262,7 +270,8 @@ const App: React.FC = () => {
       );
   }
 
-  if (!isUserActive && user && !loading) {
+  // LÓGICA DE BLOQUEIO AJUSTADA: Permite acesso à view 'settings' para regularização
+  if (!isUserActive && user && !loading && view !== 'settings') {
       return (
           <div className="fixed inset-0 z-[5000] bg-white dark:bg-[#020203] flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-700">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(239,68,68,0.08),transparent_50%)] pointer-events-none"></div>
@@ -278,7 +287,7 @@ const App: React.FC = () => {
               
               <div className="flex flex-col sm:flex-row gap-4">
                 <button 
-                    onClick={() => setView('profile')} 
+                    onClick={() => setViewState('settings')} 
                     className="px-10 py-5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 transition-all hover:scale-105 shadow-xl active:scale-95"
                 >
                     <CreditCard className="w-5 h-5"/> Ver Planos de Renovação
@@ -289,12 +298,6 @@ const App: React.FC = () => {
                 >
                     Sair da Conta
                 </button>
-              </div>
-
-              <div className="mt-20 flex flex-col items-center gap-4">
-                  <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                      <Zap className="w-3.5 h-3.5 text-amber-500"/> Seus dados estão seguros e criptografados.
-                  </div>
               </div>
           </div>
       );
@@ -314,7 +317,7 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen w-full bg-[var(--bg-color)] text-slate-900 transition-colors duration-300">
-        <MetaController {...pageMeta} />
+        <MetaController title={view.toUpperCase()} />
         {view !== 'create-project' && !editingOpportunity && <Sidebar {...commonProps} />}
         {view !== 'create-project' && !editingOpportunity && <MobileDrawer {...commonProps} />}
         
@@ -345,25 +348,6 @@ const App: React.FC = () => {
                         userRole={userRole} currentPlan={currentPlan} activeModules={activeModules}
                         customLogoUrl={orgDetails.logoUrl} orgName={orgDetails.name}
                     />
-                ) : view === 'create-project' ? (
-                    <OpportunityWizard 
-                        orgType={orgDetails.name}
-                        customLogoUrl={orgDetails.logoUrl}
-                        onSave={async (opp) => {
-                            const newOpp = await createOpportunity({ 
-                                ...opp, 
-                                organizationId: userOrgId || undefined 
-                            });
-                            if (newOpp) {
-                                await loadUserData(user.id);
-                                onOpenProject(newOpp);
-                            } else {
-                                alert("Falha ao salvar o projeto.");
-                                setView('dashboard');
-                            }
-                        }}
-                        onCancel={() => setView('dashboard')}
-                    />
                 ) : (
                     <>
                         {view === 'dashboard' && <DashboardPage 
@@ -379,16 +363,30 @@ const App: React.FC = () => {
                             } else setView('dashboard');
                         }} />}
                         {view === 'list' && <ProjectsPage opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} onRefresh={() => loadUserData(user.id)} />}
-                        
                         {view === 'kanban' && <TasksPage initialSubView="kanban" opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} tasksVersion={tasksVersion} />}
                         {view === 'calendar' && <TasksPage initialSubView="calendar" opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} tasksVersion={tasksVersion} />}
                         {view === 'gantt' && <TasksPage initialSubView="gantt" opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} tasksVersion={tasksVersion} />}
-                        
                         {view === 'crm' && <CrmPage organizationId={userOrgId || undefined} />}
                         {view === 'financial' && <FinancialPage orgType={orgDetails.name} />}
                         {view === 'clients' && <ClientsPage userRole={userRole} onlineUsers={onlineUsers} organizationId={userOrgId || undefined} onOpenProject={onOpenProject} />}
                         {view === 'intelligence' && <IntelligencePage organizationId={userOrgId || undefined} opportunities={opportunities} />}
-                        {view === 'settings' && <SettingsPage theme={theme} onToggleTheme={toggleTheme} onlineUsers={onlineUsers} userOrgId={userOrgId} orgDetails={orgDetails} onUpdateOrgDetails={() => {}} setView={setView} userRole={userRole} userData={userData} activeModules={activeModules} onRefreshModules={() => loadUserData(user.id)} />}
+                        
+                        {/* SettingsPage atualizada para receber os novos campos de faturamento */}
+                        {view === 'settings' && <SettingsPage 
+                            theme={theme} 
+                            onToggleTheme={toggleTheme} 
+                            onlineUsers={onlineUsers} 
+                            userOrgId={userOrgId} 
+                            orgDetails={orgDetails} 
+                            onUpdateOrgDetails={() => loadUserData(user.id)} 
+                            setView={setView} 
+                            userRole={userRole} 
+                            userData={userData} 
+                            activeModules={activeModules} 
+                            onRefreshModules={() => loadUserData(user.id)} 
+                            currentPlan={currentPlan}
+                        />}
+                        
                         {view === 'profile' && <ProfilePage currentPlan={currentPlan} onRefresh={() => loadUserData(user.id)} />}
                         {view === 'admin-manager' && (userData?.email === 'peboorba@gmail.com') && <AdminPage onlineUsers={onlineUsers} />}
                         {view === 'ecosystem' && <EcosystemPage organizationId={userOrgId} userRole={userRole} />}
@@ -399,7 +397,6 @@ const App: React.FC = () => {
 
         {showCreateTask && <QuickTaskModal opportunities={opportunities} onClose={() => setShowCreateTask(false)} onSave={async (task, pid) => {
             if (!userOrgId || !user) return;
-            // MAPEAMENTO CORRETO: task.text do modal vira titulo no DB
             await createTask({
                 titulo: task.text,
                 descricao: task.description,
