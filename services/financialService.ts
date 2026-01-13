@@ -66,13 +66,10 @@ export const getOperationalRates = async (organizationId: number) => {
     const roleMap = new Map(roles?.map(r => [r.id, r.custo_base]) || []);
 
     users?.forEach(u => {
-        // Prioridade: Custo Direto do User > Custo Base do Cargo > 0
         const cost = u.custo_mensal || roleMap.get(u.cargo) || 0;
         totalRhCost += Number(cost);
     });
 
-    // Fallback: Se não houver nenhum apontamento em usuários/cargos, 
-    // tentamos buscar no financeiro (extrato bruto)
     if (totalRhCost === 0) {
         const { data: rhTrans } = await supabase
             .from(TABLE)
@@ -84,7 +81,10 @@ export const getOperationalRates = async (organizationId: number) => {
         totalRhCost = rhTrans?.reduce((acc, t) => acc + Number(t.amount), 0) || 0;
     }
 
-    const manHourCost = totalRhCost / totalHoursCapacity;
+    // FALLBACK CRÍTICO: Se tudo estiver zerado, assume uma taxa de mercado para o dashboard não ficar vazio
+    let manHourCost = totalRhCost / totalHoursCapacity;
+    if (manHourCost === 0) manHourCost = 85.00; // Média de R$ 85,00/h se nada for configurado
+
     const techHourCost = techTotal / totalHoursCapacity;
 
     return {
@@ -93,7 +93,8 @@ export const getOperationalRates = async (organizationId: number) => {
         totalRate: manHourCost + techHourCost,
         capacity: totalHoursCapacity,
         rhTotal: totalRhCost,
-        techTotal
+        techTotal,
+        isFallback: totalRhCost === 0
     };
 };
 

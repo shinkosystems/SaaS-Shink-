@@ -202,8 +202,8 @@ const mapDbProjectToOpportunity = (row: DbProject, tasks: DbTask[] = []): Opport
         dbProjectId: row.id,
         docsContext: row.contexto_ia || '',
         color: row.cor || '#F59E0B',
-        receitaTotal: row.receita_total || 0,
-        prazoMeses: row.prazo_meses || 12
+        mrr: row.mrr || 0,
+        meses: row.meses || 12
     };
 };
 
@@ -231,7 +231,7 @@ const mapOpportunityToDbProject = (opp: Opportunity): any => {
         bpmn_structure: updatedBpmn,
         contexto_ia: opp.docsContext || '',
         color: opp.color || '#F59E0B',
-        receita_total: opp.receitaTotal || 0,
-        prazo_meses: opp.prazoMeses || 12
+        mrr: Number(opp.mrr) || 0,
+        meses: Number(opp.meses) || 12
     };
 };

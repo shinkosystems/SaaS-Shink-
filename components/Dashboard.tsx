@@ -1,12 +1,12 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Opportunity } from '../types';
+import { Opportunity, Archetype } from '../types';
 import MatrixChart from './MatrixChart';
 import { 
-    Zap, Target, Sparkles, Search, Plus, 
-    Layers, ShieldCheck, ArrowRight, LayoutGrid,
-    MessageSquare, Lightbulb, TrendingUp, Workflow, BrainCircuit,
-    Calendar, CreditCard, Shield, Rocket, ChevronRight, Activity, Trophy
+    Zap, Target, Sparkles, ArrowRight, 
+    Layers, ShieldCheck, TrendingUp, Rocket, 
+    ChevronRight, Activity, Trophy, DollarSign,
+    AlertTriangle, CheckCircle2, BarChart3, Clock, Info
 } from 'lucide-react';
 import { SuccessJourney } from './SuccessJourney';
 import { getOperationalRates } from '../services/financialService';
@@ -29,7 +29,6 @@ interface Props {
 export const Dashboard: React.FC<Props> = ({ 
     opportunities, onNavigate, onOpenProject, user, theme, userData, onOpenCreate, onGuruPrompt, activeModules = [], userRole, organizationId
 }) => {
-    const [commandInput, setCommandInput] = useState('');
     const [rates, setRates] = useState<any>(null);
     const firstName = userData?.name?.split(' ')[0] || 'Inovador';
 
@@ -46,102 +45,197 @@ export const Dashboard: React.FC<Props> = ({
         { id: '4', label: 'Escala', description: 'Tenha 1 projeto em execução.', completed: opportunities.some(o => o.status === 'Active'), actionId: 'kanban' },
     ];
 
-    // CÁLCULO DINÂMICO DE ROI BASEADO EM ABC REAL
-    const metrics = useMemo(() => {
-        const totalRevenue = opportunities.reduce((acc, opp) => acc + (opp.revenue * 10000), 0); // Mock scale factor
-        const totalPrioScore = opportunities.reduce((acc, opp) => acc + opp.prioScore, 0);
-        const avgMargin = rates?.totalRate ? 72 : 0; // Exemplo de margem baseada em custos
+    const dashboardMetrics = useMemo(() => {
+        const activeProjects = opportunities.filter(o => o.status === 'Active');
+        const backlogProjects = opportunities.filter(o => o.status === 'Future');
+        
+        // CÁLCULO DE MRR (REAL OU PROJETADO)
+        let isProjectedMrr = false;
+        const totalProjectedMrr = opportunities.reduce((acc, o) => {
+            // Ignorar projetos internos na receita
+            if (o.archetype === Archetype.INTERNAL_MARKETING) return acc;
 
-        return { totalRevenue, totalPrioScore, avgMargin };
+            const mrrReal = Number(o.mrr || 0);
+            if (mrrReal > 0) return acc + mrrReal;
+            
+            // Fallback: Cada ponto de revenue = R$ 2.000,00 de MRR projetados
+            isProjectedMrr = true;
+            return acc + (Number(o.revenue || 1) * 2000);
+        }, 0);
+        
+        // CÁLCULO DE CUSTO ABC (REAL OU TEÓRICO)
+        const hourlyRate = rates?.totalRate || 80;
+        
+        const totalHours = opportunities.reduce((acc, o) => {
+            const hasNodes = o.bpmn?.nodes && o.bpmn.nodes.length > 0;
+            if (!hasNodes) return acc;
+
+            const nodeHours = o.bpmn?.nodes?.reduce((nAcc, n) => {
+                const checklist = n.checklist || [];
+                return nAcc + checklist.reduce((cAcc, t) => {
+                    const h = Number(t.estimatedHours);
+                    return cAcc + (isNaN(h) || h === 0 ? 4 : h);
+                }, 0);
+            }, 0) || 0;
+            return acc + nodeHours;
+        }, 0);
+
+        const accumulatedCost = totalHours * hourlyRate;
+        const monthlyCost = totalHours > 0 ? (accumulatedCost / 12) : 0; 
+        const globalMargin = totalProjectedMrr > 0 ? ((totalProjectedMrr - monthlyCost) / totalProjectedMrr) * 100 : 0;
+
+        return { 
+            activeProjectsCount: activeProjects.length,
+            backlogCount: backlogProjects.length,
+            totalProjectedMrr,
+            accumulatedCost,
+            monthlyCost,
+            globalMargin,
+            isProjectedMrr,
+            isProjectedCost: rates?.isFallback || totalHours === 0
+        };
     }, [opportunities, rates]);
 
-    const handleCommandSubmit = (e?: React.FormEvent) => {
-        if (e) e.preventDefault();
-        if (!commandInput.trim()) return;
-        if (onGuruPrompt) {
-            onGuruPrompt(commandInput);
-            setCommandInput('');
-        }
-    };
-
     return (
-        <div className="max-w-7xl mx-auto pt-4 md:pt-10 pb-20 space-y-8 md:space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-1000 overflow-x-hidden">
+        <div className="max-w-7xl mx-auto pt-4 md:pt-10 pb-20 space-y-8 md:space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-1000">
             
-            {/* Hero Section */}
-            <div className="flex flex-col items-center text-center space-y-4 md:space-y-6 py-4 md:py-8 lg:py-6">
-                <div className="space-y-2 px-4">
-                    <h2 className="text-lg md:text-2xl lg:text-3xl font-medium text-slate-400 dark:text-slate-500 tracking-tight flex items-center justify-center gap-2 md:gap-3">
-                        <Sparkles className="w-4 h-4 md:w-6 md:h-6 text-amber-500 animate-pulse" />
-                        <span>Olá, <span className="text-slate-900 dark:text-white font-bold">{firstName}</span></span>
+            {/* Header / Command Center */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 px-4">
+                <div className="space-y-2">
+                    <h2 className="text-lg md:text-2xl font-medium text-slate-400 dark:text-slate-500 tracking-tight flex items-center gap-2">
+                        <Sparkles className="w-5 h-5 text-amber-500" />
+                        <span>Olá, <span className="text-slate-900 dark:text-white font-black">{firstName}</span></span>
                     </h2>
-                    <h1 className="text-3xl md:text-5xl lg:text-6xl font-black text-slate-900 dark:text-white tracking-tighter leading-tight lg:mb-2">
-                        Painel de <span className="text-amber-500">Operações</span>.
+                    <h1 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white tracking-tighter leading-tight">
+                        War Room de <span className="text-amber-500">Inovação</span>.
                     </h1>
                 </div>
 
-                <div className="w-full max-w-xl lg:max-w-2xl px-4 relative group">
-                    <form onSubmit={handleCommandSubmit} className="relative glass-panel bg-white/80 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl md:rounded-[2rem] p-2 md:p-3 flex items-center gap-2 md:gap-4 shadow-2xl transition-all group-focus-within:border-amber-500/50">
-                        <BrainCircuit className="w-5 h-5 ml-4 text-slate-400" />
-                        <input 
-                            value={commandInput}
-                            onChange={e => setCommandInput(e.target.value)}
-                            placeholder="Comande sua engenharia via IA..."
-                            className="flex-1 bg-transparent border-none outline-none text-sm md:text-base font-medium text-slate-900 dark:text-white"
-                        />
-                        <button type="submit" className="w-10 h-10 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 flex items-center justify-center shadow-lg"><ArrowRight className="w-5 h-5" /></button>
-                    </form>
+                <div className="flex gap-4">
+                    <button onClick={() => onNavigate('create-project')} className="px-8 py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[1.5rem] font-black text-xs uppercase tracking-widest flex items-center gap-3 shadow-xl hover:scale-105 transition-all">
+                        <Rocket className="w-4 h-4"/> Ativar Novo Ativo
+                    </button>
                 </div>
             </div>
 
-            {/* Journey */}
-            <div className="px-4">
-                <SuccessJourney milestones={milestones} onAction={onNavigate} />
+            {/* KPI Section: Saúde do Portfólio */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 px-4">
+                <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-white/5 shadow-soft flex flex-col justify-between h-44 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-700"></div>
+                    <div className="flex justify-between items-start relative z-10">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                            <DollarSign className="w-3 h-3 text-emerald-500"/> MRR {dashboardMetrics.isProjectedMrr ? 'Projetado' : 'Real'}
+                        </span>
+                        {dashboardMetrics.isProjectedMrr && <div className="p-1.5 bg-amber-500/10 rounded-lg" title="Valores baseados no Score RDE (Configure MRR alvo no projeto)"><Info className="w-3 h-3 text-amber-500"/></div>}
+                    </div>
+                    <div className="relative z-10">
+                        <div className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">
+                            R$ {dashboardMetrics.totalProjectedMrr.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
+                        </div>
+                        <p className="text-[8px] font-bold text-slate-500 uppercase mt-2">Receita Mensal em Pipeline</p>
+                    </div>
+                </div>
+
+                <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-white/5 shadow-soft flex flex-col justify-between h-44 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-700"></div>
+                    <div className="flex justify-between items-start relative z-10">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-rose-500"/> Custo Mensal ABC
+                        </span>
+                    </div>
+                    <div className="relative z-10">
+                        <div className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">
+                            R$ {dashboardMetrics.monthlyCost.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
+                        </div>
+                        <p className="text-[8px] font-bold text-slate-500 uppercase mt-2">Investimento/mês (Equipe)</p>
+                    </div>
+                </div>
+
+                <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-white/5 shadow-soft flex flex-col justify-between h-44 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-700"></div>
+                    <div className="flex justify-between items-start relative z-10">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                            <Target className="w-3 h-3 text-blue-500"/> Margem Projetada
+                        </span>
+                        <div className="p-2 bg-blue-500/10 rounded-lg"><BarChart3 className="w-3 h-3 text-blue-500"/></div>
+                    </div>
+                    <div className="relative z-10">
+                        <div className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">
+                            {dashboardMetrics.globalMargin.toFixed(1)}%
+                        </div>
+                        <div className="flex items-center gap-2 mt-2">
+                             <div className="flex-1 h-1 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
+                                <div className="h-full bg-blue-500" style={{ width: `${Math.max(0, Math.min(100, dashboardMetrics.globalMargin))}%` }}></div>
+                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-white/5 shadow-soft flex flex-col justify-between h-44 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-700"></div>
+                    <div className="flex justify-between items-start relative z-10">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                            <Zap className="w-3 h-3 text-amber-500"/> Ativos Ativos
+                        </span>
+                        <div className="p-2 bg-amber-500/10 rounded-lg"><Rocket className="w-3 h-3 text-amber-500"/></div>
+                    </div>
+                    <div className="relative z-10">
+                        <div className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">
+                            {dashboardMetrics.activeProjectsCount} <span className="text-sm font-bold text-slate-400">em curso</span>
+                        </div>
+                        <p className="text-[8px] font-bold text-slate-500 uppercase mt-2">Backlog: {dashboardMetrics.backlogCount} ideias</p>
+                    </div>
+                </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 px-4">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 px-4 pb-20">
                 <div className="lg:col-span-8 space-y-4">
-                    <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500 flex items-center gap-3 px-2">
-                        <Layers className="w-3.5 h-3.5"/> Portfólio PRIO-6
+                    <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 flex items-center gap-3 px-2">
+                        <Layers className="w-3.5 h-3.5"/> Algoritmo de Priorização RDE
                     </h3>
-                    <div className="glass-panel p-4 md:p-6 rounded-[2.5rem] border-slate-200 dark:border-white/10 bg-white/50 dark:bg-[#050507]/40 shadow-xl h-[500px]">
+                    <div className="bg-white dark:bg-slate-900 p-4 md:p-8 rounded-[3rem] border border-slate-100 dark:border-white/5 shadow-2xl h-[550px] relative overflow-hidden">
                         <MatrixChart data={opportunities} onClick={onOpenProject} theme={theme} />
                     </div>
                 </div>
 
-                <div className="lg:col-span-4 space-y-6">
-                    {userRole === 'dono' && (
-                        <div className="space-y-6">
-                            <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500 flex items-center gap-3 px-2">
-                                <TrendingUp className="w-3.5 h-3.5"/> Indicadores Financeiros
-                            </h3>
-                            <div className="glass-panel p-6 rounded-[2rem] border-slate-200 dark:border-white/5 flex flex-col justify-between h-40 animate-in zoom-in duration-500 bg-white dark:bg-[#050507]/40">
-                                <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                    <TrendingUp className="w-3 h-3 text-emerald-500"/> Custo/Hora Operacional
-                                </div>
-                                <div className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">
-                                    R$ {rates?.totalRate?.toFixed(2) || '0.00'}
-                                </div>
-                                <div className="space-y-2">
-                                    <div className="flex justify-between text-[7px] font-black text-slate-400 uppercase">
-                                        <span>RH + Tecnologia</span>
-                                        <span>Base ABC Industrial</span>
+                <div className="lg:col-span-4 space-y-8">
+                    <div className="space-y-4">
+                        <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 flex items-center gap-3 px-2">
+                            <ShieldCheck className="w-3.5 h-3.5"/> Crivo de Fragilidade
+                        </h3>
+                        <div className="bg-white dark:bg-slate-900 p-8 rounded-[3rem] border border-slate-100 dark:border-white/5 shadow-soft space-y-6">
+                            {opportunities.filter(o => o.tadsScore < 6).length > 0 ? (
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-4 text-amber-500">
+                                        <AlertTriangle className="w-6 h-6 animate-pulse"/>
+                                        <div className="text-xs font-black uppercase tracking-widest">Atenção: Ativos Frágeis</div>
                                     </div>
-                                    <div className="w-full h-1 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
-                                        <div className="h-full bg-emerald-500 shadow-glow-emerald" style={{width: '100%'}}></div>
+                                    <p className="text-[11px] text-slate-500 font-medium leading-relaxed">Detectamos {opportunities.filter(o => o.tadsScore < 6).length} projetos com baixo score T.A.D.S. Recomendamos revisão de viabilidade.</p>
+                                    <div className="space-y-2 pt-4">
+                                        {opportunities.filter(o => o.tadsScore < 6).slice(0, 3).map(o => (
+                                            <div key={o.id} onClick={() => onOpenProject(o)} className="p-3 bg-slate-50 dark:bg-white/5 rounded-xl flex justify-between items-center cursor-pointer hover:bg-amber-500/10 transition-all border border-transparent hover:border-amber-500/20">
+                                                <span className="text-[10px] font-bold truncate max-w-[150px]">{o.title}</span>
+                                                <span className="text-[9px] font-black text-rose-500 uppercase">{o.tadsScore}/10</span>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
-                            </div>
+                            ) : (
+                                <div className="text-center py-10 space-y-4">
+                                    <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto border border-emerald-500/20">
+                                        <CheckCircle2 className="w-8 h-8 text-emerald-500"/>
+                                    </div>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">DNA do Portfólio Robusto</p>
+                                </div>
+                            )}
                         </div>
-                    )}
+                    </div>
 
-                    <div className="glass-card p-8 rounded-[2.5rem] bg-gradient-to-br from-amber-500/5 to-transparent border-slate-200 dark:border-white/5 flex flex-col justify-between h-40 group">
-                        <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                            <Rocket className="w-3 h-3 text-amber-500"/> Ativos Ativos
-                        </div>
-                        <div className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">
-                            {opportunities.filter(o => o.status === 'Active').length}
-                        </div>
-                        <div className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Iniciativas em execução técnica</div>
+                    <div className="space-y-4">
+                        <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 flex items-center gap-3 px-2">
+                            <Trophy className="w-3.5 h-3.5"/> Maturidade Shinkō
+                        </h3>
+                        <SuccessJourney milestones={milestones} onAction={onNavigate} />
                     </div>
                 </div>
             </div>

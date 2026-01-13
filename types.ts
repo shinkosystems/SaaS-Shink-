@@ -121,8 +121,8 @@ export interface Opportunity {
     intensity: IntensityLevel;
     status: ProjectStatus;
     createdAt: string;
-    receitaTotal?: number;
-    prazoMeses?: number;
+    mrr: number;
+    meses: number;
     bpmn?: {
         nodes: BpmnNode[];
         lanes: any[];
@@ -157,14 +157,14 @@ export interface DbProject {
     contexto_ia?: string;
     cor?: string;
     projoport?: boolean;
-    receita_total?: number;
-    prazo_meses?: number;
+    mrr?: number;
+    meses?: number;
 }
 
 export interface DbTask {
     id: number;
     projeto?: number;
-    projetoData?: { nome: string; cor: string, receita_total?: number, prazo_meses?: number };
+    projetoData?: { nome: string; cor: string, mrr?: number, meses?: number };
     titulo: string;
     descricao: string;
     status: string;
@@ -187,31 +187,24 @@ export interface DbTask {
     anexos?: Attachment[];
 }
 
-export interface DbUser {
+/**
+ * Added missing types based on reported errors
+ */
+
+export interface Comment {
     id: string;
-    nome: string;
-    email: string;
-    perfil: string;
-    organizacao: number;
-    cargo?: number;
-    custo_mensal?: number;
-    avatar_url?: string;
-    ativo: boolean;
+    task: number;
+    user: string;
+    text: string;
+    created_at: string;
 }
 
-export interface DbRole {
-    id: number;
-    nome: string;
-    custo_base?: number;
-}
-
-export interface DbPlan {
-    id: number;
-    nome: string;
-    valor: number;
-    meses: number;
-    descricao: string;
-    colabtotal: number;
+export interface AsaasPayment {
+    id: string;
+    value: number;
+    status: string;
+    date: string;
+    description: string;
 }
 
 export interface SubscriptionPlan {
@@ -220,21 +213,18 @@ export interface SubscriptionPlan {
     name: string;
     price: number;
     features: string[];
-    recommended: boolean;
+    recommended?: boolean;
     cycle: 'MONTHLY' | 'YEARLY';
     colabtotal: number;
-}
-
-export interface AsaasPayment {
-    id: string;
-    date: string;
-    amount: number;
-    status: string;
+    meses: number;
+    descricao_raw?: string;
 }
 
 export interface AsaasSubscription {
     id: string;
     status: string;
+    value: number;
+    cycle: string;
 }
 
 export interface FinancialRecord {
@@ -285,7 +275,7 @@ export interface DbClient {
     data_inicio?: string;
     contrato?: string;
     logo_url?: string;
-    status?: string;
+    status: string;
     organizacao: number;
     tipo_pessoa?: 'Física' | 'Jurídica';
 }
@@ -306,8 +296,9 @@ export interface ProductMetricsData {
 }
 
 export interface ProductEvent {
-    event_type: 'page_view' | 'feature_use' | 'nps_response';
+    id?: string;
     user_id: string;
+    event_type: 'page_view' | 'feature_use' | 'nps_response' | 'save_opportunity';
     event_data: any;
     created_at: string;
 }
@@ -332,13 +323,17 @@ export interface DevMetricsData {
 export interface AreaAtuacao {
     id: number;
     nome: string;
+    custo_base?: number;
+    empresa?: number;
 }
 
-export interface Comment {
-    id: string;
-    text: string;
-    authorId: string;
-    createdAt: string;
+export interface DbPlan {
+    id: number;
+    nome: string;
+    valor: number;
+    meses: number;
+    descricao: string;
+    colabtotal: number;
 }
 
 export interface CmsCase {
@@ -346,8 +341,8 @@ export interface CmsCase {
     title: string;
     category: string;
     description: string;
-    metric: string;
-    image_url: string;
+    metric?: string;
+    image_url?: string;
     link_url?: string;
     created_at: string;
 }
@@ -355,20 +350,28 @@ export interface CmsCase {
 export interface CmsPost {
     id: string;
     title: string;
-    content: string;
-    tags: string[];
-    published: boolean;
     slug: string;
+    content: string;
     cover_image?: string;
     og_image?: string;
+    tags: string[];
+    published: boolean;
+    created_at: string;
     download_title?: string;
     download_url?: string;
     download_image_url?: string;
     seo_title?: string;
     seo_description?: string;
     keywords?: string;
-    created_at: string;
 }
+
+export const PLAN_LIMITS: Record<string, number> = {
+    'plan_free': 1,
+    'plan_solo': 1,
+    'plan_studio': 5,
+    'plan_scale': 15,
+    'plan_enterprise': 100
+};
 
 export type CrmStage = 'qualification' | 'proposal' | 'negotiation' | 'won' | 'lost';
 
@@ -407,14 +410,6 @@ export interface CrmOpportunity {
     };
     activities: CrmActivity[];
 }
-
-export const PLAN_LIMITS: Record<string, number> = {
-    'plan_free': 1,
-    'plan_solo': 1,
-    'plan_studio': 5,
-    'plan_scale': 15,
-    'plan_enterprise': 100
-};
 
 export const getTerminology = (orgType?: string) => {
     return {
