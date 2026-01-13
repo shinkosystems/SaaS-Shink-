@@ -10,7 +10,7 @@ import {
     Briefcase, ExternalLink, 
     Plus, TrendingUp, Zap, Target, ArrowUpRight, DollarSign,
     PieChart, BarChart3, ChevronRight, AlertTriangle, CheckCircle2, Save, RefreshCw,
-    Calendar, ChevronLeft, Users, Filter, ArrowRight, TrendingDown, Hourglass, Receipt, Coins
+    Calendar, ChevronLeft, Users, Filter, ArrowRight, TrendingDown, Hourglass, Receipt, Coins, Loader2
 } from 'lucide-react';
 
 interface Props {
@@ -27,7 +27,6 @@ const CATEGORY_STYLES: Record<string, string> = {
 };
 
 const DEFAULT_PROFIT_MARGIN = 0.35; 
-const DAILY_DELAY_PENALTY = 0.05; 
 
 const KANBAN_TO_PILLAR: Record<string, string> = {
     'Adm': 'Apoio-Adm',
@@ -65,7 +64,6 @@ export const ValueChainDashboard: React.FC<Props> = ({ organizationId }) => {
     const [projects, setProjects] = useState<DbProject[]>([]);
     const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
     const [loading, setLoading] = useState(true);
-    const [showQuickTask, setShowQuickTask] = useState(false);
     const [selectedTask, setSelectedTask] = useState<DbTask | null>(null);
     const [rates, setRates] = useState<any>(null);
     
@@ -131,7 +129,6 @@ export const ValueChainDashboard: React.FC<Props> = ({ organizationId }) => {
 
         const hourlyRate = rates?.totalRate || 0;
 
-        // Métricas por Pilar (Categorias)
         const categoryMetrics = Object.keys(CATEGORY_STYLES).map(pillar => {
             const pillarTasks = periodKanban.filter(t => KANBAN_TO_PILLAR[t.category || 'Gestão'] === pillar);
             const pillarHours = pillarTasks.reduce((acc, t) => acc + (t.duracaohoras || 2), 0);
@@ -163,7 +160,6 @@ export const ValueChainDashboard: React.FC<Props> = ({ organizationId }) => {
             };
         });
 
-        // Métricas por Projeto
         const projectMetrics = projects.map(proj => {
             const projTasks = periodKanban.filter(t => t.projeto === proj.id);
             const projHours = projTasks.reduce((acc, t) => acc + (t.duracaohoras || 2), 0);
@@ -286,7 +282,6 @@ export const ValueChainDashboard: React.FC<Props> = ({ organizationId }) => {
                                     const taskCost = (task.duracaohoras || 2) * (rates?.totalRate || 0);
                                     const taskGeneratedVal = taskCost / (1 - DEFAULT_PROFIT_MARGIN);
                                     
-                                    // Lógica de Ativo/Passivo
                                     const isBacklog = task.status === 'todo' || task.status === 'backlog';
                                     const isDone = task.status === 'done';
 
@@ -386,6 +381,34 @@ export const ValueChainDashboard: React.FC<Props> = ({ organizationId }) => {
                         </table>
                     </div>
                 </div>
+            )}
+
+            {selectedTask && (
+                <TaskDetailModal 
+                    task={convertDbTaskToBpmn(selectedTask)}
+                    nodeTitle={selectedTask.category || 'Processo'}
+                    opportunityTitle={selectedTask.projetoData?.nome}
+                    organizationId={organizationId}
+                    onClose={() => setSelectedTask(null)}
+                    onSave={async (updated) => {
+                        await updateTask(Number(updated.id), { 
+                            titulo: updated.text, 
+                            status: updated.status, 
+                            category: updated.category,
+                            responsavel: updated.assigneeId,
+                            datafim: updated.dueDate,
+                            duracaohoras: updated.estimatedHours,
+                            descricao: updated.description
+                        });
+                        loadData();
+                        setSelectedTask(null);
+                    }}
+                    onDelete={async (id) => {
+                        await deleteTask(Number(id));
+                        loadData();
+                        setSelectedTask(null);
+                    }}
+                />
             )}
         </div>
     );

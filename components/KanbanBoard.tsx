@@ -78,7 +78,10 @@ export const KanbanBoard: React.FC<Props> = ({ tasks, organizationId, readOnly, 
                                     return (
                                         <div key={task.id} draggable={!readOnly} onDragStart={() => setDraggedTask(task)} onDragEnd={() => setDraggedTask(null)} onClick={() => setEditingTaskCtx(task)} className="bg-white dark:bg-[#0a0a0c] p-5 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm hover:border-amber-500/30 transition-all cursor-grab active:cursor-grabbing group">
                                             <div className="flex justify-between items-start mb-3">
-                                                <div className="text-[8px] font-black text-amber-500 uppercase tracking-widest truncate max-w-[140px]">{task.projetoData?.nome || 'Ad-hoc'}</div>
+                                                <div className="flex flex-col">
+                                                    <div className="text-[8px] font-black text-amber-500 uppercase tracking-widest truncate max-w-[140px]">{task.projetoData?.nome || 'Ad-hoc'}</div>
+                                                    <div className="text-[7px] font-bold text-slate-400 uppercase tracking-tight mt-0.5 opacity-60">ID: {task.id}</div>
+                                                </div>
                                                 <div className="flex items-center gap-1.5">
                                                     <div className={`px-1.5 py-0.5 rounded text-[8px] font-black border ${score >= 60 ? 'bg-red-500/10 text-red-500' : 'bg-slate-100 dark:bg-white/5 text-slate-400'}`}>GUT {score}</div>
                                                 </div>

@@ -91,8 +91,14 @@ export const TasksPage: React.FC<Props> = ({ opportunities, onOpenProject, userR
     };
 
     const filteredTasks = useMemo(() => {
+        const searchLower = searchTerm.toLowerCase();
         return tasks.filter(t => {
-            const matchesSearch = t.titulo.toLowerCase().includes(searchTerm.toLowerCase());
+            // Busca expandida: Título, Descrição ou ID
+            const matchesSearch = 
+                t.titulo.toLowerCase().includes(searchLower) || 
+                (t.descricao && t.descricao.toLowerCase().includes(searchLower)) || 
+                t.id.toString().includes(searchTerm);
+                
             const matchesProject = !filterProject || t.projeto?.toString() === filterProject;
             const matchesAssignee = !filterAssignee || t.responsavel === filterAssignee;
             const score = (t.gravidade || 1) * (t.urgencia || 1) * (t.tendencia || 1);
@@ -160,7 +166,7 @@ export const TasksPage: React.FC<Props> = ({ opportunities, onOpenProject, userR
                         <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400"/>
                         <input 
                             value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                            placeholder="Buscar tarefa..."
+                            placeholder="Buscar por ID, título ou descrição..."
                             className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold outline-none focus:border-amber-500 transition-all"
                         />
                     </div>

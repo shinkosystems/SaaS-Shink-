@@ -237,11 +237,14 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
                                                     {task.text}
                                                 </p>
                                                 <div className="flex justify-between items-center pt-3 border-t border-slate-100 dark:border-white/5">
-                                                    <div className="flex items-center gap-1.5">
-                                                        <Clock className="w-3 h-3 text-slate-400"/>
-                                                        <span className="text-[8px] font-black uppercase text-slate-400">
-                                                            {task.estimatedHours || 2}h
-                                                        </span>
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <Clock className="w-3 h-3 text-slate-400"/>
+                                                            <span className="text-[8px] font-black uppercase text-slate-400">
+                                                                {task.estimatedHours || 2}h
+                                                            </span>
+                                                        </div>
+                                                        <span className="text-[7px] font-bold text-slate-400 opacity-50 uppercase tracking-tighter">ID: {task.dbId || '---'}</span>
                                                     </div>
                                                     <div className={`w-1.5 h-1.5 rounded-full ${task.status === 'done' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]'}`}></div>
                                                 </div>
@@ -283,5 +286,4 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
     );
 };
 
-// Fix: Add default export to resolve "Module has no default export" error in ProjectWorkspace.tsx
 export default BpmnBuilder;
