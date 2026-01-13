@@ -35,8 +35,7 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, activeModules: string
             title: 'Gestão',
             items: [
                 { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-                { id: 'value-chain', label: 'Cadeia de Valor', icon: Layers },
-                { id: 'ecosystem', label: 'Ecossistema', icon: Box }
+                { id: 'value-chain', label: 'Cadeia de Valor', icon: Layers }
             ]
         },
         {

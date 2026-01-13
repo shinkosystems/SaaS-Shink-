@@ -1,3 +1,4 @@
+
 import { supabase } from './supabaseClient';
 import { Opportunity, DbProject, RDEStatus, Archetype, IntensityLevel, TadsCriteria, DbTask, BpmnTask, BpmnNode } from '../types';
 
@@ -178,8 +179,6 @@ const mapDbProjectToOpportunity = (row: DbProject, tasks: DbTask[] = []): Opport
     };
 
     const bpmnStructure = row.bpmn_structure || { lanes: [], nodes: [], edges: [] };
-    
-    // Tenta ler o status específico do JSONB, se não houver, usa o boolean legado
     const savedStatus = (bpmnStructure as any).status || (row.projoport ? 'Future' : 'Active');
 
     return {
@@ -197,18 +196,18 @@ const mapDbProjectToOpportunity = (row: DbProject, tasks: DbTask[] = []): Opport
         intensity: (row.intensidade as IntensityLevel) || IntensityLevel.L1,
         tads: tads,
         tadsScore: Object.values(tads).filter(Boolean).length * 2, 
-        // Fixed: Removed 'evidence' property as it does not exist in type 'Opportunity'
         status: savedStatus,
         createdAt: row.created_at,
         bpmn: bpmnStructure,
         dbProjectId: row.id,
         docsContext: row.contexto_ia || '',
-        color: row.cor || '#F59E0B'
+        color: row.cor || '#F59E0B',
+        receitaTotal: row.receita_total || 0,
+        prazoMeses: row.prazo_meses || 12
     };
 };
 
 const mapOpportunityToDbProject = (opp: Opportunity): any => {
-    // Sincroniza o status para dentro da estrutura BPMN para persistência total
     const updatedBpmn = { ...opp.bpmn, status: opp.status };
 
     return {
@@ -228,9 +227,11 @@ const mapOpportunityToDbProject = (opp: Opportunity): any => {
         tadsrecorrencia: !!opp.tads?.recurring,
         tadsvelocidade: !!opp.tads?.mvpSpeed,
         organizacao: Number(opp.organizationId), 
-        projoport: opp.status !== 'Active', // Active é falso (é projeto), outros são verdadeiro (é oportunidade)
+        projoport: opp.status !== 'Active',
         bpmn_structure: updatedBpmn,
         contexto_ia: opp.docsContext || '',
-        color: opp.color || '#F59E0B'
+        color: opp.color || '#F59E0B',
+        receita_total: opp.receitaTotal || 0,
+        prazo_meses: opp.prazoMeses || 12
     };
 };

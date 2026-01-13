@@ -121,6 +121,8 @@ export interface Opportunity {
     intensity: IntensityLevel;
     status: ProjectStatus;
     createdAt: string;
+    receitaTotal?: number;
+    prazoMeses?: number;
     bpmn?: {
         nodes: BpmnNode[];
         lanes: any[];
@@ -155,12 +157,14 @@ export interface DbProject {
     contexto_ia?: string;
     cor?: string;
     projoport?: boolean;
+    receita_total?: number;
+    prazo_meses?: number;
 }
 
 export interface DbTask {
     id: number;
     projeto?: number;
-    projetoData?: { nome: string; cor: string };
+    projetoData?: { nome: string; cor: string, receita_total?: number, prazo_meses?: number };
     titulo: string;
     descricao: string;
     status: string;

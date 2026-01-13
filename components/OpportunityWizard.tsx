@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Opportunity, Archetype, IntensityLevel, RDEStatus, TadsCriteria, getTerminology, ProjectStatus } from '../types';
-import { Check, Loader2, Target, ShieldCheck, Zap, DollarSign, Sparkles, X, ChevronRight, Layers, Gauge, Info } from 'lucide-react';
+import { Check, Loader2, Target, ShieldCheck, Zap, DollarSign, Sparkles, X, ChevronRight, Layers, Gauge, Info, Coins, Calendar } from 'lucide-react';
 
 interface Props {
   initialData?: Partial<Opportunity>;
@@ -33,8 +33,9 @@ const Logo = ({ customLogoUrl, orgName }: { customLogoUrl?: string | null, orgNa
 const STEPS = [
     { id: 0, label: 'Estratégia', icon: Target },
     { id: 1, label: 'DNA', icon: Layers },
-    { id: 2, label: 'Impacto', icon: Zap },
-    { id: 3, label: 'Crivo Técnico', icon: ShieldCheck }
+    { id: 2, label: 'Economia', icon: Coins },
+    { id: 3, label: 'Impacto', icon: Zap },
+    { id: 4, label: 'Crivo Técnico', icon: ShieldCheck }
 ];
 
 const STATUS_OPTIONS: { value: ProjectStatus; label: string }[] = [
@@ -55,6 +56,8 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
     velocity: 3, 
     viability: 3, 
     revenue: 3,
+    receitaTotal: 0,
+    prazoMeses: 12,
     rde: RDEStatus.WARM,
     tads: { scalability: false, integration: false, painPoint: false, recurring: false, mvpSpeed: false },
     archetype: Archetype.SAAS_ENTRY,
@@ -193,7 +196,6 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                             <div className="space-y-4">
                                 <label className="text-[8px] lg:text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-2 block ml-1">Arquétipo de Negócio</label>
                                 <div className="grid grid-cols-1 gap-3">
-                                    {/* Cast to string to fix key unknown type error */}
                                     {Object.values(Archetype).map((arch: string) => (
                                         <button 
                                             key={arch}
@@ -244,6 +246,62 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                 {step === 2 && (
                     <div className="space-y-8 lg:space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
                         <div className="space-y-4">
+                            <h3 className="text-4xl lg:text-6xl font-black text-[var(--text-main)] tracking-tighter leading-none">Economia do <span className="text-amber-500">Ativo</span>.</h3>
+                            <p className="text-slate-500 dark:text-slate-400 text-base lg:text-xl font-medium">Defina a projeção financeira para cálculo de rentabilidade real.</p>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
+                             <div className="space-y-6 bg-white/5 border border-white/10 p-8 rounded-[2.5rem]">
+                                <div className="flex items-center gap-4 mb-4">
+                                    <div className="p-3 bg-emerald-500/10 rounded-2xl text-emerald-500 border border-emerald-500/20">
+                                        <Coins className="w-6 h-6"/>
+                                    </div>
+                                    <span className="text-xs font-black uppercase tracking-widest text-slate-400">Receita Total Bruta</span>
+                                </div>
+                                <div className="relative group">
+                                    <span className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl font-black text-slate-500 opacity-50">R$</span>
+                                    <input 
+                                        type="number"
+                                        value={formData.receitaTotal || ''}
+                                        onChange={e => setFormData({...formData, receitaTotal: Number(e.target.value)})}
+                                        placeholder="0,00"
+                                        className="w-full bg-black/20 border border-white/10 rounded-[1.5rem] p-6 pl-16 text-4xl font-black text-white outline-none focus:border-emerald-500/50 transition-all"
+                                    />
+                                </div>
+                                <p className="text-[10px] text-slate-500 font-bold uppercase ml-2 tracking-widest">Valor estimado do contrato ou ativo digital.</p>
+                             </div>
+
+                             <div className="space-y-6 bg-white/5 border border-white/10 p-8 rounded-[2.5rem]">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-4">
+                                        <div className="p-3 bg-blue-500/10 rounded-2xl text-blue-500 border border-blue-500/20">
+                                            <Calendar className="w-6 h-6"/>
+                                        </div>
+                                        <span className="text-xs font-black uppercase tracking-widest text-slate-400">Ciclo de Amortização</span>
+                                    </div>
+                                    <span className="text-3xl font-black text-blue-500">{formData.prazoMeses} <span className="text-sm">meses</span></span>
+                                </div>
+                                <input 
+                                    type="range" min="1" max="36" step="1"
+                                    value={formData.prazoMeses || 12}
+                                    onChange={e => setFormData({...formData, prazoMeses: parseInt(e.target.value)})}
+                                    className="w-full h-3 bg-white/10 rounded-full appearance-none cursor-pointer accent-blue-500"
+                                />
+                                <div className="flex justify-between text-[8px] font-black text-slate-500 uppercase">
+                                    <span>Curto Prazo</span>
+                                    <span>Longo Prazo</span>
+                                </div>
+                                <div className="pt-4 border-t border-white/5 flex justify-between items-center">
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Faturamento Mensal:</span>
+                                    <span className="text-lg font-black text-emerald-500">R$ {((formData.receitaTotal || 0) / (formData.prazoMeses || 1)).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}</span>
+                                </div>
+                             </div>
+                        </div>
+                    </div>
+                )}
+
+                {step === 3 && (
+                    <div className="space-y-8 lg:space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
+                        <div className="space-y-4">
                             <h3 className="text-4xl lg:text-6xl font-black text-[var(--text-main)] tracking-tighter leading-none">Matriz <span className="text-amber-500">RDE</span>.</h3>
                             <p className="text-slate-500 dark:text-slate-400 text-base lg:text-xl font-medium">Priorização fundamentada em variáveis de esforço e retorno.</p>
                         </div>
@@ -277,7 +335,7 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                     </div>
                 )}
 
-                {step === 3 && (
+                {step === 4 && (
                     <div className="space-y-8 lg:space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
                         <div className="space-y-4">
                             <h3 className="text-4xl lg:text-6xl font-black text-[var(--text-main)] tracking-tighter leading-none">Crivo <span className="text-amber-500">T.A.D.S.</span></h3>
