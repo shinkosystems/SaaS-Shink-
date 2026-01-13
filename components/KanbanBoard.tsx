@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Opportunity, DbTask } from '../types';
 import { RefreshCw, Clock, Lock, Trash2, Edit } from 'lucide-react';
 import { TaskDetailModal } from './TaskDetailModal';
-import { updateTask, syncTaskChecklist, fetchOrgMembers } from '../services/projectService';
+import { updateTask, deleteTask, syncTaskChecklist, fetchOrgMembers } from '../services/projectService';
 
 interface Props {
   tasks: DbTask[]; 
@@ -38,8 +38,17 @@ export const KanbanBoard: React.FC<Props> = ({ tasks, organizationId, readOnly, 
         if (onRefresh) onRefresh();
     };
 
+    // Agrupamento e Ordenação por Deadline
     const columnsData = COLUMNS.reduce((acc, col) => {
-        acc[col.id] = tasks.filter(t => !t.sutarefa && (t.status || 'todo').toLowerCase() === col.id);
+        const filtered = tasks.filter(t => !t.sutarefa && (t.status || 'todo').toLowerCase() === col.id);
+        
+        // Ordenação: Deadlines mais próximos primeiro. Cards sem data vão para o final.
+        acc[col.id] = filtered.sort((a, b) => {
+            const dateA = a.datafim ? new Date(a.datafim).getTime() : Infinity;
+            const dateB = b.datafim ? new Date(b.datafim).getTime() : Infinity;
+            return dateA - dateB;
+        });
+        
         return acc;
     }, {} as Record<string, DbTask[]>);
 
@@ -71,7 +80,12 @@ export const KanbanBoard: React.FC<Props> = ({ tasks, organizationId, readOnly, 
                                                 <div className="w-6 h-6 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[9px] font-black text-slate-500 dark:text-white overflow-hidden shadow-inner">
                                                     {task.responsavelData?.avatar_url ? <img src={task.responsavelData.avatar_url} className="w-full h-full object-cover"/> : task.responsavelData?.nome?.charAt(0)}
                                                 </div>
-                                                {task.datafim && <div className="text-[8px] font-black text-slate-400 uppercase flex items-center gap-1"><Clock className="w-2.5 h-2.5"/> {new Date(task.datafim).toLocaleDateString('pt-BR', {day:'2-digit', month:'short'})}</div>}
+                                                {task.datafim && (
+                                                    <div className={`text-[8px] font-black uppercase flex items-center gap-1 ${new Date(task.datafim) < new Date() && task.status !== 'done' ? 'text-red-500' : 'text-slate-400'}`}>
+                                                        <Clock className="w-2.5 h-2.5"/> 
+                                                        {new Date(task.datafim).toLocaleDateString('pt-BR', {day:'2-digit', month:'short'})}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     );
@@ -88,22 +102,33 @@ export const KanbanBoard: React.FC<Props> = ({ tasks, organizationId, readOnly, 
                         id: editingTaskCtx.id.toString(), text: editingTaskCtx.titulo, description: editingTaskCtx.descricao,
                         category: editingTaskCtx.category,
                         completed: editingTaskCtx.status === 'done', status: editingTaskCtx.status as any, estimatedHours: editingTaskCtx.duracaohoras,
-                        dueDate: editingTaskCtx.datafim, startDate: editingTaskCtx.datainicio, gut: { g: editingTaskCtx.gravidade, u: editingTaskCtx.urgencia, t: editingTaskCtx.tendencia },
+                        dueDate: editingTaskCtx.datafim, 
+                        startDate: editingTaskCtx.datainicio, 
+                        assigneeId: editingTaskCtx.responsavel,
+                        gut: { g: editingTaskCtx.gravidade, u: editingTaskCtx.urgencia, t: editingTaskCtx.tendencia },
                         dbId: editingTaskCtx.id
                     }}
-                    nodeTitle={editingTaskCtx.projetoData?.nome || 'Tarefa'}
+                    opportunityTitle={editingTaskCtx.projetoData?.nome}
+                    nodeTitle={editingTaskCtx.category || 'Tarefa'}
                     organizationId={organizationId} onClose={() => setEditingTaskCtx(null)}
                     onSave={async (updated) => {
                         await updateTask(Number(updated.id), { 
                             titulo: updated.text, 
                             status: updated.status, 
                             category: updated.category,
+                            responsavel: updated.assigneeId,
+                            datafim: updated.dueDate,
                             duracaohoras: updated.estimatedHours, 
                             gravidade: updated.gut?.g, 
                             urgencia: updated.gut?.u, 
                             tendencia: updated.gut?.t 
                         });
                         onRefresh?.(); setEditingTaskCtx(null);
+                    }}
+                    onDelete={async (id) => {
+                        await deleteTask(Number(id));
+                        onRefresh?.();
+                        setEditingTaskCtx(null);
                     }}
                 />
             )}

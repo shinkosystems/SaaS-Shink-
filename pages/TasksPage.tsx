@@ -8,7 +8,7 @@ import { Opportunity, DbTask } from '../types';
 import { 
     Trello, GanttChartSquare, Calendar as CalendarIcon, Users as UsersIcon, 
     Filter, Search, X, ChevronDown, ListTodo, PlayCircle, CheckCircle2, 
-    ClipboardCheck, Archive, Target, Calendar, ChevronLeft, ChevronRight, Zap, Loader2
+    ClipboardCheck, Archive, Target, Zap, Loader2, Briefcase
 } from 'lucide-react';
 import { fetchAllTasks, fetchOrgMembers, fetchProjects, updateTask } from '../services/projectService';
 import { optimizeSchedule } from '../services/geminiService';
@@ -71,18 +71,6 @@ export const TasksPage: React.FC<Props> = ({ opportunities, onOpenProject, userR
         }
     };
 
-    const periodLabel = useMemo(() => {
-        const d = viewDate;
-        if (filterTime === 'day') return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase();
-        if (filterTime === 'week') {
-            const first = new Date(d); first.setDate(d.getDate() - d.getDay());
-            const last = new Date(first); last.setDate(first.getDate() + 6);
-            return `${first.getDate()} ${first.toLocaleDateString('pt-BR', { month: 'short' })} - ${last.getDate()} ${last.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}`.toUpperCase();
-        }
-        if (filterTime === 'month') return d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase();
-        return d.getFullYear().toString();
-    }, [viewDate, filterTime]);
-
     const filteredTasks = useMemo(() => {
         return tasks.filter(t => {
             const matchesSearch = t.titulo.toLowerCase().includes(searchTerm.toLowerCase());
@@ -134,11 +122,26 @@ export const TasksPage: React.FC<Props> = ({ opportunities, onOpenProject, userR
                 </div>
 
                 <div className="flex flex-wrap items-center gap-4">
+                    {/* Filtro por Projeto */}
+                    <div className="flex items-center gap-3 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-1.5 rounded-xl min-w-[200px]">
+                        <Briefcase className="w-4 h-4 text-slate-400 ml-2" />
+                        <select 
+                            value={filterProject} 
+                            onChange={e => setFilterProject(e.target.value)} 
+                            className="bg-transparent border-none outline-none text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-white flex-1 cursor-pointer"
+                        >
+                            <option value="">TODOS OS PROJETOS</option>
+                            {projects.map(p => (
+                                <option key={p.id} value={p.id} className="dark:bg-slate-900">{p.nome.toUpperCase()}</option>
+                            ))}
+                        </select>
+                    </div>
+
                     <div className="relative flex-1 min-w-[200px]">
                         <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400"/>
                         <input 
                             value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                            placeholder="Buscar ativo..."
+                            placeholder="Buscar tarefa..."
                             className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold outline-none focus:border-amber-500 transition-all"
                         />
                     </div>

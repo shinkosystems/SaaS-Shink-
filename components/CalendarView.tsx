@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Opportunity, DbTask } from '../types';
-import { updateTask, fetchOrgMembers } from '../services/projectService';
+import { updateTask, deleteTask, fetchOrgMembers } from '../services/projectService';
 import { TaskDetailModal } from './TaskDetailModal';
 import { ChevronLeft, ChevronRight, Sparkles, Loader2, CheckCircle2, ArrowRight } from 'lucide-react';
 
@@ -53,8 +53,21 @@ export const CalendarView: React.FC<Props> = ({
         return days;
     }, [currentDate, viewMode]);
 
-    const normalizeDate = (d: Date | string) => {
-        const date = new Date(d);
+    // Normalização agnóstica de fuso horário
+    const normalizeDate = (d: Date | string | null | undefined) => {
+        if (!d) return 0;
+        let date: Date;
+        if (typeof d === 'string') {
+            // Se for apenas data YYYY-MM-DD, extraímos sem passar pelo parser UTC do Date
+            if (d.includes('-') && !d.includes('T') && !d.includes(':')) {
+                const [y, m, day] = d.split('-').map(Number);
+                date = new Date(y, m - 1, day);
+            } else {
+                date = new Date(d);
+            }
+        } else {
+            date = d;
+        }
         return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
     };
 
@@ -83,7 +96,14 @@ export const CalendarView: React.FC<Props> = ({
                         if (!date) return <div key={i} className="bg-slate-50 dark:bg-black/20 min-h-[140px]"></div>;
                         const isToday = new Date().toDateString() === date.toDateString();
                         const timestamp = normalizeDate(date);
-                        const dayTasks = tasks.filter(t => !t.sutarefa && timestamp >= normalizeDate(t.datainicio || t.dataproposta) && timestamp <= normalizeDate(t.datafim || t.dataproposta));
+                        
+                        // EXIBE APENAS NO DIA DA DEADLINE (datafim ou dataproposta como fallback)
+                        const dayTasks = tasks.filter(t => {
+                            if (t.sutarefa) return false;
+                            const deadline = normalizeDate(t.datafim || t.dataproposta);
+                            return timestamp === deadline;
+                        });
+
                         return (
                             <div key={date.toISOString()} className={`bg-white dark:bg-[#050507] p-3 flex flex-col gap-2 min-h-[140px] ${isToday ? 'ring-1 ring-inset ring-amber-500/40 bg-amber-500/5' : ''}`}>
                                 <span className={`text-[10px] font-black w-7 h-7 flex items-center justify-center rounded-xl ${isToday ? 'bg-amber-500 text-black shadow-glow-amber' : 'text-slate-400'}`}>{date.getDate()}</span>
@@ -101,9 +121,35 @@ export const CalendarView: React.FC<Props> = ({
             </div>
             {editingTaskCtx && (
                 <TaskDetailModal 
-                    task={{ id: editingTaskCtx.task.id.toString(), dbId: editingTaskCtx.task.id, text: editingTaskCtx.task.titulo, status: editingTaskCtx.task.status as any }}
-                    nodeTitle={editingTaskCtx.projectData?.nome || 'Tarefa'} organizationId={organizationId} onClose={() => setEditingTaskCtx(null)}
-                    onSave={async (updated) => { await updateTask(Number(updated.id), { status: updated.status }); onTaskUpdate(); setEditingTaskCtx(null); }}
+                    task={{ 
+                        id: editingTaskCtx.task.id.toString(), 
+                        dbId: editingTaskCtx.task.id, 
+                        text: editingTaskCtx.task.titulo, 
+                        description: editingTaskCtx.task.descricao,
+                        status: editingTaskCtx.task.status as any,
+                        assigneeId: editingTaskCtx.task.responsavel,
+                        dueDate: editingTaskCtx.task.datafim,
+                        category: editingTaskCtx.task.category
+                    }}
+                    opportunityTitle={editingTaskCtx.projectData?.nome}
+                    nodeTitle={editingTaskCtx.task.category || 'Tarefa'} organizationId={organizationId} onClose={() => setEditingTaskCtx(null)}
+                    onSave={async (updated) => { 
+                        await updateTask(Number(updated.id), { 
+                            status: updated.status, 
+                            responsavel: updated.assigneeId, 
+                            datafim: updated.dueDate,
+                            titulo: updated.text,
+                            descricao: updated.description,
+                            category: updated.category
+                        }); 
+                        onTaskUpdate(); 
+                        setEditingTaskCtx(null); 
+                    }}
+                    onDelete={async (id) => {
+                        await deleteTask(Number(id));
+                        onTaskUpdate();
+                        setEditingTaskCtx(null);
+                    }}
                 />
             )}
         </div>

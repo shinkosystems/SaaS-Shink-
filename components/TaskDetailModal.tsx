@@ -85,6 +85,21 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
       }
   };
 
+  const handleDiscard = () => {
+    if (readOnly) {
+        onClose();
+        return;
+    }
+    // Se a tarefa já existe no banco, "Descartar" no contexto deste sistema significa excluir
+    if (onDelete && (formData.dbId || formData.id)) {
+        if (confirm("Deseja realmente excluir permanentemente esta tarefa?")) {
+            onDelete(formData.id);
+        }
+    } else {
+        onClose();
+    }
+  };
+
   const handleSaveDescriptionOnly = async () => {
       if (readOnly) return;
       setIsEditingDesc(false);
@@ -283,7 +298,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                         </div>
 
                         {!readOnly && (
-                            <button onClick={() => onDelete && onDelete(formData.id)} className="w-full flex items-center justify-between p-6 bg-red-50 hover:bg-red-500 hover:text-white rounded-[2rem] border border-red-100 transition-all group mt-6">
+                            <button onClick={() => onDelete && onDelete(formData.id)} className="w-full flex items-center justify-between p-6 bg-red-50 hover:bg-red-500 hover:text-white rounded-[2rem] border border-red-100 transition-all group mt-6 shadow-sm">
                                 <span className="text-[10px] font-black uppercase tracking-widest">ARQUIVAR TAREFA</span>
                                 <Trash2 className="w-4 h-4 text-red-300 group-hover:text-white transition-colors"/>
                             </button>
@@ -298,7 +313,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                 <Paperclip className="w-4 h-4 text-amber-500" /> ANEXAR ATIVO
             </button>
             <div className="flex gap-10 items-center w-full md:w-auto justify-end">
-                <button onClick={onClose} className="px-4 py-2 text-[11px] font-black text-slate-400 hover:text-slate-900 uppercase tracking-[0.3em]">DESCARTAR</button>
+                <button onClick={handleDiscard} className="px-4 py-2 text-[11px] font-black text-slate-400 hover:text-red-500 uppercase tracking-[0.3em] transition-colors">{readOnly ? 'FECHAR' : 'DESCARTAR'}</button>
                 {!readOnly && (
                     <button onClick={handleSync} disabled={isSaving} className="flex-1 md:flex-none flex items-center gap-5 px-16 py-6 bg-[#F59E0B] hover:bg-amber-400 text-white rounded-[2rem] text-xs font-black uppercase tracking-[0.2em] shadow-2xl shadow-amber-500/30 transition-all disabled:opacity-50">
                         {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} SINCRONIZAR ATIVO
