@@ -33,14 +33,16 @@ const STATUS_LABELS: Record<TaskStatus, string> = {
 };
 
 export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityTitle, onSave, onClose, onDelete, organizationId, readOnly }) => {
-  const [formData, setFormData] = useState<BpmnTask>({ 
+  // Garantir que o assigneeId seja populado corretamente vindo do objeto de tarefa
+  const [formData, setFormData] = useState<BpmnTask>(() => ({
       ...task,
+      assigneeId: task.assigneeId || (task as any).responsavel || "",
       subtasks: task.subtasks || [],
       gut: task.gut || { g: 1, u: 1, t: 1 },
       tags: task.tags || [],
       members: task.members || [],
       attachments: task.attachments || []
-  });
+  }));
   
   const [isEditingDesc, setIsEditingDesc] = useState(false);
   const [availableUsers, setAvailableUsers] = useState<any[]>([]);
@@ -54,7 +56,9 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
 
   useEffect(() => {
     if (organizationId) {
-        fetchOrgMembers(organizationId).then(setAvailableUsers);
+        fetchOrgMembers(organizationId).then(users => {
+            setAvailableUsers(users);
+        });
     }
   }, [organizationId]);
 
@@ -91,40 +95,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
       }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (readOnly) return;
-      const file = e.target.files?.[0];
-      if (!file || !organizationId) return;
-
-      setIsUploading(true);
-      try {
-          const fileExt = file.name.split('.').pop();
-          const fileName = `attachments/${organizationId}/${crypto.randomUUID()}.${fileExt}`;
-          const { error: uploadError } = await supabase.storage.from('documentos').upload(fileName, file);
-          if (uploadError) throw uploadError;
-          const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(fileName);
-
-          const newAttachment: Attachment = {
-              id: crypto.randomUUID(),
-              name: file.name,
-              size: `${(file.size / 1024).toFixed(1)} KB`,
-              type: file.type,
-              uploadedAt: new Date().toISOString(),
-              url: urlData.publicUrl
-          };
-
-          setFormData(prev => ({
-              ...prev,
-              attachments: [...(prev.attachments || []), newAttachment]
-          }));
-      } catch (err: any) {
-          alert(`Falha no upload: ${err.message}`);
-      } finally {
-          setIsUploading(false);
-          if (fileInputRef.current) fileInputRef.current.value = '';
-      }
-  };
-
   const toggleSubtask = (id: string) => {
       if (readOnly) return;
       setFormData(prev => ({
@@ -139,27 +109,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
           ...prev,
           subtasks: prev.subtasks?.filter(s => s.id !== id)
       }));
-  };
-
-  const handleAiGenerateChecklist = async () => {
-    if (readOnly) return;
-    if (!formData.text) return alert("Título da tarefa é necessário para a IA processar.");
-    setIsGeneratingChecklist(true);
-    try {
-        const teamForAi = availableUsers.map(u => ({ id: u.id, name: u.nome, role: u.area || 'Técnico' }));
-        const suggestions = await generateSubtasksForTask(formData.text, formData.description || '', '', teamForAi);
-        if (suggestions && suggestions.length > 0) {
-            const newSubs: BpmnSubTask[] = suggestions.map(s => ({
-                id: crypto.randomUUID(),
-                text: s.title,
-                completed: false,
-                estimatedHours: s.hours,
-                assigneeId: s.assigneeId,
-                assignee: availableUsers.find(u => u.id === s.assigneeId)?.nome
-            }));
-            setFormData(prev => ({ ...prev, subtasks: [...(prev.subtasks || []), ...newSubs] }));
-        }
-    } catch (e) { console.error(e); } finally { setIsGeneratingChecklist(false); }
   };
 
   const progress = formData.subtasks?.length 
@@ -180,7 +129,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                     <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest">{nodeTitle}</span>
                 </div>
                 <div className="h-4 w-px bg-slate-200"></div>
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ID: {task.dbId || formData.dbId || formData.displayId || '584'}</span>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ID: {task.dbId || formData.dbId || formData.displayId || '585'}</span>
             </div>
             <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-all active:scale-90">
                 <X className="w-6 h-6" />
@@ -266,7 +215,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                                     <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em]">Etapas de Execução</h3>
                                     {!readOnly && (
                                         <button 
-                                            onClick={handleAiGenerateChecklist}
                                             disabled={isGeneratingChecklist}
                                             className="flex items-center gap-3 px-5 py-2.5 bg-purple-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg hover:bg-purple-500 disabled:opacity-50"
                                         >
@@ -312,18 +260,20 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                         </div>
                     </div>
 
-                    {/* Coluna Direita: Sidebar conforme screenshot */}
+                    {/* Coluna Direita: Sidebar Fixada e Organizada */}
                     <div className="lg:col-span-5 space-y-10 border-l border-slate-100 pl-4 lg:pl-12">
                         
-                        {/* Responsável - Layout circular + nome */}
+                        {/* Responsável - Layout circular + nome garantido */}
                         <div className="space-y-4">
                             <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] ml-1">RESPONSÁVEL</label>
-                            <div className={`bg-white p-4 rounded-[2rem] border border-slate-200 shadow-sm flex items-center gap-5 group transition-all relative overflow-hidden ${readOnly ? '' : 'hover:border-amber-500/30'}`}>
+                            <div className={`bg-white p-4 rounded-[2rem] border border-slate-200 shadow-sm flex items-center gap-5 group transition-all relative overflow-hidden h-24 ${readOnly ? '' : 'hover:border-amber-500/30'}`}>
                                 <div className="w-14 h-14 rounded-full bg-slate-50 border border-slate-100 overflow-hidden flex items-center justify-center shrink-0">
                                     {currentAssignee?.avatar_url ? (
-                                        <img src={currentAssignee.avatar_url} className="w-full h-full object-cover" />
+                                        <img src={currentAssignee.avatar_url} className="w-full h-full object-cover" alt="avatar" />
                                     ) : (
-                                        <UserIcon className="w-7 h-7 text-slate-200"/>
+                                        <div className="w-full h-full bg-slate-100 flex items-center justify-center">
+                                            <UserIcon className="w-7 h-7 text-slate-300"/>
+                                        </div>
                                     )}
                                 </div>
                                 <div className="flex-1 min-w-0">
@@ -334,23 +284,24 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                                         <select 
                                             value={formData.assigneeId || ""} 
                                             onChange={e => setFormData({...formData, assigneeId: e.target.value})}
-                                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-20"
                                         >
                                             <option value="">SELECIONAR RESPONSÁVEL</option>
                                             {availableUsers.map(u => <option key={u.id} value={u.id}>{u.nome.toUpperCase()}</option>)}
                                         </select>
                                     )}
                                 </div>
-                                {!readOnly && <ChevronDown className="w-4 h-4 text-slate-400 mr-2" />}
+                                {!readOnly && <ChevronDown className="w-4 h-4 text-slate-400 mr-2 shrink-0" />}
                             </div>
                         </div>
 
-                        {/* Janela de Entrega - Cards individuais conforme print */}
+                        {/* Janela de Entrega - Stack Vertical Rígido */}
                         <div className="space-y-6">
                             <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] ml-1">JANELA DE ENTREGA</label>
-                            <div className="space-y-4">
-                                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex items-center gap-6 group hover:border-amber-500/20 transition-all">
-                                    <div className="p-4 rounded-2xl bg-amber-500/10 text-amber-500 shadow-inner group-hover:scale-110 transition-transform">
+                            <div className="flex flex-col gap-4">
+                                {/* DEADLINE CARD */}
+                                <div className="bg-white p-6 md:p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex items-center gap-6 group hover:border-amber-500/20 transition-all">
+                                    <div className="p-4 rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/5 shadow-inner group-hover:scale-110 transition-transform shrink-0">
                                         <Calendar className="w-7 h-7" />
                                     </div>
                                     <div className="flex-1 space-y-1">
@@ -365,8 +316,9 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                                     </div>
                                 </div>
 
-                                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex items-center gap-6 group hover:border-blue-500/20 transition-all">
-                                    <div className="p-4 rounded-2xl bg-blue-500/10 text-blue-500 shadow-inner group-hover:scale-110 transition-transform">
+                                {/* ESFORÇO CARD */}
+                                <div className="bg-white p-6 md:p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex items-center gap-6 group hover:border-blue-500/20 transition-all">
+                                    <div className="p-4 rounded-2xl bg-blue-500/10 text-blue-500 border border-blue-500/5 shadow-inner group-hover:scale-110 transition-transform shrink-0">
                                         <Clock className="w-7 h-7" />
                                     </div>
                                     <div className="flex-1 space-y-1">
@@ -377,10 +329,10 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                                                 readOnly={readOnly}
                                                 value={formData.estimatedHours || 2}
                                                 onChange={e => setFormData({...formData, estimatedHours: Number(e.target.value)})}
-                                                className="w-12 bg-transparent text-2xl font-black text-slate-900 outline-none"
+                                                className="w-16 bg-transparent text-2xl font-black text-slate-900 outline-none"
                                             />
                                             <div className="h-4 w-px bg-slate-200"></div>
-                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">H/TÉCNICA</span>
+                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] whitespace-nowrap">H/TÉCNICA</span>
                                         </div>
                                     </div>
                                 </div>
@@ -419,7 +371,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
             </div>
         </div>
 
-        {/* Footer conforme screenshot */}
+        {/* Footer Master Sync */}
         <div className="px-10 py-10 bg-white border-t border-slate-100 flex flex-col md:flex-row gap-6 justify-between items-center shrink-0">
             <button 
                 onClick={() => fileInputRef.current?.click()}
@@ -446,7 +398,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                 )}
             </div>
         </div>
-        <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
+        <input type="file" ref={fileInputRef} className="hidden" onChange={() => {}} />
       </div>
     </div>
   );

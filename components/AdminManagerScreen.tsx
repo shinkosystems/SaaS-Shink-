@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { fetchAllUsers, updateGlobalClientData, fetchPlans, fetchGlobalMetrics, AdminUser, GlobalMetrics, fetchPendingApprovals, approveSubscription } from '../services/adminService';
+import { fetchAllUsers, updateGlobalClientData, fetchPlans, fetchGlobalMetrics, AdminUser, GlobalMetrics, fetchPendingApprovals, approveSubscription, deleteAdminUser } from '../services/adminService';
 import { fetchCmsCases, saveCmsCase, deleteCmsCase, fetchCmsPosts, saveCmsPost, deleteCmsPost, uploadCmsFile } from '../services/cmsService';
 import { DbPlan, FinancialTransaction, CmsCase, CmsPost } from '../types';
 import { Shield, Search, CreditCard, Loader2, Edit, CheckCircle, AlertTriangle, User, Zap, Building2, Users, DollarSign, TrendingUp, Activity, Filter, Calendar, Heart, UserMinus, Gem, MousePointer2, X, Clock, BarChart3, Wifi, Lock, ExternalLink, Check, Briefcase, FileText, ImageIcon, LinkIcon, Download, Save, Plus, Trash2, ArrowLeft, Globe, Tag, Eye, UploadCloud, ChevronRight, Settings, ArrowUpRight, SearchCode } from 'lucide-react';
@@ -63,6 +63,21 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
         }
     };
 
+    const handleDeleteUser = async (e: React.MouseEvent, userId: string) => {
+        e.stopPropagation();
+        if (confirm("Deseja deletar este usuário permanentemente? Esta ação removerá o acesso mas não deletará os dados da organização vinculada.")) {
+            setIsLoading(true);
+            const success = await deleteAdminUser(userId);
+            if (success) {
+                alert("Usuário removido.");
+                loadData();
+            } else {
+                alert("Falha ao deletar usuário.");
+                setIsLoading(false);
+            }
+        }
+    };
+
     const handleSaveUserChanges = async (updated: AdminUser) => {
         setIsLoading(true);
         try {
@@ -73,6 +88,7 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                 orgName: updated.orgName || '',
                 orgLimit: updated.orgColaboradores || 1,
                 userStatus: updated.status,
+                userAtivo: updated.ativo,
                 planId: updated.currentPlanId || 4,
                 start: updated.subscription_start || '',
                 end: updated.subscription_end || '',
@@ -317,60 +333,76 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
 
             {/* CLIENTS LIST */}
             {!isLoading && activeTab === 'clients' && (
-                <div className="space-y-4 animate-in fade-in duration-500">
-                    <div className="flex justify-between items-center mb-8 bg-white dark:bg-white/5 p-4 rounded-[1.8rem] border border-slate-200 dark:border-white/5">
-                        <div className="relative flex-1 max-w-md">
+                <div className="space-y-6 animate-in fade-in duration-500">
+                    <div className="flex flex-col md:flex-row justify-between items-center gap-6 bg-white dark:bg-white/5 p-6 rounded-[2rem] border border-slate-200 dark:border-white/5">
+                        <div className="flex items-center gap-6">
+                            <div className="p-4 rounded-2xl bg-amber-500/10 text-amber-500">
+                                <Users className="w-8 h-8"/>
+                            </div>
+                            <div>
+                                <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">{users.length} Usuários</h2>
+                                <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Base de dados consolidada</p>
+                            </div>
+                        </div>
+                        <div className="relative flex-1 max-w-md w-full">
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"/>
                             <input 
                                 placeholder="Buscar usuário, email ou organização..." 
                                 value={searchTerm}
                                 onChange={e => setSearchTerm(e.target.value)}
-                                className="w-full pl-12 pr-4 py-3 bg-transparent text-sm font-bold outline-none"
+                                className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-black/20 border border-slate-100 dark:border-white/10 rounded-2xl text-sm font-bold outline-none focus:border-amber-500 transition-all shadow-inner"
                             />
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <button className="p-2.5 hover:bg-slate-100 dark:hover:bg-white/10 rounded-xl text-slate-400 transition-all"><Filter className="w-4 h-4"/></button>
                         </div>
                     </div>
                     
-                    {filteredUsers.map(u => (
-                        <div key={u.id} className="flex flex-col md:flex-row justify-between items-center p-6 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-3xl hover:border-amber-500/30 transition-all hover:shadow-2xl group">
-                            <div className="flex items-center gap-6 w-full md:w-auto">
-                                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 flex items-center justify-center font-black text-2xl text-slate-500 dark:text-white group-hover:scale-110 transition-transform shadow-inner">
-                                    {u.nome.charAt(0)}
-                                </div>
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-3">
-                                        <div className="font-black text-xl text-slate-900 dark:text-white leading-none">{u.nome}</div>
-                                        <div className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${u.perfil === 'dono' ? 'bg-amber-500 text-black border border-amber-400' : u.perfil === 'cliente' ? 'bg-purple-500/10 text-purple-500 border border-purple-500/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 border border-slate-200 dark:border-white/10'}`}>
-                                            {u.perfil}
+                    <div className="space-y-4">
+                        {filteredUsers.map(u => (
+                            <div key={u.id} className="flex flex-col md:flex-row justify-between items-center p-6 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-3xl hover:border-amber-500/30 transition-all hover:shadow-2xl group cursor-pointer" onClick={() => setEditingUser({ ...u })}>
+                                <div className="flex items-center gap-6 w-full md:w-auto">
+                                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 flex items-center justify-center font-black text-2xl text-slate-500 dark:text-white group-hover:scale-110 transition-transform shadow-inner overflow-hidden border border-white/5">
+                                        {u.nome.charAt(0)}
+                                    </div>
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-3">
+                                            <div className="font-black text-xl text-slate-900 dark:text-white leading-none">{u.nome}</div>
+                                            <div className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${u.perfil === 'dono' ? 'bg-amber-500 text-black border border-amber-400' : u.perfil === 'cliente' ? 'bg-purple-500/10 text-purple-500 border border-purple-500/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 border border-slate-200 dark:border-white/10'}`}>
+                                                {u.perfil}
+                                            </div>
+                                            <div className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${u.ativo ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' : 'bg-red-500/10 text-red-500 border border-red-500/20'}`}>
+                                                {u.ativo ? 'ATIVO' : 'INATIVO'}
+                                            </div>
                                         </div>
-                                        <div className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${u.status === 'Ativo' ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' : 'bg-red-500/10 text-red-500 border border-red-500/20'}`}>
-                                            {u.status}
+                                        <div className="text-xs text-slate-500 font-bold uppercase tracking-wider mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                                            <span className="flex items-center gap-1.5"><Building2 className="w-3 h-3"/> {u.orgName}</span>
+                                            <span className={`flex items-center gap-1.5 font-black ${u.planName === 'Free' ? 'text-slate-400' : 'text-amber-500'}`}><Gem className="w-3 h-3"/> {u.planName}</span>
+                                            <span className="flex items-center gap-1.5"><Users className="w-3 h-3"/> {u.orgColaboradores} {u.orgColaboradores === 1 ? 'usuário' : 'usuários'}</span>
                                         </div>
                                     </div>
-                                    <div className="text-xs text-slate-500 font-bold uppercase tracking-wider mt-2 flex flex-wrap gap-x-4 gap-y-1">
-                                        <span className="flex items-center gap-1.5"><Building2 className="w-3 h-3"/> {u.orgName}</span>
-                                        <span className={`flex items-center gap-1.5 font-black ${u.planName === 'Free' ? 'text-slate-400' : 'text-amber-500'}`}><Gem className="w-3 h-3"/> {u.planName}</span>
-                                        <span className="flex items-center gap-1.5"><Users className="w-3 h-3"/> {u.orgColaboradores} {u.orgColaboradores === 1 ? 'usuário' : 'usuários'}</span>
+                                </div>
+                                
+                                <div className="flex items-center gap-6 mt-6 md:mt-0 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 pt-4 md:pt-0 border-slate-100 dark:border-white/5">
+                                    <div className="text-right">
+                                        <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Último Acesso</div>
+                                        <div className="text-xs font-bold text-slate-900 dark:text-white mt-1">{u.ultimo_acesso ? new Date(u.ultimo_acesso).toLocaleDateString() : 'Nunca'}</div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); setEditingUser({ ...u }); }} 
+                                            className="p-3 bg-slate-100 dark:bg-white/5 text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-xl transition-all"
+                                        >
+                                            <Settings className="w-4 h-4"/>
+                                        </button>
+                                        <button 
+                                            onClick={(e) => handleDeleteUser(e, u.id)}
+                                            className="p-3 bg-red-500/5 text-red-400 hover:bg-red-500 hover:text-white rounded-xl transition-all"
+                                        >
+                                            <Trash2 className="w-4 h-4"/>
+                                        </button>
                                     </div>
                                 </div>
                             </div>
-                            
-                            <div className="flex items-center gap-8 mt-6 md:mt-0 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 pt-4 md:pt-0 border-slate-100 dark:border-white/5">
-                                <div className="text-right">
-                                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Último Acesso</div>
-                                    <div className="text-xs font-bold text-slate-900 dark:text-white mt-1">{u.ultimo_acesso ? new Date(u.ultimo_acesso).toLocaleDateString() : 'Nunca'}</div>
-                                </div>
-                                <button 
-                                    onClick={() => setEditingUser({ ...u })} 
-                                    className="px-8 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:scale-105 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-xl active:scale-95 flex items-center gap-2"
-                                >
-                                    <Settings className="w-4 h-4"/> Gerenciar
-                                </button>
-                            </div>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
                 </div>
             )}
 
@@ -540,6 +572,13 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                                             {plans.map(p => <option key={p.id} value={p.id} className="bg-[#0c0c0e]">{p.nome} - R$ {p.valor.toLocaleString()}</option>)}
                                         </select>
                                     </div>
+                                </div>
+                                <div className="flex items-center gap-4 p-4 bg-black/40 border border-white/10 rounded-2xl">
+                                    <div className="flex-1">
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Usuário Ativo</label>
+                                        <p className="text-[10px] text-slate-500">Define se o usuário pode logar.</p>
+                                    </div>
+                                    <input type="checkbox" checked={editingUser.ativo} onChange={e => setEditingUser({...editingUser, ativo: e.target.checked})} className="w-6 h-6 rounded bg-slate-900 border-white/10 text-amber-500 focus:ring-amber-500" />
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>

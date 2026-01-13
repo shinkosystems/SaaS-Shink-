@@ -132,6 +132,17 @@ export const fetchAllUsers = async (): Promise<AdminUser[]> => {
     } catch (e: any) { return []; }
 };
 
+export const deleteAdminUser = async (id: string): Promise<boolean> => {
+    try {
+        const { error } = await supabase.from('users').delete().eq('id', id);
+        if (error) throw error;
+        return true;
+    } catch (e) {
+        console.error("Erro ao deletar usuário:", e);
+        return false;
+    }
+};
+
 export const updateGlobalClientData = async (data: any): Promise<{ success: boolean, msg?: string }> => {
     try {
         await supabase.from('users').update({ nome: data.userName, status: data.userStatus, ativo: data.userAtivo }).eq('id', data.userId);
