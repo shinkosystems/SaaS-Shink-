@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { CrmOpportunity, CrmActivity } from '../types';
-import { X, User, Building2, Calendar, Phone, Mail, Globe, MapPin, CheckCircle2, Clock, Plus, Trash2, Save, MessageSquare } from 'lucide-react';
+import { X, User, Building2, Calendar, Phone, Mail, Globe, MapPin, CheckCircle2, Clock, Plus, Trash2, Save, MessageSquare, DollarSign } from 'lucide-react';
 
 interface Props {
     opportunity: CrmOpportunity;
@@ -131,6 +131,22 @@ export const CrmDealModal: React.FC<Props> = ({ opportunity, onClose, onSave, on
                                         className="w-full glass-input p-2 rounded-lg text-sm bg-black/20 border-white/10 focus:border-emerald-500 text-white"
                                     />
                                 </div>
+
+                                <div className="pt-4">
+                                    <h3 className="text-sm font-bold text-amber-500 uppercase border-b border-amber-500/20 pb-2 flex items-center gap-2 mb-4">
+                                        <DollarSign className="w-4 h-4"/> Resumo Financeiro
+                                    </h3>
+                                    <div>
+                                        <label className="text-xs text-slate-500 font-bold block mb-1">Valor da Proposta (R$)</label>
+                                        <input 
+                                            type="number"
+                                            value={formData.value} 
+                                            onChange={e => setFormData({...formData, value: Number(e.target.value)})}
+                                            className="w-full glass-input p-3 rounded-lg text-lg font-black bg-black/40 border-amber-500/20 focus:border-amber-500 text-amber-500 outline-none transition-all"
+                                            placeholder="0,00"
+                                        />
+                                    </div>
+                                </div>
                             </div>
 
                             {/* Company Section */}
@@ -170,6 +186,17 @@ export const CrmDealModal: React.FC<Props> = ({ opportunity, onClose, onSave, on
                                         value={formData.company.address} 
                                         onChange={e => setFormData({...formData, company: {...formData.company, address: e.target.value}})}
                                         className="w-full glass-input p-2 rounded-lg text-sm bg-black/20 border-white/10 focus:border-emerald-500 text-white resize-none h-20"
+                                    />
+                                </div>
+                                <div className="pt-4">
+                                    <label className="text-xs text-slate-500 font-bold block mb-1 flex items-center gap-2">
+                                        <Calendar className="w-3.5 h-3.5"/> Data Prevista de Fechamento
+                                    </label>
+                                    <input 
+                                        type="date"
+                                        value={formData.expectedCloseDate ? formData.expectedCloseDate.split('T')[0] : ''} 
+                                        onChange={e => setFormData({...formData, expectedCloseDate: e.target.value})}
+                                        className="w-full glass-input p-2 rounded-lg text-sm bg-black/20 border-white/10 focus:border-emerald-500 text-white"
                                     />
                                 </div>
                             </div>
