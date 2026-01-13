@@ -127,6 +127,8 @@ export const CalendarView: React.FC<Props> = ({
                         text: editingTaskCtx.task.titulo, 
                         description: editingTaskCtx.task.descricao,
                         status: editingTaskCtx.task.status as any,
+                        // Add missing required property 'completed' derived from task status
+                        completed: editingTaskCtx.task.status === 'done',
                         assigneeId: editingTaskCtx.task.responsavel,
                         dueDate: editingTaskCtx.task.datafim,
                         category: editingTaskCtx.task.category
