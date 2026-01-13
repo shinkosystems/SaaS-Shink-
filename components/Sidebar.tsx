@@ -33,28 +33,8 @@ interface Props {
 
 const getMenuGroups = (userRole: string, isAdmin: boolean, currentPlan: string = 'plan_free', userEmail?: string, activeModules: string[] = []) => {
     const isMaster = userEmail === 'peboorba@gmail.com';
-    const isClient = userRole === 'cliente';
-    const hasModule = (key: string) => activeModules.some(m => m.toLowerCase() === key.toLowerCase());
 
-    if (!isMaster) {
-        return [
-            {
-                title: 'Execução',
-                items: [
-                    { id: 'list', label: 'Projetos', icon: List },
-                    { id: 'kanban', label: 'Tarefas', icon: Briefcase },
-                    { id: 'calendar', label: 'Cronograma', icon: Calendar },
-                ]
-            },
-            {
-                title: 'Sistema',
-                items: [
-                    { id: 'profile', label: 'Meu Perfil', icon: User },
-                ]
-            }
-        ];
-    }
-
+    // Layout Unificado Shinkō: Todos os usuários veem tudo
     const groups = [
         {
             title: 'Gestão',
@@ -64,54 +44,38 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, currentPlan: string =
         },
         {
             title: 'Execução',
-            items: [] as any[]
+            items: [
+                { id: 'list', label: 'Projetos', icon: List },
+                { id: 'kanban', label: 'Tarefas', icon: Briefcase },
+                { id: 'calendar', label: 'Cronograma', icon: Calendar },
+            ]
+        },
+        {
+            title: 'Negócios',
+            items: [
+                { id: 'crm', label: 'CRM / Vendas', icon: TrendingUp },
+                { id: 'financial', label: 'Financeiro', icon: DollarSign },
+                { id: 'clients', label: 'Stakeholders', icon: Users },
+            ]
+        },
+        {
+            title: 'Inteligência',
+            items: [
+                { id: 'product', label: 'Métricas Produto', icon: BarChart3 },
+                { id: 'dev-metrics', label: 'Engenharia', icon: Code2 }
+            ]
         }
     ];
-
-    if (hasModule('projects')) {
-        groups[1].items.push({ id: 'list', label: 'Projetos', icon: List });
-    }
-    if (hasModule('kanban')) {
-        groups[1].items.push({ id: 'kanban', label: 'Tarefas', icon: Briefcase });
-    }
-    if (hasModule('calendar')) {
-        groups[1].items.push({ id: 'calendar', label: 'Cronograma', icon: Calendar });
-    }
-
-    if (!isClient) {
-        const businessItems = [];
-        if (hasModule('crm')) {
-            businessItems.push({ id: 'crm', label: 'CRM / Vendas', icon: TrendingUp });
-        }
-        if (hasModule('financial')) {
-            businessItems.push({ id: 'financial', label: 'Financeiro', icon: DollarSign });
-        }
-        if (hasModule('clients')) {
-            businessItems.push({ id: 'clients', label: 'Clientes', icon: Users });
-        }
-
-        if (businessItems.length > 0) {
-            groups.push({ title: 'Negócios', items: businessItems });
-        }
-
-        const intelItems = [];
-        if (userEmail === 'peboorba@gmail.com' && hasModule('product')) {
-            intelItems.push({ id: 'product', label: 'Métricas Produto', icon: BarChart3 });
-        }
-        if (hasModule('engineering')) {
-            intelItems.push({ id: 'dev-metrics', label: 'Engenharia', icon: Code2 });
-        }
-
-        if (intelItems.length > 0) {
-            groups.push({ title: 'Inteligência', items: intelItems });
-        }
-    }
 
     const systemItems = [
         { id: 'profile', label: 'Meu Perfil', icon: User },
         { id: 'settings', label: 'Configurações', icon: Settings }
     ];
-    if (isAdmin || userEmail === 'peboorba@gmail.com') systemItems.push({ id: 'admin-manager', label: 'Super Admin', icon: Shield });
+    
+    if (isMaster) {
+        systemItems.push({ id: 'admin-manager', label: 'Super Admin', icon: Shield });
+    }
+    
     groups.push({ title: 'Sistema', items: systemItems });
 
     return groups;

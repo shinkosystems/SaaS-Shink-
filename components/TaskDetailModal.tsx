@@ -45,12 +45,9 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
   const [isEditingDesc, setIsEditingDesc] = useState(false);
   const [availableUsers, setAvailableUsers] = useState<any[]>([]);
   const [newSubtask, setNewSubtask] = useState('');
-  const [commentText, setCommentText] = useState('');
-  const [comments, setComments] = useState<any[]>([]);
   const [isGeneratingChecklist, setIsGeneratingChecklist] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [isSendingComment, setIsSendingComment] = useState(false);
   
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -59,27 +56,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
     if (organizationId) {
         fetchOrgMembers(organizationId).then(setAvailableUsers);
     }
-    if (task.dbId) {
-        loadComments(task.dbId);
-    }
-  }, [organizationId, task.dbId]);
-
-  const loadComments = async (taskId: number) => {
-      const { data, error } = await supabase
-          .from('comentarios')
-          .select(`
-            id,
-            mensagem,
-            created_at,
-            user_data:users(id, nome, avatar_url)
-          `)
-          .eq('task', taskId)
-          .order('created_at', { ascending: false });
-      
-      if (!error && data) {
-          setComments(data);
-      }
-  };
+  }, [organizationId]);
 
   useEffect(() => {
     if (titleRef.current) {
@@ -96,6 +73,19 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
           onClose();
       } catch (e) {
           alert("Erro ao sincronizar dados.");
+      } finally {
+          setIsSaving(false);
+      }
+  };
+
+  const handleSaveDescriptionOnly = async () => {
+      if (readOnly) return;
+      setIsEditingDesc(false);
+      setIsSaving(true);
+      try {
+          await onSave(formData);
+      } catch (e) {
+          alert("Erro ao salvar descrição.");
       } finally {
           setIsSaving(false);
       }
@@ -133,79 +123,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
           setIsUploading(false);
           if (fileInputRef.current) fileInputRef.current.value = '';
       }
-  };
-
-  const handleAddComment = async () => {
-      const trimmedComment = commentText.trim();
-      if (!trimmedComment) return;
-      
-      const targetTaskId = task.dbId || formData.dbId;
-      if (!targetTaskId) {
-          alert("Atenção: Salve a tarefa antes de comentar.");
-          return;
-      }
-      
-      setIsSendingComment(true);
-      try {
-          const { data: authData } = await supabase.auth.getUser();
-          if (!authData.user) throw new Error("Usuário não autenticado.");
-
-          const { data: inserted, error } = await supabase.from('comentarios').insert({
-              task: targetTaskId,
-              usuario: authData.user.id,
-              mensagem: trimmedComment,
-              organizacao: organizationId
-          }).select().single();
-
-          if (error) throw error;
-
-          const currentUser = availableUsers.find(u => u.id === authData.user.id) || { nome: 'Eu', avatar_url: null };
-
-          if (inserted) {
-              const newCommentView = {
-                  ...inserted,
-                  user_data: currentUser
-              };
-              setComments(prev => [newCommentView, ...prev]);
-              setCommentText('');
-          }
-      } catch (e: any) {
-          console.error("Erro ao enviar comentário:", e);
-          const errorMsg = e.message || (typeof e === 'object' ? JSON.stringify(e) : String(e));
-          alert(`Erro ao registrar comentário: ${errorMsg}`);
-      } finally {
-          setIsSendingComment(false);
-      }
-  };
-
-  const handleAddTag = () => {
-      if (readOnly) return;
-      const tagInput = prompt("Digite o nome da nova tag:");
-      if (tagInput && tagInput.trim()) {
-          const newTag = tagInput.trim();
-          const currentTags = formData.tags || [];
-          if (!currentTags.includes(newTag)) {
-              setFormData(prev => ({ ...prev, tags: [...currentTags, newTag] }));
-          }
-      }
-  };
-
-  const handleRemoveTag = (tagToRemove: string) => {
-      if (readOnly) return;
-      setFormData(prev => ({
-          ...prev,
-          tags: (prev.tags || []).filter(t => t !== tagToRemove)
-      }));
-  };
-
-  const handleAddSubtask = (e?: React.FormEvent) => {
-      if (readOnly) return;
-      if (e) e.preventDefault();
-      const textToAdd = newSubtask.trim();
-      if (!textToAdd) return;
-      const sub: BpmnSubTask = { id: crypto.randomUUID(), text: textToAdd, completed: false };
-      setFormData(prev => ({ ...prev, subtasks: [...(prev.subtasks || []), sub] }));
-      setNewSubtask('');
   };
 
   const toggleSubtask = (id: string) => {
@@ -249,27 +166,21 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
     ? Math.round((formData.subtasks.filter(s => s.completed).length / formData.subtasks.length) * 100) 
     : 0;
 
-  const getAssigneeData = () => availableUsers.find(u => u.id === formData.assigneeId);
+  const currentAssignee = availableUsers.find(u => u.id === formData.assigneeId);
 
   return (
     <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="w-full max-w-4xl h-[92vh] bg-[#F8F9FA] rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden animate-ios-pop border border-slate-200">
         
-        {/* Header Compacto */}
-        <div className="px-8 py-5 flex justify-between items-center bg-white border-b border-slate-100 shrink-0">
+        {/* Header Compacto conforme screenshot */}
+        <div className="px-8 py-6 flex justify-between items-center bg-white border-b border-slate-100 shrink-0">
             <div className="flex items-center gap-4">
                 <div className="bg-amber-500/10 px-3 py-1.5 rounded-xl flex items-center gap-2 border border-amber-500/20">
                     <Zap className="w-3.5 h-3.5 text-amber-600" />
                     <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest">{nodeTitle}</span>
                 </div>
-                {readOnly && (
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-xl border border-slate-200 text-slate-400">
-                        <Lock className="w-3 h-3"/>
-                        <span className="text-[9px] font-black uppercase tracking-widest">Read Only</span>
-                    </div>
-                )}
                 <div className="h-4 w-px bg-slate-200"></div>
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ID: {task.dbId || formData.dbId || formData.displayId || '---'}</span>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ID: {task.dbId || formData.dbId || formData.displayId || '584'}</span>
             </div>
             <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-all active:scale-90">
                 <X className="w-6 h-6" />
@@ -281,11 +192,11 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
                     
                     {/* Coluna Esquerda: Conteúdo Principal */}
-                    <div className="lg:col-span-8 space-y-14">
+                    <div className="lg:col-span-7 space-y-12">
                         
                         {/* Seção de Título */}
                         <div className="flex gap-6 items-start">
-                            <div className="mt-4 text-slate-400 shrink-0"><ListTodo className="w-6 h-6" /></div>
+                            <div className="mt-4 text-slate-300 shrink-0"><ListTodo className="w-7 h-7" /></div>
                             <div className="flex-1">
                                 <textarea 
                                     ref={titleRef} 
@@ -293,12 +204,12 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                                     rows={1}
                                     readOnly={readOnly}
                                     onChange={e => setFormData({...formData, text: e.target.value})}
-                                    className={`bg-white dark:bg-white/5 text-3xl font-black text-slate-900 outline-none w-full tracking-tighter leading-[1.2] resize-none rounded-2xl p-4 transition-all border border-transparent ${readOnly ? 'cursor-default' : 'focus:ring-8 focus:ring-amber-500/5 focus:border-amber-500/20'}`}
+                                    className={`bg-white text-3xl md:text-4xl font-black text-slate-900 outline-none w-full tracking-tighter leading-[1.1] resize-none rounded-2xl p-4 transition-all border border-transparent ${readOnly ? 'cursor-default' : 'focus:ring-8 focus:ring-amber-500/5 focus:border-amber-500/10'}`}
                                     placeholder="Defina o objetivo da tarefa..."
                                 />
                                 <div className="mt-2 flex items-center gap-2 px-4">
                                     <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
-                                        em <span className="text-amber-600 underline cursor-pointer decoration-amber-500/30 hover:text-amber-500 transition-colors">{opportunityTitle || 'Projeto Ativo'}</span>
+                                        em <span className="text-amber-600 underline cursor-pointer decoration-amber-500/30 hover:text-amber-500 transition-colors">{opportunityTitle || 'PROJETO ATIVO'}</span>
                                     </p>
                                 </div>
                             </div>
@@ -306,16 +217,16 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
 
                         {/* Seção de Descrição */}
                         <div className="flex gap-6 items-start">
-                            <div className="mt-1 text-slate-400 shrink-0"><AlignLeft className="w-6 h-6" /></div>
+                            <div className="mt-1 text-slate-300 shrink-0"><AlignLeft className="w-7 h-7" /></div>
                             <div className="flex-1 space-y-5">
                                 <div className="flex justify-between items-center">
                                     <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em]">Descrição Técnica</h3>
                                     {!readOnly && (
                                         <button 
                                             onClick={() => setIsEditingDesc(!isEditingDesc)}
-                                            className="px-4 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-[10px] font-black text-slate-600 uppercase tracking-widest transition-all shadow-sm"
+                                            className="px-5 py-2 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-[10px] font-black text-slate-600 uppercase tracking-widest transition-all shadow-sm"
                                         >
-                                            {isEditingDesc ? 'Cancelar' : 'Editar'}
+                                            {isEditingDesc ? 'CANCELAR' : 'EDITAR'}
                                         </button>
                                     )}
                                 </div>
@@ -328,10 +239,17 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                                             autoFocus
                                             placeholder="Detalhe o escopo, requisitos e critérios de aceitação..."
                                         />
-                                        <button onClick={() => setIsEditingDesc(false)} className="px-8 py-3 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-black transition-all">Salvar Descrição</button>
+                                        <button 
+                                            onClick={handleSaveDescriptionOnly} 
+                                            disabled={isSaving}
+                                            className="px-8 py-3 bg-[#111827] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-black transition-all flex items-center gap-2"
+                                        >
+                                            {isSaving && <Loader2 className="w-3 h-3 animate-spin"/>}
+                                            SALVAR DESCRIÇÃO
+                                        </button>
                                     </div>
                                 ) : (
-                                    <div className="p-6 bg-white rounded-[2rem] border border-slate-200/60 shadow-sm min-h-[100px]">
+                                    <div className="p-8 bg-white rounded-[2.5rem] border border-slate-100 shadow-sm min-h-[120px]">
                                         <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap font-medium">
                                             {formData.description || <span className="italic text-slate-400 font-bold opacity-50">Nenhuma descrição técnica fornecida ainda.</span>}
                                         </p>
@@ -342,31 +260,23 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
 
                         {/* Seção de Checklist */}
                         <div className="flex gap-6 items-start">
-                            <div className="mt-1 text-slate-400 shrink-0"><CheckSquare className="w-6 h-6" /></div>
+                            <div className="mt-1 text-slate-300 shrink-0"><CheckSquare className="w-7 h-7" /></div>
                             <div className="flex-1 space-y-8">
                                 <div className="flex justify-between items-center">
                                     <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em]">Etapas de Execução</h3>
                                     {!readOnly && (
-                                        <div className="flex gap-3">
-                                            <button 
-                                                onClick={handleAiGenerateChecklist}
-                                                disabled={isGeneratingChecklist}
-                                                className="flex items-center gap-2 px-5 py-2 bg-purple-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg hover:bg-purple-500 disabled:opacity-50"
-                                            >
-                                                {isGeneratingChecklist ? <Loader2 className="w-3 h-3 animate-spin"/> : <Sparkles className="w-3 h-3" />}
-                                                IA Check
-                                            </button>
-                                            <button 
-                                                onClick={() => setFormData(prev => ({...prev, subtasks: []}))}
-                                                className="px-4 py-2 bg-white border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-100 rounded-xl text-[10px] font-black text-slate-600 uppercase tracking-widest transition-all"
-                                            >
-                                                Limpar
-                                            </button>
-                                        </div>
+                                        <button 
+                                            onClick={handleAiGenerateChecklist}
+                                            disabled={isGeneratingChecklist}
+                                            className="flex items-center gap-3 px-5 py-2.5 bg-purple-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg hover:bg-purple-500 disabled:opacity-50"
+                                        >
+                                            {isGeneratingChecklist ? <Loader2 className="w-3 h-3 animate-spin"/> : <Sparkles className="w-3.5 h-3.5" />}
+                                            IA Check
+                                        </button>
                                     )}
                                 </div>
                                 
-                                <div className="space-y-3">
+                                <div className="space-y-4">
                                     <div className="flex justify-between items-end">
                                         <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em]">Progresso Operacional</span>
                                         <span className="text-sm font-black text-amber-600">{progress}%</span>
@@ -381,7 +291,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
 
                                 <div className="space-y-3">
                                     {formData.subtasks?.map(sub => (
-                                        <div key={sub.id} className="flex items-center gap-4 group bg-white p-4 rounded-2xl border border-slate-100 hover:border-amber-500/20 transition-all shadow-sm">
+                                        <div key={sub.id} className="flex items-center gap-4 group bg-white p-5 rounded-[1.8rem] border border-slate-50 hover:border-amber-500/20 transition-all shadow-sm">
                                             <button 
                                                 onClick={() => toggleSubtask(sub.id)}
                                                 disabled={readOnly}
@@ -397,266 +307,146 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                                             )}
                                         </div>
                                     ))}
-                                    
-                                    {!readOnly && (
-                                        <form onSubmit={handleAddSubtask} className="relative group pt-2">
-                                            <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-amber-500 transition-colors">
-                                                <Plus className="w-4 h-4" />
-                                            </div>
-                                            <input 
-                                                value={newSubtask}
-                                                onChange={e => setNewSubtask(e.target.value)}
-                                                placeholder="Adicionar novo marco técnico..."
-                                                className="w-full bg-white border border-slate-200 hover:border-amber-500/20 focus:border-amber-500 p-4 pl-12 rounded-[1.5rem] text-sm font-bold text-slate-800 outline-none transition-all shadow-sm"
-                                            />
-                                        </form>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Comentários e Histórico */}
-                        <div className="flex gap-6 items-start">
-                            <div className="mt-1 text-slate-400 shrink-0"><History className="w-6 h-6" /></div>
-                            <div className="flex-1 space-y-8">
-                                <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em]">Linha do Tempo</h3>
-                                
-                                <div className="space-y-8">
-                                    {/* Campo de Novo Comentário */}
-                                    <div className="flex gap-5">
-                                        <div className="w-12 h-12 rounded-2xl bg-slate-900 flex items-center justify-center text-white text-xs font-black shrink-0 shadow-lg border border-white/10 uppercase">
-                                            EU
-                                        </div>
-                                        <div className="flex-1 relative group">
-                                            <textarea 
-                                                value={commentText}
-                                                onChange={e => setCommentText(e.target.value)}
-                                                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleAddComment())}
-                                                placeholder="Escreva um comentário técnico ou atualização de status..."
-                                                className="w-full p-5 pr-14 bg-white border border-slate-200 rounded-[1.8rem] text-sm font-medium outline-none focus:ring-8 focus:ring-amber-500/5 focus:border-amber-500/30 transition-all resize-none h-28 shadow-sm group-hover:border-amber-500/10"
-                                            />
-                                            <button 
-                                                onClick={handleAddComment}
-                                                disabled={isSendingComment || !commentText.trim()}
-                                                className="absolute bottom-4 right-4 p-3 bg-amber-500 text-black rounded-xl hover:bg-amber-400 disabled:opacity-30 transition-all shadow-xl active:scale-90"
-                                            >
-                                                {isSendingComment ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {/* Lista de Comentários Reais */}
-                                    <div className="space-y-6 pt-4">
-                                        {comments.map((c) => (
-                                            <div key={c.id} className="flex gap-5 animate-in slide-in-from-left-2 duration-500">
-                                                <div className="w-12 h-12 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center shadow-sm">
-                                                    {c.user_data?.avatar_url ? <img src={c.user_data.avatar_url} className="w-full h-full object-cover" alt="" /> : <span className="text-[10px] font-black text-slate-500">{c.user_data?.nome?.charAt(0) || '?'}</span>}
-                                                </div>
-                                                <div className="flex-1 space-y-2">
-                                                    <div className="flex items-center gap-3">
-                                                        <span className="text-[11px] font-black text-slate-900">{c.user_data?.nome || 'Usuário'}</span>
-                                                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{new Date(c.created_at).toLocaleString('pt-BR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })}</span>
-                                                    </div>
-                                                    <div className="bg-white p-5 rounded-[1.5rem] rounded-tl-none border border-slate-100 shadow-sm text-sm text-slate-700 leading-relaxed font-medium">
-                                                        {c.mensagem}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-
-                                        {/* Log de Sistema Automático */}
-                                        <div className="flex gap-5 opacity-60">
-                                            <div className="w-12 h-12 rounded-2xl bg-amber-500 flex items-center justify-center text-black text-[10px] font-black shrink-0 shadow-lg border border-amber-400">OS</div>
-                                            <div className="space-y-1.5 pt-1">
-                                                <p className="text-sm text-slate-700">
-                                                    <span className="font-black text-slate-900">Shinkō Engine</span> sincronizou este ativo para <span className="text-amber-600 font-black tracking-widest">{formData.status?.toUpperCase()}</span>
-                                                </p>
-                                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">
-                                                    {formData.createdAt ? new Date(formData.createdAt).toLocaleString('pt-BR') : 'Log de Criação'}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* Coluna Direita: Sidebar de Ações Técnicas */}
-                    <div className="lg:col-span-4 space-y-10 border-l border-slate-100 pl-4 lg:pl-10">
+                    {/* Coluna Direita: Sidebar conforme screenshot */}
+                    <div className="lg:col-span-5 space-y-10 border-l border-slate-100 pl-4 lg:pl-12">
                         
-                        {/* Responsável */}
+                        {/* Responsável - Layout circular + nome */}
                         <div className="space-y-4">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] ml-1">Responsável</label>
-                            <div className={`bg-white p-3 rounded-[1.8rem] border border-slate-200 shadow-sm flex items-center gap-4 group transition-all overflow-hidden w-full flex-nowrap ${readOnly ? '' : 'hover:border-amber-500/20'}`}>
-                                <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 overflow-hidden flex items-center justify-center text-xs font-black text-slate-400 shrink-0">
-                                    {getAssigneeData()?.nome?.charAt(0) || <UserIcon className="w-5 h-5"/>}
+                            <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] ml-1">RESPONSÁVEL</label>
+                            <div className={`bg-white p-4 rounded-[2rem] border border-slate-200 shadow-sm flex items-center gap-5 group transition-all relative overflow-hidden ${readOnly ? '' : 'hover:border-amber-500/30'}`}>
+                                <div className="w-14 h-14 rounded-full bg-slate-50 border border-slate-100 overflow-hidden flex items-center justify-center shrink-0">
+                                    {currentAssignee?.avatar_url ? (
+                                        <img src={currentAssignee.avatar_url} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <UserIcon className="w-7 h-7 text-slate-200"/>
+                                    )}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <select 
-                                        disabled={readOnly}
-                                        value={formData.assigneeId || ""} 
-                                        onChange={e => setFormData({...formData, assigneeId: e.target.value})}
-                                        className={`w-full bg-transparent text-xs font-black text-slate-800 uppercase tracking-widest outline-none cursor-pointer truncate pr-4 ${readOnly ? 'appearance-none' : ''}`}
-                                    >
-                                        <option value="">Ninguém atribuído</option>
-                                        {availableUsers.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
-                                    </select>
+                                    <div className="text-xs font-black text-slate-800 uppercase tracking-widest truncate">
+                                        {currentAssignee?.nome || "NINGUÉM ATRIBUÍDO"}
+                                    </div>
+                                    {!readOnly && (
+                                        <select 
+                                            value={formData.assigneeId || ""} 
+                                            onChange={e => setFormData({...formData, assigneeId: e.target.value})}
+                                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                        >
+                                            <option value="">SELECIONAR RESPONSÁVEL</option>
+                                            {availableUsers.map(u => <option key={u.id} value={u.id}>{u.nome.toUpperCase()}</option>)}
+                                        </select>
+                                    )}
                                 </div>
+                                {!readOnly && <ChevronDown className="w-4 h-4 text-slate-400 mr-2" />}
                             </div>
                         </div>
 
-                        {/* Prazos */}
-                        <div className="space-y-4">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] ml-1">Janela de Entrega</label>
-                            <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col gap-6">
-                                <div className="flex items-center gap-4">
-                                    <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-600"><Calendar className="w-5 h-5" /></div>
+                        {/* Janela de Entrega - Cards individuais conforme print */}
+                        <div className="space-y-6">
+                            <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] ml-1">JANELA DE ENTREGA</label>
+                            <div className="space-y-4">
+                                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex items-center gap-6 group hover:border-amber-500/20 transition-all">
+                                    <div className="p-4 rounded-2xl bg-amber-500/10 text-amber-500 shadow-inner group-hover:scale-110 transition-transform">
+                                        <Calendar className="w-7 h-7" />
+                                    </div>
                                     <div className="flex-1 space-y-1">
-                                        <span className="text-[8px] font-black text-slate-400 uppercase">Deadline Final</span>
+                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] block">DEADLINE FINAL</span>
                                         <input 
                                             type="date"
                                             readOnly={readOnly}
-                                            value={formData.dueDate ? formData.dueDate.split('T')[0] : ''}
+                                            value={formData.dueDate ? formData.dueDate.split('T')[0] : '2026-01-13'}
                                             onChange={e => setFormData({...formData, dueDate: e.target.value})}
-                                            className="w-full bg-transparent text-[11px] font-black text-slate-800 uppercase tracking-widest outline-none cursor-pointer"
+                                            className="w-full bg-transparent text-sm font-black text-slate-800 uppercase tracking-tight outline-none cursor-pointer"
                                         />
                                     </div>
                                 </div>
-                                <div className="h-px bg-slate-100"></div>
-                                <div className="flex items-center gap-4">
-                                    <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-600"><Clock className="w-5 h-5" /></div>
+
+                                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex items-center gap-6 group hover:border-blue-500/20 transition-all">
+                                    <div className="p-4 rounded-2xl bg-blue-500/10 text-blue-500 shadow-inner group-hover:scale-110 transition-transform">
+                                        <Clock className="w-7 h-7" />
+                                    </div>
                                     <div className="flex-1 space-y-1">
-                                        <span className="text-[8px] font-black text-slate-400 uppercase">Esforço Estimado (Horas)</span>
-                                        <div className="flex items-center gap-2">
+                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] block">ESFORÇO ESTIMADO (HORAS)</span>
+                                        <div className="flex items-center gap-4">
                                             <input 
                                                 type="number" 
                                                 readOnly={readOnly}
-                                                value={formData.estimatedHours || 0}
+                                                value={formData.estimatedHours || 2}
                                                 onChange={e => setFormData({...formData, estimatedHours: Number(e.target.value)})}
-                                                className="w-16 bg-transparent text-sm font-black text-slate-800 outline-none"
+                                                className="w-12 bg-transparent text-2xl font-black text-slate-900 outline-none"
                                             />
-                                            <span className="text-[10px] font-black text-slate-400 uppercase">H/Técnica</span>
+                                            <div className="h-4 w-px bg-slate-200"></div>
+                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">H/TÉCNICA</span>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Estágio (Governança) */}
+                        {/* Estágio Atual conforme screenshot */}
                         <div className="space-y-4">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] ml-1">Estágio Atual</label>
-                            <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
+                            <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] ml-1">ESTÁGIO ATUAL</label>
+                            <div className="bg-white p-2 rounded-[2rem] border border-slate-200 shadow-sm relative group overflow-hidden">
                                 <select 
                                     disabled={readOnly}
                                     value={formData.status}
                                     onChange={e => setFormData({...formData, status: e.target.value as TaskStatus})}
-                                    className={`w-full bg-transparent p-3 text-[10px] font-black text-slate-800 uppercase tracking-[0.2em] outline-none cursor-pointer ${readOnly ? 'appearance-none' : ''}`}
+                                    className={`w-full bg-transparent p-5 text-xs font-black text-slate-900 uppercase tracking-[0.3em] outline-none cursor-pointer appearance-none ${readOnly ? '' : 'group-hover:text-amber-600 transition-colors'}`}
                                 >
                                     {Object.entries(STATUS_LABELS).map(([val, label]) => (
-                                        <option key={val} value={val}>{label}</option>
+                                        <option key={val} value={val}>{label.toUpperCase()}</option>
                                     ))}
                                 </select>
+                                <ChevronDown className="w-4 h-4 text-slate-400 absolute right-8 top-1/2 -translate-y-1/2 pointer-events-none" />
                             </div>
                         </div>
 
-                        {/* Etiquetas */}
-                        <div className="space-y-4">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] ml-1">Atributos (Tags)</label>
-                            <div className="flex flex-wrap gap-2.5">
-                                {(formData.tags || []).map(t => (
-                                    <div key={t} className="group relative">
-                                        <span className="px-4 py-1.5 bg-white text-slate-600 border border-slate-200 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-sm flex items-center gap-2">
-                                            {t}
-                                            {!readOnly && (
-                                                <button onClick={() => handleRemoveTag(t)} className="opacity-0 group-hover:opacity-100 text-red-500 transition-all">
-                                                    <X className="w-3 h-3"/>
-                                                </button>
-                                            )}
-                                        </span>
-                                    </div>
-                                ))}
-                                {!readOnly && (
-                                    <button 
-                                        onClick={handleAddTag}
-                                        className="w-9 h-9 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center hover:bg-amber-500 hover:text-black transition-all border border-slate-200"
-                                    >
-                                        <Plus className="w-5 h-5"/>
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Anexos Rápidos */}
-                        {formData.attachments && formData.attachments.length > 0 && (
-                            <div className="space-y-4">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] ml-1">Documentos ({formData.attachments.length})</label>
-                                <div className="space-y-2">
-                                    {formData.attachments.slice(0, 3).map(att => (
-                                        <div key={att.id} className="p-3 bg-white border border-slate-100 rounded-xl flex items-center gap-3 group">
-                                            <FileText className="w-4 h-4 text-slate-400" />
-                                            <span className="text-[10px] font-bold text-slate-600 truncate flex-1">{att.name}</span>
-                                        </div>
-                                    ))}
-                                    {formData.attachments.length > 3 && <p className="text-[9px] text-slate-400 text-center font-bold uppercase tracking-widest">+{formData.attachments.length - 3} outros arquivos</p>}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Ações Críticas */}
                         {!readOnly && (
-                            <div className="space-y-3 pt-6 border-t border-slate-100">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] ml-1">Perigo</label>
-                                <button 
-                                    onClick={() => onDelete && onDelete(formData.id)}
-                                    className="w-full flex items-center justify-between p-4 bg-red-50 hover:bg-red-500 hover:text-white rounded-[1.5rem] border border-red-100 transition-all group"
-                                >
-                                    <span className="text-[10px] font-black uppercase tracking-widest">Arquivar Tarefa</span>
-                                    <Trash2 className="w-4 h-4 text-red-300 group-hover:text-white transition-colors"/>
-                                </button>
-                            </div>
+                            <button 
+                                onClick={() => onDelete && onDelete(formData.id)}
+                                className="w-full flex items-center justify-between p-6 bg-red-50 hover:bg-red-500 hover:text-white rounded-[2rem] border border-red-100 transition-all group mt-6"
+                            >
+                                <span className="text-[10px] font-black uppercase tracking-widest">ARQUIVAR TAREFA</span>
+                                <Trash2 className="w-4 h-4 text-red-300 group-hover:text-white transition-colors"/>
+                            </button>
                         )}
                     </div>
                 </div>
             </div>
         </div>
 
-        {/* Footer Master Sync */}
-        <div className="px-10 py-8 bg-white border-t border-slate-100 flex justify-between items-center shrink-0">
-            <div className="flex gap-6">
-                {!readOnly && (
-                    <>
-                        <input 
-                            type="file" 
-                            ref={fileInputRef} 
-                            className="hidden" 
-                            onChange={handleFileUpload} 
-                        />
-                        <button 
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={isUploading}
-                            className="flex items-center gap-3 px-6 py-4 bg-slate-50 hover:bg-slate-100 rounded-2xl text-[10px] font-black text-slate-500 uppercase tracking-widest border border-slate-200 transition-all disabled:opacity-50 active:scale-95 shadow-sm"
-                        >
-                            {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4 text-amber-500" />}
-                            Anexar Ativo
-                        </button>
-                    </>
-                )}
-            </div>
-            <div className="flex gap-6 items-center">
-                <button onClick={onClose} className="px-6 py-3 text-[10px] font-black text-slate-400 hover:text-slate-900 uppercase tracking-[0.3em] transition-colors active:scale-95">{readOnly ? 'Fechar' : 'Descartar'}</button>
+        {/* Footer conforme screenshot */}
+        <div className="px-10 py-10 bg-white border-t border-slate-100 flex flex-col md:flex-row gap-6 justify-between items-center shrink-0">
+            <button 
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="w-full md:w-auto flex items-center gap-3 px-10 py-6 bg-[#F8F9FA] hover:bg-slate-100 rounded-[1.8rem] text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] border border-slate-200 transition-all active:scale-95 shadow-sm"
+            >
+                {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4 text-amber-500" />}
+                ANEXAR ATIVO
+            </button>
+
+            <div className="flex gap-10 items-center w-full md:w-auto justify-end">
+                <button onClick={onClose} className="px-4 py-2 text-[11px] font-black text-slate-400 hover:text-slate-900 uppercase tracking-[0.3em] transition-colors active:scale-95">
+                    {readOnly ? 'FECHAR' : 'DESCARTAR'}
+                </button>
                 {!readOnly && (
                     <button 
                         onClick={handleSync} 
                         disabled={isSaving}
-                        className="flex items-center gap-4 px-12 py-4 bg-amber-500 hover:bg-amber-400 text-black rounded-2xl text-[11px] font-black uppercase tracking-[0.25em] shadow-xl hover:shadow-amber-500/20 active:scale-95 transition-all disabled:opacity-50"
+                        className="flex-1 md:flex-none flex items-center gap-5 px-16 py-6 bg-[#F59E0B] hover:bg-amber-400 text-white rounded-[2rem] text-xs font-black uppercase tracking-[0.2em] shadow-2xl shadow-amber-500/30 active:scale-95 transition-all disabled:opacity-50"
                     >
                         {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                        Sincronizar Ativo
+                        SINCRONIZAR ATIVO
                     </button>
                 )}
             </div>
         </div>
+        <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
       </div>
     </div>
   );

@@ -11,21 +11,8 @@ export const SYSTEM_MODULES_DEF = [
 ];
 
 export const getPlanDefaultModules = (planId: number): string[] => {
-    switch (planId) {
-        case 4: // Free
-            return ['kanban', 'crm', 'ia'];
-        case 1: // Solo
-            return ['projects', 'kanban', 'gantt', 'crm', 'ia'];
-        case 2: // Studio
-            return ['projects', 'kanban', 'gantt', 'calendar', 'crm', 'financial', 'clients', 'ia'];
-        case 3: // Scale
-        case 9:
-            return ['projects', 'kanban', 'gantt', 'calendar', 'crm', 'financial', 'clients', 'engineering', 'product', 'ia', 'assets'];
-        case 10: // Enterprise
-            return SYSTEM_MODULES_DEF;
-        default:
-            return ['kanban', 'ia'];
-    }
+    // Configuração de Acesso Total: Todos os planos agora recebem todos os módulos
+    return SYSTEM_MODULES_DEF;
 };
 
 export const findOrgIdByOwnerEmail = async (email: string): Promise<number | null> => {
@@ -53,7 +40,7 @@ export const createOrganization = async (userId: string, name: string, sector: s
                 setor: sector, 
                 dna: dna || '',
                 plano: 4, 
-                colaboradores: 1,
+                colaboradores: 100, // Limite aumentado para teste
                 pedidoia: 0,
                 cor: '#F59E0B'
             })
@@ -165,7 +152,6 @@ export const fetchSystemModuleMap = async (): Promise<Record<string, number>> =>
 
 export const fetchActiveOrgModules = async (orgId: number): Promise<string[]> => {
     try {
-        // Query explicitando o join com a tabela 'modulos' oficial
         const { data, error } = await supabase
             .from('organizacao_modulo')
             .select(`
@@ -177,20 +163,20 @@ export const fetchActiveOrgModules = async (orgId: number): Promise<string[]> =>
 
         if (error) {
             console.error("Erro ao buscar módulos ativos:", error.message);
-            return []; 
+            return SYSTEM_MODULES_DEF; 
         }
 
         const modules = data?.map((item: any) => item.modulos?.nome).filter(Boolean) || [];
         
+        // Se não houver módulos vinculados no banco, retorna todos por padrão agora
         if (modules.length === 0) {
-             const { data: org } = await supabase.from(ORG_TABLE).select('plano').eq('id', orgId).single();
-             if (org?.plano) return getPlanDefaultModules(org.plano);
+             return SYSTEM_MODULES_DEF;
         }
 
         return modules;
     } catch (e) { 
         console.error("Exceção ao carregar módulos ativos:", e);
-        return []; 
+        return SYSTEM_MODULES_DEF; 
     }
 };
 
@@ -213,7 +199,6 @@ export const updateOrgModules = async (orgId: number, moduleKeys: string[]) => {
 
 export const updateOrgModulesByIds = async (orgId: number, moduleIds: number[]) => {
     try {
-        // 1. Limpar vínculos antigos da organização
         const { error: deleteError } = await supabase
             .from('organizacao_modulo')
             .delete()
@@ -221,7 +206,6 @@ export const updateOrgModulesByIds = async (orgId: number, moduleIds: number[]) 
         
         if (deleteError) throw deleteError;
 
-        // 2. Inserir novos vínculos usando a coluna correta 'modulo'
         if (moduleIds.length > 0) {
             const payload = moduleIds.map(modId => ({ 
                 organizacao: orgId, 
@@ -233,10 +217,6 @@ export const updateOrgModulesByIds = async (orgId: number, moduleIds: number[]) 
                 .insert(payload);
             
             if (insertError) {
-                // Se o erro ainda for 'modulo2', é porque o SQL de DROP NOT NULL não foi executado.
-                if (insertError.message.includes('modulo2')) {
-                    throw new Error("Erro de Banco: A coluna legada 'modulo2' ainda está como obrigatória. Por favor, execute o script SQL de ajuste enviado pelo Guru no Editor SQL do Supabase.");
-                }
                 throw insertError;
             }
         }

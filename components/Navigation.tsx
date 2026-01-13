@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { 
     LayoutDashboard, List, Calendar, Settings,
@@ -36,25 +37,7 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, activeModules: string
     const isMaster = userEmail === 'peboorba@gmail.com';
     const hasModule = (key: string) => activeModules.some(m => m.toLowerCase() === key.toLowerCase());
 
-    if (!isMaster && userRole !== 'dono') {
-        return [
-            {
-                title: 'Execução',
-                items: [
-                    { id: 'list', label: 'Projetos', icon: List },
-                    { id: 'kanban', label: 'Operações', icon: Briefcase },
-                    { id: 'calendar', label: 'Cronograma', icon: Calendar },
-                ]
-            },
-            {
-                title: 'Sistema',
-                items: [
-                    { id: 'profile', label: 'Meu Perfil', icon: User },
-                ]
-            }
-        ];
-    }
-
+    // Layout para TODOS os usuários (Acesso Total Liberado)
     const groups = [
         {
             title: 'Gestão',
@@ -66,27 +49,37 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, activeModules: string
         {
             title: 'Execução',
             items: [
-                ...(hasModule('projects') ? [{ id: 'list', label: 'Projetos', icon: List }] : []),
-                ...(hasModule('kanban') ? [{ id: 'kanban', label: 'Operações', icon: Briefcase }] : []),
-                ...(hasModule('calendar') ? [{ id: 'calendar', label: 'Cronograma', icon: Calendar }] : []),
+                { id: 'list', label: 'Projetos', icon: List },
+                { id: 'kanban', label: 'Operações', icon: Briefcase },
+                { id: 'calendar', label: 'Cronograma', icon: Calendar },
             ]
         }
     ];
 
     const businessItems = [
-        ...(hasModule('crm') ? [{ id: 'crm', label: 'Vendas CRM', icon: TrendingUp }] : []),
-        ...(hasModule('financial') ? [{ id: 'financial', label: 'Financeiro', icon: DollarSign }] : []),
-        ...(hasModule('clients') ? [{ id: 'clients', label: 'Stakeholders', icon: Users }] : []),
+        { id: 'crm', label: 'Vendas CRM', icon: TrendingUp },
+        { id: 'financial', label: 'Financeiro', icon: DollarSign },
+        { id: 'clients', label: 'Stakeholders', icon: Users },
     ];
-    if (businessItems.length > 0) groups.push({ title: 'Negócios', items: businessItems });
+    groups.push({ title: 'Negócios', items: businessItems });
     
-    groups.push({ title: 'Performance', items: [{ id: 'intelligence', label: 'Inteligência', icon: BarChart3 }] });
+    groups.push({ 
+        title: 'Performance', 
+        items: [
+            { id: 'intelligence', label: 'Inteligência', icon: BarChart3 }
+        ] 
+    });
 
     const systemItems = [
         { id: 'profile', label: 'Meu Perfil', icon: User },
         { id: 'settings', label: 'Ajustes', icon: Settings }
     ];
-    if (isMaster) systemItems.push({ id: 'admin-manager', label: 'Controle Root', icon: Shield });
+    
+    // Apenas a trava de super admin permanece
+    if (isMaster) {
+        systemItems.push({ id: 'admin-manager', label: 'Controle Root', icon: Shield });
+    }
+    
     groups.push({ title: 'Sistema', items: systemItems });
 
     return groups;
