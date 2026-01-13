@@ -1,3 +1,4 @@
+
 export interface SuccessMilestone {
     id: string;
     label: string;
@@ -264,6 +265,9 @@ export interface FinancialTransaction {
     orgName?: string;
     metadata?: any;
     modulos?: number[];
+    isRecurring?: boolean;
+    periodicity?: 'monthly' | 'quarterly' | 'semiannual' | 'yearly';
+    installments?: number;
 }
 
 export interface DbClient {

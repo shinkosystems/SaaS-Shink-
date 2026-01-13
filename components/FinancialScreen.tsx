@@ -19,7 +19,7 @@ export const FinancialScreen: React.FC<Props> = ({ orgType }) => {
     const [orgId, setOrgId] = useState<number | null>(null);
 
     const loadData = async () => {
-        if (transactions.length === 0) setLoading(true);
+        setLoading(true);
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
             const { data: userData } = await supabase.from('users').select('organizacao').eq('id', user.id).single();
@@ -36,12 +36,20 @@ export const FinancialScreen: React.FC<Props> = ({ orgType }) => {
 
     const handleAddTransaction = async (t: Omit<FinancialTransaction, 'id'>) => {
         if (!orgId) return;
-        const tempId = crypto.randomUUID();
-        const newT = { ...t, id: tempId, organizationId: orgId };
-        setTransactions(prev => [newT, ...prev].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+        
+        setIsSyncing(true);
         const saved = await addTransaction({ ...t, organizationId: orgId });
-        if (saved) setTransactions(prev => prev.map(item => item.id === tempId ? saved : item));
-        else { setTransactions(prev => prev.filter(item => item.id !== tempId)); alert("Erro ao salvar transação."); }
+        
+        if (saved && saved.length > 0) {
+            // Recarrega todos os dados para garantir sincronia correta com o banco
+            await loadData();
+            if (saved.length > 1) {
+                alert(`${saved.length} lançamentos recorrentes foram criados com sucesso!`);
+            }
+        } else {
+            alert("Erro ao salvar transação.");
+        }
+        setIsSyncing(false);
     };
 
     const handleEditTransaction = async (t: FinancialTransaction) => {

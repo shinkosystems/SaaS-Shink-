@@ -24,38 +24,78 @@ export const fetchTransactions = async (organizationId: number): Promise<Financi
         type: row.type,
         category: row.category,
         organizationId: row.organization_id,
-        isContract: !!row.metadata?.contractId 
+        isContract: !!row.metadata?.contractId,
+        isRecurring: !!row.is_recurring,
+        periodicity: row.periodicity,
+        installments: row.installments
     }));
 };
 
-export const addTransaction = async (transaction: Omit<FinancialTransaction, 'id'>): Promise<FinancialTransaction | null> => {
-    const { data, error } = await supabase
-        .from(TABLE)
-        .insert({
-            date: transaction.date,
-            description: transaction.description,
-            amount: transaction.amount,
-            type: transaction.type,
-            category: transaction.category,
-            organization_id: transaction.organizationId
-        })
-        .select()
-        .single();
+export const addTransaction = async (transaction: Omit<FinancialTransaction, 'id'>): Promise<FinancialTransaction[] | null> => {
+    try {
+        const transactionsToInsert: any[] = [];
+        const installments = transaction.installments || 1;
+        const startDate = new Date(transaction.date);
+        
+        // Se for recorrente, gera múltiplas linhas, senão gera apenas uma
+        for (let i = 0; i < (transaction.isRecurring ? installments : 1); i++) {
+            const currentDate = new Date(startDate);
+            
+            // Lógica de incremento de data conforme periodicidade
+            if (transaction.isRecurring) {
+                if (transaction.periodicity === 'monthly') {
+                    currentDate.setMonth(startDate.getMonth() + i);
+                } else if (transaction.periodicity === 'quarterly') {
+                    currentDate.setMonth(startDate.getMonth() + (i * 3));
+                } else if (transaction.periodicity === 'semiannual') {
+                    currentDate.setMonth(startDate.getMonth() + (i * 6));
+                } else if (transaction.periodicity === 'yearly') {
+                    currentDate.setFullYear(startDate.getFullYear() + i);
+                }
+            }
 
-    if (error) {
-        console.error('Erro ao adicionar transação:', error.message || error);
+            transactionsToInsert.push({
+                date: currentDate.toISOString().split('T')[0],
+                description: transaction.isRecurring && installments > 1 
+                    ? `${transaction.description} (${i + 1}/${installments})` 
+                    : transaction.description,
+                amount: transaction.amount,
+                type: transaction.type,
+                category: transaction.category,
+                organization_id: transaction.organizationId,
+                is_recurring: transaction.isRecurring,
+                periodicity: transaction.periodicity,
+                installments: transaction.installments,
+                metadata: {
+                    isRecurringChild: i > 0,
+                    sequence: i + 1
+                }
+            });
+        }
+
+        const { data, error } = await supabase
+            .from(TABLE)
+            .insert(transactionsToInsert)
+            .select();
+
+        if (error) throw error;
+
+        return data.map((row: any) => ({
+            id: row.id,
+            date: row.date,
+            description: row.description,
+            amount: Number(row.amount),
+            type: row.type,
+            category: row.category,
+            organizationId: row.organization_id,
+            isRecurring: row.is_recurring,
+            periodicity: row.periodicity,
+            installments: row.installments
+        }));
+    } catch (error: any) {
+        console.error('Erro ao adicionar transação(ões):', error.message || error);
         return null;
     }
-
-    return {
-        id: data.id,
-        date: data.date,
-        description: data.description,
-        amount: Number(data.amount),
-        type: data.type,
-        category: data.category,
-        organizationId: data.organization_id
-    };
 };
 
 export const updateTransaction = async (transaction: FinancialTransaction): Promise<FinancialTransaction | null> => {
@@ -67,7 +107,10 @@ export const updateTransaction = async (transaction: FinancialTransaction): Prom
         amount: updates.amount,
         type: updates.type,
         category: updates.category,
-        organization_id: updates.organizationId
+        organization_id: updates.organizationId,
+        is_recurring: updates.isRecurring,
+        periodicity: updates.periodicity,
+        installments: updates.installments
     };
 
     const { data, error } = await supabase
@@ -90,7 +133,10 @@ export const updateTransaction = async (transaction: FinancialTransaction): Prom
         type: data.type,
         category: data.category,
         organizationId: data.organization_id,
-        isContract: !!(data.metadata?.contractId)
+        isContract: !!(data.metadata?.contractId),
+        isRecurring: data.is_recurring,
+        periodicity: data.periodicity,
+        installments: data.installments
     };
 };
 
@@ -109,7 +155,6 @@ export const deleteTransaction = async (id: string): Promise<boolean> => {
 
 export const syncContractTransactions = async (organizationId: number): Promise<{ created: number, errors: number }> => {
     try {
-        // 1. Buscar Clientes Ativos (Organization column in clientes is organizacao)
         const { data: clients, error: clientsError } = await supabase
             .from('clientes')
             .select('*')
@@ -118,7 +163,6 @@ export const syncContractTransactions = async (organizationId: number): Promise<
 
         if (clientsError || !clients) throw new Error("Erro ao buscar clientes: " + (clientsError?.message || 'Sem dados'));
 
-        // 2. Buscar Transações Existentes (Organization column in transacoes is organization_id)
         const { data: existingTrans, error: transError } = await supabase
             .from(TABLE)
             .select('metadata')
@@ -136,7 +180,6 @@ export const syncContractTransactions = async (organizationId: number): Promise<
 
         const transactionsToInsert: any[] = [];
 
-        // 3. Gerar Parcelas Faltantes
         clients.forEach((client: any) => {
             const startDateStr = client.data_inicio;
             const monthlyValue = Number(client.valormensal);
@@ -172,7 +215,6 @@ export const syncContractTransactions = async (organizationId: number): Promise<
             }
         });
 
-        // 4. Batch Insert
         if (transactionsToInsert.length > 0) {
             const { error: insertError } = await supabase
                 .from(TABLE)

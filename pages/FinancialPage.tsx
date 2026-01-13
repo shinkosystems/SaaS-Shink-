@@ -8,7 +8,7 @@ interface Props {
 
 export const FinancialPage: React.FC<Props> = ({ orgType }) => {
     return (
-        <div className="w-full min-h-full bg-transparent">
+        <div className="h-full overflow-y-auto custom-scrollbar bg-transparent">
             <FinancialScreen orgType={orgType} />
         </div>
     );
