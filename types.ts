@@ -1,4 +1,19 @@
 
+export type ProcessCategory = 'Apoio-Adm' | 'Apoio-Gestão' | 'Primária-Modelagem' | 'Primária-Interface' | 'Primária-Lógica' | 'Primária-Marketing';
+export type ProcessStatus = 'To-do' | 'Doing' | 'Done';
+
+export interface TaskProcess {
+    id: string;
+    projeto_id: number;
+    title: string;
+    category: ProcessCategory;
+    status: ProcessStatus;
+    estimated_cost_weight: number;
+    evidence_url?: string;
+    organizacao_id: number;
+    created_at: string;
+}
+
 export interface SuccessMilestone {
     id: string;
     label: string;
@@ -7,24 +22,17 @@ export interface SuccessMilestone {
     actionId: string;
 }
 
-export interface EcosystemApp {
-    id: string;
-    name: string;
-    description: string;
-    category: 'Core' | 'Business' | 'Intelligence' | 'Engineering';
-    icon: string;
-    price: number;
-    status: 'installed' | 'available' | 'coming_soon';
+export enum RDEStatus {
+    HOT = 'Quente',
+    WARM = 'Morno',
+    COLD = 'Frio'
 }
-
-export type ProjectStatus = 'Active' | 'Negotiation' | 'Future' | 'Archived' | 'Frozen';
 
 export enum Archetype {
     SAAS_ENTRY = 'SaaS de Entrada',
     SAAS_PLATFORM = 'SaaS Plataforma',
-    MOBILE_APP = 'Mobile App',
-    INTERNAL_MARKETING = 'Interno / Marketing',
-    CONSULTANCY = 'Consultoria / Serviço'
+    SERVICE_TECH = 'Serviço Tecnológico',
+    INTERNAL_MARKETING = 'Interno / Marketing'
 }
 
 export enum IntensityLevel {
@@ -32,12 +40,6 @@ export enum IntensityLevel {
     L2 = 2,
     L3 = 3,
     L4 = 4
-}
-
-export enum RDEStatus {
-    HOT = 'Quente',
-    WARM = 'Morno',
-    COLD = 'Frio'
 }
 
 export interface TadsCriteria {
@@ -48,8 +50,62 @@ export interface TadsCriteria {
     mvpSpeed: boolean;
 }
 
+export type ProjectStatus = 'Active' | 'Negotiation' | 'Future' | 'Frozen' | 'Archived' | 'won' | 'lost';
+
+export interface Attachment {
+    id: string;
+    name: string;
+    size: string;
+    type: string;
+    url: string;
+    uploadedAt: string;
+}
+
+export type TaskStatus = 'todo' | 'doing' | 'review' | 'approval' | 'done' | 'backlog';
+
+export interface BpmnSubTask {
+    id: string;
+    dbId?: number;
+    text: string;
+    completed: boolean;
+    assigneeId?: string;
+    dueDate?: string;
+    startDate?: string;
+    estimatedHours?: number;
+}
+
+export interface BpmnTask {
+    id: string;
+    dbId?: number;
+    displayId?: number;
+    text: string;
+    description: string;
+    category?: string;
+    status: TaskStatus;
+    completed: boolean;
+    completedAt?: string;
+    dueDate?: string;
+    startDate?: string;
+    createdAt?: string;
+    assignee?: string;
+    assigneeId?: string;
+    estimatedHours?: number;
+    gut?: { g: number; u: number; t: number };
+    tags?: string[];
+    members?: string[];
+    attachments?: Attachment[];
+    subtasks?: BpmnSubTask[];
+}
+
+export interface BpmnNode {
+    id: string;
+    label: string;
+    checklist: BpmnTask[];
+}
+
 export interface Opportunity {
     id: string;
+    dbProjectId?: number;
     title: string;
     description: string;
     clientId?: string;
@@ -59,104 +115,28 @@ export interface Opportunity {
     velocity: number;
     revenue: number;
     prioScore: number;
-    archetype: Archetype;
-    intensity: IntensityLevel;
     tads: TadsCriteria;
     tadsScore: number;
-    evidence: {
-        clientsAsk: string[];
-        clientsSuffer: string[];
-        wontPay: string[];
-    };
-    status: ProjectStatus | string;
+    archetype: Archetype;
+    intensity: IntensityLevel;
+    status: ProjectStatus;
     createdAt: string;
-    bpmn?: BpmnStructure;
-    dbProjectId?: number;
+    bpmn?: {
+        nodes: BpmnNode[];
+        lanes: any[];
+        edges: any[];
+        status?: string;
+    };
     docsContext?: string;
     color?: string;
-}
-
-export interface BpmnStructure {
-    nodes: BpmnNode[];
-    lanes: any[];
-    edges: any[];
-}
-
-export interface BpmnNode {
-    id: string;
-    label: string;
-    checklist: BpmnTask[];
-}
-
-export interface BpmnTask {
-    id: string;
-    dbId?: number;
-    displayId?: number;
-    text: string;
-    description?: string;
-    category?: string;
-    status: TaskStatus;
-    completed: boolean;
-    estimatedHours?: number;
-    dueDate?: string;
-    startDate?: string;
-    assignee?: string;
-    assigneeId?: string;
-    gut?: { g: number; u: number; t: number };
-    tags?: string[];
-    members?: string[];
-    attachments?: Attachment[];
-    subtasks?: BpmnSubTask[];
-    createdAt?: string;
-    completedAt?: string;
-}
-
-export interface BpmnSubTask {
-    id: string;
-    dbId?: number;
-    text: string;
-    completed: boolean;
-    estimatedHours?: number;
-    assigneeId?: string;
-    assignee?: string;
-    dueDate?: string;
-    startDate?: string;
-}
-
-export type TaskStatus = 'todo' | 'doing' | 'review' | 'approval' | 'done' | 'backlog';
-
-export interface DbTask {
-    id: number;
-    projeto?: number | null;
-    titulo: string;
-    descricao?: string;
-    category?: string;
-    status: string;
-    responsavel?: string;
-    gravidade?: number;
-    urgencia?: number;
-    tendencia?: number;
-    dataproposta?: string;
-    deadline?: string;
-    datainicio?: string;
-    datafim?: string;
-    duracaohoras?: number;
-    sutarefa?: boolean;
-    tarefamae?: number | null;
-    organizacao: number;
-    membros?: string[];
-    etiquetas?: string[];
-    createdat: string;
-    projetoData?: { nome: string; cor: string };
-    responsavelData?: any;
-    anexos?: Attachment[];
+    dbId?: string;
 }
 
 export interface DbProject {
     id: number;
     nome: string;
     descricao?: string;
-    cliente?: string | null;
+    cliente?: string;
     organizacao: number;
     rde?: string;
     viabilidade?: number;
@@ -170,50 +150,64 @@ export interface DbProject {
     tadsdorreal?: boolean;
     tadsrecorrencia?: boolean;
     tadsvelocidade?: boolean;
-    projoport?: boolean;
+    created_at: string;
     bpmn_structure?: any;
     contexto_ia?: string;
     cor?: string;
-    created_at: string;
+    projoport?: boolean;
 }
 
-export interface Attachment {
-    id: string;
-    name: string;
-    size: string;
-    type: string;
-    uploadedAt: string;
-    url: string;
-}
-
-export interface Comment {
+export interface DbTask {
     id: number;
-    task: number;
-    usuario: string;
-    mensagem: string;
-    created_at: string;
-    user_data?: {
-        id: string;
-        nome: string;
-        avatar_url: string | null;
-    };
+    projeto?: number;
+    projetoData?: { nome: string; cor: string };
+    titulo: string;
+    descricao: string;
+    status: string;
+    responsavel: string;
+    responsavelData?: any;
+    category?: string;
+    gravidade?: number;
+    urgencia?: number;
+    tendencia?: number;
+    dataproposta: string;
+    datainicio?: string;
+    datafim?: string;
+    duracaohoras?: number;
+    sutarefa?: boolean;
+    tarefamae?: number;
+    organizacao: number;
+    membros?: string[];
+    etiquetas?: string[];
+    createdat: string;
+    anexos?: Attachment[];
 }
 
-export const PLAN_LIMITS = {
-    plan_free: { projects: 1, users: 1 },
-    plan_solo: { projects: 5, users: 1 },
-    plan_studio: { projects: 20, users: 5 },
-    plan_scale: { projects: 100, users: 15 },
-    plan_enterprise: { projects: 1000, users: 1000 }
-};
-
-export interface AsaasPayment {
+export interface DbUser {
     id: string;
-    date: string;
-    value: number;
-    description: string;
-    status: string;
-    invoiceUrl?: string;
+    nome: string;
+    email: string;
+    perfil: string;
+    organizacao: number;
+    cargo?: number;
+    custo_mensal?: number;
+    avatar_url?: string;
+    ativo: boolean;
+}
+
+export interface DbRole {
+    id: number;
+    nome: string;
+    custo_base?: number;
+}
+
+export interface DbPlan {
+    id: number;
+    nome: string;
+    valor: number;
+    meses: number;
+    descricao: string;
+    colabtotal: number;
 }
 
 export interface SubscriptionPlan {
@@ -225,16 +219,18 @@ export interface SubscriptionPlan {
     recommended: boolean;
     cycle: 'MONTHLY' | 'YEARLY';
     colabtotal: number;
-    meses: number;
-    descricao_raw?: string;
+}
+
+export interface AsaasPayment {
+    id: string;
+    date: string;
+    amount: number;
+    status: string;
 }
 
 export interface AsaasSubscription {
     id: string;
     status: string;
-    value: number;
-    cycle: string;
-    nextDueDate: string;
 }
 
 export interface FinancialRecord {
@@ -262,14 +258,14 @@ export interface FinancialTransaction {
     category: string;
     organizationId: number;
     isContract?: boolean;
-    pago?: boolean;
-    comprovante?: string;
-    orgName?: string;
-    metadata?: any;
-    modulos?: number[];
     isRecurring?: boolean;
     periodicity?: 'monthly' | 'quarterly' | 'semiannual' | 'yearly';
     installments?: number;
+    metadata?: any;
+    pago?: boolean;
+    comprovante?: string;
+    orgName?: string;
+    modulos?: number[];
 }
 
 export interface DbClient {
@@ -286,7 +282,7 @@ export interface DbClient {
     contrato?: string;
     logo_url?: string;
     status?: string;
-    organizacao?: number;
+    organizacao: number;
     tipo_pessoa?: 'Física' | 'Jurídica';
 }
 
@@ -306,9 +302,8 @@ export interface ProductMetricsData {
 }
 
 export interface ProductEvent {
-    id?: string;
+    event_type: 'page_view' | 'feature_use' | 'nps_response';
     user_id: string;
-    event_type: 'page_view' | 'feature_use' | 'nps_response' | 'error' | 'session_start';
     event_data: any;
     created_at: string;
 }
@@ -330,13 +325,16 @@ export interface DevMetricsData {
     };
 }
 
-export interface DbPlan {
+export interface AreaAtuacao {
     id: number;
     nome: string;
-    valor: number;
-    meses: number;
-    descricao: string;
-    colabtotal: number;
+}
+
+export interface Comment {
+    id: string;
+    text: string;
+    authorId: string;
+    createdAt: string;
 }
 
 export interface CmsCase {
@@ -353,20 +351,30 @@ export interface CmsCase {
 export interface CmsPost {
     id: string;
     title: string;
-    slug: string;
     content: string;
-    cover_image?: string;
     tags: string[];
     published: boolean;
-    created_at: string;
-    updated_at?: string;
+    slug: string;
+    cover_image?: string;
+    og_image?: string;
     download_title?: string;
     download_url?: string;
     download_image_url?: string;
     seo_title?: string;
     seo_description?: string;
     keywords?: string;
-    og_image?: string;
+    created_at: string;
+}
+
+export type CrmStage = 'qualification' | 'proposal' | 'negotiation' | 'won' | 'lost';
+
+export interface CrmActivity {
+    id: string;
+    type: 'call' | 'email' | 'meeting' | 'task';
+    subject: string;
+    date: string;
+    status: 'pending' | 'completed';
+    owner: string;
 }
 
 export interface CrmOpportunity {
@@ -396,44 +404,35 @@ export interface CrmOpportunity {
     activities: CrmActivity[];
 }
 
-export type CrmStage = 'qualification' | 'proposal' | 'negotiation' | 'won' | 'lost';
-
-export interface CrmActivity {
-    id: string;
-    type: 'call' | 'email' | 'meeting' | 'task';
-    subject: string;
-    date: string;
-    status: 'pending' | 'completed';
-    owner: string;
-}
-
-export interface AreaAtuacao {
-    id: number;
-    nome: string;
-}
+export const PLAN_LIMITS: Record<string, number> = {
+    'plan_free': 1,
+    'plan_solo': 1,
+    'plan_studio': 5,
+    'plan_scale': 15,
+    'plan_enterprise': 100
+};
 
 export const getTerminology = (orgType?: string) => {
     return {
-        painPointLabel: "Dor",
-        revenueLabel: "Receita",
-        viabilityLabel: "Viabilidade",
-        mvpLabel: "Velocidade",
+        painPointLabel: "Dor do Usuário",
+        mvpLabel: "Tempo para MVP",
+        viabilityLabel: "Viabilidade Técnica",
+        revenueLabel: "Potencial de Receita",
         scalabilityLabel: "Escalabilidade",
         integrationLabel: "Integração",
         recurringLabel: "Recorrência",
         mrrLabel: "MRR",
-        intensities: {
-            1: "Baixa Intensidade",
-            2: "Média Intensidade",
-            3: "Alta Intensidade",
-            4: "Crítica"
-        },
         archetypes: {
-            [Archetype.SAAS_ENTRY]: { label: 'SaaS de Entrada', desc: 'Software pronto para escala com baixo toque humano.' },
-            [Archetype.SAAS_PLATFORM]: { label: 'SaaS Plataforma', desc: 'Ecossistema complexo com múltiplas integrações.' },
-            [Archetype.MOBILE_APP]: { label: 'Mobile App', desc: 'Foco em experiência mobile nativa de alta performance.' },
-            [Archetype.INTERNAL_MARKETING]: { label: 'Interno / Marketing', desc: 'Otimização de processos, landing pages ou infra de marketing.' },
-            [Archetype.CONSULTANCY]: { label: 'Consultoria / Serviço', desc: 'Entrega de valor baseada em horas técnicas e autoridade.' }
+            [Archetype.SAAS_ENTRY]: { label: "SaaS de Entrada", desc: "Software simples com foco em dor única." },
+            [Archetype.SAAS_PLATFORM]: { label: "Plataforma SaaS", desc: "Ecossistema complexo com múltiplas features." },
+            [Archetype.SERVICE_TECH]: { label: "Serviço Tech", desc: "Híbrido entre software e consultoria especializada." },
+            [Archetype.INTERNAL_MARKETING]: { label: "Interno / Mkt", desc: "Ferramenta para otimização de processos próprios." }
+        },
+        intensities: {
+            [IntensityLevel.L1]: "Foco em MVP e validação de hipótese.",
+            [IntensityLevel.L2]: "Desenvolvimento de core features.",
+            [IntensityLevel.L3]: "Escalonamento e otimização de performance.",
+            [IntensityLevel.L4]: "Manutenção crítica e expansão de mercado."
         }
     };
 };

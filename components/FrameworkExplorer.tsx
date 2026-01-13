@@ -1,9 +1,9 @@
+
 import React, { useState, useMemo } from 'react';
 import { 
-    Zap, Target, ShieldCheck, Layers, Gauge, Info, Sparkles, 
-    ChevronRight, ChevronLeft, ArrowRight, Save, RotateCcw,
-    BrainCircuit, Loader2, CheckCircle2, TrendingUp, BarChart3,
-    Microscope, FlaskConical, Atom, DollarSign, ArrowLeft
+    Zap, Target, ShieldCheck, Microscope, Gauge, Info, 
+    ChevronRight, ChevronLeft, ArrowRight, BrainCircuit, Loader2, CheckCircle2, 
+    DollarSign, ArrowLeft
 } from 'lucide-react';
 import { Opportunity, Archetype, IntensityLevel, RDEStatus, TadsCriteria, getTerminology } from '../types';
 import MatrixChart from './MatrixChart';
@@ -11,7 +11,7 @@ import { analyzeOpportunity } from '../services/geminiService';
 
 interface Props {
     onSaveToProject: (opp: Opportunity) => void;
-    orgType?: string;
+    orgName?: string;
     onBack: () => void;
 }
 
@@ -22,8 +22,8 @@ const STEPS = [
     { id: 'tads', label: 'Crivo T.A.D.S', icon: ShieldCheck }
 ];
 
-export const FrameworkExplorer: React.FC<Props> = ({ onSaveToProject, orgType, onBack }) => {
-    const terms = getTerminology(orgType);
+export const FrameworkExplorer: React.FC<Props> = ({ onSaveToProject, orgName, onBack }) => {
+    const terms = getTerminology(orgName);
     const [step, setStep] = useState(0);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [aiVerdict, setAiVerdict] = useState<string | null>(null);
@@ -57,7 +57,7 @@ export const FrameworkExplorer: React.FC<Props> = ({ onSaveToProject, orgType, o
         if (!simData.title || !simData.description) return alert("Preencha título e descrição para análise.");
         setIsAnalyzing(true);
         try {
-            const verdict = await analyzeOpportunity(simData.title, simData.description, orgType);
+            const verdict = await analyzeOpportunity(simData.title, simData.description, orgName);
             setAiVerdict(verdict);
         } catch (e) {
             alert("Erro na conexão com o Guru AI.");
@@ -94,7 +94,7 @@ export const FrameworkExplorer: React.FC<Props> = ({ onSaveToProject, orgType, o
                 <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] mix-blend-overlay"></div>
             </div>
 
-            {/* Top Lab Header - Compacted for Horizontal Tablets */}
+            {/* Top Lab Header */}
             <header className="h-16 md:h-20 shrink-0 border-b border-white/5 bg-black/40 backdrop-blur-3xl px-6 md:px-8 flex items-center justify-between z-50">
                 <div className="flex items-center gap-4 md:gap-6">
                     <button onClick={onBack} className="p-2 md:p-3 hover:bg-white/5 rounded-xl md:2xl transition-all text-slate-400 hover:text-white border border-transparent hover:border-white/10">
@@ -175,14 +175,14 @@ export const FrameworkExplorer: React.FC<Props> = ({ onSaveToProject, orgType, o
                                     <div className="space-y-3">
                                         <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Arquétipo de Negócio</label>
                                         <div className="space-y-2 md:space-y-3">
-                                            {Object.values(Archetype).map(arch => (
+                                            {Object.values(Archetype).map((arch: string) => (
                                                 <button 
                                                     key={arch}
-                                                    onClick={() => setSimData({...simData, archetype: arch})}
+                                                    onClick={() => setSimData({...simData, archetype: arch as Archetype})}
                                                     className={`w-full p-4 md:p-6 rounded-2xl md:rounded-[2rem] border text-left transition-all group ${simData.archetype === arch ? 'bg-amber-500 border-amber-400 text-black shadow-glow-amber' : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'}`}
                                                 >
-                                                    <div className="font-black text-[10px] md:text-xs uppercase tracking-widest mb-1">{terms.archetypes[arch].label}</div>
-                                                    <p className={`text-[9px] md:text-[10px] font-bold leading-relaxed ${simData.archetype === arch ? 'text-black/60' : 'text-slate-500'}`}>{terms.archetypes[arch].desc}</p>
+                                                    <div className="font-black text-[10px] md:text-xs uppercase tracking-widest mb-1">{terms.archetypes[arch as Archetype].label}</div>
+                                                    <p className={`text-[9px] md:text-[10px] font-bold leading-relaxed ${simData.archetype === arch ? 'text-black/60' : 'text-slate-500'}`}>{terms.archetypes[arch as Archetype].desc}</p>
                                                 </button>
                                             ))}
                                         </div>
@@ -293,7 +293,7 @@ export const FrameworkExplorer: React.FC<Props> = ({ onSaveToProject, orgType, o
                     </div>
                 </main>
 
-                {/* Sidebar Monitor - Compacted for Horizontal Tablets */}
+                {/* Sidebar Monitor */}
                 <aside className="w-72 md:w-80 lg:w-96 shrink-0 border-l border-white/5 bg-black/40 backdrop-blur-3xl hidden xl:flex flex-col p-6 md:p-10 space-y-8 md:space-y-12">
                     <div className="space-y-1">
                         <h3 className="text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Snapshot do Ativo</h3>
@@ -316,23 +316,6 @@ export const FrameworkExplorer: React.FC<Props> = ({ onSaveToProject, orgType, o
                             <div className="text-[9px] md:text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1 md:mb-2">TADS VALIDATION</div>
                             <div className="text-5xl md:text-7xl font-black text-white tracking-tighter">{metrics.tadsScore}<span className="text-lg md:text-xl text-slate-600">/10</span></div>
                             <div className="text-[8px] md:text-[9px] font-bold text-slate-500 uppercase mt-2">{metrics.tadsTrueCount} critérios validados</div>
-                        </div>
-
-                        <div className="p-5 md:p-6 bg-blue-500/5 rounded-[1.5rem] md:rounded-[2rem] border border-blue-500/10">
-                            <div className="flex items-center justify-between mb-3 md:mb-4">
-                                <span className="text-[8px] md:text-[9px] font-black text-blue-500 uppercase tracking-widest">DNA MESTRE</span>
-                                <Atom className="w-3.5 h-3.5 md:w-4 md:h-4 text-blue-500"/>
-                            </div>
-                            <div className="space-y-2 md:space-y-3">
-                                <div className="flex justify-between text-[10px] md:text-xs">
-                                    <span className="text-slate-500 font-bold uppercase tracking-tighter">Arquétipo</span>
-                                    <span className="text-white font-black">{simData.archetype?.split(' ')[0]}</span>
-                                </div>
-                                <div className="flex justify-between text-[10px] md:text-xs">
-                                    <span className="text-slate-500 font-bold uppercase tracking-tighter">Intensidade</span>
-                                    <span className="text-white font-black">L{simData.intensity}</span>
-                                </div>
-                            </div>
                         </div>
                     </div>
 

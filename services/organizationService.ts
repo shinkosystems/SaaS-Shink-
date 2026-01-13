@@ -5,15 +5,162 @@ import { PLAN_LIMITS } from '../types';
 const ORG_TABLE = 'organizacoes';
 const LOGO_BUCKET = 'fotoperfil'; 
 
-// Definição técnica dos módulos do sistema (deve bater com a coluna 'nome' da tabela 'modulos')
 export const SYSTEM_MODULES_DEF = [
     'projects', 'kanban', 'gantt', 'calendar', 'crm', 'financial', 'clients', 'engineering', 'product', 'ia', 'whitelabel', 'assets'
 ];
 
 export const getPlanDefaultModules = (planId: number): string[] => {
-    // Configuração de Acesso Total: Todos os planos agora recebem todos os módulos
     return SYSTEM_MODULES_DEF;
 };
+
+// --- FUNÇÕES DE GESTÃO DE MÓDULOS ALINHADAS AO SCHEMA ---
+
+/**
+ * Busca a lista de nomes (slugs) de módulos ativos para uma organização.
+ * Refatorado para consulta em duas etapas para evitar erros de Join ambíguo.
+ */
+export const fetchActiveOrgModules = async (orgId: number): Promise<string[]> => {
+    try {
+        if (!orgId) return [];
+
+        // 1. Busca os IDs dos módulos vinculados na tabela associativa
+        const { data: relations, error: relError } = await supabase
+            .from('organizacao_modulo')
+            .select('modulo')
+            .eq('organizacao', orgId);
+        
+        if (relError) throw relError;
+        if (!relations || relations.length === 0) return [];
+
+        const moduleIds = relations.map(r => r.modulo).filter(id => id !== null);
+        if (moduleIds.length === 0) return [];
+
+        // 2. Busca os nomes reais desses módulos na tabela mestre
+        const { data: moduleNames, error: nameError } = await supabase
+            .from('modulos')
+            .select('nome')
+            .in('id', moduleIds);
+        
+        if (nameError) throw nameError;
+
+        return (moduleNames || [])
+            .map((m: any) => m.nome)
+            .filter(Boolean);
+
+    } catch (e: any) {
+        const errorDetail = e?.message || e?.details || JSON.stringify(e);
+        console.error("Error fetching modules:", errorDetail);
+        return [];
+    }
+};
+
+/**
+ * Atualiza os módulos de uma organização.
+ * Primeiro busca os IDs correspondentes aos nomes fornecidos e atualiza a tabela associativa.
+ */
+export const updateOrgModules = async (orgId: number, moduleList: string[]) => {
+    try {
+        if (!orgId) return false;
+
+        // 1. Busca os IDs reais dos módulos baseados nos nomes (slugs)
+        const { data: modData, error: fetchError } = await supabase
+            .from('modulos')
+            .select('id, nome')
+            .in('nome', moduleList);
+        
+        if (fetchError) throw fetchError;
+        if (!modData) return false;
+
+        // 2. Remove vínculos antigos para garantir sincronia limpa
+        const { error: deleteError } = await supabase
+            .from('organizacao_modulo')
+            .delete()
+            .eq('organizacao', orgId);
+        
+        if (deleteError) throw deleteError;
+
+        // 3. Insere os novos vínculos
+        if (modData.length > 0) {
+            const rows = modData.map(m => ({ 
+                organizacao: orgId, 
+                modulo: m.id 
+            }));
+            const { error: insertError } = await supabase.from('organizacao_modulo').insert(rows);
+            if (insertError) throw insertError;
+        }
+        return true;
+    } catch (e: any) {
+        const errorDetail = e?.message || e?.details || JSON.stringify(e);
+        console.error("Error updating modules:", errorDetail);
+        return false;
+    }
+};
+
+/**
+ * Gera um mapeamento dinâmico de Nome -> ID para tradução rápida.
+ */
+export const fetchSystemModuleMap = async (): Promise<Record<string, number>> => {
+    try {
+        const { data, error } = await supabase.from('modulos').select('id, nome');
+        if (error) throw error;
+        
+        const map: Record<string, number> = {};
+        data?.forEach(m => {
+            if (m.nome) map[m.nome.toLowerCase()] = m.id;
+        });
+        return map;
+    } catch (e: any) {
+        const errorDetail = e?.message || e?.details || JSON.stringify(e);
+        console.error("Error fetching system module map:", errorDetail);
+        return {};
+    }
+};
+
+/**
+ * Atualiza módulos da organização usando IDs numéricos diretos.
+ */
+export const updateOrgModulesByIds = async (orgId: number, moduleIds: number[]) => {
+    try {
+        if (!orgId) return false;
+
+        await supabase.from('organizacao_modulo').delete().eq('organizacao', orgId);
+        
+        if (moduleIds.length > 0) {
+            const rows = moduleIds.map(id => ({ 
+                organizacao: orgId, 
+                modulo: id 
+            }));
+            const { error: insertError } = await supabase.from('organizacao_modulo').insert(rows);
+            if (insertError) throw insertError;
+        }
+        return true;
+    } catch (e: any) {
+        const errorDetail = e?.message || e?.details || JSON.stringify(e);
+        console.error("Error updating modules by ids:", errorDetail);
+        return false;
+    }
+};
+
+/**
+ * Busca detalhes públicos de uma organização para customização dinâmica (White Label).
+ */
+export const getPublicOrgDetails = async (orgId: number) => {
+    try {
+        const { data, error } = await supabase
+            .from(ORG_TABLE)
+            .select('nome, logo, cor, setor')
+            .eq('id', orgId)
+            .single();
+        if (error) throw error;
+        return data;
+    } catch (err: any) {
+        const errorDetail = err?.message || err?.details || JSON.stringify(err);
+        console.error("Error fetching public org details:", errorDetail);
+        return null;
+    }
+};
+
+// --- FUNÇÕES DE ORGANIZAÇÃO E USUÁRIOS ---
 
 export const findOrgIdByOwnerEmail = async (email: string): Promise<number | null> => {
     try {
@@ -40,7 +187,7 @@ export const createOrganization = async (userId: string, name: string, sector: s
                 setor: sector, 
                 dna: dna || '',
                 plano: 4, 
-                colaboradores: 100, // Limite aumentado para teste
+                colaboradores: 100,
                 pedidoia: 0,
                 cor: '#F59E0B'
             })
@@ -63,6 +210,9 @@ export const createOrganization = async (userId: string, name: string, sector: s
         
         if (userError) throw userError;
 
+        // Vincula módulos padrão para nova organização
+        await updateOrgModules(org.id, ['projects', 'kanban', 'ia']);
+
         await supabase
             .from('clientes')
             .insert({
@@ -79,7 +229,8 @@ export const createOrganization = async (userId: string, name: string, sector: s
 
         return org;
     } catch (err: any) {
-        throw new Error(`Falha ao criar organização: ${err.message}`);
+        const errorDetail = err?.message || err?.details || JSON.stringify(err);
+        throw new Error(`Falha ao criar organização: ${errorDetail}`);
     }
 };
 
@@ -95,7 +246,8 @@ export const uploadLogo = async (orgId: number, file: File) => {
         const { data } = supabase.storage.from(LOGO_BUCKET).getPublicUrl(fileName);
         return data.publicUrl;
     } catch (error: any) {
-        throw new Error(`Erro no upload do logo: ${error.message}`);
+        const errorDetail = error?.message || error?.details || JSON.stringify(error);
+        throw new Error(`Erro no upload do logo: ${errorDetail}`);
     }
 };
 
@@ -111,14 +263,17 @@ export const uploadAvatar = async (userId: string, file: File) => {
         if (updateError) throw updateError;
         return publicUrl;
     } catch (error: any) {
-        throw new Error(`Erro no upload da foto: ${error.message}`);
+        const errorDetail = error?.message || error?.details || JSON.stringify(error);
+        throw new Error(`Erro no upload da foto: ${errorDetail}`);
     }
 };
 
 export const fetchOrganizationDetails = async (orgId: number) => {
     try {
         const { data, error } = await supabase.from(ORG_TABLE).select('*').eq('id', orgId).single();
-        if (error && error.code !== 'PGRST116') console.error(`Error fetching organization details:`, error);
+        if (error && error.code !== 'PGRST116') {
+            console.error(`Error fetching organization details:`, error.message);
+        }
         return data;
     } catch (err) { return null; }
 };
@@ -135,105 +290,35 @@ export const updateOrgDetails = async (orgId: number, updates: any) => {
     if (Object.keys(payload).length === 0) return { success: true };
     try {
         const { data, error } = await supabase.from(ORG_TABLE).update(payload).eq('id', orgId).select();
-        if (error) throw new Error(error.message);
+        if (error) throw error;
         return { success: true, data };
-    } catch (err: any) { throw new Error(err.message); }
-};
-
-export const fetchSystemModuleMap = async (): Promise<Record<string, number>> => {
-    const { data, error } = await supabase.from('modulos').select('id, nome');
-    if (error || !data) return {};
-    const map: Record<string, number> = {};
-    data.forEach(m => { 
-        if (m.nome) map[m.nome.toLowerCase()] = m.id; 
-    });
-    return map;
-};
-
-export const fetchActiveOrgModules = async (orgId: number): Promise<string[]> => {
-    try {
-        const { data, error } = await supabase
-            .from('organizacao_modulo')
-            .select(`
-                modulos (
-                    nome
-                )
-            `)
-            .eq('organizacao', orgId);
-
-        if (error) {
-            console.error("Erro ao buscar módulos ativos:", error.message);
-            return SYSTEM_MODULES_DEF; 
-        }
-
-        const modules = data?.map((item: any) => item.modulos?.nome).filter(Boolean) || [];
-        
-        // Se não houver módulos vinculados no banco, retorna todos por padrão agora
-        if (modules.length === 0) {
-             return SYSTEM_MODULES_DEF;
-        }
-
-        return modules;
-    } catch (e) { 
-        console.error("Exceção ao carregar módulos ativos:", e);
-        return SYSTEM_MODULES_DEF; 
-    }
-};
-
-export const updateOrgModules = async (orgId: number, moduleKeys: string[]) => {
-    try {
-        const moduleMap = await fetchSystemModuleMap();
-        if (Object.keys(moduleMap).length === 0) {
-            throw new Error("Não foi possível carregar o catálogo de módulos do sistema.");
-        }
-
-        const idsToInsert = moduleKeys
-            .map(k => moduleMap[k.toLowerCase()])
-            .filter(id => id !== undefined && id !== null) as number[];
-        
-        return updateOrgModulesByIds(orgId, idsToInsert);
     } catch (err: any) { 
-        throw new Error(err.message); 
-    }
-};
-
-export const updateOrgModulesByIds = async (orgId: number, moduleIds: number[]) => {
-    try {
-        const { error: deleteError } = await supabase
-            .from('organizacao_modulo')
-            .delete()
-            .eq('organizacao', orgId);
-        
-        if (deleteError) throw deleteError;
-
-        if (moduleIds.length > 0) {
-            const payload = moduleIds.map(modId => ({ 
-                organizacao: orgId, 
-                modulo: modId
-            }));
-            
-            const { error: insertError } = await supabase
-                .from('organizacao_modulo')
-                .insert(payload);
-            
-            if (insertError) {
-                throw insertError;
-            }
-        }
-        return { success: true };
-    } catch (err: any) { 
-        console.error("Erro técnico na sincronização de módulos:", err.message);
-        throw new Error(err.message); 
+        const errorDetail = err?.message || err?.details || JSON.stringify(err);
+        throw new Error(errorDetail); 
     }
 };
 
 export const fetchRoles = async (orgId: number) => {
-    const { data, error } = await supabase.from('area_atuacao').select('*').eq('empresa', orgId);
-    if (error) return [];
+    const { data, error } = await supabase
+        .from('area_atuacao')
+        .select('*')
+        .eq('empresa', Number(orgId));
+    
+    if (error) {
+        console.warn("Cargos não carregados:", error.message);
+        return [];
+    }
+
     return data.map((d: any) => ({
         id: d.id,
-        nome: d.cargo || `Cargo ${d.id}`
+        nome: d.cargo || `Cargo ${d.id}`,
+        custo_base: d.custo_base || 0
     }));
+};
+
+export const updateRoleCost = async (roleId: number, cost: number) => {
+    const { error } = await supabase.from('area_atuacao').update({ custo_base: cost }).eq('id', roleId);
+    return !error;
 };
 
 export const createRole = async (nome: string, orgId: number) => {
@@ -247,10 +332,32 @@ export const deleteRole = async (id: number) => {
     return !error;
 };
 
+/**
+ * Busca membros com detecção automática de colunas opcionais (custo_mensal)
+ */
 export const fetchOrganizationMembersWithRoles = async (orgId: number) => {
-    const { data, error } = await supabase.from('users').select(`id, nome, email, avatar_url, perfil, cargo`).eq('organizacao', orgId);
-    if (error) return [];
-    return data;
+    const targetOrgId = Number(orgId);
+    if (!targetOrgId) return [];
+
+    try {
+        const { data, error } = await supabase
+            .from('users')
+            .select(`id, nome, email, avatar_url, perfil, cargo, ativo, custo_mensal`)
+            .eq('organizacao', targetOrgId);
+        
+        if (error) {
+            const { data: safeData, error: safeError } = await supabase
+                .from('users')
+                .select(`id, nome, email, avatar_url, perfil, cargo, ativo`)
+                .eq('organizacao', targetOrgId);
+
+            if (safeError) return [];
+            return (safeData || []).map((u: any) => ({ ...u, custo_mensal: 0 }));
+        }
+        return data || [];
+    } catch (e) {
+        return [];
+    }
 };
 
 export const updateUserRole = async (userId: string, roleId: number | null) => {
@@ -258,10 +365,9 @@ export const updateUserRole = async (userId: string, roleId: number | null) => {
     return !error;
 };
 
-export const getPublicOrgDetails = async (orgId: number) => {
+export const updateUserCost = async (userId: string, cost: number) => {
     try {
-        const { data, error } = await supabase.from('organizacoes').select('nome, logo, core, plano').eq('id', orgId).single();
-        if (error) return null;
-        return data;
-    } catch (e) { return null; }
+        const { error } = await supabase.from('users').update({ custo_mensal: cost }).eq('id', userId);
+        return !error;
+    } catch (e) { return false; }
 };

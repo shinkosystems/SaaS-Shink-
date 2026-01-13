@@ -1,4 +1,3 @@
-
 import { supabase } from './supabaseClient';
 import { Opportunity, DbProject, RDEStatus, Archetype, IntensityLevel, TadsCriteria, DbTask, BpmnTask, BpmnNode } from '../types';
 
@@ -198,7 +197,7 @@ const mapDbProjectToOpportunity = (row: DbProject, tasks: DbTask[] = []): Opport
         intensity: (row.intensidade as IntensityLevel) || IntensityLevel.L1,
         tads: tads,
         tadsScore: Object.values(tads).filter(Boolean).length * 2, 
-        evidence: { clientsAsk: [], clientsSuffer: [], wontPay: [] },
+        // Fixed: Removed 'evidence' property as it does not exist in type 'Opportunity'
         status: savedStatus,
         createdAt: row.created_at,
         bpmn: bpmnStructure,
@@ -232,6 +231,6 @@ const mapOpportunityToDbProject = (opp: Opportunity): any => {
         projoport: opp.status !== 'Active', // Active é falso (é projeto), outros são verdadeiro (é oportunidade)
         bpmn_structure: updatedBpmn,
         contexto_ia: opp.docsContext || '',
-        cor: opp.color || '#F59E0B'
+        color: opp.color || '#F59E0B'
     };
 };

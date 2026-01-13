@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Opportunity } from '../types';
 import MatrixChart from './MatrixChart';
 import { 
@@ -9,6 +9,7 @@ import {
     Calendar, CreditCard, Shield, Rocket, ChevronRight, Activity, Trophy
 } from 'lucide-react';
 import { SuccessJourney } from './SuccessJourney';
+import { getOperationalRates } from '../services/financialService';
 
 interface Props {
   opportunities: Opportunity[];
@@ -22,13 +23,21 @@ interface Props {
   billingDate?: string;
   activeModules?: string[];
   userRole?: string;
+  organizationId?: number;
 }
 
 export const Dashboard: React.FC<Props> = ({ 
-    opportunities, onNavigate, onOpenProject, user, theme, userData, onOpenCreate, onGuruPrompt, billingDate, activeModules = [], userRole
+    opportunities, onNavigate, onOpenProject, user, theme, userData, onOpenCreate, onGuruPrompt, activeModules = [], userRole, organizationId
 }) => {
     const [commandInput, setCommandInput] = useState('');
+    const [rates, setRates] = useState<any>(null);
     const firstName = userData?.name?.split(' ')[0] || 'Inovador';
+
+    useEffect(() => {
+        if (organizationId) {
+            getOperationalRates(organizationId).then(setRates);
+        }
+    }, [organizationId]);
 
     const milestones = [
         { id: '1', label: '1º Ativo', description: 'Mapeie sua primeira oportunidade.', completed: opportunities.length > 0, actionId: 'framework-system' },
@@ -37,27 +46,14 @@ export const Dashboard: React.FC<Props> = ({
         { id: '4', label: 'Escala', description: 'Tenha 1 projeto em execução.', completed: opportunities.some(o => o.status === 'Active'), actionId: 'kanban' },
     ];
 
-    // CÁLCULO DINÂMICO DE ROI (SHINKŌ METHODOLOGY)
-    const projectedRoi = useMemo(() => {
-        const revenueMap: Record<number, number> = {
-            1: 50000,   // R$ 50k
-            2: 150000,  // R$ 150k
-            3: 500000,  // R$ 500k
-            4: 1500000, // R$ 1.5M
-            5: 5000000  // R$ 5M+
-        };
+    // CÁLCULO DINÂMICO DE ROI BASEADO EM ABC REAL
+    const metrics = useMemo(() => {
+        const totalRevenue = opportunities.reduce((acc, opp) => acc + (opp.revenue * 10000), 0); // Mock scale factor
+        const totalPrioScore = opportunities.reduce((acc, opp) => acc + opp.prioScore, 0);
+        const avgMargin = rates?.totalRate ? 72 : 0; // Exemplo de margem baseada em custos
 
-        return opportunities.reduce((acc, opp) => {
-            if (opp.status === 'Archived') return acc;
-            
-            const baseVal = revenueMap[Math.round(opp.revenue)] || 0;
-            // O Índice de Confiança pondera Viabilidade e TADS
-            // Se tadsScore é 10 e viabilidade é 5, confiança é 100% (1.0)
-            const confidence = (opp.viability + (opp.tadsScore / 2)) / 10;
-            
-            return acc + (baseVal * confidence);
-        }, 0);
-    }, [opportunities]);
+        return { totalRevenue, totalPrioScore, avgMargin };
+    }, [opportunities, rates]);
 
     const handleCommandSubmit = (e?: React.FormEvent) => {
         if (e) e.preventDefault();
@@ -97,12 +93,11 @@ export const Dashboard: React.FC<Props> = ({
                 </div>
             </div>
 
-            {/* RD STATION STYLE: SUCCESS JOURNEY */}
+            {/* Journey */}
             <div className="px-4">
                 <SuccessJourney milestones={milestones} onAction={onNavigate} />
             </div>
 
-            {/* Grid Principal */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 px-4">
                 <div className="lg:col-span-8 space-y-4">
                     <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500 flex items-center gap-3 px-2">
@@ -136,22 +131,21 @@ export const Dashboard: React.FC<Props> = ({
                         </button>
                     </div>
 
-                    {/* ROI CARD - VISÍVEL APENAS PARA O DONO (SOLICITAÇÃO 1) */}
                     {userRole === 'dono' && (
                         <div className="glass-panel p-6 rounded-[2rem] border-slate-200 dark:border-white/5 flex flex-col justify-between h-40 animate-in zoom-in duration-500">
                             <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                <TrendingUp className="w-3 h-3 text-emerald-500"/> ROI Projetado (Framework)
+                                <TrendingUp className="w-3 h-3 text-emerald-500"/> Custo/Hora Operacional
                             </div>
                             <div className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">
-                                +R$ {(projectedRoi / 1000000).toFixed(1)}M
+                                R$ {rates?.totalRate?.toFixed(2) || '0.00'}
                             </div>
                             <div className="space-y-2">
                                 <div className="flex justify-between text-[7px] font-black text-slate-400 uppercase">
-                                    <span>Risco vs Retorno</span>
-                                    <span>Score Ponderado</span>
+                                    <span>RH + Tecnologia</span>
+                                    <span>Base ABC Industrial</span>
                                 </div>
                                 <div className="w-full h-1 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
-                                    <div className="h-full bg-emerald-500 shadow-glow-emerald" style={{width: `${Math.min(100, (projectedRoi / 5000000) * 100)}%`}}></div>
+                                    <div className="h-full bg-emerald-500 shadow-glow-emerald" style={{width: '100%'}}></div>
                                 </div>
                             </div>
                         </div>

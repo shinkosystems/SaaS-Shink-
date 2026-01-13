@@ -11,11 +11,7 @@ export const fetchTransactions = async (organizationId: number): Promise<Financi
         .eq('organization_id', organizationId)
         .order('date', { ascending: false });
 
-    if (error) {
-        console.error('Erro ao buscar transações:', error.message || error);
-        return [];
-    }
-
+    if (error) return [];
     return data.map((row: any) => ({
         id: row.id,
         date: row.date,
@@ -32,266 +28,141 @@ export const fetchTransactions = async (organizationId: number): Promise<Financi
     }));
 };
 
-export const addTransaction = async (transaction: Omit<FinancialTransaction, 'id'>): Promise<FinancialTransaction[] | null> => {
-    try {
-        const transactionsToInsert: any[] = [];
-        const installments = transaction.installments || 1;
-        const startDate = new Date(transaction.date);
-        
-        // Gerar um ID único para o grupo de recorrência
-        const recurringGroupId = transaction.isRecurring ? crypto.randomUUID() : null;
-        
-        for (let i = 0; i < (transaction.isRecurring ? installments : 1); i++) {
-            const currentDate = new Date(startDate);
-            
-            if (transaction.isRecurring) {
-                if (transaction.periodicity === 'monthly') {
-                    currentDate.setMonth(startDate.getMonth() + i);
-                } else if (transaction.periodicity === 'quarterly') {
-                    currentDate.setMonth(startDate.getMonth() + (i * 3));
-                } else if (transaction.periodicity === 'semiannual') {
-                    currentDate.setMonth(startDate.getMonth() + (i * 6));
-                } else if (transaction.periodicity === 'yearly') {
-                    currentDate.setFullYear(startDate.getFullYear() + i);
-                }
-            }
+/**
+ * Atividade Baseada em Custos (ABC) Granular
+ * Prioriza custos diretos apontados em usuários e cargos
+ */
+export const getOperationalRates = async (organizationId: number) => {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-            transactionsToInsert.push({
-                date: currentDate.toISOString().split('T')[0],
-                description: transaction.isRecurring && installments > 1 
-                    ? `${transaction.description} (${i + 1}/${installments})` 
-                    : transaction.description,
-                amount: transaction.amount,
-                type: transaction.type,
-                category: transaction.category,
-                organization_id: transaction.organizationId,
-                is_recurring: transaction.isRecurring,
-                periodicity: transaction.periodicity,
-                installments: transaction.installments,
-                metadata: {
-                    isRecurringChild: i > 0,
-                    sequence: i + 1,
-                    recurring_group_id: recurringGroupId,
-                    base_description: transaction.description // Guardamos o nome original para facilitar updates
-                }
-            });
-        }
-
-        const { data, error } = await supabase
-            .from(TABLE)
-            .insert(transactionsToInsert)
-            .select();
-
-        if (error) throw error;
-
-        return data.map((row: any) => ({
-            id: row.id,
-            date: row.date,
-            description: row.description,
-            amount: Number(row.amount),
-            type: row.type,
-            category: row.category,
-            organizationId: row.organization_id,
-            isRecurring: row.is_recurring,
-            periodicity: row.periodicity,
-            installments: row.installments,
-            metadata: row.metadata || {}
-        }));
-    } catch (error: any) {
-        console.error('Erro ao adicionar transação(ões):', error.message || error);
-        return null;
-    }
-};
-
-export const updateTransaction = async (transaction: FinancialTransaction): Promise<FinancialTransaction | null> => {
-    const { id, ...updates } = transaction;
-    
-    // 1. Payload básico para este registro
-    const payload = {
-        date: updates.date,
-        description: updates.description,
-        amount: updates.amount,
-        type: updates.type,
-        category: updates.category,
-        organization_id: updates.organizationId,
-        is_recurring: updates.isRecurring,
-        periodicity: updates.periodicity,
-        installments: updates.installments,
-        metadata: updates.metadata
-    };
-
-    // 2. Se for parte de um grupo recorrente, atualizamos os "irmãos"
-    const groupId = updates.metadata?.recurring_group_id;
-    
-    if (groupId) {
-        try {
-            // Atualiza Categoria e Natureza em todos os registros do grupo
-            await supabase
-                .from(TABLE)
-                .update({ 
-                    category: updates.category,
-                    type: updates.type
-                })
-                .eq('organization_id', updates.organizationId)
-                .filter('metadata->>recurring_group_id', 'eq', groupId);
-            
-            // Se a descrição base mudou, precisamos atualizar as descrições individuais mantendo o (x/y)
-            const oldBaseDesc = updates.metadata?.base_description;
-            // Pegamos a nova descrição e removemos possíveis sufixos (x/y) para achar a nova base
-            const newBaseDesc = updates.description.split(' (')[0];
-
-            if (newBaseDesc !== oldBaseDesc) {
-                // Buscamos todos do grupo para renomear um a um mantendo o índice
-                const { data: siblings } = await supabase
-                    .from(TABLE)
-                    .select('id, metadata')
-                    .eq('organization_id', updates.organizationId)
-                    .filter('metadata->>recurring_group_id', 'eq', groupId);
-                
-                if (siblings) {
-                    for (const sib of siblings) {
-                        const seq = sib.metadata?.sequence;
-                        const total = updates.installments;
-                        const newDesc = total && total > 1 ? `${newBaseDesc} (${seq}/${total})` : newBaseDesc;
-                        
-                        await supabase.from(TABLE).update({ 
-                            description: newDesc,
-                            metadata: { ...sib.metadata, base_description: newBaseDesc }
-                        }).eq('id', sib.id);
-                    }
-                }
-            }
-        } catch (e) {
-            console.error("Falha na sincronização do grupo recorrente:", e);
-        }
-    }
-
-    const { data, error } = await supabase
+    // 1. Busca Despesas Tecnológicas para rateio de infra
+    const { data: trans } = await supabase
         .from(TABLE)
-        .update(payload)
-        .eq('id', id)
-        .select()
-        .single();
+        .select('amount, category')
+        .eq('organization_id', organizationId)
+        .eq('type', 'outflow')
+        .eq('category', 'Tecnológico')
+        .gte('date', thirtyDaysAgo.toISOString().split('T')[0]);
 
-    if (error) {
-        console.error('Erro ao atualizar transação:', error.message);
-        return null;
+    // 2. Busca Usuários e Cargos com seus custos apontados
+    const { data: users } = await supabase
+        .from('users')
+        .select('id, custo_mensal, cargo')
+        .eq('organizacao', organizationId)
+        .eq('ativo', true);
+
+    const { data: roles } = await supabase
+        .from('area_atuacao')
+        .select('id, custo_base')
+        .eq('empresa', organizationId);
+
+    const techTotal = trans?.reduce((acc, t) => acc + Number(t.amount), 0) || 0;
+    const numUsers = users?.length || 1;
+    const totalHoursCapacity = numUsers * 160;
+
+    // 3. Calcula o Custo Homem Médio baseado no APONTAMENTO REAL
+    let totalRhCost = 0;
+    const roleMap = new Map(roles?.map(r => [r.id, r.custo_base]) || []);
+
+    users?.forEach(u => {
+        // Prioridade: Custo Direto do User > Custo Base do Cargo > 0
+        const cost = u.custo_mensal || roleMap.get(u.cargo) || 0;
+        totalRhCost += Number(cost);
+    });
+
+    // Fallback: Se não houver nenhum apontamento em usuários/cargos, 
+    // tentamos buscar no financeiro (extrato bruto)
+    if (totalRhCost === 0) {
+        const { data: rhTrans } = await supabase
+            .from(TABLE)
+            .select('amount')
+            .eq('organization_id', organizationId)
+            .eq('type', 'outflow')
+            .eq('category', 'RH')
+            .gte('date', thirtyDaysAgo.toISOString().split('T')[0]);
+        totalRhCost = rhTrans?.reduce((acc, t) => acc + Number(t.amount), 0) || 0;
     }
+
+    const manHourCost = totalRhCost / totalHoursCapacity;
+    const techHourCost = techTotal / totalHoursCapacity;
 
     return {
-        id: data.id,
-        date: data.date,
-        description: data.description,
-        amount: Number(data.amount),
-        type: data.type,
-        category: data.category,
-        organizationId: data.organization_id,
-        isContract: !!(data.metadata?.contractId),
-        isRecurring: data.is_recurring,
-        periodicity: data.periodicity,
-        installments: data.installments,
-        metadata: data.metadata || {}
+        manHourCost,
+        techHourCost,
+        totalRate: manHourCost + techHourCost,
+        capacity: totalHoursCapacity,
+        rhTotal: totalRhCost,
+        techTotal
     };
 };
 
-export const deleteTransaction = async (id: string): Promise<boolean> => {
-    const { error } = await supabase
-        .from(TABLE)
-        .delete()
-        .eq('id', id);
+export const addTransaction = async (transaction: Omit<FinancialTransaction, 'id'>): Promise<FinancialTransaction[] | null> => {
+    const { organizationId, isRecurring, installments, periodicity, ...baseData } = transaction;
+    const records = [];
+    const count = isRecurring ? (installments || 12) : 1;
 
-    if (error) {
-        console.error('Erro ao deletar transação:', error.message || error);
-        return false;
+    for (let i = 0; i < count; i++) {
+        const date = new Date(baseData.date);
+        if (periodicity === 'monthly') date.setMonth(date.getMonth() + i);
+        else if (periodicity === 'quarterly') date.setMonth(date.getMonth() + (i * 3));
+        else if (periodicity === 'yearly') date.setFullYear(date.getFullYear() + i);
+
+        records.push({
+            ...baseData,
+            date: date.toISOString().split('T')[0],
+            organization_id: organizationId,
+            is_recurring: isRecurring,
+            installments: installments,
+            periodicity: periodicity
+        });
     }
-    return true;
+
+    const { data, error } = await supabase.from(TABLE).insert(records).select();
+    if (error) return null;
+    return data as any;
 };
 
-export const syncContractTransactions = async (organizationId: number): Promise<{ created: number, errors: number }> => {
-    try {
-        const { data: clients, error: clientsError } = await supabase
-            .from('clientes')
-            .select('*')
-            .eq('organizacao', organizationId)
-            .neq('status', 'Bloqueado'); 
+export const updateTransaction = async (t: FinancialTransaction) => {
+    const { id, ...data } = t;
+    const { error } = await supabase.from(TABLE).update({
+        amount: t.amount,
+        description: t.description,
+        category: t.category,
+        date: t.date,
+        type: t.type
+    }).eq('id', id);
+    return !error;
+};
 
-        if (clientsError || !clients) throw new Error("Erro ao buscar clientes: " + (clientsError?.message || 'Sem dados'));
+export const deleteTransaction = async (id: string) => {
+    const { error } = await supabase.from(TABLE).delete().eq('id', id);
+    return !error;
+};
 
-        const { data: existingTrans, error: transError } = await supabase
-            .from(TABLE)
-            .select('metadata')
-            .eq('organization_id', organizationId)
-            .not('metadata', 'is', null);
+export const syncContractTransactions = async (organizationId: number) => {
+    const { data: clients } = await supabase.from('clientes').select('*').eq('organizacao', organizationId).eq('status', 'Ativo');
+    if (!clients) return { created: 0, errors: 0 };
 
-        if (transError) throw new Error("Erro ao buscar transações existentes: " + transError.message);
+    let created = 0;
+    for (const client of clients) {
+        if (!client.valormensal || client.valormensal <= 0) continue;
+        const { data: existing } = await supabase.from(TABLE).select('id').eq('organization_id', organizationId).eq('metadata->contractId', client.id);
+        if (existing && existing.length > 0) continue;
 
-        const existingSet = new Set<string>();
-        existingTrans?.forEach((t: any) => {
-            if (t.metadata?.contractId !== undefined && t.metadata?.installmentIndex !== undefined) {
-                existingSet.add(`${t.metadata.contractId}-${t.metadata.installmentIndex}`);
-            }
+        const success = await addTransaction({
+            amount: client.valormensal,
+            description: `Mensalidade - ${client.nome}`,
+            date: client.data_inicio || new Date().toISOString().split('T')[0],
+            type: 'inflow',
+            category: 'Vendas',
+            organizationId,
+            isRecurring: true,
+            installments: client.meses || 12,
+            periodicity: 'monthly',
+            metadata: { contractId: client.id }
         });
-
-        const transactionsToInsert: any[] = [];
-
-        clients.forEach((client: any) => {
-            const startDateStr = client.data_inicio;
-            const monthlyValue = Number(client.valormensal);
-            const durationMonths = Number(client.meses || 12);
-
-            if (!startDateStr || !monthlyValue) return;
-
-            const start = new Date(startDateStr);
-            start.setHours(12, 0, 0, 0); 
-            
-            const contractGroupId = `contract-${client.id}-${Date.now()}`;
-
-            for (let i = 0; i < durationMonths; i++) {
-                const uniqueKey = `${client.id}-${i}`;
-
-                if (existingSet.has(uniqueKey)) continue;
-
-                const installmentDate = new Date(start);
-                installmentDate.setMonth(start.getMonth() + i);
-                const isoDate = installmentDate.toISOString().split('T')[0];
-
-                transactionsToInsert.push({
-                    organization_id: organizationId,
-                    date: isoDate,
-                    description: `Mensalidade - ${client.nome} (${i + 1}/${durationMonths})`,
-                    amount: monthlyValue,
-                    type: 'inflow',
-                    category: 'Receita Recorrente',
-                    metadata: {
-                        contractId: client.id,
-                        installmentIndex: i,
-                        isAutoGenerated: true,
-                        recurring_group_id: contractGroupId,
-                        base_description: `Mensalidade - ${client.nome}`,
-                        sequence: i + 1
-                    },
-                    is_recurring: true,
-                    periodicity: 'monthly',
-                    installments: durationMonths
-                });
-            }
-        });
-
-        if (transactionsToInsert.length > 0) {
-            const { error: insertError } = await supabase
-                .from(TABLE)
-                .insert(transactionsToInsert);
-
-            if (insertError) {
-                console.error("Erro no insert em lote:", insertError.message);
-                return { created: 0, errors: transactionsToInsert.length };
-            }
-        }
-
-        return { created: transactionsToInsert.length, errors: 0 };
-
-    } catch (error: any) {
-        console.error("Falha na sincronização:", error.message || error);
-        return { created: 0, errors: 1 };
+        if (success) created += 1;
     }
+    return { created, errors: 0 };
 };

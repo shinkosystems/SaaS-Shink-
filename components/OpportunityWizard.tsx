@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Opportunity, Archetype, IntensityLevel, RDEStatus, TadsCriteria, getTerminology, ProjectStatus } from '../types';
-import { ArrowLeft, Check, Loader2, Target, ShieldCheck, Zap, DollarSign, BrainCircuit, LayoutGrid, Sparkles, X, ChevronRight, Layers, Gauge, ShieldAlert, Info, PlayCircle, Timer } from 'lucide-react';
+import { Check, Loader2, Target, ShieldCheck, Zap, DollarSign, Sparkles, X, ChevronRight, Layers, Gauge, Info } from 'lucide-react';
 
 interface Props {
   initialData?: Partial<Opportunity>;
@@ -193,18 +193,19 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                             <div className="space-y-4">
                                 <label className="text-[8px] lg:text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-2 block ml-1">Arquétipo de Negócio</label>
                                 <div className="grid grid-cols-1 gap-3">
-                                    {Object.values(Archetype).map(arch => (
+                                    {/* Cast to string to fix key unknown type error */}
+                                    {Object.values(Archetype).map((arch: string) => (
                                         <button 
                                             key={arch}
-                                            onClick={() => setFormData({...formData, archetype: arch})}
+                                            onClick={() => setFormData({...formData, archetype: arch as Archetype})}
                                             className={`p-4 lg:p-6 rounded-[1.5rem] lg:rounded-[2rem] border text-left transition-all group ${formData.archetype === arch ? 'bg-amber-500 border-amber-400 text-black shadow-glow-amber scale-[1.02]' : 'bg-[var(--card-bg)] border-[var(--border-color)] text-slate-500 hover:bg-white/5'}`}
                                         >
                                             <div className="flex justify-between items-start mb-1 lg:mb-2">
-                                                <div className="font-black text-xs lg:text-sm uppercase tracking-widest">{terms.archetypes[arch].label}</div>
+                                                <div className="font-black text-xs lg:text-sm uppercase tracking-widest">{terms.archetypes[arch as Archetype].label}</div>
                                                 {formData.archetype === arch && <Check className="w-4 h-4" />}
                                             </div>
                                             <p className={`text-[8px] lg:text-[10px] font-bold leading-relaxed ${formData.archetype === arch ? 'text-black/70' : 'text-slate-500 dark:text-slate-400'}`}>
-                                                {terms.archetypes[arch].desc}
+                                                {terms.archetypes[arch as Archetype].desc}
                                             </p>
                                         </button>
                                     ))}
@@ -249,7 +250,7 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                         <div className="grid grid-cols-1 gap-8 lg:gap-10 glass-card p-6 lg:p-12 border-[var(--border-color)]">
                             {[
                                 { key: 'revenue', label: terms.revenueLabel, icon: DollarSign, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-                                { key: 'viability', label: terms.viabilityLabel, icon: ShieldAlert, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+                                { key: 'viability', label: terms.viabilityLabel, icon: Target, color: 'text-blue-500', bg: 'bg-blue-500/10' },
                                 { key: 'velocity', label: terms.mvpLabel, icon: Zap, color: 'text-amber-500', bg: 'bg-amber-500/10' }
                             ].map(item => (
                                 <div key={item.key} className="space-y-4 lg:space-y-6">

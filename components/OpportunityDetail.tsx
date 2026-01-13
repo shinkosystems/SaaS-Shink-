@@ -1,14 +1,15 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Opportunity, BpmnTask, ProjectStatus } from '../types';
 import { TaskDetailModal } from './TaskDetailModal';
 import { 
     Activity, Target, Zap, DollarSign, Calendar, Clock, Lock, 
     ArrowLeft, MoreHorizontal, FileText, Edit2, Check, X, 
     ChevronDown, ChevronUp, Layers, Rocket, ShieldCheck, TrendingUp, Trash2,
-    PlayCircle, PauseCircle, Timer, Archive, CheckCircle2
+    PlayCircle, PauseCircle, Timer, Archive, CheckCircle2, AlertTriangle
 } from 'lucide-react';
 import { updateTask, deleteTask } from '../services/projectService';
+import { getOperationalRates } from '../services/financialService';
 
 interface Props {
   opportunity: Opportunity;
@@ -35,13 +36,34 @@ const OpportunityDetail: React.FC<Props> = ({
     const [isEditingDesc, setIsEditingDesc] = useState(false);
     const [descText, setDescText] = useState(opportunity.description || '');
     const [isStatusMenuOpen, setIsStatusMenuOpen] = useState(false);
+    const [rates, setRates] = useState<any>(null);
     const menuRef = useRef<HTMLDivElement>(null);
     
+    useEffect(() => {
+        if (opportunity.organizationId) {
+            getOperationalRates(opportunity.organizationId).then(setRates);
+        }
+    }, [opportunity.organizationId]);
+
+    const financialHealth = useMemo(() => {
+        let totalHours = 0;
+        opportunity.bpmn?.nodes?.forEach(node => {
+            node.checklist.forEach(task => {
+                totalHours += Number(task.estimatedHours || 2);
+            });
+        });
+
+        const accumulatedCost = totalHours * (rates?.totalRate || 0);
+        const revenue = (opportunity as any).revenue_value || 0; // Se houver contrato
+        const margin = revenue > 0 ? ((revenue - accumulatedCost) / revenue) * 100 : 0;
+
+        return { totalHours, accumulatedCost, revenue, margin };
+    }, [opportunity, rates]);
+
     const totalTasks = opportunity.bpmn?.nodes?.reduce((acc, node) => acc + node.checklist.length, 0) || 0;
     const completedTasks = opportunity.bpmn?.nodes?.reduce((acc, node) => acc + node.checklist.filter(t => t.status === 'done').length, 0) || 0;
     const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
-    // Fecha o menu ao clicar fora
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -52,7 +74,7 @@ const OpportunityDetail: React.FC<Props> = ({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const handleStatusSelect = (newStatus: string) => {
+    const handleStatusSelect = (newStatus: ProjectStatus) => {
         if (userRole === 'cliente') return;
         setIsStatusMenuOpen(false);
         const updatedOpp = { ...opportunity, status: newStatus };
@@ -95,8 +117,6 @@ const OpportunityDetail: React.FC<Props> = ({
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 pb-8 border-b border-slate-200 dark:border-[#333]">
                 <div className="space-y-4 w-full">
                     <div className="flex items-center gap-3">
-                        
-                        {/* SELETOR DE STATUS CUSTOMIZADO (SOLICITAÇÃO) */}
                         <div className="relative" ref={menuRef}>
                             <button 
                                 onClick={() => userRole !== 'cliente' && setIsStatusMenuOpen(!isStatusMenuOpen)}
@@ -129,9 +149,6 @@ const OpportunityDetail: React.FC<Props> = ({
                         <span className="shrink-0 px-3 py-1.5 bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 rounded-xl text-[9px] font-black uppercase tracking-widest border border-slate-200 dark:border-white/5">
                             {opportunity.archetype}
                         </span>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                             • {new Date(opportunity.createdAt).toLocaleDateString()}
-                        </span>
                     </div>
                     <h1 className="text-4xl lg:text-6xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">{opportunity.title}</h1>
                 </div>
@@ -141,8 +158,8 @@ const OpportunityDetail: React.FC<Props> = ({
                             <TrendingUp className="w-5 h-5"/>
                          </div>
                          <div>
-                             <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Score de Saúde</div>
-                             <div className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">Alta Performance</div>
+                             <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Lucratividade Técnica</div>
+                             <div className="text-sm font-black text-emerald-500 uppercase tracking-tight">{financialHealth.margin.toFixed(1)}% de Margem</div>
                          </div>
                     </div>
                     {userRole !== 'cliente' && (
@@ -153,12 +170,12 @@ const OpportunityDetail: React.FC<Props> = ({
                 </div>
             </div>
 
-            {/* Grid de Métricas */}
+            {/* Grid de Métricas ABC */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <MetricCard label="Custo Acumulado" value={`R$ ${financialHealth.accumulatedCost.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`} icon={DollarSign} color="bg-red-500" subValue={`${financialHealth.totalHours}h de Produção`} />
+                <MetricCard label="Status Operacional" value={`${progress}%`} icon={CheckCircle2} color="bg-emerald-500" subValue={`${completedTasks}/${totalTasks} Tasks`} />
                 <MetricCard label="PRIO-6 Score" value={opportunity.prioScore.toFixed(1)} icon={Target} color="bg-purple-500" subValue="Matemática de Valor" />
-                <MetricCard label="Entrega Técnica" value={`${progress}%`} icon={CheckCircle2} color="bg-emerald-500" subValue={`${completedTasks}/${totalTasks} Tasks`} />
                 <MetricCard label="Time to MVP" value={`${opportunity.velocity}/5`} icon={Zap} color="bg-amber-500" subValue="Velocidade de Saída" />
-                <MetricCard label="Impacto Financeiro" value={`${opportunity.revenue}/5`} icon={DollarSign} color="bg-blue-500" subValue="Variável Receita" />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -209,24 +226,15 @@ const OpportunityDetail: React.FC<Props> = ({
                         </div>
                     </div>
 
-                    <div className="glass-card p-8 rounded-[2.5rem] border border-slate-200 dark:border-[#333] bg-slate-900 text-white relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full -mr-16 -mt-16 blur-3xl opacity-50"></div>
-                        <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-8 relative z-10">Governança Industrial</h3>
-                        <div className="space-y-6 relative z-10">
-                            {[
-                                { label: 'Arquétipo', val: opportunity.archetype, icon: Rocket },
-                                { label: 'Intensidade', val: `Nível L${opportunity.intensity}`, icon: Zap },
-                                { label: 'Ativo ID', val: opportunity.id.substring(0, 8).toUpperCase(), mono: true, icon: Lock }
-                            ].map((i, idx) => (
-                                <div key={idx} className="flex justify-between items-center border-b border-white/5 pb-4">
-                                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-3">
-                                        <i.icon className="w-3.5 h-3.5 text-amber-500"/> {i.label}
-                                    </span>
-                                    <span className={`text-[11px] font-black ${i.mono ? 'font-mono text-amber-500/80' : 'text-white'}`}>{i.val}</span>
-                                </div>
-                            ))}
+                    {financialHealth.margin < 30 && (
+                        <div className="p-6 bg-amber-500/10 border border-amber-500/20 rounded-[2rem] flex items-start gap-4">
+                            <AlertTriangle className="w-6 h-6 text-amber-500 shrink-0"/>
+                            <div>
+                                <h4 className="text-xs font-black text-amber-500 uppercase tracking-widest">Alerta de Margem</h4>
+                                <p className="text-[10px] text-amber-600/80 font-bold mt-1">O custo de execução ABC está próximo ou acima da receita projetada para este ativo. Revise o peso das atividades.</p>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
             </div>
         </div>

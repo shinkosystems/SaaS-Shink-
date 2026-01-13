@@ -1,15 +1,15 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { 
     BrainCircuit, Send, Loader2, X, Zap, MessageSquare, ArrowRight, 
     Activity, AlertTriangle, CheckCircle2, Command, Database, 
-    TrendingUp, DollarSign, ListTodo, RefreshCw, Trash2 
+    TrendingUp, DollarSign, ListTodo, RefreshCw, Trash2, Layers 
 } from 'lucide-react';
 import { askGuru, generateDashboardInsight } from '../services/geminiService';
 import { createTask, updateTask, deleteTask } from '../services/projectService';
 import { createOpportunity } from '../services/opportunityService';
 import { saveCrmOpportunity } from '../services/crmService';
 import { addTransaction } from '../services/financialService';
+import { createValueChainTask } from '../services/valueChainService';
 import { Opportunity, RDEStatus, IntensityLevel } from '../types';
 
 interface Props {
@@ -91,6 +91,17 @@ export const GuruFab: React.FC<Props> = ({ opportunities, user, organizationId, 
                     await deleteTask(args.id);
                     setChatHistory(prev => [...prev, { role: 'guru', text: `🗑️ Tarefa removida do sistema.`, isCommand: true, icon: Trash2 }]);
                 }
+            } else if (name === 'manage_value_chain') {
+                await createValueChainTask({
+                    title: args.title,
+                    category: args.category,
+                    estimated_cost_weight: args.weight || 1,
+                    projeto_id: args.projectId,
+                    evidence_url: args.evidenceUrl,
+                    organizacao_id: organizationId,
+                    status: 'To-do'
+                });
+                setChatHistory(prev => [...prev, { role: 'guru', text: `🌀 Processo **"${args.title}"** adicionado ao Fluxo de Valor.`, isCommand: true, icon: Layers }]);
             } else if (name === 'manage_project') {
                 if (args.action === 'create') {
                     await createOpportunity({ title: args.title, description: args.description, organizationId, status: 'Active', rde: args.rde || RDEStatus.WARM, archetype: args.archetype, intensity: IntensityLevel.L1, velocity: 3, viability: 3, revenue: 3, prioScore: 50, createdAt: new Date().toISOString(), id: crypto.randomUUID() } as any);
@@ -184,6 +195,7 @@ export const GuruFab: React.FC<Props> = ({ opportunities, user, organizationId, 
                                 <span className="text-[10px] font-black uppercase text-slate-400">Analisando Operação...</span>
                             </div>
                         ) : insight && chatHistory.length === 0 && (
+                            // Fixed: replaced 'getAlertLevel' with 'getAlertStyle'
                             <div className={`rounded-[2rem] p-8 border ${getAlertStyle(insight.alertLevel).bg} ${getAlertStyle(insight.alertLevel).border} animate-in zoom-in`}>
                                 <h3 className={`${getAlertStyle(insight.alertLevel).text} font-black text-xs uppercase tracking-widest mb-3 flex items-center gap-2`}>
                                     {React.createElement(getAlertStyle(insight.alertLevel).icon, { className: "w-4 h-4" })}

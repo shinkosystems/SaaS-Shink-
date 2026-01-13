@@ -1,19 +1,16 @@
-import React, { useState, useRef, useEffect } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { 
     Settings, Sun, Moon, Palette, Building2, UploadCloud, Save, Monitor, Users, 
-    Briefcase, Plus, Trash2, Check, User, BrainCircuit, Sparkles, BookOpen, 
-    Fingerprint, Loader2, AlertTriangle, Lock, Copy, CheckCircle, LayoutGrid, 
-    DollarSign, Code2, BarChart3, Calendar, TrendingUp, ShieldCheck, ShoppingCart, 
-    Receipt, X, Image as ImageIcon, FileText, ArrowRight, ChevronRight,
-    UserPlus, Mail, Shield, Zap, Rocket, Building, MonitorSmartphone, Activity,
-    Gem, CheckCircle2, Clock, Crown, CreditCard, Copy as CopyIcon, CheckCircle2 as CheckCircleIcon,
-    Barcode, ExternalLink, ArrowLeft, Download, Info, MapPin
+    Briefcase, Plus, Trash2, Check, User, BrainCircuit, Sparkles,
+    Loader2, DollarSign, Calendar, TrendingUp, ShieldCheck, 
+    X, ImageIcon, ChevronRight, Zap, Target, Activity, ChevronDown, RefreshCw, AlertCircle, Database, Layout
 } from 'lucide-react';
-import { fetchRoles, createRole, deleteRole, fetchOrganizationMembersWithRoles, updateUserRole, updateOrgModules, createOrganization, SYSTEM_MODULES_DEF, updateOrgDetails } from '../services/organizationService';
-import { fetchSubscriptionPlans, createAsaasPayment, uploadReceiptAndNotify, AsaasPaymentResponse } from '../services/asaasService';
+import { 
+    fetchRoles, createRole, deleteRole, updateRoleCost,
+    fetchOrganizationMembersWithRoles, updateUserRole, updateUserCost, updateOrgDetails
+} from '../services/organizationService';
 import { ElasticSwitch } from './ElasticSwitch';
-import { supabase } from '../services/supabaseClient';
-import { SubscriptionPlan } from '../types';
 
 interface Props {
   theme: 'dark' | 'light';
@@ -28,142 +25,144 @@ interface Props {
   currentPlan?: string;
   activeModules: string[];
   onRefreshModules: () => void;
-  initialTab?: 'general' | 'modules' | 'team' | 'ai' | 'plans';
+  initialTab?: 'general' | 'modules' | 'team' | 'ai' | 'plans' | 'costs';
 }
 
-const AVAILABLE_MODULES = [
-    { id: 'projects', label: 'Gestão de Projetos', desc: 'Portfólio e lista de ativos estratégicos.', icon: Briefcase, price: 0, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-    { id: 'kanban', label: 'Kanban Board', desc: 'Gestão visual de tarefas e fluxos técnicos.', icon: LayoutGrid, price: 0, color: 'text-blue-500', bg: 'bg-blue-50' },
-    { id: 'calendar', label: 'Agenda & Prazos', desc: 'Visualização cronológica de marcos e entregas.', icon: Calendar, price: 0, color: 'text-teal-500', bg: 'bg-teal-50' },
-    { id: 'crm', label: 'Vendas CRM', desc: 'Pipeline comercial e gestão de contratos.', icon: TrendingUp, price: 49.90, color: 'text-orange-500', bg: 'bg-orange-50' }, 
-    { id: 'financial', label: 'Finanças & MRR', desc: 'Fluxo de caixa, DRE e métricas de recorrência.', icon: DollarSign, price: 39.90, color: 'text-emerald-600', bg: 'bg-emerald-50' }, 
-    { id: 'ia', label: 'Inteligência (Guru)', desc: 'Assistente COO/CTO Virtual via IA Generativa.', icon: BrainCircuit, price: 59.90, color: 'text-purple-500', bg: 'bg-purple-50' },
-];
-
 export const SettingsScreen: React.FC<Props> = ({ 
-    theme, onToggleTheme, onlineUsers, userOrgId, orgDetails, onUpdateOrgDetails, setView, userRole, userData, currentPlan, activeModules, onRefreshModules, initialTab = 'general'
+    theme, onToggleTheme, onlineUsers, userOrgId, orgDetails, onUpdateOrgDetails, userRole, userData, activeModules, onRefreshModules, initialTab = 'general'
 }) => {
-  const isOwner = userRole === 'dono';
-  const [activeTab, setActiveTab] = useState<'general' | 'modules' | 'team' | 'ai' | 'plans'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'general' | 'modules' | 'team' | 'ai' | 'plans' | 'costs'>(initialTab);
   const [roles, setRoles] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
-  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isLoadingPlans, setIsLoadingPlans] = useState(false);
+  const [loadingMembers, setLoadingMembers] = useState(true);
+  const [isSavingCosts, setIsSavingCosts] = useState(false);
+  const [isSavingAi, setIsSavingAi] = useState(false);
   const [newRoleName, setNewRoleName] = useState('');
-  
-  // Checkout State
-  const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null);
-  const [paymentData, setPaymentData] = useState<AsaasPaymentResponse | null>(null);
-  const [isGeneratingPayment, setIsGeneratingPayment] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'PIX' | 'BOLETO' | 'CREDIT_CARD' | null>(null);
-  const [receiptFile, setReceiptFile] = useState<File | null>(null);
-  const [isUploadingReceipt, setIsUploadingReceipt] = useState(false);
-  const [isCopied, setIsCopied] = useState(false);
 
-  // Estados Unificados (Faturamento + IA)
-  const [billingConfig, setBillingConfig] = useState({
-      nome: orgDetails?.name || '',
-      cpf_cnpj: orgDetails?.cpf_cnpj || '',
-      cep: orgDetails?.cep || '',
-      endereco_numero: orgDetails?.endereco_numero || ''
-  });
+  // Estados para IA
+  const [aiSector, setAiSector] = useState(orgDetails?.aiSector || '');
+  const [aiTone, setAiTone] = useState(orgDetails?.aiTone || '');
+  const [aiContext, setAiContext] = useState(orgDetails?.aiContext || '');
 
-  const [aiConfig, setAiConfig] = useState({
-      sector: orgDetails?.aiSector || '',
-      tone: orgDetails?.aiTone || '',
-      dna: orgDetails?.aiContext || ''
-  });
+  // Estados locais para edição em lote (Bulk Edit)
+  const [localCosts, setLocalCosts] = useState<Record<string, number>>({});
+  const [localRoles, setLocalRoles] = useState<Record<string, number | null>>({});
 
-  useEffect(() => { if (userOrgId) loadTeamData(); }, [userOrgId]);
-  useEffect(() => { if (activeTab === 'plans' && isOwner) loadPlans(); }, [activeTab, isOwner]);
+  useEffect(() => { 
+      if (userOrgId) loadTeamData(); 
+  }, [userOrgId]);
 
   const loadTeamData = async () => {
     if (!userOrgId) return;
-    const [r, m] = await Promise.all([fetchRoles(userOrgId), fetchOrganizationMembersWithRoles(userOrgId)]);
-    setRoles(r); setMembers(m);
+    setLoadingMembers(true);
+    try {
+        const [r, m] = await Promise.all([
+            fetchRoles(userOrgId), 
+            fetchOrganizationMembersWithRoles(userOrgId)
+        ]);
+        
+        setRoles(r); 
+        
+        let finalMembers = m;
+        if (!m || m.length === 0) {
+            if (userData?.id) {
+                finalMembers = [{
+                    id: userData.id,
+                    nome: userData.name || 'Você',
+                    email: userData.email,
+                    perfil: userRole,
+                    cargo: null,
+                    custo_mensal: 0
+                }];
+            }
+        }
+        
+        setMembers(finalMembers);
+        
+        const costs: Record<string, number> = {};
+        const memberRoles: Record<string, number | null> = {};
+        
+        finalMembers.forEach(member => {
+            memberRoles[member.id] = member.cargo || null;
+            if (!member.custo_mensal || member.custo_mensal === 0) {
+                const roleObj = r.find((role: any) => role.id === member.cargo);
+                costs[member.id] = roleObj?.custo_base || 0;
+            } else {
+                costs[member.id] = member.custo_mensal;
+            }
+        });
+        
+        setLocalCosts(costs);
+        setLocalRoles(memberRoles);
+    } catch (e: any) {
+        console.error("Erro no carregamento do time:", e.message);
+    } finally {
+        setLoadingMembers(false);
+    }
   };
 
-  const loadPlans = async () => {
-      setIsLoadingPlans(true);
-      const data = await fetchSubscriptionPlans();
-      setPlans(data);
-      setIsLoadingPlans(false);
+  const handleRoleChange = (memberId: string, roleId: number | null) => {
+      setLocalRoles(prev => ({ ...prev, [memberId]: roleId }));
+      const selectedRole = roles.find(r => r.id === roleId);
+      if (selectedRole) {
+          setLocalCosts(prev => ({ ...prev, [memberId]: selectedRole.custo_base }));
+      }
   };
 
-  const handleSelectPlan = (plan: SubscriptionPlan) => {
-      setSelectedPlan(plan);
-      setPaymentMethod(null);
-      setPaymentData(null);
-  };
-
-  const handleExecutePayment = async (method: 'PIX' | 'BOLETO' | 'CREDIT_CARD') => {
-      if (!selectedPlan) return;
-      setPaymentMethod(method);
-      setIsGeneratingPayment(true);
-      try {
-          const res = await createAsaasPayment(userData.id, method, selectedPlan.price, `Assinatura Shinkō OS: ${selectedPlan.name}`);
-          if (res) {
-              setPaymentData(res);
-              if (method === 'CREDIT_CARD' && res.invoiceUrl) window.open(res.invoiceUrl, '_blank');
-          } else alert("Erro de conexão com o Gateway.");
-      } catch (e) { alert("Erro ao processar faturamento."); } 
-      finally { setIsGeneratingPayment(false); }
-  };
-
-  const handleSendReceipt = async () => {
-      if (!receiptFile || !userOrgId || !selectedPlan) return;
-      setIsUploadingReceipt(true);
-      try {
-          const res = await uploadReceiptAndNotify(userData.id, userOrgId, selectedPlan.dbId || 0, selectedPlan.price, receiptFile, `Pagamento Confirmado: ${selectedPlan.name}`, { users: selectedPlan.colabtotal, modules: activeModules });
-          if (res.success) {
-              alert("Comprovante enviado!");
-              setSelectedPlan(null); setPaymentData(null); setReceiptFile(null);
-          } else throw new Error(res.error);
-      } catch (e: any) { alert("Falha: " + e.message); } 
-      finally { setIsUploadingReceipt(false); }
-  };
-
-  const handleSaveGeneral = async () => {
+  const handleSaveAllCosts = async () => {
       if (!userOrgId) return;
-      setIsSaving(true);
-      await updateOrgDetails(userOrgId, { 
-          nome: billingConfig.nome, 
-          cpf_cnpj: billingConfig.cpf_cnpj.replace(/\D/g, ''), 
-          cep: billingConfig.cep.replace(/\D/g, ''), 
-          endereco_numero: billingConfig.endereco_numero 
-      });
-      onUpdateOrgDetails({}); // Refresh App context
-      setIsSaving(false);
-      alert("Configurações Gerais Salvas!");
+      setIsSavingCosts(true);
+      let failures = 0;
+      try {
+          const promises = members.map(async m => {
+              if (localCosts[m.id] !== m.custo_mensal) {
+                  const ok = await updateUserCost(m.id, localCosts[m.id]);
+                  if (!ok) failures++;
+              }
+              if (localRoles[m.id] !== m.cargo) {
+                  const ok = await updateUserRole(m.id, localRoles[m.id]);
+                  if (!ok) failures++;
+              }
+          });
+          await Promise.all(promises);
+          await loadTeamData();
+          alert(failures > 0 ? "Atenção: Alguns dados não puderam ser sincronizados." : "Engenharia de Custos sincronizada!");
+      } catch (e) {
+          alert("Erro operacional ao salvar.");
+      } finally {
+          setIsSavingCosts(false);
+      }
   };
 
-  const handleSaveAi = async () => {
-      if (!userOrgId) return;
-      setIsSaving(true);
-      await updateOrgDetails(userOrgId, { aiSector: aiConfig.sector, aiTone: aiConfig.tone, aiContext: aiConfig.dna });
-      setIsSaving(false);
-      alert("DNA Industrial atualizado!");
-  };
-
-  const handleCreateRole = async () => {
-      if (!newRoleName.trim() || !userOrgId) return;
-      await createRole(newRoleName, userOrgId);
-      setNewRoleName(''); loadTeamData();
+  const handleSaveAiDNA = async () => {
+    if (!userOrgId) return;
+    setIsSavingAi(true);
+    try {
+        const res = await updateOrgDetails(userOrgId, {
+            aiSector, aiTone, aiContext
+        });
+        if (res.success) {
+            alert("Mente da IA sincronizada com o DNA da empresa!");
+            onRefreshModules();
+        }
+    } catch (e) {
+        alert("Erro ao salvar DNA.");
+    } finally {
+        setIsSavingAi(false);
+    }
   };
 
   const tabs = [
       { id: 'general', label: 'GERAL' },
-      { id: 'modules', label: 'MARKETPLACE' },
-      ...(isOwner ? [{ id: 'plans', label: 'PLANOS' }] : []),
       { id: 'team', label: 'TIME' },
-      { id: 'ai', label: 'INTELIGÊNCIA' }
+      { id: 'costs', label: 'CUSTOS' },
+      { id: 'ai', label: 'IA DNA' }
   ];
 
   return (
     <div className="flex flex-col h-full animate-in fade-in duration-700 max-w-7xl mx-auto p-4 md:p-8 space-y-12">
         <div className="space-y-3 pt-4">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-orange-50 border border-orange-100 rounded-full text-[10px] font-black text-orange-600 uppercase tracking-widest">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-orange-50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-900/30 rounded-full text-[10px] font-black text-orange-600 uppercase tracking-widest">
                 <Settings className="w-3.5 h-3.5"/> SISTEMA OPERACIONAL
             </div>
             <h1 className="text-5xl md:text-7xl font-black text-slate-900 dark:text-white tracking-tighter">Ajustes <span className="text-orange-500">Mestres</span>.</h1>
@@ -178,11 +177,7 @@ export const SettingsScreen: React.FC<Props> = ({
         <div className="flex-1 overflow-y-auto custom-scrollbar pb-32">
             {activeTab === 'general' && (
                 <div className="max-w-4xl space-y-10 animate-in slide-in-from-bottom-4 duration-500">
-                    <div className="space-y-2">
-                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Perfil & Faturamento</h3>
-                        <p className="text-slate-500 text-sm font-medium">Configure a identidade e dados para emissão de faturas.</p>
-                    </div>
-                    <div className="bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-[3rem] p-10 space-y-8">
+                    <div className="bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-[3rem] p-10 space-y-8 shadow-sm">
                         <div className="flex items-center justify-between p-6 bg-slate-50 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10">
                             <div className="flex items-center gap-4">
                                 <div className="p-3 bg-white dark:bg-white/10 rounded-2xl shadow-sm">
@@ -195,212 +190,184 @@ export const SettingsScreen: React.FC<Props> = ({
                             </div>
                             <ElasticSwitch checked={theme === 'dark'} onChange={onToggleTheme} />
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Razão Social</label>
-                                <input value={billingConfig.nome} onChange={e => setBillingConfig({...billingConfig, nome: e.target.value})} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 p-5 rounded-2xl text-sm font-black outline-none focus:border-orange-500 transition-all dark:text-white" />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-orange-500 uppercase tracking-widest ml-1">CPF ou CNPJ</label>
-                                <input value={billingConfig.cpf_cnpj} onChange={e => setBillingConfig({...billingConfig, cpf_cnpj: e.target.value})} placeholder="Obrigatório para Asaas" className="w-full bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 p-5 rounded-2xl text-sm font-black outline-none focus:border-orange-500 transition-all dark:text-white" />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">CEP</label>
-                                <input value={billingConfig.cep} onChange={e => setBillingConfig({...billingConfig, cep: e.target.value})} placeholder="00000-000" className="w-full bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 p-5 rounded-2xl text-sm font-black outline-none focus:border-orange-500 transition-all dark:text-white" />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Número</label>
-                                <input value={billingConfig.endereco_numero} onChange={e => setBillingConfig({...billingConfig, endereco_numero: e.target.value})} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 p-5 rounded-2xl text-sm font-black outline-none focus:border-orange-500 transition-all dark:text-white" />
-                            </div>
-                        </div>
-                        <button onClick={handleSaveGeneral} disabled={isSaving} className="w-full py-5 bg-slate-900 dark:bg-white text-white dark:text-black rounded-[1.8rem] font-black text-xs uppercase tracking-widest shadow-xl flex items-center justify-center gap-3">
-                            {isSaving ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>} SALVAR ALTERAÇÕES
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {activeTab === 'plans' && isOwner && (
-                <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-500">
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-                        <div className="space-y-2">
-                            <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Gestão de Escala</h3>
-                            <p className="text-slate-500 text-sm font-medium">Controle sua assinatura e capacidade operacional.</p>
-                        </div>
-                    </div>
-                    {(!billingConfig.cpf_cnpj || !billingConfig.cep) && (
-                        <div className="p-6 bg-red-500/10 border border-red-500/20 rounded-[2rem] flex items-center justify-between gap-6">
-                            <div className="flex items-center gap-4">
-                                <AlertTriangle className="w-6 h-6 text-red-500"/>
-                                <p className="text-xs font-black text-red-500 uppercase">Configure CPF/CNPJ e CEP na aba GERAL para habilitar pagamentos.</p>
-                            </div>
-                        </div>
-                    )}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {plans.map(plan => (
-                            <div key={plan.id} className={`glass-card p-8 rounded-[3rem] flex flex-col justify-between min-h-[550px] relative transition-all group border-2 ${plan.recommended ? 'border-orange-500 bg-orange-500/[0.03]' : 'border-slate-100 dark:border-white/5 bg-white'}`}>
-                                <div>
-                                    <h4 className="text-3xl font-black text-slate-900 dark:text-white mb-4">{plan.name}</h4>
-                                    <div className="flex items-baseline gap-1 mb-8">
-                                        <span className="text-6xl font-black text-slate-900 dark:text-white tracking-tighter">R$ {plan.price}</span>
-                                    </div>
-                                    <div className="space-y-3 mb-10">
-                                        {plan.features.map((f, i) => ( <div key={i} className="flex items-center gap-2 text-xs font-bold text-slate-500"><CheckCircle2 className="w-4 h-4 text-orange-500"/>{f}</div> ))}
-                                    </div>
-                                </div>
-                                <button disabled={currentPlan === plan.id || (!billingConfig.cpf_cnpj || !billingConfig.cep)} onClick={() => handleSelectPlan(plan)} className="w-full py-5 rounded-[1.8rem] font-black text-[11px] uppercase tracking-widest bg-orange-500 text-white disabled:opacity-30">
-                                    {currentPlan === plan.id ? 'Plano Ativo' : 'Contratar Agora'}
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* Checkout Modal Integrado */}
-            {selectedPlan && (
-                <div className="fixed inset-0 z-[3000] flex items-center justify-center p-6 bg-black/95 backdrop-blur-2xl animate-in fade-in">
-                    <div className="w-full max-w-4xl bg-[#0A0A0C] rounded-[3rem] border border-white/10 flex flex-col md:flex-row overflow-hidden max-h-[90vh]">
-                        <div className="flex-1 p-10 space-y-8 overflow-y-auto border-r border-white/5">
-                            <div className="flex justify-between items-center">
-                                <h2 className="text-3xl font-black text-white">Assinar <span className="text-orange-500">{selectedPlan.name}</span></h2>
-                                <button onClick={() => setSelectedPlan(null)} className="text-slate-500 hover:text-red-500"><X className="w-7 h-7"/></button>
-                            </div>
-                            {!paymentMethod ? (
-                                <div className="grid grid-cols-1 gap-4">
-                                    <button onClick={() => handleExecutePayment('PIX')} className="p-6 rounded-3xl bg-white/5 border border-white/10 flex items-center justify-between group">
-                                        <div className="flex items-center gap-4"><Zap className="w-6 h-6 text-orange-500"/><span className="text-white font-black uppercase">PIX Instantâneo</span></div>
-                                        <ChevronRight className="text-slate-700"/>
-                                    </button>
-                                    <button onClick={() => handleExecutePayment('CREDIT_CARD')} className="p-6 rounded-3xl bg-white/5 border border-white/10 flex items-center justify-between group">
-                                        <div className="flex items-center gap-4"><CreditCard className="w-6 h-6 text-blue-500"/><span className="text-white font-black uppercase">Cartão de Crédito</span></div>
-                                        <ChevronRight className="text-slate-700"/>
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className="space-y-6">
-                                    {isGeneratingPayment ? <div className="py-10 flex flex-col items-center"><Loader2 className="animate-spin text-orange-500 w-10 h-10"/></div> : paymentData && (
-                                        <div className="space-y-6">
-                                            {paymentMethod === 'PIX' && (
-                                                <div className="p-8 bg-white rounded-[2rem] flex flex-col items-center gap-4">
-                                                    <img src={paymentData.qrCode?.startsWith('data') ? paymentData.qrCode : `data:image/png;base64,${paymentData.qrCode}`} className="w-48 h-48" />
-                                                    <button onClick={() => { navigator.clipboard.writeText(paymentData.copyPaste || ''); setIsCopied(true); setTimeout(()=>setIsCopied(false), 2000); }} className="px-6 py-3 bg-slate-900 text-white rounded-xl text-xs font-black uppercase">{isCopied ? 'Copiado!' : 'Copiar Código'}</button>
-                                                </div>
-                                            )}
-                                            <div className="space-y-4">
-                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Passo Final: Subir Comprovante</p>
-                                                {!receiptFile ? (
-                                                    <div onClick={() => document.getElementById('receipt-upload')?.click()} className="py-10 border-2 border-dashed border-white/10 rounded-[2rem] flex flex-col items-center cursor-pointer"><ImageIcon className="text-slate-700 mb-2"/><span className="text-[9px] font-black text-slate-600 uppercase">Anexar Documento</span></div>
-                                                ) : (
-                                                    <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center justify-between"><div className="flex items-center gap-2"><FileText className="text-emerald-500"/><span className="text-white text-xs font-bold truncate max-w-[150px]">{receiptFile.name}</span></div><button onClick={() => setReceiptFile(null)}><X className="text-red-500"/></button></div>
-                                                )}
-                                                <input id="receipt-upload" type="file" hidden onChange={e => e.target.files?.[0] && setReceiptFile(e.target.files[0])} />
-                                                <button onClick={handleSendReceipt} disabled={!receiptFile || isUploadingReceipt} className="w-full py-5 bg-orange-500 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl disabled:opacity-20">{isUploadingReceipt ? <Loader2 className="animate-spin mx-auto"/> : 'Sincronizar Assinatura'}</button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                        <div className="w-full md:w-[320px] bg-white/[0.02] p-10 flex flex-col justify-between border-l border-white/5">
-                            <div className="text-center">
-                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Investimento</span>
-                                <div className="text-5xl font-black text-white mt-2">R$ {selectedPlan.price}</div>
-                            </div>
-                            <div className="flex items-center gap-3 p-4 bg-emerald-500/5 rounded-2xl"><ShieldCheck className="text-emerald-500 w-5 h-5"/><p className="text-[8px] text-slate-500">Dados protegidos via Asaas Gateway.</p></div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Abas Team, AI e Modules mantidas integralmente */}
-            {activeTab === 'team' && (
-                <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-500">
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        <div className="lg:col-span-2 space-y-6">
-                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Gestão de Acesso</h3>
-                            <div className="space-y-3">
-                                {members.map(m => (
-                                    <div key={m.id} className="p-6 bg-white dark:bg-white/5 border border-slate-100 dark:border-white/5 rounded-3xl flex items-center justify-between">
-                                        <div className="flex items-center gap-5">
-                                            <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-white/5 flex items-center justify-center font-black text-xs text-slate-500">
-                                                {m.avatar_url ? <img src={m.avatar_url} className="w-full h-full object-cover rounded-2xl" /> : m.nome.charAt(0)}
-                                            </div>
-                                            <div>
-                                                <div className="text-sm font-black text-slate-900 dark:text-white">{m.nome}</div>
-                                                <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{m.perfil} • {roles.find(r => r.id === m.cargo)?.nome || 'Sem Cargo'}</div>
-                                            </div>
-                                        </div>
-                                        <select value={m.cargo || ''} onChange={e => updateUserRole(m.id, parseInt(e.target.value)).then(loadTeamData)} className="bg-slate-50 dark:bg-black/20 border border-slate-100 dark:border-white/10 rounded-xl p-2 text-[10px] font-black uppercase">
-                                            <option value="">Cargo...</option>
-                                            {roles.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}
-                                        </select>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                        <div className="space-y-6">
-                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Cargos & Estrutura</h3>
-                            <div className="bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 p-6 rounded-[2.5rem] space-y-4">
-                                <div className="flex gap-2">
-                                    <input value={newRoleName} onChange={e => setNewRoleName(e.target.value)} placeholder="Novo Cargo..." className="flex-1 bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-xl p-3 text-xs font-bold outline-none dark:text-white" />
-                                    <button onClick={handleCreateRole} className="p-3 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl"><Plus className="w-4 h-4"/></button>
-                                </div>
-                                <div className="space-y-2">
-                                    {roles.map(r => (
-                                        <div key={r.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-50 dark:border-white/5 text-[10px] font-black uppercase text-slate-500">
-                                            <span>{r.nome}</span>
-                                            <button onClick={() => deleteRole(r.id).then(loadTeamData)}><Trash2 className="w-3.5 h-3.5 text-red-500/50 hover:text-red-500"/></button>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
             )}
 
             {activeTab === 'ai' && (
-                <div className="max-w-3xl space-y-10 animate-in slide-in-from-bottom-4 duration-500">
-                    <div className="space-y-2">
-                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">DNA Industrial da IA</h3>
-                    </div>
-                    <div className="bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-[3rem] p-10 space-y-8">
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-500 uppercase ml-1">Setor</label>
-                            <input value={aiConfig.sector} onChange={e => setAiConfig({...aiConfig, sector: e.target.value})} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 p-5 rounded-2xl text-base font-black outline-none focus:border-orange-500 dark:text-white" placeholder="Ex: Software" />
+                <div className="max-w-5xl space-y-10 animate-in slide-in-from-bottom-4 duration-500">
+                    <div className="bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-[3rem] p-10 space-y-10 shadow-sm relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-10 opacity-[0.03] pointer-events-none">
+                            <BrainCircuit className="w-64 h-64 text-amber-500"/>
                         </div>
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-500 uppercase ml-1">Contexto Mestre</label>
-                            <textarea value={aiConfig.dna} onChange={e => setAiConfig({...aiConfig, dna: e.target.value})} className="w-full h-48 bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 p-5 rounded-2xl outline-none resize-none dark:text-white" placeholder="Explique seu diferencial..." />
+                        
+                        <div className="space-y-2 relative z-10">
+                            <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tighter">Mente da IA <span className="text-amber-500">(DNA)</span>.</h3>
+                            <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Ajuste o comportamento do Guru IA para o seu contexto de negócio.</p>
                         </div>
-                        <button onClick={handleSaveAi} disabled={isSaving} className="w-full py-5 bg-slate-900 dark:bg-white text-white dark:text-black rounded-[1.8rem] font-black uppercase tracking-widest shadow-xl">
-                            {isSaving ? <Loader2 className="animate-spin mx-auto"/> : 'SINCRONIZAR DNA'}
-                        </button>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
+                            <div className="space-y-4">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Setor de Atuação</label>
+                                <input value={aiSector} onChange={e => setAiSector(e.target.value)} placeholder="Ex: SaaS Financeiro, EdTech..." className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-black/40 border border-slate-100 dark:border-white/10 text-sm font-bold outline-none focus:border-amber-500 transition-all dark:text-white" />
+                            </div>
+                            <div className="space-y-4">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tom de Voz</label>
+                                <select value={aiTone} onChange={e => setAiTone(e.target.value)} className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-black/40 border border-slate-100 dark:border-white/10 text-sm font-bold outline-none cursor-pointer appearance-none dark:text-white">
+                                    <option value="Técnico/Analítico">Técnico & Analítico</option>
+                                    <option value="Inspirador/Visionário">Inspirador & Visionário</option>
+                                    <option value="Direto/Agressivo">Direto & Executivo</option>
+                                    <option value="Amigável/Suporte">Amigável & Prestativo</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4 relative z-10">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Contexto Estratégico (DNA da Empresa)</label>
+                            <textarea 
+                                value={aiContext} 
+                                onChange={e => setAiContext(e.target.value)} 
+                                placeholder="Descreva brevemente quem é a empresa, qual o grande objetivo do ano e as restrições técnicas atuais..."
+                                className="w-full h-48 p-6 rounded-3xl bg-slate-50 dark:bg-black/40 border border-slate-100 dark:border-white/10 text-sm font-medium outline-none focus:border-amber-500 transition-all resize-none dark:text-white"
+                            />
+                        </div>
+
+                        <div className="flex justify-end pt-4 relative z-10">
+                            <button 
+                                onClick={handleSaveAiDNA}
+                                disabled={isSavingAi}
+                                className="px-10 py-4 bg-slate-900 dark:bg-white text-white dark:text-black rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl flex items-center gap-3 active:scale-95 transition-all disabled:opacity-50"
+                            >
+                                {isSavingAi ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4"/>}
+                                Sincronizar Mente IA
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
 
-            {activeTab === 'modules' && (
-                <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-500">
-                    <div className="bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-[2.5rem] overflow-hidden">
-                        <div className="divide-y divide-slate-50 dark:divide-white/5">
-                            {AVAILABLE_MODULES.map(mod => {
-                                const isOwned = activeModules.includes(mod.id);
-                                return (
-                                    <div key={mod.id} className="p-8 flex items-center justify-between hover:bg-slate-50/50 transition-all group">
-                                        <div className="flex items-center gap-6">
-                                            <div className={`p-4 rounded-2xl ${mod.bg} ${mod.color}`}><mod.icon className="w-6 h-6"/></div>
-                                            <div><h4 className="text-base font-black text-slate-900 dark:text-white">{mod.label}</h4><p className="text-[11px] text-slate-500 font-medium">{mod.desc}</p></div>
+            {activeTab === 'costs' && (
+                <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-500">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                        <div className="lg:col-span-4 space-y-6">
+                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2">
+                                <Target className="w-4 h-4 text-amber-500"/> Estrutura de Cargos
+                            </h3>
+                            <div className="bg-white dark:bg-white/5 border border-slate-100 dark:border-white/5 p-6 rounded-[2.5rem] space-y-4 shadow-sm">
+                                <div className="flex gap-2 mb-4">
+                                    <input value={newRoleName} onChange={e => setNewRoleName(e.target.value)} placeholder="Novo Cargo..." className="flex-1 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl p-3 text-xs font-bold outline-none dark:text-white" />
+                                    <button onClick={() => { if(newRoleName) createRole(newRoleName, userOrgId!).then(() => { setNewRoleName(''); loadTeamData(); }); }} className="p-3 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl hover:scale-105 transition-all"><Plus className="w-4 h-4"/></button>
+                                </div>
+                                <div className="space-y-3">
+                                    {roles.map(r => (
+                                        <div key={r.id} className="p-4 bg-slate-50 dark:bg-black/20 border border-slate-100 dark:border-white/5 rounded-2xl flex items-center justify-between group">
+                                            <span className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">{r.nome}</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[9px] font-bold text-slate-400">R$</span>
+                                                <input 
+                                                    type="number"
+                                                    defaultValue={r.custo_base}
+                                                    onBlur={(e) => updateRoleCost(r.id, Number(e.target.value)).then(loadTeamData)}
+                                                    className="w-20 bg-white dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-lg p-1.5 text-right text-[10px] font-black outline-none"
+                                                />
+                                                <button onClick={() => deleteRole(r.id).then(loadTeamData)} className="p-1.5 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><Trash2 className="w-3.5 h-3.5"/></button>
+                                            </div>
                                         </div>
-                                        <div className="flex items-center gap-3">
-                                            <span className={`text-[9px] font-black uppercase ${isOwned ? 'text-orange-500' : 'text-slate-400'}`}>{isOwned ? 'ATIVO' : 'OFF'}</span>
-                                            <ElasticSwitch checked={isOwned} onChange={() => {}} />
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                                    ))}
+                                </div>
+                            </div>
                         </div>
+                        <div className="lg:col-span-8 space-y-6">
+                            <div className="flex justify-between items-center">
+                                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2">
+                                    <Users className="w-4 h-4 text-blue-500"/> Apontamento Industrial
+                                </h3>
+                                <button 
+                                    onClick={handleSaveAllCosts}
+                                    disabled={isSavingCosts || loadingMembers}
+                                    className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                                >
+                                    {isSavingCosts ? <Loader2 className="w-3 h-3 animate-spin"/> : <Save className="w-3 h-3"/>}
+                                    Sincronizar RH
+                                </button>
+                            </div>
+                            <div className="bg-white dark:bg-white/5 border border-slate-100 dark:border-white/5 rounded-[2.5rem] overflow-hidden shadow-sm">
+                                <table className="w-full text-left">
+                                    <thead className="bg-slate-50 dark:bg-white/[0.02] border-b border-slate-100 dark:border-white/5">
+                                        <tr>
+                                            <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Colaborador</th>
+                                            <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Cargo Shinkō</th>
+                                            <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Custo Mensal (Salário)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                                        {members.map(m => (
+                                            <tr key={m.id} className="group hover:bg-slate-50 dark:hover:bg-white/[0.01] transition-colors">
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-black text-xs border border-slate-200 dark:border-white/5 overflow-hidden shrink-0 shadow-inner">
+                                                            {m.avatar_url ? <img src={m.avatar_url} className="w-full h-full object-cover" /> : (m.nome ? m.nome.charAt(0) : '?')}
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <div className="text-[11px] font-black text-slate-900 dark:text-white truncate">{m.nome}</div>
+                                                            <div className="text-[9px] font-medium text-slate-400 truncate">{m.email}</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="relative">
+                                                        <select 
+                                                            value={localRoles[m.id] || ''} 
+                                                            onChange={e => handleRoleChange(m.id, e.target.value ? parseInt(e.target.value) : null)}
+                                                            className={`w-full bg-slate-100 dark:bg-black/40 border-2 rounded-xl p-2.5 text-[10px] font-black uppercase appearance-none outline-none transition-all ${localRoles[m.id] !== m.cargo ? 'border-amber-500/50' : 'border-transparent'}`}
+                                                        >
+                                                            <option value="">Sem Cargo...</option>
+                                                            {roles.map(r => <option key={r.id} value={r.id}>{r.nome.toUpperCase()}</option>)}
+                                                        </select>
+                                                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center justify-end gap-3">
+                                                        <span className="text-[10px] font-bold text-slate-400">R$</span>
+                                                        <input 
+                                                            type="number"
+                                                            value={localCosts[m.id] || ''}
+                                                            placeholder="0"
+                                                            onChange={(e) => setLocalCosts({...localCosts, [m.id]: Number(e.target.value)})}
+                                                            className={`w-32 bg-slate-100 dark:bg-black/40 border-2 rounded-xl p-2.5 text-right text-xs font-black outline-none transition-all ${localCosts[m.id] !== m.custo_mensal ? 'border-emerald-500/50' : 'border-transparent'} dark:text-white`}
+                                                        />
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'team' && (
+                <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-500">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {members.map(m => (
+                            <div key={m.id} className="p-6 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-3xl flex items-center justify-between group">
+                                <div className="flex items-center gap-5">
+                                    <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-white/5 flex items-center justify-center font-black text-xs text-slate-500 border border-slate-200 dark:border-white/10 shrink-0">
+                                        {m.avatar_url ? <img src={m.avatar_url} className="w-full h-full object-cover rounded-2xl" /> : (m.nome ? m.nome.charAt(0) : '?')}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className="text-sm font-black text-slate-900 dark:text-white truncate">{m.nome}</div>
+                                        <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{m.perfil}</div>
+                                    </div>
+                                </div>
+                                <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${onlineUsers.includes(m.id) ? 'bg-emerald-500/10 text-emerald-500' : 'bg-slate-100 dark:bg-white/5 text-slate-400'}`}>
+                                    {onlineUsers.includes(m.id) ? 'Online' : 'Offline'}
+                                </span>
+                            </div>
+                        ))}
                     </div>
                 </div>
             )}

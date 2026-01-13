@@ -43,6 +43,25 @@ const controlTools: FunctionDeclaration[] = [
         }
     },
     {
+        name: "manage_value_chain",
+        description: "Cria um novo processo/atividade no Fluxo de Valor (Cadeia de Valor).",
+        parameters: {
+            type: Type.OBJECT,
+            properties: {
+                title: { type: Type.STRING, description: "Nome do processo." },
+                category: { 
+                    type: Type.STRING, 
+                    enum: ['Apoio-Adm', 'Apoio-Gestão', 'Primária-Modelagem', 'Primária-Interface', 'Primária-Lógica', 'Primária-Marketing'],
+                    description: "Pilar do Framework Shinkō."
+                },
+                weight: { type: Type.NUMBER, description: "Peso para cálculo de rateio (1 a 10)." },
+                projectId: { type: Type.NUMBER, description: "ID do projeto vinculado." },
+                evidenceUrl: { type: Type.STRING, description: "Link opcional para evidência." }
+            },
+            required: ["title", "category", "projectId"]
+        }
+    },
+    {
         name: "manage_project",
         description: "Cria ou atualiza projetos estratégicos no portfólio.",
         parameters: {
@@ -94,7 +113,7 @@ const controlTools: FunctionDeclaration[] = [
             properties: {
                 view: { 
                     type: Type.STRING, 
-                    enum: ["dashboard", "projects", "kanban", "calendar", "crm", "financial", "intelligence", "settings"],
+                    enum: ["dashboard", "projects", "kanban", "calendar", "crm", "financial", "intelligence", "settings", "value-chain"],
                     description: "Destino da navegação." 
                 }
             },
@@ -110,12 +129,12 @@ export const askGuru = async (question: string, context: string): Promise<{ text
     const systemInstruction = `
         Você é o Shinkō Guru, assistente operacional de elite (COO/CTO Virtual).
         
-        PODERES: Você pode criar tarefas, projetos, leads de CRM e registros financeiros via ferramentas.
+        PODERES: Você pode criar tarefas, projetos, processos na cadeia de valor, leads de CRM e registros financeiros via ferramentas.
         COMPORTAMENTO: Seja direto, técnico e aja como um braço direito do gestor.
         CONTEXTO ATUAL: ${context}
 
         REGRAS DE OURO:
-        1. Se o usuário pedir algo que você pode fazer (ex: 'cria uma tarefa'), SEMPRE use a ferramenta correspondente.
+        1. Se o usuário pedir algo que você pode fazer (ex: 'adiciona um processo no fluxo de valor'), SEMPRE use a ferramenta correspondente.
         2. Responda em Português do Brasil de forma concisa.
         3. Use Markdown para clareza.
     `;
