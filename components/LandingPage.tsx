@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
     ArrowRight, Sparkles, Target, BrainCircuit, ShieldCheck, 
@@ -7,7 +8,6 @@ import {
     Gauge, Search, Terminal, Workflow
 } from 'lucide-react';
 import { CasesGallery } from './CasesGallery';
-import { AdSenseBlock } from './AdSenseBlock';
 
 interface Props {
   onEnter: () => void;
@@ -215,11 +215,6 @@ export const LandingPage: React.FC<Props> = ({ onEnter, onOpenBlog, customName, 
                       <p className="text-xl text-slate-400 leading-relaxed font-medium">O framework Shinkō elimina o achismo técnico. Cada oportunidade é processada por nosso algoritmo de priorização.</p>
                   </div>
               </div>
-          </section>
-
-          {/* LANDING PAGE ADSENSE FOOTER BLOCK */}
-          <section className="w-full max-w-7xl px-6">
-              <AdSenseBlock slot="XXXXXXXXXX3" format="auto" className="rounded-[3rem]" />
           </section>
 
           <section className="w-full py-24 md:py-48 bg-[#020202] px-6 relative overflow-hidden">

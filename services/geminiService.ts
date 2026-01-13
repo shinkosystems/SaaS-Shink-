@@ -143,14 +143,25 @@ export const optimizeSchedule = async (tasks: any[], availableTeam: any[], globa
     const ai = getAiClient();
     if (!ai || tasks.length === 0) return [];
 
-    const systemInstruction = `Você é o Engenheiro de Operações Shinkō. Sua missão é otimizar o cronograma de execução técnica.`;
+    const systemInstruction = `Você é o Engenheiro de Operações Shinkō. 
+    Sua missão é otimizar o cronograma de execução técnica, fazendo o balanceamento de carga da equipe.
+    
+    REGRAS DE BALANCEAMENTO:
+    1. Priorize tarefas com maior score GUT (Gravidade x Urgência x Tendência).
+    2. Respeite a capacidade de ${globalCapacity} horas por dia por pessoa.
+    3. Distribua as tarefas de forma que ninguém fique sobrecarregado enquanto outros estão ociosos.
+    4. Projete as datas de início (startDate) e fim (dueDate) em formato YYYY-MM-DD.
+    5. Atribua as tarefas aos membros da equipe (assigneeId) que possuam o perfil adequado.
+    
+    EQUIPE DISPONÍVEL: ${JSON.stringify(availableTeam.map(m => ({ id: m.id, nome: m.nome, area: m.area })))}
+    `;
 
-    const prompt = `OTIMIZAR CRONOGRAMA: ${JSON.stringify(tasks.map(t => ({
+    const prompt = `OTIMIZAR O SEGUINTE PIPELINE DE TAREFAS: ${JSON.stringify(tasks.map(t => ({
         id: t.id,
         titulo: t.titulo,
         duracaohoras: t.duracaohoras || 2,
         gut: (t.gravidade || 1) * (t.urgencia || 1) * (t.tendencia || 1),
-        responsavel_atual: t.responsavel
+        responsavel_id_atual: t.responsavel
     })))}`;
 
     try {
@@ -159,7 +170,20 @@ export const optimizeSchedule = async (tasks: any[], availableTeam: any[], globa
             contents: prompt,
             config: { 
                 systemInstruction,
-                responseMimeType: "application/json"
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            id: { type: Type.NUMBER, description: "O ID numérico original da tarefa" },
+                            startDate: { type: Type.STRING, description: "Nova data de início YYYY-MM-DD" },
+                            dueDate: { type: Type.STRING, description: "Nova data de término YYYY-MM-DD" },
+                            assigneeId: { type: Type.STRING, description: "UUID do responsável ideal" }
+                        },
+                        required: ["id", "startDate", "dueDate", "assigneeId"]
+                    }
+                }
             }
         }));
 

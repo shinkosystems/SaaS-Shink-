@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { CmsPost } from '../types';
 import { fetchCmsPosts, captureLead, fetchCmsPostBySlug } from '../services/cmsService';
@@ -7,7 +8,6 @@ import {
     Clock, Share2, Bookmark, MessageSquare, Newspaper
 } from 'lucide-react';
 import { MetaController } from './MetaController';
-import { AdSenseBlock } from './AdSenseBlock';
 
 interface Props {
     onBack: () => void;
@@ -116,7 +116,7 @@ export const InsightCenter: React.FC<Props> = ({ onBack, onEnter, initialPostSlu
                         <div className="hidden md:flex items-center gap-4">
                             <img src={BRAND_LOGO} alt="Shinkō" className="h-8 w-auto opacity-80" />
                             <div className="w-px h-6 bg-white/10"></div>
-                            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-500">Engineering Blog</span>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-amber-500">Engineering Blog</span>
                         </div>
                     </div>
 
@@ -153,9 +153,6 @@ export const InsightCenter: React.FC<Props> = ({ onBack, onEnter, initialPostSlu
                                     className="w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-amber-500/50 text-sm font-medium transition-all"
                                 />
                             </div>
-
-                            {/* ADSENSE SIDEBAR AD */}
-                            <AdSenseBlock slot="XXXXXXXXXX1" format="rectangle" />
 
                             <div className="space-y-6">
                                 <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 flex items-center gap-2">
@@ -210,9 +207,6 @@ export const InsightCenter: React.FC<Props> = ({ onBack, onEnter, initialPostSlu
                                     className="prose-shinko text-slate-300 leading-relaxed text-xl"
                                     dangerouslySetInnerHTML={{ __html: selectedPost.content || '' }}
                                 />
-
-                                {/* ADSENSE ARTICLE CONTENT AD */}
-                                <AdSenseBlock slot="XXXXXXXXXX2" className="my-16" />
 
                                 {selectedPost.download_url && (
                                     <div className="mt-32 p-1 rounded-[3rem] bg-gradient-to-br from-amber-500 via-orange-600 to-amber-700 shadow-2xl">

@@ -55,17 +55,36 @@ export const TasksPage: React.FC<Props> = ({ opportunities, onOpenProject, userR
 
     const handleGlobalOptimize = async () => {
         if (!organizationId || isOptimizing) return;
+        
         setIsOptimizing(true);
         try {
             const pendingTasks = tasks.filter(t => t.status !== 'done' && t.status !== 'approval');
+            if (pendingTasks.length === 0) {
+                alert("Nenhuma tarefa pendente para otimizar.");
+                setIsOptimizing(false);
+                return;
+            }
+
             const optimized = await optimizeSchedule(pendingTasks, members);
+            
             if (optimized && optimized.length > 0) {
-                await Promise.all(optimized.map(item => updateTask(item.id, { datainicio: item.startDate, datafim: item.dueDate, responsavel: item.assigneeId })));
-                alert("Pipeline otimizado com IA!");
-                loadData();
+                // Atualiza sequencialmente ou em paralelo
+                await Promise.all(optimized.map(item => 
+                    updateTask(Number(item.id), { 
+                        datainicio: item.startDate, 
+                        datafim: item.dueDate, 
+                        responsavel: item.assigneeId 
+                    })
+                ));
+                
+                alert("Pipeline balanceado e otimizado com IA!");
+                await loadData();
+            } else {
+                alert("A IA não conseguiu gerar um novo plano. Verifique as horas estimadas das tarefas.");
             }
         } catch (e) {
-            console.error(e);
+            console.error("Erro no balanceamento IA:", e);
+            alert("Falha técnica ao processar balanceamento.");
         } finally {
             setIsOptimizing(false);
         }
