@@ -92,7 +92,7 @@ export const createProject = async (nome: string, cliente: string | null, userId
 
 export const addAttachmentToProject = async (projectId: number, attachment: Attachment) => {
     try {
-        const { data: proj, error } = await supabase.from(PROJECT_TABLE).select('bpmn_structure').eq('id', projectId).single();
+        const { data: proj, error = null } = await supabase.from(PROJECT_TABLE).select('bpmn_structure').eq('id', projectId).single();
         if (error || !proj) throw new Error("Project not found");
         const structure = proj.bpmn_structure || { nodes: [], lanes: [], edges: [] };
         const currentAttachments = (structure as any).attachments || [];
@@ -171,7 +171,7 @@ export const createTask = async (task: Partial<DbTask>): Promise<DbTask | null> 
              else throw new Error("Responsável (UUID) é obrigatório.");
         }
         if (!task.organizacao) {
-            const { data: u } = await supabase.from('users').select('organizacao').eq('id', task.responsavel).single();
+            const { data: u = null } = await supabase.from('users').select('organizacao').eq('id', task.responsavel).single();
             if (u) task.organizacao = u.organizacao;
             else throw new Error("ID da Organização não fornecido.");
         }
@@ -204,7 +204,7 @@ export const createTask = async (task: Partial<DbTask>): Promise<DbTask | null> 
             etiquetas: cleanTask.etiquetas || []
         };
 
-        const { data, error } = await supabase.from(TASKS_TABLE).insert(payload).select().maybeSingle();
+        const { data, error = null } = await supabase.from(TASKS_TABLE).insert(payload).select().maybeSingle();
         if (error) throw error;
         if (!data) return null;
         const { description, anexos: savedAnexos } = unpackAttachments(data.descricao);
@@ -220,8 +220,12 @@ export const updateTask = async (id: number, updates: Partial<DbTask>): Promise<
     let hasAttachmentsUpdate = false;
     let newAttachments: Attachment[] = [];
 
+    // Captura campos válidos
     Object.entries(updates).forEach(([key, value]) => {
-        if (key === 'anexos') { hasAttachmentsUpdate = true; newAttachments = value as Attachment[]; }
+        if (key === 'anexos' || key === 'attachments') { 
+            hasAttachmentsUpdate = true; 
+            newAttachments = value as Attachment[]; 
+        }
         else if (value !== undefined && key !== 'projetoData' && key !== 'responsavelData' && key !== 'createdat' && key !== 'id') {
             if (key === 'duracaohoras') payload[key] = Math.round(Number(value));
             else payload[key] = value;
@@ -231,25 +235,21 @@ export const updateTask = async (id: number, updates: Partial<DbTask>): Promise<
     if (Object.keys(payload).length === 0 && !hasAttachmentsUpdate) return null;
     if (payload.responsavel === null) delete payload.responsavel;
 
-    if (hasAttachmentsUpdate) {
-        let descriptionToPack = payload.descricao;
-        if (descriptionToPack === undefined) {
-            const { data: currentTask } = await supabase.from(TASKS_TABLE).select('descricao').eq('id', id).maybeSingle();
-            descriptionToPack = currentTask ? unpackAttachments(currentTask.descricao).description : "";
-        }
-        payload.descricao = packAttachments(descriptionToPack, newAttachments);
-    } else if (payload.descricao !== undefined) {
-         const { data: currentTask } = await supabase.from(TASKS_TABLE).select('descricao').eq('id', id).maybeSingle();
-         if (currentTask) {
-             const { anexos } = unpackAttachments(currentTask.descricao);
-             payload.descricao = packAttachments(payload.descricao, anexos);
-         }
-    }
-    delete (payload as any).anexos;
+    // Lógica de empacotamento de anexos na descrição (padrão do sistema)
+    const { data: currentTask } = await supabase.from(TASKS_TABLE).select('descricao').eq('id', id).maybeSingle();
+    const currentUnpacked = unpackAttachments(currentTask?.descricao || "");
+    
+    const finalDescription = payload.descricao !== undefined ? payload.descricao : currentUnpacked.description;
+    const finalAttachments = hasAttachmentsUpdate ? newAttachments : currentUnpacked.anexos;
+    
+    payload.descricao = packAttachments(finalDescription, finalAttachments);
+    delete payload.anexos;
+    delete payload.attachments;
 
-    const { data, error } = await supabase.from(TASKS_TABLE).update(payload).eq('id', id).select().maybeSingle();
+    const { data, error = null } = await supabase.from(TASKS_TABLE).update(payload).eq('id', id).select().maybeSingle();
     if (error) return null;
     if (!data) return null;
+    
     const { description, anexos } = unpackAttachments(data.descricao);
     return { ...data, descricao: description, anexos: anexos };
 };

@@ -6,7 +6,8 @@ import {
     Save, Calendar, Users, Zap, 
     Plus, User as UserIcon, BrainCircuit, Loader2, Sparkles,
     Tag, Paperclip, MessageSquare, MoreHorizontal, Eye, Share2, 
-    CheckCircle2, ChevronDown, ListTodo, History, FileText, Download, Send, Lock
+    CheckCircle2, ChevronDown, ListTodo, History, FileText, Download, Send, Lock,
+    Image as ImageIcon, Film, File as FileIcon, ExternalLink
 } from 'lucide-react';
 import { fetchOrgMembers } from '../services/projectService';
 import { supabase } from '../services/supabaseClient';
@@ -71,6 +72,54 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
     }
   }, [formData.text]);
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file || readOnly) return;
+
+      setIsUploading(true);
+      try {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `tasks/${formData.dbId || 'temp'}-${Date.now()}.${fileExt}`;
+          
+          const { error: uploadError } = await supabase.storage
+              .from('documentos')
+              .upload(fileName, file);
+
+          if (uploadError) throw uploadError;
+
+          const { data: urlData } = supabase.storage
+              .from('documentos')
+              .getPublicUrl(fileName);
+
+          const newAttachment: Attachment = {
+              id: crypto.randomUUID(),
+              name: file.name,
+              size: (file.size / 1024).toFixed(1) + ' KB',
+              type: file.type,
+              url: urlData.publicUrl,
+              uploadedAt: new Date().toISOString()
+          };
+
+          setFormData(prev => ({
+              ...prev,
+              attachments: [newAttachment, ...(prev.attachments || [])]
+          }));
+      } catch (err: any) {
+          alert("Erro no upload: " + err.message);
+      } finally {
+          setIsUploading(false);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+  };
+
+  const removeAttachment = (id: string) => {
+      if (readOnly) return;
+      setFormData(prev => ({
+          ...prev,
+          attachments: prev.attachments?.filter(a => a.id !== id)
+      }));
+  };
+
   const handleSync = async () => {
       if (readOnly) return;
       setIsSaving(true);
@@ -90,7 +139,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
         onClose();
         return;
     }
-    // Se a tarefa já existe no banco, "Descartar" no contexto deste sistema significa excluir
     if (onDelete && (formData.dbId || formData.id)) {
         if (confirm("Deseja realmente excluir permanentemente esta tarefa?")) {
             onDelete(formData.id);
@@ -114,23 +162,21 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
       }
   };
 
-  const toggleSubtask = (id: string) => {
-      if (readOnly) return;
-      setFormData(prev => ({
-          ...prev,
-          subtasks: prev.subtasks?.map(s => s.id === id ? { ...s, completed: !s.completed } : s)
-      }));
-  };
-
   const progress = formData.subtasks?.length 
     ? Math.round((formData.subtasks.filter(s => s.completed).length / formData.subtasks.length) * 100) 
     : 0;
 
   const currentAssignee = availableUsers.find(u => u.id === formData.assigneeId);
 
+  const getAttachmentIcon = (type: string) => {
+      if (type.startsWith('image/')) return <ImageIcon className="w-4 h-4" />;
+      if (type.startsWith('video/')) return <Film className="w-4 h-4" />;
+      return <FileIcon className="w-4 h-4" />;
+  };
+
   return (
     <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="w-full max-w-4xl h-[92vh] bg-[#F8F9FA] rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden animate-ios-pop border border-slate-200">
+      <div className="w-full max-w-5xl h-[92vh] bg-[#F8F9FA] rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden animate-ios-pop border border-slate-200">
         
         <div className="px-8 py-6 flex justify-between items-center bg-white border-b border-slate-100 shrink-0">
             <div className="flex items-center gap-4">
@@ -201,6 +247,53 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                                         <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap font-medium">
                                             {formData.description || <span className="italic text-slate-400 font-bold opacity-50">Sem descrição.</span>}
                                         </p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* SEÇÃO DE ATIVOS (ANEXOS) */}
+                        <div className="flex gap-6 items-start">
+                            <div className="mt-1 text-slate-300 shrink-0"><Paperclip className="w-7 h-7" /></div>
+                            <div className="flex-1 space-y-6">
+                                <div className="flex justify-between items-center">
+                                    <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em]">Ativos Vinculados</h3>
+                                    {isUploading && <div className="flex items-center gap-2 text-[10px] font-black text-amber-500 animate-pulse"><Loader2 className="w-3 h-3 animate-spin"/> SUBINDO...</div>}
+                                </div>
+                                
+                                {formData.attachments && formData.attachments.length > 0 ? (
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                        {formData.attachments.map(att => (
+                                            <div key={att.id} className="group relative bg-white border border-slate-100 rounded-2xl p-3 flex flex-col gap-2 shadow-sm hover:border-amber-500/30 transition-all">
+                                                <div className="aspect-square bg-slate-50 rounded-xl overflow-hidden flex items-center justify-center">
+                                                    {att.type.startsWith('image/') ? (
+                                                        <img src={att.url} className="w-full h-full object-cover" />
+                                                    ) : att.type.startsWith('video/') ? (
+                                                        <Film className="w-8 h-8 text-slate-300" />
+                                                    ) : (
+                                                        <FileIcon className="w-8 h-8 text-slate-300" />
+                                                    )}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-[9px] font-bold text-slate-800 truncate" title={att.name}>{att.name}</p>
+                                                    <p className="text-[8px] text-slate-400 font-medium uppercase">{att.size}</p>
+                                                </div>
+                                                <div className="flex gap-2 mt-1">
+                                                    <a href={att.url} target="_blank" className="flex-1 p-1.5 bg-slate-50 hover:bg-slate-100 rounded-lg flex items-center justify-center transition-colors">
+                                                        <ExternalLink className="w-3 h-3 text-slate-400"/>
+                                                    </a>
+                                                    {!readOnly && (
+                                                        <button onClick={() => removeAttachment(att.id)} className="flex-1 p-1.5 bg-red-50 hover:bg-red-500 hover:text-white rounded-lg flex items-center justify-center transition-colors">
+                                                            <Trash2 className="w-3 h-3"/>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="p-8 border-2 border-dashed border-slate-200 rounded-[2rem] text-center">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nenhum ativo anexado</p>
                                     </div>
                                 )}
                             </div>
@@ -309,19 +402,23 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
         </div>
 
         <div className="px-10 py-10 bg-white border-t border-slate-100 flex flex-col md:flex-row gap-6 justify-between items-center shrink-0">
-            <button onClick={() => fileInputRef.current?.click()} className="w-full md:w-auto flex items-center gap-3 px-10 py-6 bg-[#F8F9FA] hover:bg-slate-100 rounded-[1.8rem] text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] border border-slate-200 shadow-sm">
-                <Paperclip className="w-4 h-4 text-amber-500" /> ANEXAR ATIVO
+            <button 
+                onClick={() => fileInputRef.current?.click()} 
+                disabled={isUploading || readOnly}
+                className="w-full md:w-auto flex items-center gap-3 px-10 py-6 bg-[#F8F9FA] hover:bg-slate-100 rounded-[1.8rem] text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] border border-slate-200 shadow-sm disabled:opacity-50"
+            >
+                {isUploading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Paperclip className="w-4 h-4 text-amber-500" />} ANEXAR ATIVO
             </button>
             <div className="flex gap-10 items-center w-full md:w-auto justify-end">
                 <button onClick={handleDiscard} className="px-4 py-2 text-[11px] font-black text-slate-400 hover:text-red-500 uppercase tracking-[0.3em] transition-colors">{readOnly ? 'FECHAR' : 'DESCARTAR'}</button>
                 {!readOnly && (
-                    <button onClick={handleSync} disabled={isSaving} className="flex-1 md:flex-none flex items-center gap-5 px-16 py-6 bg-[#F59E0B] hover:bg-amber-400 text-white rounded-[2rem] text-xs font-black uppercase tracking-[0.2em] shadow-2xl shadow-amber-500/30 transition-all disabled:opacity-50">
+                    <button onClick={handleSync} disabled={isSaving || isUploading} className="flex-1 md:flex-none flex items-center gap-5 px-16 py-6 bg-[#F59E0B] hover:bg-amber-400 text-white rounded-[2rem] text-xs font-black uppercase tracking-[0.2em] shadow-2xl shadow-amber-500/30 transition-all disabled:opacity-50">
                         {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} SINCRONIZAR ATIVO
                     </button>
                 )}
             </div>
         </div>
-        <input type="file" ref={fileInputRef} className="hidden" />
+        <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} multiple={false} />
       </div>
     </div>
   );
