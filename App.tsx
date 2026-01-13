@@ -20,7 +20,7 @@ import { CrmPage } from './pages/CrmPage';
 import { FinancialPage } from './pages/FinancialPage';
 import { ClientsPage } from './pages/ClientsPage';
 import { IntelligencePage } from './pages/IntelligencePage';
-import { SettingsPage } from './pages/SettingsPage'; // Certifique-se que o arquivo exporta como SettingsPage ou mude para SettingsScreen se renomeou o export
+import { SettingsPage } from './pages/SettingsPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { AdminPage } from './pages/AdminPage';
 import { EcosystemPage } from './pages/EcosystemPage';
@@ -88,30 +88,17 @@ const App: React.FC = () => {
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [showBlog, setShowBlog] = useState(false);
   const [blogPostSlug, setBlogPostSlug] = useState<string | null>(null);
-  
-  // Estado orgDetails atualizado com campos do Asaas
   const [orgDetails, setOrgDetails] = useState({ 
-      name: '', 
-      limit: 1, 
-      logoUrl: null, 
-      primaryColor: '#F59E0B', 
-      aiSector: '', 
-      aiTone: '', 
-      aiContext: '',
-      cpf_cnpj: '',
-      cep: '',
-      endereco_numero: ''
+      name: '', limit: 1, logoUrl: null, primaryColor: '#F59E0B', aiSector: '', aiTone: '', aiContext: '' 
   });
-  
   const [dbStatus, setDbStatus] = useState<'connected'|'disconnected'>('connected');
-  const [pageMeta, setPageMeta] = useState<{title?: string, description?: string, image?: string}>({});
 
   const handleRouting = async () => {
       let path = window.location.pathname;
       if (window.location.protocol === 'blob:' || window.location.hostname.includes('usercontent.goog')) return;
 
       if (path === '/') {
-          setPageMeta({ title: 'Home', description: 'Sistema Operacional para Framework Shinkō' });
+          // Home
       } else if (path.startsWith('/blog')) {
           const slug = path.split('/')[2];
           setShowBlog(true);
@@ -220,22 +207,13 @@ const App: React.FC = () => {
               setIsUserActive(data.ativo !== false); 
               
               if (data.organizacao) {
-                  // Carregando dados da organização incluindo campos de faturamento
                   const { data: orgData } = await supabase.from('organizacoes').select('*').eq('id', data.organizacao).single();
                   
                   if (orgData) {
                     setCurrentPlan(mapDbPlanIdToString(orgData.plano || 4));
                     setOrgDetails({
-                        name: orgData.nome, 
-                        limit: orgData.colaboradores, 
-                        logoUrl: orgData.logo, 
-                        primaryColor: orgData.cor || '#F59E0B',
-                        aiSector: orgData.setor || '', 
-                        aiTone: orgData.tomdevoz || '', 
-                        aiContext: orgData.dna || '',
-                        cpf_cnpj: orgData.cpf_cnpj || '',
-                        cep: orgData.cep || '',
-                        endereco_numero: orgData.endereco_numero || ''
+                        name: orgData.nome, limit: orgData.colaboradores, logoUrl: orgData.logo, primaryColor: orgData.cor || '#F59E0B',
+                        aiSector: orgData.setor || '', aiTone: orgData.tomdevoz || '', aiContext: orgData.dna || ''
                     });
 
                     const modules = await fetchActiveOrgModules(data.organizacao);
@@ -270,7 +248,6 @@ const App: React.FC = () => {
       );
   }
 
-  // LÓGICA DE BLOQUEIO AJUSTADA: Permite acesso à view 'settings' para regularização
   if (!isUserActive && user && !loading && view !== 'settings') {
       return (
           <div className="fixed inset-0 z-[5000] bg-white dark:bg-[#020203] flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-700">
@@ -348,6 +325,25 @@ const App: React.FC = () => {
                         userRole={userRole} currentPlan={currentPlan} activeModules={activeModules}
                         customLogoUrl={orgDetails.logoUrl} orgName={orgDetails.name}
                     />
+                ) : view === 'create-project' ? (
+                    <OpportunityWizard 
+                        orgType={orgDetails.name}
+                        customLogoUrl={orgDetails.logoUrl}
+                        onSave={async (opp) => {
+                            const newOpp = await createOpportunity({ 
+                                ...opp, 
+                                organizationId: userOrgId || undefined 
+                            });
+                            if (newOpp) {
+                                await loadUserData(user.id);
+                                onOpenProject(newOpp);
+                            } else {
+                                alert("Falha ao salvar o projeto.");
+                                setView('dashboard');
+                            }
+                        }}
+                        onCancel={() => setView('dashboard')}
+                    />
                 ) : (
                     <>
                         {view === 'dashboard' && <DashboardPage 
@@ -370,23 +366,7 @@ const App: React.FC = () => {
                         {view === 'financial' && <FinancialPage orgType={orgDetails.name} />}
                         {view === 'clients' && <ClientsPage userRole={userRole} onlineUsers={onlineUsers} organizationId={userOrgId || undefined} onOpenProject={onOpenProject} />}
                         {view === 'intelligence' && <IntelligencePage organizationId={userOrgId || undefined} opportunities={opportunities} />}
-                        
-                        {/* SettingsPage atualizada para receber os novos campos de faturamento */}
-                        {view === 'settings' && <SettingsPage 
-                            theme={theme} 
-                            onToggleTheme={toggleTheme} 
-                            onlineUsers={onlineUsers} 
-                            userOrgId={userOrgId} 
-                            orgDetails={orgDetails} 
-                            onUpdateOrgDetails={() => loadUserData(user.id)} 
-                            setView={setView} 
-                            userRole={userRole} 
-                            userData={userData} 
-                            activeModules={activeModules} 
-                            onRefreshModules={() => loadUserData(user.id)} 
-                            currentPlan={currentPlan}
-                        />}
-                        
+                        {view === 'settings' && <SettingsPage theme={theme} onToggleTheme={toggleTheme} onlineUsers={onlineUsers} userOrgId={userOrgId} orgDetails={orgDetails} onUpdateOrgDetails={() => loadUserData(user.id)} setView={setView} userRole={userRole} userData={userData} activeModules={activeModules} onRefreshModules={() => loadUserData(user.id)} currentPlan={currentPlan} />}
                         {view === 'profile' && <ProfilePage currentPlan={currentPlan} onRefresh={() => loadUserData(user.id)} />}
                         {view === 'admin-manager' && (userData?.email === 'peboorba@gmail.com') && <AdminPage onlineUsers={onlineUsers} />}
                         {view === 'ecosystem' && <EcosystemPage organizationId={userOrgId} userRole={userRole} />}
