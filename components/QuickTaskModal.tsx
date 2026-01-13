@@ -1,7 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { Opportunity, BpmnTask } from '../types';
-// Add missing ChevronDown to lucide-react imports
-import { X, CheckCircle, Calendar as CalendarIcon, User, Briefcase, Layers, Clock, BarChart3, AlignLeft, ChevronDown } from 'lucide-react';
+import { X, CheckCircle, Calendar as CalendarIcon, User, Briefcase, Layers, Clock, BarChart3, AlignLeft, ChevronDown, Tag } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 
 interface Props {
@@ -16,9 +16,15 @@ interface OrgMember {
     nome: string;
 }
 
+const SHINKO_CATEGORIES = [
+    "Adm", "Financeiro", "Gestão", "Tecnológico", "RH", 
+    "Modelagem", "Interface", "Lógica", "Marketing", "Suporte"
+];
+
 export const QuickTaskModal: React.FC<Props> = ({ opportunities, onClose, onSave, userRole }) => {
   const [taskTitle, setTaskTitle] = useState('');
   const [projectId, setProjectId] = useState<string>('');
+  const [category, setCategory] = useState('Gestão');
   const [assigneeId, setAssigneeId] = useState('');
   const [assigneeName, setAssigneeName] = useState('');
   const [dueDate, setDueDate] = useState(new Date().toISOString().split('T')[0]);
@@ -64,8 +70,12 @@ export const QuickTaskModal: React.FC<Props> = ({ opportunities, onClose, onSave
           assigneeId: assigneeId || undefined,
           dueDate: dueDate,
           estimatedHours: estimatedHours,
-          gut: { g: gravidade, u: urgencia, t: tendencia }
+          gut: { g: gravidade, u: urgencia, t: tendencia },
+          tags: [category] // Usando tags para armazenar a categoria principal
       };
+
+      // @ts-ignore - Enviando categoria extra no payload para o service
+      newTask.category = category;
 
       onSave(newTask, projectId || null);
   };
@@ -77,7 +87,6 @@ export const QuickTaskModal: React.FC<Props> = ({ opportunities, onClose, onSave
     <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-300">
         <div className="w-full max-w-lg max-h-[95vh] rounded-[3rem] shadow-2xl flex flex-col animate-ios-pop relative overflow-hidden bg-[#F2F2F7] dark:bg-[#0A0A0C]">
             
-            {/* Header exato da screenshot */}
             <div className="flex justify-between items-center p-8 pb-4 shrink-0">
                 <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-xl bg-transparent flex items-center justify-center">
@@ -96,22 +105,56 @@ export const QuickTaskModal: React.FC<Props> = ({ opportunities, onClose, onSave
             </div>
 
             <div className="px-8 pb-8 pt-4 space-y-8 overflow-y-auto custom-scrollbar flex-1">
-                {/* Título Principal */}
                 <div>
                     <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-4 ml-1">O que precisa ser feito?</label>
-                    <div className="relative group">
-                        <input 
-                            type="text" 
-                            value={taskTitle}
-                            onChange={e => setTaskTitle(e.target.value)}
-                            className="w-full bg-white dark:bg-white/5 border-2 border-transparent focus:border-blue-500 rounded-[1.5rem] p-6 text-xl font-bold shadow-soft transition-all outline-none text-slate-900 dark:text-white"
-                            placeholder="Ex: Criar landing page..."
-                            autoFocus
-                        />
+                    <input 
+                        type="text" 
+                        value={taskTitle}
+                        onChange={e => setTaskTitle(e.target.value)}
+                        className="w-full bg-white dark:bg-white/5 border-2 border-transparent focus:border-blue-500 rounded-[1.5rem] p-6 text-xl font-bold shadow-soft transition-all outline-none text-slate-900 dark:text-white"
+                        placeholder="Ex: Criar landing page..."
+                        autoFocus
+                    />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-4">
+                        <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-3">
+                            <Tag className="w-4 h-4 text-slate-400"/> Categoria
+                        </label>
+                        <div className="relative">
+                            <select 
+                                value={category}
+                                onChange={e => setCategory(e.target.value)}
+                                className="w-full bg-white dark:bg-white/5 border-none rounded-[1.5rem] p-6 text-sm font-bold cursor-pointer shadow-soft appearance-none outline-none text-slate-800 dark:text-white"
+                            >
+                                {SHINKO_CATEGORIES.map(cat => (
+                                    <option key={cat} value={cat} className="bg-white dark:bg-black">{cat}</option>
+                                ))}
+                            </select>
+                            <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        </div>
+                    </div>
+                    <div className="space-y-4">
+                        <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-3">
+                            <Briefcase className="w-4 h-4 text-slate-400"/> Projeto
+                        </label>
+                        <div className="relative">
+                            <select 
+                                value={projectId}
+                                onChange={e => setProjectId(e.target.value)}
+                                className="w-full bg-white dark:bg-white/5 border-none rounded-[1.5rem] p-6 text-sm font-bold cursor-pointer shadow-soft appearance-none outline-none text-slate-800 dark:text-white"
+                            >
+                                <option value="" className="bg-white dark:bg-black">-- Avulsa --</option>
+                                {activeProjects.map(p => (
+                                    <option key={p.id} value={p.id} className="bg-white dark:bg-black">{p.title}</option>
+                                ))}
+                            </select>
+                            <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        </div>
                     </div>
                 </div>
 
-                {/* Descrição */}
                 <div className="space-y-4">
                     <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-3">
                         <AlignLeft className="w-4 h-4 text-slate-400"/> Descrição
@@ -119,32 +162,11 @@ export const QuickTaskModal: React.FC<Props> = ({ opportunities, onClose, onSave
                     <textarea 
                         value={description}
                         onChange={e => setDescription(e.target.value)}
-                        className="w-full bg-white dark:bg-white/5 border-none rounded-[1.5rem] p-6 text-base min-h-[120px] resize-none shadow-soft outline-none text-slate-700 dark:text-slate-300"
-                        placeholder="Detalhes adicionais da tarefa..."
+                        className="w-full bg-white dark:bg-white/5 border-none rounded-[1.5rem] p-6 text-base min-h-[100px] resize-none shadow-soft outline-none text-slate-700 dark:text-slate-300"
+                        placeholder="Detalhes adicionais..."
                     />
                 </div>
 
-                {/* Projeto Vinculado */}
-                <div className="space-y-4">
-                    <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-3">
-                        <Briefcase className="w-4 h-4 text-slate-400"/> Projeto Vinculado
-                    </label>
-                    <div className="relative">
-                        <select 
-                            value={projectId}
-                            onChange={e => setProjectId(e.target.value)}
-                            className="w-full bg-white dark:bg-white/5 border-none rounded-[1.5rem] p-6 text-sm font-bold cursor-pointer shadow-soft appearance-none outline-none text-slate-800 dark:text-white"
-                        >
-                            <option value="" className="bg-white dark:bg-black">-- Tarefa Avulsa (Ad-hoc) --</option>
-                            {activeProjects.map(p => (
-                                <option key={p.id} value={p.id} className="bg-white dark:bg-black">{p.title}</option>
-                            ))}
-                        </select>
-                        <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                    </div>
-                </div>
-
-                {/* Responsável e Prazo em Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-4">
                         <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-3">
@@ -181,7 +203,6 @@ export const QuickTaskModal: React.FC<Props> = ({ opportunities, onClose, onSave
                     </div>
                 </div>
 
-                {/* Matriz GUT exata da screenshot */}
                 <div className="bg-white/50 dark:bg-white/[0.02] p-8 rounded-[2.5rem] border border-slate-200/50 dark:border-white/5 shadow-inner">
                     <div className="flex justify-between items-center mb-8">
                         <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-3">
@@ -223,22 +244,10 @@ export const QuickTaskModal: React.FC<Props> = ({ opportunities, onClose, onSave
                 </div>
             </div>
 
-            {/* Footer com botão laranja exato */}
             <div className="p-8 pb-10 flex justify-between items-center bg-white/40 dark:bg-black/20 shrink-0">
-                <button 
-                    onClick={onClose} 
-                    className="px-8 py-5 text-[11px] font-black uppercase tracking-[0.2em] text-slate-500 hover:text-slate-900 dark:hover:text-white transition-all"
-                >
-                    CANCELAR
-                </button>
-                <button 
-                    onClick={handleSave}
-                    className="px-14 py-5 bg-[#F59E0B] text-white rounded-[1.8rem] font-black text-xs uppercase tracking-[0.15em] shadow-xl hover:scale-[1.02] active:scale-95 transition-all shadow-amber-500/20"
-                >
-                    SINCRONIZAR ATIVO
-                </button>
+                <button onClick={onClose} className="px-8 py-5 text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">CANCELAR</button>
+                <button onClick={handleSave} className="px-14 py-5 bg-[#F59E0B] text-white rounded-[1.8rem] font-black text-xs uppercase tracking-[0.15em] shadow-xl hover:scale-[1.02] active:scale-95 transition-all shadow-amber-500/20">SINCRONIZAR ATIVO</button>
             </div>
-
         </div>
     </div>
   );

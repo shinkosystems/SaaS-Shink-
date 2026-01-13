@@ -94,6 +94,7 @@ export interface BpmnTask {
     displayId?: number;
     text: string;
     description?: string;
+    category?: string;
     status: TaskStatus;
     completed: boolean;
     estimatedHours?: number;
@@ -124,6 +125,33 @@ export interface BpmnSubTask {
 
 export type TaskStatus = 'todo' | 'doing' | 'review' | 'approval' | 'done' | 'backlog';
 
+export interface DbTask {
+    id: number;
+    projeto?: number | null;
+    titulo: string;
+    descricao?: string;
+    category?: string;
+    status: string;
+    responsavel?: string;
+    gravidade?: number;
+    urgencia?: number;
+    tendencia?: number;
+    dataproposta?: string;
+    deadline?: string;
+    datainicio?: string;
+    datafim?: string;
+    duracaohoras?: number;
+    sutarefa?: boolean;
+    tarefamae?: number | null;
+    organizacao: number;
+    membros?: string[];
+    etiquetas?: string[];
+    createdat: string;
+    projetoData?: { nome: string; cor: string };
+    responsavelData?: any;
+    anexos?: Attachment[];
+}
+
 export interface DbProject {
     id: number;
     nome: string;
@@ -147,32 +175,6 @@ export interface DbProject {
     contexto_ia?: string;
     cor?: string;
     created_at: string;
-}
-
-export interface DbTask {
-    id: number;
-    projeto?: number | null;
-    titulo: string;
-    descricao?: string;
-    status: string;
-    responsavel?: string;
-    gravidade?: number;
-    urgencia?: number;
-    tendencia?: number;
-    dataproposta?: string;
-    deadline?: string;
-    datainicio?: string;
-    datafim?: string;
-    duracaohoras?: number;
-    sutarefa?: boolean;
-    tarefamae?: number | null;
-    organizacao: number;
-    membros?: string[];
-    etiquetas?: string[];
-    createdat: string;
-    projetoData?: { nome: string; cor: string };
-    responsavelData?: any;
-    anexos?: Attachment[];
 }
 
 export interface Attachment {

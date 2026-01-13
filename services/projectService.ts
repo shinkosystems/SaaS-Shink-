@@ -163,12 +163,6 @@ export const fetchAllTasks = async (organizationId?: number): Promise<DbTask[]> 
     } catch (error: any) { return []; }
 };
 
-export const fetchAssignableUsers = async (organizationId: number): Promise<{id: string, nome: string}[]> => {
-    const { data, error } = await supabase.from('users').select('id, nome').eq('organizacao', organizationId);
-    if (error) return [];
-    return data || [];
-};
-
 export const createTask = async (task: Partial<DbTask>): Promise<DbTask | null> => {
     try {
         if (!task.responsavel) {
@@ -186,7 +180,6 @@ export const createTask = async (task: Partial<DbTask>): Promise<DbTask | null> 
         const prazo = cleanTask.datafim || new Date().toISOString();
         const packedDescription = packAttachments(cleanTask.descricao || '', anexos || []);
 
-        // SEGURANÇA: FALLBACK PARA TITULO (NUNCA PODE SER NULO)
         const finalTitle = cleanTask.titulo || cleanTask.text || 'Nova Tarefa';
 
         const payload = {
@@ -195,6 +188,7 @@ export const createTask = async (task: Partial<DbTask>): Promise<DbTask | null> 
             descricao: packedDescription,
             status: cleanTask.status || 'todo',
             responsavel: cleanTask.responsavel,
+            category: cleanTask.category || (cleanTask.tags?.[0]) || 'Gestão',
             gravidade: cleanTask.gravidade || 1,
             urgencia: cleanTask.urgencia || 1,
             tendencia: cleanTask.tendencia || 1,

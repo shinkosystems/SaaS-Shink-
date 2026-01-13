@@ -27,7 +27,8 @@ export const fetchTransactions = async (organizationId: number): Promise<Financi
         isContract: !!row.metadata?.contractId,
         isRecurring: !!row.is_recurring,
         periodicity: row.periodicity,
-        installments: row.installments
+        installments: row.installments,
+        metadata: row.metadata || {}
     }));
 };
 
@@ -37,11 +38,12 @@ export const addTransaction = async (transaction: Omit<FinancialTransaction, 'id
         const installments = transaction.installments || 1;
         const startDate = new Date(transaction.date);
         
-        // Se for recorrente, gera múltiplas linhas, senão gera apenas uma
+        // Gerar um ID único para o grupo de recorrência
+        const recurringGroupId = transaction.isRecurring ? crypto.randomUUID() : null;
+        
         for (let i = 0; i < (transaction.isRecurring ? installments : 1); i++) {
             const currentDate = new Date(startDate);
             
-            // Lógica de incremento de data conforme periodicidade
             if (transaction.isRecurring) {
                 if (transaction.periodicity === 'monthly') {
                     currentDate.setMonth(startDate.getMonth() + i);
@@ -68,7 +70,9 @@ export const addTransaction = async (transaction: Omit<FinancialTransaction, 'id
                 installments: transaction.installments,
                 metadata: {
                     isRecurringChild: i > 0,
-                    sequence: i + 1
+                    sequence: i + 1,
+                    recurring_group_id: recurringGroupId,
+                    base_description: transaction.description // Guardamos o nome original para facilitar updates
                 }
             });
         }
@@ -90,7 +94,8 @@ export const addTransaction = async (transaction: Omit<FinancialTransaction, 'id
             organizationId: row.organization_id,
             isRecurring: row.is_recurring,
             periodicity: row.periodicity,
-            installments: row.installments
+            installments: row.installments,
+            metadata: row.metadata || {}
         }));
     } catch (error: any) {
         console.error('Erro ao adicionar transação(ões):', error.message || error);
@@ -101,6 +106,7 @@ export const addTransaction = async (transaction: Omit<FinancialTransaction, 'id
 export const updateTransaction = async (transaction: FinancialTransaction): Promise<FinancialTransaction | null> => {
     const { id, ...updates } = transaction;
     
+    // 1. Payload básico para este registro
     const payload = {
         date: updates.date,
         description: updates.description,
@@ -110,8 +116,55 @@ export const updateTransaction = async (transaction: FinancialTransaction): Prom
         organization_id: updates.organizationId,
         is_recurring: updates.isRecurring,
         periodicity: updates.periodicity,
-        installments: updates.installments
+        installments: updates.installments,
+        metadata: updates.metadata
     };
+
+    // 2. Se for parte de um grupo recorrente, atualizamos os "irmãos"
+    const groupId = updates.metadata?.recurring_group_id;
+    
+    if (groupId) {
+        try {
+            // Atualiza Categoria e Natureza em todos os registros do grupo
+            await supabase
+                .from(TABLE)
+                .update({ 
+                    category: updates.category,
+                    type: updates.type
+                })
+                .eq('organization_id', updates.organizationId)
+                .filter('metadata->>recurring_group_id', 'eq', groupId);
+            
+            // Se a descrição base mudou, precisamos atualizar as descrições individuais mantendo o (x/y)
+            const oldBaseDesc = updates.metadata?.base_description;
+            // Pegamos a nova descrição e removemos possíveis sufixos (x/y) para achar a nova base
+            const newBaseDesc = updates.description.split(' (')[0];
+
+            if (newBaseDesc !== oldBaseDesc) {
+                // Buscamos todos do grupo para renomear um a um mantendo o índice
+                const { data: siblings } = await supabase
+                    .from(TABLE)
+                    .select('id, metadata')
+                    .eq('organization_id', updates.organizationId)
+                    .filter('metadata->>recurring_group_id', 'eq', groupId);
+                
+                if (siblings) {
+                    for (const sib of siblings) {
+                        const seq = sib.metadata?.sequence;
+                        const total = updates.installments;
+                        const newDesc = total && total > 1 ? `${newBaseDesc} (${seq}/${total})` : newBaseDesc;
+                        
+                        await supabase.from(TABLE).update({ 
+                            description: newDesc,
+                            metadata: { ...sib.metadata, base_description: newBaseDesc }
+                        }).eq('id', sib.id);
+                    }
+                }
+            }
+        } catch (e) {
+            console.error("Falha na sincronização do grupo recorrente:", e);
+        }
+    }
 
     const { data, error } = await supabase
         .from(TABLE)
@@ -136,7 +189,8 @@ export const updateTransaction = async (transaction: FinancialTransaction): Prom
         isContract: !!(data.metadata?.contractId),
         isRecurring: data.is_recurring,
         periodicity: data.periodicity,
-        installments: data.installments
+        installments: data.installments,
+        metadata: data.metadata || {}
     };
 };
 
@@ -189,6 +243,8 @@ export const syncContractTransactions = async (organizationId: number): Promise<
 
             const start = new Date(startDateStr);
             start.setHours(12, 0, 0, 0); 
+            
+            const contractGroupId = `contract-${client.id}-${Date.now()}`;
 
             for (let i = 0; i < durationMonths; i++) {
                 const uniqueKey = `${client.id}-${i}`;
@@ -209,8 +265,14 @@ export const syncContractTransactions = async (organizationId: number): Promise<
                     metadata: {
                         contractId: client.id,
                         installmentIndex: i,
-                        isAutoGenerated: true
-                    }
+                        isAutoGenerated: true,
+                        recurring_group_id: contractGroupId,
+                        base_description: `Mensalidade - ${client.nome}`,
+                        sequence: i + 1
+                    },
+                    is_recurring: true,
+                    periodicity: 'monthly',
+                    installments: durationMonths
                 });
             }
         });

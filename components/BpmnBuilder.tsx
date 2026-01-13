@@ -60,6 +60,7 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
                         id: crypto.randomUUID(),
                         text: t.text,
                         description: t.description || '',
+                        category: 'Gestão',
                         status: 'todo',
                         completed: false,
                         estimatedHours: Number(t.estimatedHours) || 2
@@ -132,6 +133,7 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
             const updatePayload: any = {
                 titulo: updatedTask.text,
                 descricao: updatedTask.description,
+                category: updatedTask.category,
                 status: updatedTask.status,
                 responsavel: updatedTask.assigneeId,
                 duracaohoras: updatedTask.estimatedHours,
@@ -281,4 +283,5 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
     );
 };
 
+// Fix: Add default export to resolve "Module has no default export" error in ProjectWorkspace.tsx
 export default BpmnBuilder;

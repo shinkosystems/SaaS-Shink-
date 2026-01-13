@@ -6,7 +6,7 @@ import { TaskDetailModal } from './TaskDetailModal';
 import { updateTask, syncTaskChecklist, fetchOrgMembers } from '../services/projectService';
 
 interface Props {
-  tasks: DbTask[]; // Recebe tarefas filtradas da TasksPage
+  tasks: DbTask[]; 
   onSelectOpportunity: (opp: Opportunity) => void;
   userRole?: string;
   organizationId?: number; 
@@ -86,6 +86,7 @@ export const KanbanBoard: React.FC<Props> = ({ tasks, organizationId, readOnly, 
                 <TaskDetailModal 
                     task={{
                         id: editingTaskCtx.id.toString(), text: editingTaskCtx.titulo, description: editingTaskCtx.descricao,
+                        category: editingTaskCtx.category,
                         completed: editingTaskCtx.status === 'done', status: editingTaskCtx.status as any, estimatedHours: editingTaskCtx.duracaohoras,
                         dueDate: editingTaskCtx.datafim, startDate: editingTaskCtx.datainicio, gut: { g: editingTaskCtx.gravidade, u: editingTaskCtx.urgencia, t: editingTaskCtx.tendencia },
                         dbId: editingTaskCtx.id
@@ -93,7 +94,15 @@ export const KanbanBoard: React.FC<Props> = ({ tasks, organizationId, readOnly, 
                     nodeTitle={editingTaskCtx.projetoData?.nome || 'Tarefa'}
                     organizationId={organizationId} onClose={() => setEditingTaskCtx(null)}
                     onSave={async (updated) => {
-                        await updateTask(Number(updated.id), { titulo: updated.text, status: updated.status, duracaohoras: updated.estimatedHours, gravidade: updated.gut?.g, urgencia: updated.gut?.u, tendencia: updated.gut?.t });
+                        await updateTask(Number(updated.id), { 
+                            titulo: updated.text, 
+                            status: updated.status, 
+                            category: updated.category,
+                            duracaohoras: updated.estimatedHours, 
+                            gravidade: updated.gut?.g, 
+                            urgencia: updated.gut?.u, 
+                            tendencia: updated.gut?.t 
+                        });
                         onRefresh?.(); setEditingTaskCtx(null);
                     }}
                 />

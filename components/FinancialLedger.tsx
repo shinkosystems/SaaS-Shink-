@@ -13,6 +13,11 @@ interface Props {
     isSyncing?: boolean;
 }
 
+const SHINKO_CATEGORIES = [
+    "Adm", "Financeiro", "Gestão", "Tecnológico", "RH", 
+    "Modelagem", "Interface", "Lógica", "Marketing", "Suporte"
+];
+
 type ListPeriod = 'day' | 'week' | 'month' | 'quarter' | 'year' | 'all';
 
 export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransaction, onEditTransaction, onDeleteTransaction, onSyncContracts, isSyncing }) => {
@@ -27,10 +32,11 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
         date: new Date().toISOString().split('T')[0],
         amount: 0,
         description: '',
-        category: 'Operacional',
+        category: 'Financeiro',
         isRecurring: false,
         periodicity: 'monthly',
-        installments: 1
+        installments: 1,
+        metadata: {}
     });
 
     const handleEditClick = (e: React.MouseEvent, t: FinancialTransaction) => {
@@ -52,11 +58,12 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
             date: new Date().toISOString().split('T')[0],
             amount: 0,
             description: '',
-            category: 'Operacional',
+            category: 'Financeiro',
             isRecurring: false,
             periodicity: 'monthly',
             installments: 1,
-            id: undefined 
+            id: undefined,
+            metadata: {}
         });
         setShowModal(true);
     };
@@ -79,7 +86,8 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
                 organizationId: newTrans.organizationId || 0,
                 isRecurring: newTrans.isRecurring,
                 periodicity: newTrans.periodicity,
-                installments: newTrans.installments
+                installments: newTrans.installments,
+                metadata: newTrans.metadata || {}
             });
         }
         setShowModal(false);
@@ -138,7 +146,6 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
     return (
         <div className="w-full flex flex-col bg-white dark:bg-[#0A0A0C] rounded-[3rem] border border-slate-200 dark:border-white/5 shadow-soft animate-in fade-in duration-500 pb-20">
             
-            {/* Toolbar Central */}
             <div className="p-8 border-b border-slate-100 dark:border-white/5 bg-slate-50/20 dark:bg-white/[0.01] space-y-6">
                 <div className="flex flex-col lg:flex-row gap-6 justify-between items-center">
                     <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
@@ -193,7 +200,6 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
                 </div>
             </div>
 
-            {/* Table Area */}
             <div className="overflow-x-auto custom-scrollbar">
                 <table className="w-full text-left table-auto">
                     <thead className="bg-slate-50/50 dark:bg-white/[0.02] text-slate-400 border-b border-slate-100 dark:border-white/5 text-[9px] font-black uppercase tracking-[0.2em]">
@@ -210,7 +216,7 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
                             <tr><td colSpan={5} className="py-32 text-center">
                                 <div className="flex flex-col items-center gap-4 opacity-30">
                                     <Filter className="w-12 h-12"/>
-                                    <span className="text-xs font-black uppercase tracking-[0.4em]">Nenhum lançamento neste período</span>
+                                    <span className="text-xs font-black uppercase tracking-[0.4em]">Nenhum lançamento</span>
                                 </div>
                             </td></tr>
                         )}
@@ -254,7 +260,6 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
                 </table>
             </div>
 
-            {/* FORM MODAL */}
             {showModal && (
                 <div className="fixed inset-0 z-[3000] flex items-center justify-center p-6 md:p-16 bg-black/90 backdrop-blur-2xl animate-in fade-in duration-300">
                     <div className="w-full max-w-lg rounded-[3rem] shadow-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-[#0A0A0C] overflow-hidden animate-ios-pop flex flex-col max-h-[95vh]">
@@ -309,12 +314,9 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
                                 <div>
                                     <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Categoria</label>
                                     <select value={newTrans.category} onChange={e => setNewTrans({...newTrans, category: e.target.value})} className="w-full p-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xs font-bold outline-none focus:border-amber-500 dark:text-white">
-                                        <option value="Operacional">Operacional</option>
-                                        <option value="Vendas">Vendas</option>
-                                        <option value="Marketing">Marketing</option>
-                                        <option value="Infraestrutura">Infraestrutura</option>
-                                        <option value="Impostos">Impostos</option>
-                                        <option value="Assinatura">Assinatura</option>
+                                        {SHINKO_CATEGORIES.map(cat => (
+                                            <option key={cat} value={cat}>{cat}</option>
+                                        ))}
                                     </select>
                                 </div>
 
@@ -324,7 +326,7 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
                                             <div className="p-2.5 bg-amber-500/10 text-amber-500 rounded-xl"><Repeat className="w-4 h-4"/></div>
                                             <div>
                                                 <span className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-widest block">Recorrência</span>
-                                                <span className="text-[9px] text-slate-500 uppercase font-bold">Lançamento automático</span>
+                                                <span className="text-[9px] text-slate-500 uppercase font-bold">Automático</span>
                                             </div>
                                         </div>
                                         <ElasticSwitch checked={newTrans.isRecurring || false} onChange={() => setNewTrans({...newTrans, isRecurring: !newTrans.isRecurring})} />
