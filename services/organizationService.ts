@@ -15,7 +15,6 @@ export const getPlanDefaultModules = (planId: number): string[] => {
 
 // --- FUNÇÕES DE GESTÃO DE MÓDULOS ---
 
-// fix: added missing fetchSystemModuleMap function required by asaasService
 export const fetchSystemModuleMap = async (): Promise<Record<string, number>> => {
     try {
         const { data, error } = await supabase.from('modulos').select('id, nome');
@@ -83,7 +82,6 @@ export const updateOrgModules = async (orgId: number, moduleList: string[]) => {
     }
 };
 
-// fix: added missing updateOrgModulesByIds function required by adminService
 export const updateOrgModulesByIds = async (orgId: number, moduleIds: number[]) => {
     try {
         if (!orgId) return false;
@@ -121,7 +119,6 @@ export const createOrganization = async (userId: string, name: string, sector: s
         
         // Fallback robusto: se a coluna 'plano' falhar por erro de cache de schema, tenta sem ela
         if (orgError && orgError.message.includes('plano')) {
-            console.warn("Coluna 'plano' não detectada no schema. Tentando criação sem ela...");
             const { data: fallbackOrg, error: fallbackError } = await supabase
                 .from(ORG_TABLE)
                 .insert({ 
@@ -143,6 +140,7 @@ export const createOrganization = async (userId: string, name: string, sector: s
 
         if (!org) throw new Error("Falha ao retornar organização criada.");
 
+        // Criar usuário Dono
         const { error: userError } = await supabase
             .from('users')
             .upsert({ 
@@ -157,7 +155,27 @@ export const createOrganization = async (userId: string, name: string, sector: s
         
         if (userError) throw userError;
 
-        await updateOrgModules(org.id, ['projects', 'kanban', 'ia']);
+        // Ativar módulos iniciais
+        await updateOrgModules(org.id, ['projects', 'kanban', 'ia', 'clients']);
+
+        // --- AUTOMATIZAÇÃO SHINKŌ: CRIAR PROJETO DE SUPORTE DEFAULT ---
+        // Correção: Adicionado 'rde: Morno' para evitar erro NOT NULL
+        const { error: supportError } = await supabase.from('projetos').insert({
+            nome: 'Central de Suporte & Voz do Cliente',
+            descricao: 'Processo padrão para recebimento de feedbacks e chamados técnicos. Este projeto recebe cards automaticamente do portal de tickets.',
+            organizacao: org.id,
+            arquetipo: 'Serviço Tecnológico',
+            intensidade: 1,
+            velocidade: 5,
+            viabilidade: 5,
+            receita: 1,
+            prioseis: 60,
+            cor: '#3B82F6',
+            projoport: false,
+            rde: 'Morno'
+        });
+
+        if (supportError) console.error("Erro ao criar projeto suporte default:", supportError);
 
         await supabase.from('clientes').insert({
             nome: name,

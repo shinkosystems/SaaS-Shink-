@@ -27,6 +27,7 @@ import { AdminPage } from './pages/AdminPage';
 import { EcosystemPage } from './pages/EcosystemPage';
 import { ValueChainDashboard } from './pages/ValueChainDashboard';
 import { AssetsPage } from './pages/AssetsPage';
+import { TicketPortalPage } from './pages/TicketPortalPage';
 
 // Utility Components
 import AuthScreen from './components/AuthScreen';
@@ -96,6 +97,13 @@ const App: React.FC = () => {
 
   const handleRouting = async () => {
       let path = window.location.pathname;
+
+      // Rota Pública de Tickets
+      if (path.startsWith('/ticket/')) {
+          setViewState('ticket-portal');
+          return;
+      }
+
       if (path.startsWith('/blog')) {
           const slug = path.split('/')[2];
           setShowBlog(true);
@@ -238,6 +246,11 @@ const App: React.FC = () => {
       setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
 
+  // Renderização da Rota de Ticket (Pública)
+  if (view === 'ticket-portal') {
+      return <TicketPortalPage />;
+  }
+
   if (!user && !loading) {
       if (showBlog) return ( <InsightCenter initialPostSlug={blogPostSlug} onBack={() => { setShowBlog(false); navigateTo('/'); }} onEnter={() => setShowAuth(true)} /> );
       return (
@@ -344,8 +357,6 @@ const App: React.FC = () => {
 
         {showCreateTask && <QuickTaskModal opportunities={opportunities} onClose={() => setShowCreateTask(false)} onSave={async (task, pid) => {
             if (!userOrgId || !user) return;
-            // Fix for Error: Argument of type '{ ... }' is not assignable to parameter of type 'Partial<DbTask>'. 
-            // Types of property 'id' are incompatible. Type 'string' is not assignable to type 'number'.
             const { id, ...taskWithoutId } = task as any;
             await createTask({...taskWithoutId, projeto: pid ? Number(pid) : null, responsavel: task.assigneeId || user.id, organizacao: userOrgId});
             loadUserData(user.id);
