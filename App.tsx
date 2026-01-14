@@ -39,7 +39,7 @@ import { GuruFab } from './components/GuruFab';
 import { FeedbackModal } from './components/FeedbackModal';
 import { LandingPage } from './components/LandingPage';
 import { InsightCenter } from './components/InsightCenter';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 
 const ROUTES: Record<string, string> = {
     'dashboard': '/',
@@ -98,7 +98,6 @@ const App: React.FC = () => {
   const handleRouting = async () => {
       let path = window.location.pathname;
 
-      // Rota Pública de Tickets
       if (path.startsWith('/ticket/')) {
           setViewState('ticket-portal');
           return;
@@ -246,7 +245,6 @@ const App: React.FC = () => {
       setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
 
-  // Renderização da Rota de Ticket (Pública)
   if (view === 'ticket-portal') {
       return <TicketPortalPage />;
   }
@@ -286,9 +284,11 @@ const App: React.FC = () => {
                         orgType={orgDetails.name}
                         customLogoUrl={orgDetails.logoUrl}
                         onSave={async (opp) => {
-                            await updateOpportunity(opp);
-                            loadUserData(user.id);
-                            onOpenProject(opp);
+                            const updated = await updateOpportunity(opp);
+                            if (updated) {
+                                await loadUserData(user.id);
+                                onOpenProject(updated);
+                            }
                         }}
                         onCancel={() => onOpenProject(editingOpportunity)}
                     />
@@ -314,7 +314,8 @@ const App: React.FC = () => {
                                 await loadUserData(user.id);
                                 onOpenProject(newOpp);
                             } else {
-                                alert("Falha ao salvar o projeto.");
+                                // Tratamento de erro robusto conforme solicitado
+                                alert("Erro de Sincronização: O Framework Shinkō exige uma Organização Ativa e permissões de Dono/Delineador para persistir ativos. Verifique sua conta.");
                                 setView('dashboard');
                             }
                         }}

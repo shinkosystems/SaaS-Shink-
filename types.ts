@@ -14,14 +14,6 @@ export interface TaskProcess {
     created_at: string;
 }
 
-export interface SuccessMilestone {
-    id: string;
-    label: string;
-    description: string;
-    completed: boolean;
-    actionId: string;
-}
-
 export enum RDEStatus {
     HOT = 'Quente',
     WARM = 'Morno',
@@ -187,16 +179,37 @@ export interface DbTask {
     anexos?: Attachment[];
 }
 
-/**
- * Added missing types based on reported errors
- */
+export interface FinancialTransaction {
+    id: string;
+    date: string;
+    description: string;
+    amount: number;
+    type: 'inflow' | 'outflow';
+    category: string;
+    organizationId: number;
+    isContract?: boolean;
+    isRecurring?: boolean;
+    periodicity?: 'monthly' | 'quarterly' | 'semiannual' | 'yearly';
+    installments?: number;
+    metadata?: any;
+    pago?: boolean;
+    comprovante?: string;
+    orgName?: string;
+    modulos?: number[];
+}
+
+// Added missing members below to fix compilation errors
 
 export interface Comment {
     id: string;
     task: number;
-    user: string;
+    user_id: string;
     text: string;
     created_at: string;
+    user_data?: {
+        nome: string;
+        avatar_url: string | null;
+    }
 }
 
 export interface AsaasPayment {
@@ -204,16 +217,17 @@ export interface AsaasPayment {
     value: number;
     status: string;
     date: string;
-    description: string;
+    invoiceUrl?: string;
+    bankSlipUrl?: string;
 }
 
 export interface SubscriptionPlan {
     id: string;
-    dbId?: number;
+    dbId: number;
     name: string;
     price: number;
     features: string[];
-    recommended?: boolean;
+    recommended: boolean;
     cycle: 'MONTHLY' | 'YEARLY';
     colabtotal: number;
     meses: number;
@@ -243,38 +257,19 @@ export interface FinancialRecord {
     churned_mrr: number;
 }
 
-export interface FinancialTransaction {
-    id: string;
-    date: string;
-    description: string;
-    amount: number;
-    type: 'inflow' | 'outflow';
-    category: string;
-    organizationId: number;
-    isContract?: boolean;
-    isRecurring?: boolean;
-    periodicity?: 'monthly' | 'quarterly' | 'semiannual' | 'yearly';
-    installments?: number;
-    metadata?: any;
-    pago?: boolean;
-    comprovante?: string;
-    orgName?: string;
-    modulos?: number[];
-}
-
 export interface DbClient {
     id: string;
     nome: string;
     email: string;
-    telefone?: string;
-    cnpj?: string;
-    endereco?: string;
-    numcolaboradores?: number;
-    valormensal?: number;
-    meses?: number;
-    data_inicio?: string;
-    contrato?: string;
-    logo_url?: string;
+    telefone: string;
+    cnpj: string;
+    endereco: string;
+    numcolaboradores: number;
+    valormensal: number;
+    meses: number;
+    data_inicio: string;
+    contrato: string;
+    logo_url: string;
     status: string;
     organizacao: number;
     tipo_pessoa?: 'Física' | 'Jurídica';
@@ -298,7 +293,7 @@ export interface ProductMetricsData {
 export interface ProductEvent {
     id?: string;
     user_id: string;
-    event_type: 'page_view' | 'feature_use' | 'nps_response' | 'save_opportunity';
+    event_type: 'page_view' | 'feature_use' | 'nps_response' | 'error';
     event_data: any;
     created_at: string;
 }
@@ -324,7 +319,6 @@ export interface AreaAtuacao {
     id: number;
     nome: string;
     custo_base?: number;
-    empresa?: number;
 }
 
 export interface DbPlan {
@@ -341,8 +335,8 @@ export interface CmsCase {
     title: string;
     category: string;
     description: string;
+    image_url: string;
     metric?: string;
-    image_url?: string;
     link_url?: string;
     created_at: string;
 }
@@ -353,16 +347,17 @@ export interface CmsPost {
     slug: string;
     content: string;
     cover_image?: string;
-    og_image?: string;
     tags: string[];
     published: boolean;
     created_at: string;
-    download_title?: string;
-    download_url?: string;
-    download_image_url?: string;
+    updated_at: string;
     seo_title?: string;
     seo_description?: string;
     keywords?: string;
+    download_title?: string;
+    download_url?: string;
+    download_image_url?: string;
+    og_image?: string;
 }
 
 export const PLAN_LIMITS: Record<string, number> = {
@@ -422,7 +417,7 @@ export const getTerminology = (orgType?: string) => {
         recurringLabel: "Recorrência",
         mrrLabel: "MRR",
         archetypes: {
-            [Archetype.SAAS_ENTRY]: { label: "SaaS de Entrada", desc: "Software simples com foco em dor única." },
+            [Archetype.SAAS_ENTRY]: { label: "SaaS de Entrada", desc: "Software simples with foco em dor única." },
             [Archetype.SAAS_PLATFORM]: { label: "Plataforma SaaS", desc: "Ecossistema complexo com múltiplas features." },
             [Archetype.SERVICE_TECH]: { label: "Serviço Tech", desc: "Híbrido entre software e consultoria especializada." },
             [Archetype.INTERNAL_MARKETING]: { label: "Interno / Mkt", desc: "Ferramenta para otimização de processos próprios." }

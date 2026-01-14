@@ -69,68 +69,35 @@ export const createOpportunity = async (opp: Opportunity): Promise<Opportunity |
     if (!supabase) return null;
 
     try {
-        const { data: auth } = await supabase.auth.getUser();
+        const { data: { user } } = await supabase.auth.getUser();
         let targetOrgId = opp.organizationId;
 
-        if (!targetOrgId && auth.user) {
-            const { data: u } = await supabase.from('users').select('organizacao').eq('id', auth.user.id).single();
+        if (!targetOrgId && user) {
+            const { data: u } = await supabase.from('users').select('organizacao').eq('id', user.id).single();
             targetOrgId = u?.organizacao;
         }
 
-        if (!targetOrgId) return null;
+        if (!targetOrgId) {
+            console.error("createOpportunity: organizationId not found.");
+            return null;
+        }
 
         const dbPayload = mapOpportunityToDbProject({ ...opp, organizationId: Number(targetOrgId) });
-        delete dbPayload.id; 
+        
+        // Remove ID to allow serial generation
+        const { id, ...insertData } = dbPayload;
         
         const { data: projectData, error } = await supabase
             .from(TABLE_NAME)
-            .insert(dbPayload)
+            .insert(insertData)
             .select()
             .single();
         
-        if (error) throw new Error(`Falha no banco: ${error.message}`);
-
-        if (opp.bpmn?.nodes && opp.bpmn.nodes.length > 0) {
-            const defaultAssignee = auth.user?.id;
-            for (const node of opp.bpmn.nodes) {
-                if (node.checklist) {
-                    for (const task of node.checklist) {
-                        const { data: parentTask } = await supabase.from('tasks').insert({
-                            projeto: projectData.id,
-                            titulo: task.text,
-                            descricao: task.description || node.label || '',
-                            status: 'todo',
-                            responsavel: task.assigneeId || defaultAssignee,
-                            duracaohoras: Number(task.estimatedHours) || 2,
-                            organizacao: Number(targetOrgId),
-                            gravidade: task.gut?.g || 1, 
-                            urgencia: task.gut?.u || 1, 
-                            tendencia: task.gut?.t || 1,
-                            dataproposta: new Date().toISOString(),
-                            sutarefa: false
-                        }).select().single();
-
-                        if (parentTask && task.subtasks) {
-                            const subtasksPayload = task.subtasks.map(sub => ({
-                                projeto: projectData.id,
-                                titulo: sub.text,
-                                status: 'todo',
-                                responsavel: sub.assigneeId || defaultAssignee,
-                                tarefamae: parentTask.id,
-                                sutarefa: true,
-                                organizacao: Number(targetOrgId),
-                                descricao: 'Subtarefa automatizada',
-                                dataproposta: new Date().toISOString(),
-                                gravidade: 1, urgencia: 1, tendencia: 1,
-                                duracaohoras: 1
-                            }));
-                            if(subtasksPayload.length > 0) await supabase.from('tasks').insert(subtasksPayload);
-                        }
-                    }
-                }
-            }
+        if (error) {
+            console.error("DB Insert Error:", error.message);
+            throw new Error(`Falha no banco: ${error.message}`);
         }
-        
+
         return mapDbProjectToOpportunity(projectData, []);
     } catch (err: any) {
         console.error("createOpportunity error:", err);
@@ -211,6 +178,7 @@ const mapOpportunityToDbProject = (opp: Opportunity): any => {
     const updatedBpmn = { ...opp.bpmn, status: opp.status };
 
     return {
+        id: opp.id ? Number(opp.id) : undefined,
         nome: opp.title || 'Sem Título',
         descricao: opp.description || '',
         cliente: opp.clientId || null,
@@ -230,7 +198,7 @@ const mapOpportunityToDbProject = (opp: Opportunity): any => {
         projoport: opp.status !== 'Active',
         bpmn_structure: updatedBpmn,
         contexto_ia: opp.docsContext || '',
-        color: opp.color || '#F59E0B',
+        cor: opp.color || '#F59E0B',
         mrr: Number(opp.mrr) || 0,
         meses: Number(opp.meses) || 12
     };

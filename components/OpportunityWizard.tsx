@@ -8,7 +8,6 @@ interface Props {
   onSave: (opp: Opportunity) => Promise<void> | void;
   onCancel: () => void;
   orgType?: string;
-  activeModules?: string[];
   customLogoUrl?: string | null;
 }
 
@@ -34,14 +33,14 @@ const STEPS = [
     { id: 0, label: 'Estratégia', icon: Target },
     { id: 1, label: 'DNA', icon: Layers },
     { id: 2, label: 'Economia', icon: Coins },
-    { id: 3, label: 'Impacto', icon: Zap },
-    { id: 4, label: 'Crivo Técnico', icon: ShieldCheck }
+    { id: 3, label: 'Matriz RDE', icon: Zap },
+    { id: 4, label: 'Crivo TADS', icon: ShieldCheck }
 ];
 
 const STATUS_OPTIONS: { value: ProjectStatus; label: string }[] = [
-    { value: 'Future', label: 'Mapear como Oportunidade (Backlog)' },
-    { value: 'Negotiation', label: 'Mapear como Negociação (Comercial)' },
-    { value: 'Active', label: 'Ativar Imediatamente (Execução)' }
+    { value: 'Future', label: 'Backlog / Oportunidade' },
+    { value: 'Negotiation', label: 'Em Negociação' },
+    { value: 'Active', label: 'Ativar na Engenharia' }
 ];
 
 export default function OpportunityWizard({ initialData, onSave, onCancel, orgType, customLogoUrl }: Props) {
@@ -68,21 +67,27 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
   const isInternal = formData.archetype === Archetype.INTERNAL_MARKETING;
 
   const handleSave = async () => {
+      if (!formData.title) return alert("Defina um título para o projeto.");
       setIsSaving(true);
-      const tadsScore = Object.values(formData.tads || {}).filter(Boolean).length * 2;
-      const prioScore = ((formData.velocity || 1) * 0.4 + (formData.viability || 1) * 0.35 + (formData.revenue || 1) * 0.25) * 10;
+      try {
+          const tadsScore = Object.values(formData.tads || {}).filter(Boolean).length * 2;
+          const prioScore = ((formData.velocity || 1) * 0.4 + (formData.viability || 1) * 0.35 + (formData.revenue || 1) * 0.25) * 10;
 
-      await onSave({
-          ...formData,
-          id: initialData?.id || crypto.randomUUID(),
-          mrr: isInternal ? 0 : Number(formData.mrr || 0),
-          meses: Number(formData.meses || 12),
-          prioScore: prioScore,
-          tadsScore: tadsScore,
-          createdAt: initialData?.createdAt || new Date().toISOString(),
-          status: formData.status || 'Future'
-      } as Opportunity);
-      setIsSaving(false);
+          await onSave({
+              ...formData,
+              id: initialData?.id || crypto.randomUUID(),
+              mrr: isInternal ? 0 : Number(formData.mrr || 0),
+              meses: Number(formData.meses || 12),
+              prioScore: prioScore,
+              tadsScore: tadsScore,
+              createdAt: initialData?.createdAt || new Date().toISOString(),
+              status: formData.status || 'Future'
+          } as Opportunity);
+      } catch (e) {
+          console.error("Wizard Save Error:", e);
+      } finally {
+          setIsSaving(false);
+      }
   };
 
   const toggleTads = (key: keyof TadsCriteria) => {
@@ -109,7 +114,7 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                 </button>
                 <div>
                     <h2 className="text-lg lg:text-2xl font-black text-[var(--text-main)] tracking-tighter leading-none truncate max-w-[150px] lg:max-w-none">{isEditing ? 'Refinar' : 'Mapear'} <span className="text-amber-500">Projeto</span>.</h2>
-                    <p className="text-[8px] lg:text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1 lg:mt-2">Framework Shinkō</p>
+                    <p className="text-[8px] lg:text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1 lg:mt-2">FRAMEWORK SHINKŌ</p>
                 </div>
             </div>
             
@@ -122,8 +127,8 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                     ))}
                 </div>
                 {step === STEPS.length - 1 ? (
-                    <button onClick={handleSave} className="px-6 lg:px-12 py-3 lg:py-4 bg-amber-500 text-black rounded-2xl lg:rounded-[1.5rem] font-black text-[10px] lg:text-xs uppercase tracking-widest shadow-glow-amber hover:scale-105 transition-all">
-                        {isSaving ? <Loader2 className="animate-spin w-5 h-5"/> : 'Sincronizar'}
+                    <button onClick={handleSave} disabled={isSaving} className="px-6 lg:px-12 py-3 lg:py-4 bg-amber-500 text-black rounded-2xl lg:rounded-[1.5rem] font-black text-[10px] lg:text-xs uppercase tracking-widest shadow-glow-amber hover:scale-105 transition-all flex items-center gap-2 disabled:opacity-50">
+                        {isSaving ? <Loader2 className="animate-spin w-5 h-5"/> : 'Finalizar Mapeamento'}
                     </button>
                 ) : (
                     <button onClick={() => setStep(s => s + 1)} className="px-6 lg:px-12 py-3 lg:py-4 bg-slate-900 dark:bg-white text-white dark:text-black rounded-2xl lg:rounded-[1.5rem] font-black text-[10px] lg:text-xs uppercase tracking-widest hover:scale-105 transition-all flex items-center gap-2">
@@ -139,48 +144,43 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                 {step === 0 && (
                     <div className="space-y-8 lg:space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
                         <div className="space-y-4">
-                            <div className="w-12 h-12 lg:w-16 lg:h-16 rounded-[1.2rem] lg:rounded-[1.8rem] bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 shadow-glow-amber">
-                                <Sparkles className="w-6 h-6 lg:w-8 lg:h-8"/>
-                            </div>
                             <h3 className="text-4xl lg:text-6xl font-black text-[var(--text-main)] tracking-tighter leading-[1.1]">Onde está o <br/><span className="text-amber-500">Valor?</span></h3>
-                            <p className="text-slate-500 dark:text-slate-400 text-base lg:text-xl font-medium max-w-lg">Defina o nome, contexto e o estado inicial do seu ativo.</p>
+                            <p className="text-slate-500 dark:text-slate-400 text-base lg:text-xl font-medium max-w-lg">Nomeie seu ativo e defina sua governança inicial.</p>
                         </div>
                         <div className="space-y-8 lg:space-y-10">
                             <div>
-                                <label className="text-[8px] lg:text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-3 block ml-1">Identificação</label>
+                                <label className="text-[8px] lg:text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-3 block ml-1">Identificação do Ativo</label>
                                 <input 
                                     autoFocus
                                     value={formData.title}
                                     onChange={e => setFormData({...formData, title: e.target.value})}
-                                    placeholder="Ex: Novo Projeto Estratégico"
+                                    placeholder="Ex: Sistema de Gestão de Frotas v2"
                                     className="w-full bg-[var(--input-bg)] border border-[var(--border-color)] rounded-[1.5rem] lg:rounded-[2rem] p-6 lg:p-8 text-2xl lg:text-4xl font-black text-[var(--text-main)] outline-none focus:border-amber-500/50 transition-all shadow-inner"
                                 />
                             </div>
 
-                            <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
-                                <div>
-                                    <label className="text-[8px] lg:text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-3 block ml-1">Estado de Governança</label>
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                        {STATUS_OPTIONS.map(opt => (
-                                            <button
-                                                key={opt.value}
-                                                type="button"
-                                                onClick={() => setFormData({...formData, status: opt.value})}
-                                                className={`p-4 rounded-2xl border text-[10px] font-black uppercase tracking-widest transition-all ${formData.status === opt.value ? 'bg-amber-500 border-amber-400 text-black shadow-lg scale-105' : 'bg-white/5 border-white/10 text-slate-500 hover:bg-white/10'}`}
-                                            >
-                                                {opt.label}
-                                            </button>
-                                        ))}
-                                    </div>
+                            <div className="space-y-3">
+                                <label className="text-[8px] lg:text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-3 block ml-1">Governança</label>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                    {STATUS_OPTIONS.map(opt => (
+                                        <button
+                                            key={opt.value}
+                                            type="button"
+                                            onClick={() => setFormData({...formData, status: opt.value})}
+                                            className={`p-4 rounded-2xl border text-[10px] font-black uppercase tracking-widest transition-all ${formData.status === opt.value ? 'bg-amber-500 border-amber-400 text-black shadow-lg scale-105' : 'bg-white/5 border-white/10 text-slate-500 hover:bg-white/10'}`}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
 
                             <div>
-                                <label className="text-[8px] lg:text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-3 block ml-1">Escopo e Missão</label>
+                                <label className="text-[8px] lg:text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-3 block ml-1">Contexto Técnico</label>
                                 <textarea 
                                     value={formData.description}
                                     onChange={e => setFormData({...formData, description: e.target.value})}
-                                    placeholder={`Qual ${terms.painPointLabel.toLowerCase()} estamos resolvendo?`}
+                                    placeholder="Descreva a dor que este projeto resolve..."
                                     className="w-full bg-[var(--input-bg)] border border-[var(--border-color)] rounded-[1.5rem] lg:rounded-[2.5rem] p-6 lg:p-10 text-base lg:text-xl text-[var(--text-main)] outline-none focus:border-amber-500/50 transition-all h-48 lg:h-60 resize-none leading-relaxed shadow-inner"
                                 />
                             </div>
@@ -191,7 +191,7 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                 {step === 1 && (
                     <div className="space-y-8 lg:space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
                         <div className="space-y-4">
-                            <h3 className="text-4xl lg:text-6xl font-black text-[var(--text-main)] tracking-tighter leading-none">DNA do <span className="text-amber-500">Projeto</span>.</h3>
+                            <h3 className="text-4xl lg:text-6xl font-black text-[var(--text-main)] tracking-tighter leading-none">DNA do <span className="text-amber-500">Ativo</span>.</h3>
                             <p className="text-slate-500 dark:text-slate-400 text-base lg:text-xl font-medium">Categorize a natureza e o peso da sua solução.</p>
                         </div>
                         
@@ -250,7 +250,7 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                     <div className="space-y-8 lg:space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
                         <div className="space-y-4">
                             <h3 className="text-4xl lg:text-6xl font-black text-[var(--text-main)] tracking-tighter leading-none">Economia do <span className="text-amber-500">Ativo</span>.</h3>
-                            <p className="text-slate-500 dark:text-slate-400 text-base lg:text-xl font-medium">Defina a projeção de receita mensal recorrente para este projeto.</p>
+                            <p className="text-slate-500 dark:text-slate-400 text-base lg:text-xl font-medium">Projete o retorno financeiro deste projeto.</p>
                         </div>
                         
                         {isInternal ? (
@@ -259,8 +259,8 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                                     <Ban className="w-10 h-10 text-slate-400" />
                                 </div>
                                 <div>
-                                    <h4 className="text-2xl font-black text-white">Projeto de Uso Interno</h4>
-                                    <p className="text-slate-500 font-medium max-w-md mx-auto mt-2">Ativos deste arquétipo não geram faturamento direto. O valor é medido por eficiência operacional e redução de custos.</p>
+                                    <h4 className="text-2xl font-black text-white">Projeto Interno</h4>
+                                    <p className="text-slate-500 font-medium max-w-md mx-auto mt-2">Ativos deste arquétipo medem valor por redução de custos ou ganho de eficiência técnica.</p>
                                 </div>
                             </div>
                         ) : (
@@ -270,7 +270,7 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                                         <div className="p-3 bg-emerald-500/10 rounded-2xl text-emerald-500 border border-emerald-500/20">
                                             <Coins className="w-6 h-6"/>
                                         </div>
-                                        <span className="text-xs font-black uppercase tracking-widest text-slate-400">MRR Alvo (Mensal)</span>
+                                        <span className="text-xs font-black uppercase tracking-widest text-slate-400">MRR Alvo</span>
                                     </div>
                                     <div className="relative group">
                                         <span className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl font-black text-slate-500 opacity-50">R$</span>
@@ -282,7 +282,6 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                                             className="w-full bg-black/20 border border-white/10 rounded-[1.5rem] p-6 pl-16 text-4xl font-black text-white outline-none focus:border-emerald-500/50 transition-all"
                                         />
                                     </div>
-                                    <p className="text-[10px] text-slate-500 font-bold uppercase ml-2 tracking-widest">Quanto este ativo deve gerar de recorrência mensal.</p>
                                 </div>
 
                                 <div className="space-y-6 bg-white/5 border border-white/10 p-8 rounded-[2.5rem]">
@@ -291,7 +290,7 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                                             <div className="p-3 bg-blue-500/10 rounded-2xl text-blue-500 border border-blue-500/20">
                                                 <Calendar className="w-6 h-6"/>
                                             </div>
-                                            <span className="text-xs font-black uppercase tracking-widest text-slate-400">Ciclo de Amortização</span>
+                                            <span className="text-xs font-black uppercase tracking-widest text-slate-400">Ciclo</span>
                                         </div>
                                         <span className="text-3xl font-black text-blue-500">{formData.meses} <span className="text-sm">meses</span></span>
                                     </div>
@@ -301,13 +300,9 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                                         onChange={e => setFormData({...formData, meses: parseInt(e.target.value)})}
                                         className="w-full h-3 bg-white/10 rounded-full appearance-none cursor-pointer accent-blue-500"
                                     />
-                                    <div className="flex justify-between text-[8px] font-black text-slate-500 uppercase">
-                                        <span>Curto Prazo</span>
-                                        <span>Longo Prazo</span>
-                                    </div>
                                     <div className="pt-4 border-t border-white/5 flex justify-between items-center">
-                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor do Ativo (Equity):</span>
-                                        <span className="text-lg font-black text-emerald-500">R$ {(Number(formData.mrr || 0) * (formData.meses || 12)).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
+                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor Projetado:</span>
+                                        <span className="text-lg font-black text-emerald-500">R$ {(Number(formData.mrr || 0) * (formData.meses || 12)).toLocaleString('pt-BR')}</span>
                                     </div>
                                 </div>
                             </div>
@@ -319,7 +314,7 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                     <div className="space-y-8 lg:space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
                         <div className="space-y-4">
                             <h3 className="text-4xl lg:text-6xl font-black text-[var(--text-main)] tracking-tighter leading-none">Matriz <span className="text-amber-500">RDE</span>.</h3>
-                            <p className="text-slate-500 dark:text-slate-400 text-base lg:text-xl font-medium">Priorização fundamentada em variáveis de esforço e retorno.</p>
+                            <p className="text-slate-500 dark:text-slate-400 text-base lg:text-xl font-medium">Priorização estratégica baseada em esforço e retorno.</p>
                         </div>
                         <div className="grid grid-cols-1 gap-8 lg:gap-10 glass-card p-6 lg:p-12 border-[var(--border-color)]">
                             {[
@@ -333,9 +328,7 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                                             <div className={`p-3 lg:p-4 rounded-xl lg:rounded-2xl ${item.bg} ${item.color} border border-white/5 shadow-sm`}>
                                                 <item.icon className="w-5 h-5 lg:w-6 lg:h-6" />
                                             </div>
-                                            <div>
-                                                <span className="text-lg lg:text-2xl font-black text-[var(--text-main)] uppercase tracking-tight block leading-none">{item.label}</span>
-                                            </div>
+                                            <span className="text-lg lg:text-2xl font-black text-[var(--text-main)] uppercase tracking-tight block leading-none">{item.label}</span>
                                         </div>
                                         <span className={`text-4xl lg:text-6xl font-black ${item.color} tracking-tighter leading-none`}>{formData[item.key as keyof Opportunity] as number}</span>
                                     </div>
@@ -354,27 +347,27 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                 {step === 4 && (
                     <div className="space-y-8 lg:space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
                         <div className="space-y-4">
-                            <h3 className="text-4xl lg:text-6xl font-black text-[var(--text-main)] tracking-tighter leading-none">Crivo <span className="text-amber-500">T.A.D.S.</span></h3>
-                            <p className="text-slate-500 dark:text-slate-400 text-base lg:text-xl font-medium">Fundamentos contextuais para viabilidade de longo prazo.</p>
+                            <h3 className="text-4xl lg:text-6xl font-black text-[var(--text-main)] tracking-tighter leading-none">Mapear <span className="text-amber-500">Projeto</span>.</h3>
+                            <p className="text-slate-500 dark:text-slate-400 text-base lg:text-xl font-medium">Validadores fundamentais do Framework Shinkō.</p>
                         </div>
-                        <div className="grid grid-cols-1 gap-3 lg:gap-4">
+                        <div className="grid grid-cols-1 gap-4">
                             {[
-                                { key: 'scalability', label: terms.scalabilityLabel, desc: `Escalabilidade em volume sem aumentar proporcionalmente o custo.` },
-                                { key: 'integration', label: terms.integrationLabel, desc: `Conexão fluida com as outras áreas e ferramentas.` },
-                                { key: 'painPoint', label: terms.painPointLabel, desc: `Evidência factual de necessidade real do usuário.` },
-                                { key: 'recurring', label: terms.recurringLabel, desc: `Modelo que permite vínculo de longo prazo.` },
-                                { key: 'mvpSpeed', label: terms.mvpLabel, desc: `Entrega do primeiro marco funcional em tempo recorde.` }
+                                { key: 'scalability', label: terms.scalabilityLabel, desc: `Capacidade de escalar em volume sem aumentar o custo proporcional.` },
+                                { key: 'integration', label: terms.integrationLabel, desc: `Conexão fluida com as outras áreas e ferramentas do ecossistema.` },
+                                { key: 'painPoint', label: terms.painPointLabel, desc: `Evidência factual de necessidade real e imediata do usuário.` },
+                                { key: 'recurring', label: terms.recurringLabel, desc: `Modelo que permite vínculo de longo prazo e faturamento recorrente.` },
+                                { key: 'mvpSpeed', label: terms.mvpLabel, desc: `Entrega funcional rápida para validação de hipótese de mercado.` }
                             ].map(item => (
                                 <button 
                                     key={item.key}
                                     onClick={() => toggleTads(item.key as keyof TadsCriteria)}
-                                    className={`p-5 lg:p-8 rounded-2xl lg:rounded-[2.5rem] border text-left transition-all flex items-center justify-between group ${formData.tads?.[item.key as keyof TadsCriteria] ? 'bg-emerald-500 border-emerald-400 text-black shadow-glow-emerald' : 'bg-[var(--card-bg)] border-[var(--border-color)] text-slate-500 hover:border-amber-500/30'}`}
+                                    className={`p-6 lg:p-8 rounded-[2rem] border text-left transition-all flex items-center justify-between group ${formData.tads?.[item.key as keyof TadsCriteria] ? 'bg-emerald-600 border-emerald-500 text-white shadow-xl scale-[1.02]' : 'bg-[var(--card-bg)] border-[var(--border-color)] text-slate-500 hover:border-amber-500/30'}`}
                                 >
                                     <div className="max-w-[80%] lg:max-w-[85%]">
-                                        <div className={`text-sm lg:text-xl font-black uppercase tracking-tight mb-1 lg:mb-2 ${formData.tads?.[item.key as keyof TadsCriteria] ? 'text-black' : 'text-[var(--text-main)]'}`}>{item.label}</div>
-                                        <div className={`text-[10px] lg:sm font-medium leading-relaxed ${formData.tads?.[item.key as keyof TadsCriteria] ? 'text-black/70' : 'text-slate-500 dark:text-slate-400'}`}>{item.desc}</div>
+                                        <div className={`text-sm lg:text-xl font-black uppercase tracking-tight mb-1 lg:mb-2 ${formData.tads?.[item.key as keyof TadsCriteria] ? 'text-white' : 'text-[var(--text-main)]'}`}>{item.label}</div>
+                                        <div className={`text-[10px] lg:text-sm font-medium leading-relaxed ${formData.tads?.[item.key as keyof TadsCriteria] ? 'text-emerald-100' : 'text-slate-500 dark:text-slate-400'}`}>{item.desc}</div>
                                     </div>
-                                    <div className={`w-10 h-10 lg:w-14 lg:h-14 rounded-xl lg:rounded-2xl flex items-center justify-center border-2 transition-all ${formData.tads?.[item.key as keyof TadsCriteria] ? 'bg-black text-emerald-500 border-black' : 'border-slate-200 dark:border-white/10 group-hover:border-amber-500/50 shadow-sm'}`}>
+                                    <div className={`w-10 h-10 lg:w-14 lg:h-14 rounded-xl lg:rounded-2xl flex items-center justify-center border-2 transition-all ${formData.tads?.[item.key as keyof TadsCriteria] ? 'bg-white text-emerald-600 border-white' : 'border-slate-200 dark:border-white/10 group-hover:border-amber-500/50 shadow-sm'}`}>
                                         {formData.tads?.[item.key as keyof TadsCriteria] && <Check className="w-5 h-5 lg:w-8 lg:h-8 stroke-[4px]"/>}
                                     </div>
                                 </button>
