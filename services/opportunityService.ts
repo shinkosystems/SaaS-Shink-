@@ -40,7 +40,9 @@ export const fetchOpportunities = async (organizationId?: number, clientId?: str
         }
     }
 
-    return projects.map((row: any) => {
+    // Criamos o array de oportunidades e aplicamos um DEEP CLONE no resultado final 
+    // para garantir que nenhuma referência "read-only" do driver do Supabase chegue ao React
+    const results = projects.map((row: any) => {
         const projectTasks = tasks ? tasks.filter((t: any) => t.projeto === row.id) : [];
         const hydratedTasks = projectTasks.map((t: any) => ({
             ...t,
@@ -48,6 +50,8 @@ export const fetchOpportunities = async (organizationId?: number, clientId?: str
         }));
         return mapDbProjectToOpportunity(row, hydratedTasks);
     });
+
+    return JSON.parse(JSON.stringify(results));
   } catch (err) {
     console.error("fetchOpportunities error:", err);
     return null;
@@ -61,7 +65,8 @@ export const fetchOpportunityById = async (id: string | number): Promise<Opportu
         if (error || !project) return null;
 
         const { data: tasks } = await supabase.from('tasks').select('*').eq('projeto', id);
-        return mapDbProjectToOpportunity(project, tasks || []);
+        const result = mapDbProjectToOpportunity(project, tasks || []);
+        return JSON.parse(JSON.stringify(result));
     } catch (e) { return null; }
 };
 
@@ -98,7 +103,8 @@ export const createOpportunity = async (opp: Opportunity): Promise<Opportunity |
             throw new Error(`Falha no banco: ${error.message}`);
         }
 
-        return mapDbProjectToOpportunity(projectData, []);
+        const result = mapDbProjectToOpportunity(projectData, []);
+        return JSON.parse(JSON.stringify(result));
     } catch (err: any) {
         console.error("createOpportunity error:", err);
         return null;
@@ -115,7 +121,8 @@ export const updateOpportunity = async (opp: Opportunity): Promise<Opportunity |
         if (error) return null;
 
         const { data: tasks } = await supabase.from('tasks').select('*').eq('projeto', opp.id);
-        return mapDbProjectToOpportunity(data, tasks || []); 
+        const result = mapDbProjectToOpportunity(data, tasks || []); 
+        return JSON.parse(JSON.stringify(result));
     } catch (err) { return null; }
 };
 
@@ -145,11 +152,8 @@ const mapDbProjectToOpportunity = (row: DbProject, tasks: DbTask[] = []): Opport
         mvpSpeed: !!row.tadsvelocidade
     };
 
-    // DEEP CLONE: Crucial para evitar o erro de 'read-only property lanes'
-    // Garantimos que o objeto JSON vindo do banco seja uma nova instância mutável
-    const bpmnStructureRaw = row.bpmn_structure || { lanes: [], nodes: [], edges: [] };
-    const bpmnStructure = JSON.parse(JSON.stringify(bpmnStructureRaw));
-    
+    // Snapshot BPMN snapshot inicial
+    const bpmnStructure = row.bpmn_structure || { lanes: [], nodes: [], edges: [] };
     const savedStatus = (bpmnStructure as any).status || (row.projoport ? 'Future' : 'Active');
 
     return {

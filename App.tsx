@@ -152,7 +152,7 @@ const App: React.FC = () => {
   };
 
   const setView = (newView: string) => {
-      // Limpeza robusta antes de trocar de visão
+      // Limpeza robusta antes de trocar de visão para evitar travamentos
       setSelectedProjectState(null); 
       setEditingOpportunity(null);
       setIsMobileOpen(false);
@@ -161,13 +161,16 @@ const App: React.FC = () => {
   };
 
   const onOpenProject = (opp: Opportunity) => {
-      setSelectedProjectState(opp);
+      // Garantimos que estamos passando uma cópia mutável
+      const mutableOpp = JSON.parse(JSON.stringify(opp));
+      setSelectedProjectState(mutableOpp);
       setEditingOpportunity(null);
       navigateTo(`/project/${opp.id}`);
   };
 
   const onEditProject = (opp: Opportunity) => {
-      setEditingOpportunity(opp);
+      const mutableOpp = JSON.parse(JSON.stringify(opp));
+      setEditingOpportunity(mutableOpp);
       setSelectedProjectState(null);
       navigateTo(`/project/${opp.id}/edit`);
   };

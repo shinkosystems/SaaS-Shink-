@@ -11,22 +11,24 @@ interface Props {
 
 const MatrixChart: React.FC<Props> = ({ data, onClick, theme = 'dark' }) => {
   
-  // SANITIZAÇÃO: Passamos apenas o necessário para o Recharts.
-  // Evitamos passar o objeto 'bpmn' que contém 'lanes' e pode causar erro de read-only se a lib tentar mutar.
+  /**
+   * CRITICAL FIX: SANITIZAÇÃO ABSOLUTA
+   * O Recharts em produção tenta mutar objetos para animações.
+   * Se passarmos o objeto 'bpmn' (que contém 'lanes'), ele quebrará com erro de 'read-only'.
+   * Aqui extraímos apenas o necessário para o gráfico e o tooltip.
+   */
   const chartData = data.map(d => ({ 
       id: d.id,
       title: d.title,
       status: d.status,
       archetype: d.archetype,
-      mrr: d.mrr,
-      prioScore: d.prioScore,
-      velocity: d.velocity,
-      viability: d.viability,
-      x: d.velocity, 
-      y: d.viability, 
-      z: Number(d.mrr || 1),
-      // Referência guardada para o clique, mas fora da raiz que o Recharts processa intensamente
-      original: d 
+      mrr: Number(d.mrr || 0),
+      prioScore: Number(d.prioScore || 0),
+      velocity: Number(d.velocity || 0),
+      viability: Number(d.viability || 0),
+      x: Number(d.velocity || 0), 
+      y: Number(d.viability || 0), 
+      z: Number(d.mrr || 1)
   }));
 
   const isDark = theme === 'dark';
@@ -42,8 +44,6 @@ const MatrixChart: React.FC<Props> = ({ data, onClick, theme = 'dark' }) => {
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const d = payload[0].payload;
-      const mrr = Number(d.mrr || 0);
-      
       return (
         <div className="p-6 rounded-[1.5rem] backdrop-blur-3xl border shadow-2xl text-xs z-[500] animate-in fade-in zoom-in-95 duration-200" style={{ backgroundColor: colors.tooltipBg, borderColor: colors.tooltipBorder, color: colors.tooltipText }}>
           <div className="flex justify-between items-center mb-4">
@@ -65,7 +65,7 @@ const MatrixChart: React.FC<Props> = ({ data, onClick, theme = 'dark' }) => {
               </div>
               <div className="flex flex-col">
                   <span className="text-[8px] font-black uppercase text-slate-500">MRR Alvo</span>
-                  <span className="font-black text-sm text-emerald-500">R$ {mrr.toLocaleString('pt-BR')}</span>
+                  <span className="font-black text-sm text-emerald-500">R$ {d.mrr.toLocaleString('pt-BR')}</span>
               </div>
           </div>
           <div className="mt-4 bg-blue-500/10 text-blue-500 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase text-center border border-blue-500/10">{d.archetype}</div>
@@ -73,6 +73,14 @@ const MatrixChart: React.FC<Props> = ({ data, onClick, theme = 'dark' }) => {
       );
     }
     return null;
+  };
+
+  const handlePointClick = (pointData: any) => {
+      if (!onClick) return;
+      // Recuperamos a Oportunidade original pelo ID para garantir que o objeto completo (incluindo BPMN) 
+      // seja passado para o Workspace sem ter sido "contaminado" ou mutado pelo Recharts.
+      const original = data.find(item => item.id === pointData.id);
+      if (original) onClick(original);
   };
 
   return (
@@ -115,7 +123,11 @@ const MatrixChart: React.FC<Props> = ({ data, onClick, theme = 'dark' }) => {
             isAnimationActive={false}
           />
           
-          <Scatter name="Ativos" data={chartData} onClick={(node) => onClick && onClick(node.payload.original as Opportunity)}>
+          <Scatter 
+            name="Ativos" 
+            data={chartData} 
+            onClick={(node) => handlePointClick(node.payload)}
+          >
             {chartData.map((entry, index) => {
               const isPrio = entry.x >= 3 && entry.y >= 3;
               return (
