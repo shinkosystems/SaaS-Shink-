@@ -119,8 +119,8 @@ export const fetchAreasAtuacao = async (): Promise<AreaAtuacao[]> => {
     })).sort((a, b) => a.nome.localeCompare(b.nome));
 };
 
-export const fetchOrgMembers = async (organizationId: number): Promise<{id: string, nome: string, cargo: number, area?: string}[]> => {
-    const { data: users, error } = await supabase.from('users').select('id, nome, cargo').eq('organizacao', organizationId);
+export const fetchOrgMembers = async (organizationId: number): Promise<{id: string, nome: string, cargo: number, area?: string, avatar_url?: string}[]> => {
+    const { data: users, error } = await supabase.from('users').select('id, nome, cargo, avatar_url').eq('organizacao', organizationId);
     if (error) return [];
     const cargoIds = [...new Set(users.map((u: any) => u.cargo).filter(Boolean))];
     let areaMap = new Map<number, string>();
@@ -135,6 +135,7 @@ export const fetchOrgMembers = async (organizationId: number): Promise<{id: stri
         id: u.id,
         nome: u.nome,
         cargo: u.cargo,
+        avatar_url: u.avatar_url,
         area: areaMap.get(u.cargo) || 'Sem Cargo'
     }));
 };
@@ -220,7 +221,7 @@ export const updateTask = async (id: number, updates: Partial<DbTask>): Promise<
     let hasAttachmentsUpdate = false;
     let newAttachments: Attachment[] = [];
 
-    // Captura campos válidos
+    // Mapeamento direto para garantir persistência correta
     Object.entries(updates).forEach(([key, value]) => {
         if (key === 'anexos' || key === 'attachments') { 
             hasAttachmentsUpdate = true; 
@@ -228,14 +229,22 @@ export const updateTask = async (id: number, updates: Partial<DbTask>): Promise<
         }
         else if (value !== undefined && key !== 'projetoData' && key !== 'responsavelData' && key !== 'createdat' && key !== 'id') {
             if (key === 'duracaohoras') payload[key] = Math.round(Number(value));
+            else if (key === 'responsavel') payload[key] = value;
+            else if (key === 'status') payload[key] = value;
+            else if (key === 'titulo') payload[key] = value;
+            else if (key === 'category') payload[key] = value;
+            else if (key === 'datafim') payload[key] = value;
+            else if (key === 'datainicio') payload[key] = value;
+            else if (key === 'gravidade') payload[key] = value;
+            else if (key === 'urgencia') payload[key] = value;
+            else if (key === 'tendencia') payload[key] = value;
             else payload[key] = value;
         }
     });
 
     if (Object.keys(payload).length === 0 && !hasAttachmentsUpdate) return null;
-    if (payload.responsavel === null) delete payload.responsavel;
 
-    // Lógica de empacotamento de anexos na descrição (padrão do sistema)
+    // Lógica de empacotamento de anexos na descrição
     const { data: currentTask } = await supabase.from(TASKS_TABLE).select('descricao').eq('id', id).maybeSingle();
     const currentUnpacked = unpackAttachments(currentTask?.descricao || "");
     
@@ -247,7 +256,10 @@ export const updateTask = async (id: number, updates: Partial<DbTask>): Promise<
     delete payload.attachments;
 
     const { data, error = null } = await supabase.from(TASKS_TABLE).update(payload).eq('id', id).select().maybeSingle();
-    if (error) return null;
+    if (error) {
+        console.error("Erro no updateTask:", error.message);
+        return null;
+    }
     if (!data) return null;
     
     const { description, anexos } = unpackAttachments(data.descricao);
