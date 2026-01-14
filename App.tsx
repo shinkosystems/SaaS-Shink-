@@ -152,10 +152,11 @@ const App: React.FC = () => {
   };
 
   const setView = (newView: string) => {
-      setViewState(newView);
+      // Limpeza robusta antes de trocar de visão
       setSelectedProjectState(null); 
       setEditingOpportunity(null);
       setIsMobileOpen(false);
+      setViewState(newView);
       navigateTo(ROUTES[newView] || '/');
   };
 
@@ -297,7 +298,7 @@ const App: React.FC = () => {
                         opportunity={selectedProject} onBack={() => setSelectedProjectState(null)}
                         onUpdate={(opp) => updateOpportunity(opp).then(() => loadUserData(user.id))}
                         onEdit={(opp) => onEditProject(opp)} 
-                        onDelete={(id) => deleteOpportunity(id).then(() => setSelectedProjectState(null))}
+                        onDelete={(id) => deleteOpportunity(id).then(() => { setSelectedProjectState(null); loadUserData(user.id); })}
                         userRole={userRole} currentPlan={currentPlan} activeModules={activeModules}
                         customLogoUrl={orgDetails.logoUrl} orgName={orgDetails.name}
                     />
@@ -314,8 +315,7 @@ const App: React.FC = () => {
                                 await loadUserData(user.id);
                                 onOpenProject(newOpp);
                             } else {
-                                // Tratamento de erro robusto conforme solicitado
-                                alert("Erro de Sincronização: O Framework Shinkō exige uma Organização Ativa e permissões de Dono/Delineador para persistir ativos. Verifique sua conta.");
+                                alert("Erro de Sincronização: O Framework Shinkō exige uma Organização Ativa.");
                                 setView('dashboard');
                             }
                         }}

@@ -145,7 +145,11 @@ const mapDbProjectToOpportunity = (row: DbProject, tasks: DbTask[] = []): Opport
         mvpSpeed: !!row.tadsvelocidade
     };
 
-    const bpmnStructure = row.bpmn_structure || { lanes: [], nodes: [], edges: [] };
+    // DEEP CLONE: Crucial para evitar o erro de 'read-only property lanes'
+    // Garantimos que o objeto JSON vindo do banco seja uma nova instância mutável
+    const bpmnStructureRaw = row.bpmn_structure || { lanes: [], nodes: [], edges: [] };
+    const bpmnStructure = JSON.parse(JSON.stringify(bpmnStructureRaw));
+    
     const savedStatus = (bpmnStructure as any).status || (row.projoport ? 'Future' : 'Active');
 
     return {

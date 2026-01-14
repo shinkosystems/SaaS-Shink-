@@ -11,11 +11,22 @@ interface Props {
 
 const MatrixChart: React.FC<Props> = ({ data, onClick, theme = 'dark' }) => {
   
+  // SANITIZAÇÃO: Passamos apenas o necessário para o Recharts.
+  // Evitamos passar o objeto 'bpmn' que contém 'lanes' e pode causar erro de read-only se a lib tentar mutar.
   const chartData = data.map(d => ({ 
-      ...d, 
+      id: d.id,
+      title: d.title,
+      status: d.status,
+      archetype: d.archetype,
+      mrr: d.mrr,
+      prioScore: d.prioScore,
+      velocity: d.velocity,
+      viability: d.viability,
       x: d.velocity, 
       y: d.viability, 
-      z: Number(d.mrr || 1)
+      z: Number(d.mrr || 1),
+      // Referência guardada para o clique, mas fora da raiz que o Recharts processa intensamente
+      original: d 
   }));
 
   const isDark = theme === 'dark';
@@ -50,7 +61,7 @@ const MatrixChart: React.FC<Props> = ({ data, onClick, theme = 'dark' }) => {
               </div>
               <div className="flex flex-col">
                   <span className="text-[8px] font-black uppercase text-slate-500">PRIO-6 Score</span>
-                  <span className="font-black text-sm text-purple- purple-500">{d.prioScore.toFixed(1)}</span>
+                  <span className="font-black text-sm text-purple-500">{d.prioScore.toFixed(1)}</span>
               </div>
               <div className="flex flex-col">
                   <span className="text-[8px] font-black uppercase text-slate-500">MRR Alvo</span>
@@ -104,7 +115,7 @@ const MatrixChart: React.FC<Props> = ({ data, onClick, theme = 'dark' }) => {
             isAnimationActive={false}
           />
           
-          <Scatter name="Ativos" data={chartData} onClick={(node) => onClick && onClick(node.payload as Opportunity)}>
+          <Scatter name="Ativos" data={chartData} onClick={(node) => onClick && onClick(node.payload.original as Opportunity)}>
             {chartData.map((entry, index) => {
               const isPrio = entry.x >= 3 && entry.y >= 3;
               return (
