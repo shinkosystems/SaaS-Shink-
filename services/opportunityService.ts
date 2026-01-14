@@ -4,16 +4,6 @@ import { Opportunity, DbProject, RDEStatus, Archetype, IntensityLevel, TadsCrite
 
 const TABLE_NAME = 'projetos';
 
-// Função de clonagem profunda ultra-segura para quebrar referências "read-only" de produção
-const secureClone = (data: any) => {
-    if (!data) return data;
-    try {
-        return JSON.parse(JSON.stringify(data));
-    } catch (e) {
-        return { ...data };
-    }
-};
-
 export const fetchOpportunities = async (organizationId?: number, clientId?: string): Promise<Opportunity[] | null> => {
   if (!supabase) return null;
   
@@ -33,20 +23,33 @@ export const fetchOpportunities = async (organizationId?: number, clientId?: str
 
     const { data: projects, error } = await query;
     if (error) return null;
+
     if (!projects || projects.length === 0) return [];
 
     const projectIds = projects.map(p => p.id);
-    const { data: tasks } = await supabase.from('tasks').select('*').in('projeto', projectIds);
 
-    const results = projects.map((row: any) => {
+    let tasksQuery = supabase.from('tasks').select('*').in('projeto', projectIds);
+    const { data: tasks } = await tasksQuery;
+
+    let userMap = new Map<string, any>();
+    if (tasks && tasks.length > 0) {
+        const userIds = [...new Set(tasks.map((t: any) => t.responsavel).filter(Boolean))];
+        if (userIds.length > 0) {
+            const { data: users } = await supabase.from('users').select('id, nome, desenvolvedor').in('id', userIds);
+            users?.forEach(u => userMap.set(u.id, u));
+        }
+    }
+
+    return projects.map((row: any) => {
         const projectTasks = tasks ? tasks.filter((t: any) => t.projeto === row.id) : [];
-        return mapDbProjectToOpportunity(row, projectTasks);
+        const hydratedTasks = projectTasks.map((t: any) => ({
+            ...t,
+            responsavelData: userMap.get(t.responsavel)
+        }));
+        return mapDbProjectToOpportunity(row, hydratedTasks);
     });
-
-    // Retorna uma cópia limpa e mutável para evitar erros de 'read-only' no Recharts
-    return secureClone(results);
   } catch (err) {
-    console.error("fetchOpportunities fatal error:", err);
+    console.error("fetchOpportunities error:", err);
     return null;
   }
 };
@@ -56,20 +59,50 @@ export const fetchOpportunityById = async (id: string | number): Promise<Opportu
     try {
         const { data: project, error } = await supabase.from(TABLE_NAME).select(`*, clienteData:clientes(nome, logo_url)`).eq('id', id).single();
         if (error || !project) return null;
+
         const { data: tasks } = await supabase.from('tasks').select('*').eq('projeto', id);
-        return secureClone(mapDbProjectToOpportunity(project, tasks || []));
+        return mapDbProjectToOpportunity(project, tasks || []);
     } catch (e) { return null; }
 };
 
 export const createOpportunity = async (opp: Opportunity): Promise<Opportunity | null> => {
     if (!supabase) return null;
+
     try {
-        const dbPayload = mapOpportunityToDbProject(opp);
+        const { data: { user } } = await supabase.auth.getUser();
+        let targetOrgId = opp.organizationId;
+
+        if (!targetOrgId && user) {
+            const { data: u } = await supabase.from('users').select('organizacao').eq('id', user.id).single();
+            targetOrgId = u?.organizacao;
+        }
+
+        if (!targetOrgId) {
+            console.error("createOpportunity: organizationId not found.");
+            return null;
+        }
+
+        const dbPayload = mapOpportunityToDbProject({ ...opp, organizationId: Number(targetOrgId) });
+        
+        // Remove ID to allow serial generation
         const { id, ...insertData } = dbPayload;
-        const { data, error } = await supabase.from(TABLE_NAME).insert(insertData).select().single();
-        if (error) throw error;
-        return secureClone(mapDbProjectToOpportunity(data, []));
-    } catch (err: any) { return null; }
+        
+        const { data: projectData, error } = await supabase
+            .from(TABLE_NAME)
+            .insert(insertData)
+            .select()
+            .single();
+        
+        if (error) {
+            console.error("DB Insert Error:", error.message);
+            throw new Error(`Falha no banco: ${error.message}`);
+        }
+
+        return mapDbProjectToOpportunity(projectData, []);
+    } catch (err: any) {
+        console.error("createOpportunity error:", err);
+        return null;
+    }
 };
 
 export const updateOpportunity = async (opp: Opportunity): Promise<Opportunity | null> => {
@@ -77,17 +110,27 @@ export const updateOpportunity = async (opp: Opportunity): Promise<Opportunity |
     try {
         const dbPayload = mapOpportunityToDbProject(opp);
         const { id, ...updateData } = dbPayload;
+        
         const { data, error } = await supabase.from(TABLE_NAME).update(updateData).eq('id', opp.id).select().single();
         if (error) return null;
+
         const { data: tasks } = await supabase.from('tasks').select('*').eq('projeto', opp.id);
-        return secureClone(mapDbProjectToOpportunity(data, tasks || [])); 
+        return mapDbProjectToOpportunity(data, tasks || []); 
     } catch (err) { return null; }
 };
 
 export const deleteOpportunity = async (id: string | number): Promise<boolean> => {
     if (!supabase) return false;
     const numericId = Number(id);
+    if (isNaN(numericId)) return false;
+
     try {
+        const { data: tasks } = await supabase.from('tasks').select('id').eq('projeto', numericId);
+        if (tasks && tasks.length > 0) {
+            const taskIds = tasks.map((t: any) => t.id);
+            await supabase.from('comentarios').delete().in('task', taskIds);
+            await supabase.from('tasks').delete().eq('projeto', numericId);
+        }
         const { error } = await supabase.from(TABLE_NAME).delete().eq('id', numericId);
         return !error;
     } catch (err) { return false; }
@@ -101,14 +144,13 @@ const mapDbProjectToOpportunity = (row: DbProject, tasks: DbTask[] = []): Opport
         recurring: !!row.tadsrecorrencia,
         mvpSpeed: !!row.tadsvelocidade
     };
-    
-    // Garante que o BPMN venha com estrutura mínima mas em objeto novo
-    const bpmn = secureClone(row.bpmn_structure) || { nodes: [], lanes: [], edges: [] };
-    
+
+    const bpmnStructure = row.bpmn_structure || { lanes: [], nodes: [], edges: [] };
+    const savedStatus = (bpmnStructure as any).status || (row.projoport ? 'Future' : 'Active');
+
     return {
         id: row.id.toString(),
         title: row.nome,
-        // CORREÇÃO: O banco usa 'descricao', o App usa 'description'
         description: row.descricao || '',
         clientId: row.cliente || undefined,
         organizationId: row.organizacao,
@@ -121,9 +163,9 @@ const mapDbProjectToOpportunity = (row: DbProject, tasks: DbTask[] = []): Opport
         intensity: (row.intensidade as IntensityLevel) || IntensityLevel.L1,
         tads: tads,
         tadsScore: Object.values(tads).filter(Boolean).length * 2, 
-        status: (bpmn as any).status || (row.projoport ? 'Future' : 'Active'),
+        status: savedStatus,
         createdAt: row.created_at,
-        bpmn: bpmn,
+        bpmn: bpmnStructure,
         dbProjectId: row.id,
         docsContext: row.contexto_ia || '',
         color: row.cor || '#F59E0B',
@@ -133,28 +175,31 @@ const mapDbProjectToOpportunity = (row: DbProject, tasks: DbTask[] = []): Opport
 };
 
 const mapOpportunityToDbProject = (opp: Opportunity): any => {
+    const updatedBpmn = { ...opp.bpmn, status: opp.status };
+
     return {
-        nome: opp.title,
-        descricao: opp.description,
+        id: opp.id ? Number(opp.id) : undefined,
+        nome: opp.title || 'Sem Título',
+        descricao: opp.description || '',
         cliente: opp.clientId || null,
-        rde: opp.rde,
-        velocidade: opp.velocity,
-        viabilidade: opp.viability,
-        receita: opp.revenue,
-        prioseis: opp.prioScore,
-        arquetipo: opp.archetype,
-        intensidade: opp.intensity,
-        tadsescalabilidade: opp.tads?.scalability,
-        tadsintegracao: opp.tads?.integration,
-        tadsdorreal: opp.tads?.painPoint,
-        tadsrecorrencia: opp.tads?.recurring,
-        tadsvelocidade: opp.tads?.mvpSpeed,
-        organizacao: opp.organizationId,
+        rde: opp.rde || 'Morno',
+        velocidade: Number(opp.velocity) || 1,
+        viabilidade: Number(opp.viability) || 1,
+        receita: Number(opp.revenue) || 1,
+        prioseis: Number(opp.prioScore) || 0,
+        arquetipo: opp.archetype || 'SaaS de Entrada',
+        intensidade: Number(opp.intensity) || 1,
+        tadsescalabilidade: !!opp.tads?.scalability,
+        tadsintegracao: !!opp.tads?.integration,
+        tadsdorreal: !!opp.tads?.painPoint,
+        tadsrecorrencia: !!opp.tads?.recurring,
+        tadsvelocidade: !!opp.tads?.mvpSpeed,
+        organizacao: Number(opp.organizationId), 
         projoport: opp.status !== 'Active',
-        bpmn_structure: { ...opp.bpmn, status: opp.status },
-        contexto_ia: opp.docsContext,
-        cor: opp.color,
-        mrr: opp.mrr,
-        meses: opp.meses
+        bpmn_structure: updatedBpmn,
+        contexto_ia: opp.docsContext || '',
+        cor: opp.color || '#F59E0B',
+        mrr: Number(opp.mrr) || 0,
+        meses: Number(opp.meses) || 12
     };
 };
