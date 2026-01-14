@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { findOrgIdByOwnerEmail, createOrganization } from '../services/organizationService';
-import { Loader2, X, Sparkles, ArrowRight, Building2, Users, Eye, EyeOff } from 'lucide-react';
+import { Loader2, X, Sparkles, ArrowRight, Building2, Users, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 
 interface Props {
   onGuestLogin: (persona?: any) => void;
@@ -21,8 +21,8 @@ const AuthScreen: React.FC<Props> = ({ onClose, customLogoUrl, customOrgName }) 
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [showPassword, setShowPassword] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
-  // Registration Flow state
   const [orgFlow, setOrgFlow] = useState<'new' | 'join'>('new');
   const [newOrgName, setNewOrgName] = useState('');
   const [ownerEmail, setOwnerEmail] = useState('');
@@ -33,12 +33,12 @@ const AuthScreen: React.FC<Props> = ({ onClose, customLogoUrl, customOrgName }) 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setErrorMessage(null);
     try {
       if (mode === 'login') {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       } else {
-        // Validation for registration
         if (!name.trim()) throw new Error("Informe seu nome.");
         
         let targetOrgId: number | null = null;
@@ -65,27 +65,29 @@ const AuthScreen: React.FC<Props> = ({ onClose, customLogoUrl, customOrgName }) 
         if (signUpError) throw signUpError;
 
         if (signUpData.user) {
-            // Se for nova organização, criamos agora
             if (orgFlow === 'new') {
-                await createOrganization(signUpData.user.id, newOrgName, 'Tecnologia', '', email, name);
+                try {
+                    await createOrganization(signUpData.user.id, newOrgName, 'Tecnologia', '', email, name);
+                } catch (orgErr: any) {
+                    // Se a criação da org falhar, tentamos informar o usuário
+                    throw new Error(`Conta criada, mas houve um erro ao configurar sua empresa: ${orgErr.message}. Tente fazer login.`);
+                }
             } else {
-                // Se estiver entrando, vinculamos ao ID localizado
                 const { error: updateError } = await supabase
                     .from('users')
                     .update({ 
                         organizacao: targetOrgId, 
                         perfil: 'colaborador',
-                        ativo: true // Solicitação: Novo usuário ativo por padrão
+                        ativo: true 
                     })
                     .eq('id', signUpData.user.id);
-                
                 if (updateError) console.error("Erro ao vincular organização:", updateError);
             }
         }
       }
       onClose();
     } catch (err: any) { 
-        alert(err.message); 
+        setErrorMessage(err.message);
     } finally { 
         setLoading(false); 
     }
@@ -109,6 +111,13 @@ const AuthScreen: React.FC<Props> = ({ onClose, customLogoUrl, customOrgName }) 
             </h2>
             <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px] mt-4">Sistema de Inovação Industrial</p>
         </div>
+
+        {errorMessage && (
+            <div className="mx-12 mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-start gap-3 animate-in shake duration-500">
+                <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5"/>
+                <p className="text-[11px] text-red-200 font-medium leading-relaxed">{errorMessage}</p>
+            </div>
+        )}
 
         <form onSubmit={handleAuth} className="px-12 pb-12 space-y-5">
             {mode === 'register' && (
@@ -197,7 +206,6 @@ const AuthScreen: React.FC<Props> = ({ onClose, customLogoUrl, customOrgName }) 
                                 className="w-full p-4 rounded-2xl bg-white/5 border border-white/10 text-white outline-none focus:border-amber-500/50 transition-all"
                                 placeholder="E-mail de quem te convidou"
                             />
-                            <p className="text-[8px] text-slate-500 font-bold uppercase mt-1 px-1">Você entrará como colaborador.</p>
                         </div>
                     )}
                 </div>
@@ -206,7 +214,7 @@ const AuthScreen: React.FC<Props> = ({ onClose, customLogoUrl, customOrgName }) 
             <button 
                 type="submit" 
                 disabled={loading}
-                className="w-full py-5 bg-white text-black rounded-2xl font-black text-xs uppercase tracking-widest shinko-button flex items-center justify-center gap-2 mt-4 hover:bg-amber-500 transition-all shadow-xl"
+                className="w-full py-5 bg-white text-black rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 mt-4 hover:bg-amber-500 transition-all shadow-xl"
             >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin"/> : mode === 'login' ? 'Entrar no Sistema' : 'Finalizar Cadastro'}
                 <ArrowRight className="w-4 h-4"/>
