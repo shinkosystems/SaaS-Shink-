@@ -1,15 +1,15 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { supabase } from './services/supabaseClient';
-import { Opportunity, BpmnTask } from './types';
+import { Opportunity } from './types';
 import { fetchOpportunities, createOpportunity, updateOpportunity, deleteOpportunity, fetchOpportunityById } from './services/opportunityService';
 import { createTask } from './services/projectService';
-import { updateOrgDetails, fetchActiveOrgModules, getPlanDefaultModules } from './services/organizationService';
+import { fetchActiveOrgModules, getPlanDefaultModules } from './services/organizationService';
 import { subscribeToPresence } from './services/presenceService';
 import { trackUserAccess } from './services/analyticsService';
 import { mapDbPlanIdToString } from './services/asaasService';
 
-// Navigation Components
+// Unificando a importação da Navegação (Usando o arquivo que contém Sidebar e MobileDrawer)
 import { Sidebar, MobileDrawer } from './components/Navigation';
 
 // Page Components
@@ -24,10 +24,8 @@ import { IntelligencePage } from './pages/IntelligencePage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { AdminPage } from './pages/AdminPage';
-import { EcosystemPage } from './pages/EcosystemPage';
 import { ValueChainDashboard } from './pages/ValueChainDashboard';
 import { AssetsPage } from './pages/AssetsPage';
-import { TicketPortalPage } from './pages/TicketPortalPage';
 
 // Utility Components
 import AuthScreen from './components/AuthScreen';
@@ -39,12 +37,11 @@ import { GuruFab } from './components/GuruFab';
 import { FeedbackModal } from './components/FeedbackModal';
 import { LandingPage } from './components/LandingPage';
 import { InsightCenter } from './components/InsightCenter';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 const ROUTES: Record<string, string> = {
     'dashboard': '/',
     'value-chain': '/value-chain',
-    'ecosystem': '/ecosystem',
     'framework-system': '/framework',
     'list': '/projects',
     'create-project': '/project/new',
@@ -98,11 +95,6 @@ const App: React.FC = () => {
   const handleRouting = async () => {
       let path = window.location.pathname;
 
-      if (path.startsWith('/ticket/')) {
-          setViewState('ticket-portal');
-          return;
-      }
-
       if (path.startsWith('/blog')) {
           const slug = path.split('/')[2];
           setShowBlog(true);
@@ -152,7 +144,6 @@ const App: React.FC = () => {
   };
 
   const setView = (newView: string) => {
-      // Limpeza robusta antes de trocar de visão para evitar travamentos
       setSelectedProjectState(null); 
       setEditingOpportunity(null);
       setIsMobileOpen(false);
@@ -161,16 +152,13 @@ const App: React.FC = () => {
   };
 
   const onOpenProject = (opp: Opportunity) => {
-      // Garantimos que estamos passando uma cópia mutável
-      const mutableOpp = JSON.parse(JSON.stringify(opp));
-      setSelectedProjectState(mutableOpp);
+      setSelectedProjectState(JSON.parse(JSON.stringify(opp)));
       setEditingOpportunity(null);
       navigateTo(`/project/${opp.id}`);
   };
 
   const onEditProject = (opp: Opportunity) => {
-      const mutableOpp = JSON.parse(JSON.stringify(opp));
-      setEditingOpportunity(mutableOpp);
+      setEditingOpportunity(JSON.parse(JSON.stringify(opp)));
       setSelectedProjectState(null);
       navigateTo(`/project/${opp.id}/edit`);
   };
@@ -249,10 +237,6 @@ const App: React.FC = () => {
       setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
 
-  if (view === 'ticket-portal') {
-      return <TicketPortalPage />;
-  }
-
   if (!user && !loading) {
       if (showBlog) return ( <InsightCenter initialPostSlug={blogPostSlug} onBack={() => { setShowBlog(false); navigateTo('/'); }} onEnter={() => setShowAuth(true)} /> );
       return (
@@ -318,7 +302,7 @@ const App: React.FC = () => {
                                 await loadUserData(user.id);
                                 onOpenProject(newOpp);
                             } else {
-                                alert("Erro de Sincronização: O Framework Shinkō exige uma Organização Ativa.");
+                                alert("Erro: Organização Inativa.");
                                 setView('dashboard');
                             }
                         }}
@@ -348,7 +332,6 @@ const App: React.FC = () => {
                         {view === 'financial' && <FinancialPage orgType={orgDetails.name} />}
                         {view === 'clients' && <ClientsPage userRole={userRole} onlineUsers={onlineUsers} organizationId={userOrgId || undefined} onOpenProject={onOpenProject} />}
                         {view === 'value-chain' && <ValueChainDashboard organizationId={userOrgId || undefined} />}
-                        {view === 'ecosystem' && <EcosystemPage organizationId={userOrgId || undefined} userRole={userRole} />}
                         {view === 'intelligence' && <IntelligencePage organizationId={userOrgId || undefined} opportunities={opportunities} />}
                         {view === 'assets' && <AssetsPage organizationId={userOrgId || undefined} />}
                         {view === 'settings' && <SettingsPage theme={theme} onToggleTheme={toggleTheme} onlineUsers={onlineUsers} userOrgId={userOrgId} orgDetails={orgDetails} onUpdateOrgDetails={() => {}} setView={setView} userRole={userRole} userData={userData} activeModules={activeModules} onRefreshModules={() => loadUserData(user.id)} />}
@@ -361,8 +344,7 @@ const App: React.FC = () => {
 
         {showCreateTask && <QuickTaskModal opportunities={opportunities} onClose={() => setShowCreateTask(false)} onSave={async (task, pid) => {
             if (!userOrgId || !user) return;
-            const { id, ...taskWithoutId } = task as any;
-            await createTask({...taskWithoutId, projeto: pid ? Number(pid) : null, responsavel: task.assigneeId || user.id, organizacao: userOrgId});
+            await createTask({...task, projeto: pid ? Number(pid) : null, responsavel: task.assigneeId || user.id, organizacao: userOrgId});
             loadUserData(user.id);
             setShowCreateTask(false);
         }} userRole={userRole} />}
