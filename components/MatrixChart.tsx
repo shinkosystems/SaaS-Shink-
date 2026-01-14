@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceArea, Label, ZAxis } from 'recharts';
+import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceArea, ZAxis } from 'recharts';
 import { Opportunity } from '../types';
 
 interface Props {
@@ -11,9 +11,11 @@ interface Props {
 
 const MatrixChart: React.FC<Props> = ({ data, onClick, theme = 'dark' }) => {
   
-  // SANITIZAÇÃO CRÍTICA:
+  // SANITIZAÇÃO ABSOLUTA:
   // Nunca passe o objeto da oportunidade inteiro para o Recharts.
-  // Criamos um objeto "flat" contendo apenas primitivos.
+  // Criamos uma lista de objetos contendo apenas tipos primitivos.
+  // O erro 'read only lanes' acontece porque o Recharts tenta 'decorar' 
+  // o objeto que contém a propriedade lanes.
   const chartData = data.map(d => ({ 
       id: d.id,
       title: d.title,
@@ -44,15 +46,14 @@ const MatrixChart: React.FC<Props> = ({ data, onClick, theme = 'dark' }) => {
 
   const handlePointClick = (pointData: any) => {
       if (!onClick) return;
-      // Recuperamos o objeto completo do array original estável 'data'
-      // garantindo que o componente pai receba o objeto BPMN original e limpo.
+      // Recuperamos o objeto completo do array original estável fora do contexto do gráfico
       const original = data.find(item => item.id === pointData.id);
       if (original) onClick(original);
   };
 
   return (
-    <div className="w-full h-full relative font-sans isolate min-h-[300px]">
-        <ResponsiveContainer width="100%" height="100%">
+    <div className="w-full h-full relative font-sans isolate min-h-[400px]">
+        <ResponsiveContainer width="100%" height="100%" minHeight={400}>
         <ScatterChart margin={{ top: 40, right: 40, bottom: 40, left: 40 }}>
           <ReferenceArea x1={3} x2={6} y1={3} y2={6} fill="#10b981" fillOpacity={0.05} />
           <ReferenceArea x1={0} x2={3} y1={3} y2={6} fill="#eab308" fillOpacity={0.05} />
@@ -67,7 +68,11 @@ const MatrixChart: React.FC<Props> = ({ data, onClick, theme = 'dark' }) => {
           
           <Tooltip content={<CustomTooltip />} isAnimationActive={false} />
           
-          <Scatter data={chartData} onClick={(node) => handlePointClick(node.payload)}>
+          <Scatter 
+            data={chartData} 
+            onClick={(node) => handlePointClick(node.payload)}
+            isAnimationActive={false} // Desativar animação reduz a chance de mutações de propriedade
+          >
             {chartData.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={
                   entry.x >= 3 && entry.y >= 3 ? '#10b981' : 

@@ -4,10 +4,14 @@ import { Opportunity, DbProject, RDEStatus, Archetype, IntensityLevel, TadsCrite
 
 const TABLE_NAME = 'projetos';
 
-// Função utilitária para garantir que o objeto seja mutável e não esteja "frozen"
-const atomicClone = (data: any) => {
+// Função de clonagem profunda ultra-segura para quebrar referências "read-only" de produção
+const secureClone = (data: any) => {
     if (!data) return data;
-    return JSON.parse(JSON.stringify(data));
+    try {
+        return JSON.parse(JSON.stringify(data));
+    } catch (e) {
+        return { ...data };
+    }
 };
 
 export const fetchOpportunities = async (organizationId?: number, clientId?: string): Promise<Opportunity[] | null> => {
@@ -39,7 +43,8 @@ export const fetchOpportunities = async (organizationId?: number, clientId?: str
         return mapDbProjectToOpportunity(row, projectTasks);
     });
 
-    return atomicClone(results);
+    // Retorna uma cópia limpa e mutável para evitar erros de 'read-only' no Recharts
+    return secureClone(results);
   } catch (err) {
     console.error("fetchOpportunities fatal error:", err);
     return null;
@@ -52,7 +57,7 @@ export const fetchOpportunityById = async (id: string | number): Promise<Opportu
         const { data: project, error } = await supabase.from(TABLE_NAME).select(`*, clienteData:clientes(nome, logo_url)`).eq('id', id).single();
         if (error || !project) return null;
         const { data: tasks } = await supabase.from('tasks').select('*').eq('projeto', id);
-        return atomicClone(mapDbProjectToOpportunity(project, tasks || []));
+        return secureClone(mapDbProjectToOpportunity(project, tasks || []));
     } catch (e) { return null; }
 };
 
@@ -63,7 +68,7 @@ export const createOpportunity = async (opp: Opportunity): Promise<Opportunity |
         const { id, ...insertData } = dbPayload;
         const { data, error } = await supabase.from(TABLE_NAME).insert(insertData).select().single();
         if (error) throw error;
-        return atomicClone(mapDbProjectToOpportunity(data, []));
+        return secureClone(mapDbProjectToOpportunity(data, []));
     } catch (err: any) { return null; }
 };
 
@@ -75,7 +80,7 @@ export const updateOpportunity = async (opp: Opportunity): Promise<Opportunity |
         const { data, error } = await supabase.from(TABLE_NAME).update(updateData).eq('id', opp.id).select().single();
         if (error) return null;
         const { data: tasks } = await supabase.from('tasks').select('*').eq('projeto', opp.id);
-        return atomicClone(mapDbProjectToOpportunity(data, tasks || [])); 
+        return secureClone(mapDbProjectToOpportunity(data, tasks || [])); 
     } catch (err) { return null; }
 };
 
@@ -96,11 +101,14 @@ const mapDbProjectToOpportunity = (row: DbProject, tasks: DbTask[] = []): Opport
         recurring: !!row.tadsrecorrencia,
         mvpSpeed: !!row.tadsvelocidade
     };
-    const bpmn = row.bpmn_structure || { nodes: [], lanes: [], edges: [] };
+    
+    // Garante que o BPMN venha com estrutura mínima mas em objeto novo
+    const bpmn = secureClone(row.bpmn_structure) || { nodes: [], lanes: [], edges: [] };
+    
     return {
         id: row.id.toString(),
         title: row.nome,
-        // FIX: Changed row.description to row.descricao because DbProject interface uses 'descricao'
+        // CORREÇÃO: O banco usa 'descricao', o App usa 'description'
         description: row.descricao || '',
         clientId: row.cliente || undefined,
         organizationId: row.organizacao,

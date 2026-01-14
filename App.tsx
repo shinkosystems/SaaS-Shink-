@@ -9,7 +9,7 @@ import { subscribeToPresence } from './services/presenceService';
 import { trackUserAccess } from './services/analyticsService';
 import { mapDbPlanIdToString } from './services/asaasService';
 
-// Unificando a importação da Navegação (Usando o arquivo que contém Sidebar e MobileDrawer)
+// Importação unificada da navegação
 import { Sidebar, MobileDrawer } from './components/Navigation';
 
 // Page Components
@@ -125,7 +125,7 @@ const App: React.FC = () => {
                   setEditingOpportunity(null);
                   setViewState('project-view');
               }
-          } else setView('dashboard');
+          } else setViewState('dashboard');
           return;
       }
 
@@ -152,13 +152,13 @@ const App: React.FC = () => {
   };
 
   const onOpenProject = (opp: Opportunity) => {
-      setSelectedProjectState(JSON.parse(JSON.stringify(opp)));
+      setSelectedProjectState(opp);
       setEditingOpportunity(null);
       navigateTo(`/project/${opp.id}`);
   };
 
   const onEditProject = (opp: Opportunity) => {
-      setEditingOpportunity(JSON.parse(JSON.stringify(opp)));
+      setEditingOpportunity(opp);
       setSelectedProjectState(null);
       navigateTo(`/project/${opp.id}/edit`);
   };
@@ -200,7 +200,7 @@ const App: React.FC = () => {
       try {
           const { data } = await supabase.from('users').select('*').eq('id', userId).single();
           if (data) {
-              setUserData({ name: data.nome, email: data.email, avatar: data.avatar_url });
+              setUserData({ id: data.id, name: data.nome, email: data.email, avatar: data.avatar_url });
               const currentRole = data.perfil || 'colaborador';
               setUserRole(currentRole);
               setUserOrgId(data.organizacao);
@@ -265,81 +265,87 @@ const App: React.FC = () => {
         {view !== 'create-project' && !editingOpportunity && <MobileDrawer {...commonProps} />}
         
         <main className={`flex-1 overflow-hidden relative pt-16 lg:pt-0`}>
-            <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-amber-500 w-8 h-8"/></div>}>
-                {editingOpportunity ? (
-                    <OpportunityWizard 
-                        initialData={editingOpportunity} 
-                        orgType={orgDetails.name}
-                        customLogoUrl={orgDetails.logoUrl}
-                        onSave={async (opp) => {
-                            const updated = await updateOpportunity(opp);
-                            if (updated) {
+            {loading ? (
+                <div className="flex items-center justify-center h-full flex-col gap-4">
+                    <Loader2 className="animate-spin text-amber-500 w-12 h-12"/>
+                    <span className="text-xs font-black uppercase tracking-widest text-slate-400">Sincronizando Workspace...</span>
+                </div>
+            ) : (
+                <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-amber-500 w-8 h-8"/></div>}>
+                    {editingOpportunity ? (
+                        <OpportunityWizard 
+                            initialData={editingOpportunity} 
+                            orgType={orgDetails.name}
+                            customLogoUrl={orgDetails.logoUrl}
+                            onSave={async (opp) => {
+                                await updateOpportunity(opp);
                                 await loadUserData(user.id);
-                                onOpenProject(updated);
-                            }
-                        }}
-                        onCancel={() => onOpenProject(editingOpportunity)}
-                    />
-                ) : selectedProject ? (
-                    <ProjectWorkspace 
-                        opportunity={selectedProject} onBack={() => setSelectedProjectState(null)}
-                        onUpdate={(opp) => updateOpportunity(opp).then(() => loadUserData(user.id))}
-                        onEdit={(opp) => onEditProject(opp)} 
-                        onDelete={(id) => deleteOpportunity(id).then(() => { setSelectedProjectState(null); loadUserData(user.id); })}
-                        userRole={userRole} currentPlan={currentPlan} activeModules={activeModules}
-                        customLogoUrl={orgDetails.logoUrl} orgName={orgDetails.name}
-                    />
-                ) : view === 'create-project' ? (
-                    <OpportunityWizard 
-                        orgType={orgDetails.name}
-                        customLogoUrl={orgDetails.logoUrl}
-                        onSave={async (opp) => {
-                            const newOpp = await createOpportunity({ 
-                                ...opp, 
-                                organizationId: userOrgId || undefined 
-                            });
-                            if (newOpp) {
-                                await loadUserData(user.id);
-                                onOpenProject(newOpp);
-                            } else {
-                                alert("Erro: Organização Inativa.");
-                                setView('dashboard');
-                            }
-                        }}
-                        onCancel={() => setView('dashboard')}
-                    />
-                ) : (
-                    <>
-                        {view === 'dashboard' && <DashboardPage 
-                            opportunities={opportunities} onOpenProject={onOpenProject} 
-                            onNavigate={setView} user={user} theme={theme} 
-                            onGuruPrompt={(p) => setGuruInitialPrompt(p)}
-                        />}
-                        {view === 'framework-system' && <FrameworkPage orgName={orgDetails.name} onBack={() => setView('dashboard')} onSaveToProject={async (opp) => {
-                            const newOpp = await createOpportunity({ ...opp, organizationId: userOrgId || undefined });
-                            if (newOpp) {
-                                await loadUserData(user.id);
-                                onOpenProject(newOpp);
-                            } else setView('dashboard');
-                        }} />}
-                        {view === 'list' && <ProjectsPage opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} onRefresh={() => loadUserData(user.id)} />}
-                        
-                        {view === 'kanban' && <TasksPage initialSubView="kanban" opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} />}
-                        {view === 'calendar' && <TasksPage initialSubView="calendar" opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} />}
-                        {view === 'gantt' && <TasksPage initialSubView="gantt" opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} />}
-                        
-                        {view === 'crm' && <CrmPage organizationId={userOrgId || undefined} />}
-                        {view === 'financial' && <FinancialPage orgType={orgDetails.name} />}
-                        {view === 'clients' && <ClientsPage userRole={userRole} onlineUsers={onlineUsers} organizationId={userOrgId || undefined} onOpenProject={onOpenProject} />}
-                        {view === 'value-chain' && <ValueChainDashboard organizationId={userOrgId || undefined} />}
-                        {view === 'intelligence' && <IntelligencePage organizationId={userOrgId || undefined} opportunities={opportunities} />}
-                        {view === 'assets' && <AssetsPage organizationId={userOrgId || undefined} />}
-                        {view === 'settings' && <SettingsPage theme={theme} onToggleTheme={toggleTheme} onlineUsers={onlineUsers} userOrgId={userOrgId} orgDetails={orgDetails} onUpdateOrgDetails={() => {}} setView={setView} userRole={userRole} userData={userData} activeModules={activeModules} onRefreshModules={() => loadUserData(user.id)} />}
-                        {view === 'profile' && <ProfilePage currentPlan={currentPlan} onRefresh={() => loadUserData(user.id)} />}
-                        {view === 'admin-manager' && (userData?.email === 'peboorba@gmail.com') && <AdminPage onlineUsers={onlineUsers} />}
-                    </>
-                )}
-            </Suspense>
+                                setSelectedProjectState(opp);
+                                setEditingOpportunity(null);
+                            }}
+                            onCancel={() => onOpenProject(editingOpportunity)}
+                        />
+                    ) : selectedProject ? (
+                        <ProjectWorkspace 
+                            opportunity={selectedProject} onBack={() => setSelectedProjectState(null)}
+                            onUpdate={(opp) => updateOpportunity(opp).then(() => loadUserData(user.id))}
+                            onEdit={(opp) => onEditProject(opp)} 
+                            onDelete={(id) => deleteOpportunity(id).then(() => { setSelectedProjectState(null); loadUserData(user.id); })}
+                            userRole={userRole} currentPlan={currentPlan} activeModules={activeModules}
+                            customLogoUrl={orgDetails.logoUrl} orgName={orgDetails.name}
+                        />
+                    ) : view === 'create-project' ? (
+                        <OpportunityWizard 
+                            orgType={orgDetails.name}
+                            customLogoUrl={orgDetails.logoUrl}
+                            onSave={async (opp) => {
+                                const newOpp = await createOpportunity({ 
+                                    ...opp, 
+                                    organizationId: userOrgId || undefined 
+                                });
+                                if (newOpp) {
+                                    await loadUserData(user.id);
+                                    onOpenProject(newOpp);
+                                } else {
+                                    alert("Erro ao salvar projeto.");
+                                    setView('dashboard');
+                                }
+                            }}
+                            onCancel={() => setView('dashboard')}
+                        />
+                    ) : (
+                        <>
+                            {view === 'dashboard' && <DashboardPage 
+                                opportunities={opportunities} onOpenProject={onOpenProject} 
+                                onNavigate={setView} user={user} theme={theme} 
+                                onGuruPrompt={(p) => setGuruInitialPrompt(p)}
+                            />}
+                            {view === 'framework-system' && <FrameworkPage orgName={orgDetails.name} onBack={() => setView('dashboard')} onSaveToProject={async (opp) => {
+                                const newOpp = await createOpportunity({ ...opp, organizationId: userOrgId || undefined });
+                                if (newOpp) {
+                                    await loadUserData(user.id);
+                                    onOpenProject(newOpp);
+                                } else setView('dashboard');
+                            }} />}
+                            {view === 'list' && <ProjectsPage opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} onRefresh={() => loadUserData(user.id)} />}
+                            
+                            {view === 'kanban' && <TasksPage initialSubView="kanban" opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} />}
+                            {view === 'calendar' && <TasksPage initialSubView="calendar" opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} />}
+                            {view === 'gantt' && <TasksPage initialSubView="gantt" opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} />}
+                            
+                            {view === 'crm' && <CrmPage organizationId={userOrgId || undefined} />}
+                            {view === 'financial' && <FinancialPage orgType={orgDetails.name} />}
+                            {view === 'clients' && <ClientsPage userRole={userRole} onlineUsers={onlineUsers} organizationId={userOrgId || undefined} onOpenProject={onOpenProject} />}
+                            {view === 'value-chain' && <ValueChainDashboard organizationId={userOrgId || undefined} />}
+                            {view === 'intelligence' && <IntelligencePage organizationId={userOrgId || undefined} opportunities={opportunities} />}
+                            {view === 'assets' && <AssetsPage organizationId={userOrgId || undefined} />}
+                            {view === 'settings' && <SettingsPage theme={theme} onToggleTheme={toggleTheme} onlineUsers={onlineUsers} userOrgId={userOrgId} orgDetails={orgDetails} onUpdateOrgDetails={() => {}} setView={setView} userRole={userRole} userData={userData} activeModules={activeModules} onRefreshModules={() => loadUserData(user.id)} />}
+                            {view === 'profile' && <ProfilePage currentPlan={currentPlan} onRefresh={() => loadUserData(user.id)} />}
+                            {view === 'admin-manager' && (userData?.email === 'peboorba@gmail.com') && <AdminPage onlineUsers={onlineUsers} />}
+                        </>
+                    )}
+                </Suspense>
+            )}
         </main>
 
         {showCreateTask && <QuickTaskModal opportunities={opportunities} onClose={() => setShowCreateTask(false)} onSave={async (task, pid) => {
