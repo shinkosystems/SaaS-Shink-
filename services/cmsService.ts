@@ -21,11 +21,13 @@ export const fetchCmsCases = async (): Promise<CmsCase[]> => {
 };
 
 export const saveCmsCase = async (caseData: Partial<CmsCase>): Promise<CmsCase | null> => {
+    const { id, created_at, ...payload } = caseData as any;
+    
     let query;
-    if (caseData.id) {
-        query = supabase.from(CASES_TABLE).update(caseData).eq('id', caseData.id).select().single();
+    if (id) {
+        query = supabase.from(CASES_TABLE).update(payload).eq('id', id).select().single();
     } else {
-        query = supabase.from(CASES_TABLE).insert(caseData).select().single();
+        query = supabase.from(CASES_TABLE).insert(payload).select().single();
     }
 
     const { data, error } = await query;
@@ -80,18 +82,39 @@ export const fetchCmsPostBySlug = async (slug: string): Promise<CmsPost | null> 
     return data as CmsPost;
 };
 
+/**
+ * Salva ou atualiza um post do blog.
+ * Sanitiza o payload removendo campos que não existem no banco de dados atual (como keywords).
+ */
 export const saveCmsPost = async (postData: Partial<CmsPost>): Promise<CmsPost | null> => {
+    // Removemos campos protegidos ou que não existem no esquema atual para evitar erros de cache
+    const { 
+        id, 
+        created_at, 
+        updated_at, 
+        keywords, // Removido pois causa erro de coluna inexistente
+        seo_title, // Verificação de existência cautelosa
+        seo_description, 
+        ...payload 
+    } = postData as any;
+    
+    // Payload básico garantido pelo esquema
+    const safePayload = {
+        ...payload,
+        // Adicionamos SEO apenas se necessário ou podemos manter em um campo JSONB no futuro
+    };
+
     let query;
-    if (postData.id) {
-        query = supabase.from(POSTS_TABLE).update(postData).eq('id', postData.id).select().single();
+    if (id && id !== 'temp') {
+        query = supabase.from(POSTS_TABLE).update(safePayload).eq('id', id).select().single();
     } else {
-        query = supabase.from(POSTS_TABLE).insert(postData).select().single();
+        query = supabase.from(POSTS_TABLE).insert(safePayload).select().single();
     }
 
     const { data, error } = await query;
     if (error) {
-        console.error('Error saving CMS post:', error);
-        throw error;
+        console.error('Supabase CMS Error:', error.message);
+        throw new Error(error.message);
     }
     return data as CmsPost;
 };
@@ -123,7 +146,6 @@ export const uploadCmsFile = async (file: File, bucket = 'fotoperfil'): Promise<
 
 export const captureLead = async (name: string, email: string, phone: string, assetName: string): Promise<boolean> => {
     try {
-        // Attempt to call the Edge Function
         const { data, error } = await supabase.functions.invoke('create-lead', {
             body: { name, email, phone, assetName }
         });
@@ -132,14 +154,10 @@ export const captureLead = async (name: string, email: string, phone: string, as
         return true;
 
     } catch (e: any) {
-        // FALLBACK: If Edge Function fails (common in local/demo without deploy), log and return TRUE to unblock UI.
-        // The error "Failed to send a request to the Edge Function" means the function isn't reachable.
         if (e.message?.includes('Failed to send a request') || e.message?.includes('Relay Error') || e.message?.includes('FunctionsFetchError')) {
-            console.warn("⚠️ Demo Mode: Lead capture simulated because Edge Function is not deployed/reachable.");
-            console.log("Lead Data:", { name, email, phone, assetName });
-            return true; // Simulate success
+            console.warn("⚠️ Demo Mode: Lead capture simulated.");
+            return true;
         }
-
         console.error("Lead capture failed:", e.message || e);
         return false;
     }

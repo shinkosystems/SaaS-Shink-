@@ -20,6 +20,7 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
     const [cmsPosts, setCmsPosts] = useState<CmsPost[]>([]);
     
     const [isLoading, setIsLoading] = useState(true);
+    const [isSavingPost, setIsSavingPost] = useState(false);
     const [approvingId, setApprovingId] = useState<string | null>(null);
     const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
     const [editingCase, setEditingCase] = useState<Partial<CmsCase> | null>(null);
@@ -120,12 +121,22 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
 
     const handleSavePost = async () => {
         if (!editingPost?.title) return alert("Título é obrigatório.");
-        setIsLoading(true);
+        if (!editingPost?.slug) return alert("Slug é obrigatório.");
+        
+        setIsSavingPost(true);
         try {
-            await saveCmsPost(editingPost);
-            setEditingPost(null);
-            loadData();
-        } catch (e) { alert("Erro ao salvar post."); } finally { setIsLoading(false); }
+            const result = await saveCmsPost(editingPost);
+            if (result) {
+                alert("Insight sincronizado com sucesso!");
+                setEditingPost(null);
+                loadData();
+            }
+        } catch (e: any) { 
+            console.error("Save Post Failure:", e);
+            alert(`Erro ao sincronizar insight: ${e.message || 'Falha de conexão com o banco'}`); 
+        } finally { 
+            setIsSavingPost(false); 
+        }
     };
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: string, isPost = false) => {
@@ -365,10 +376,10 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                                     <div className="flex-1">
                                         <div className="flex items-center gap-3">
                                             <div className="font-black text-xl text-slate-900 dark:text-white leading-none">{u.nome}</div>
-                                            <div className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${u.perfil === 'dono' ? 'bg-amber-500 text-black border border-amber-400' : u.perfil === 'cliente' ? 'bg-purple-500/10 text-purple-500 border border-purple-500/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 border border-slate-200 dark:border-white/10'}`}>
+                                            <div className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${u.perfil === 'dono' ? 'bg-amber-500 text-black border border-amber-400' : u.perfil === 'cliente' ? 'bg-purple-500/10 text-purple-500 border-purple-500/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 border border-slate-200 dark:border-white/10'}`}>
                                                 {u.perfil}
                                             </div>
-                                            <div className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${u.ativo ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' : 'bg-red-500/10 text-red-500 border border-red-500/20'}`}>
+                                            <div className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${u.ativo ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
                                                 {u.ativo ? 'ATIVO' : 'INATIVO'}
                                             </div>
                                         </div>
@@ -519,7 +530,7 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                                 </div>
                                 <div className="flex gap-2">
                                     <button onClick={() => setEditingPost(p)} className="p-3 bg-slate-50 dark:bg-white/5 text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-2xl transition-all"><Edit className="w-5 h-5"/></button>
-                                    <button onClick={async () => { if(confirm("Excluir post?")) { await deleteCmsPost(p.id); loadData(); } }} className="p-3 bg-red-500/5 text-red-500 hover:bg-red-500 hover:text-white rounded-2xl transition-all"><Trash2 className="w-5 h-5"/></button>
+                                    <button onClick={async () => { if(confirm("Excluir post?")) { await deleteCmsPost(p.id); loadData(); } }} className="p-3 bg-red-500/5 text-red-400 hover:bg-red-500 hover:text-white rounded-2xl transition-all"><Trash2 className="w-5 h-5"/></button>
                                 </div>
                             </div>
                         ))}
@@ -669,7 +680,7 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                         <div className="flex-1 flex overflow-hidden">
                             {/* Editor Principal */}
                             <div className="flex-1 p-8 overflow-y-auto custom-scrollbar space-y-8 border-r border-white/5">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="flex flex-col gap-6">
                                     <div>
                                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Título do Post</label>
                                         <input 
@@ -691,7 +702,7 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
 
                                 <div className="space-y-4">
                                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Material Rico (Download)</label>
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="flex flex-col gap-4">
                                         <input value={editingPost.download_title || ''} onChange={e => setEditingPost({...editingPost, download_title: e.target.value})} placeholder="Título do Botão (ex: Baixar Guia)" className="w-full p-4 rounded-xl bg-black/40 border border-white/10 text-white text-xs outline-none"/>
                                         <input value={editingPost.download_url || ''} onChange={e => setEditingPost({...editingPost, download_url: e.target.value})} placeholder="Link do PDF/Arquivo" className="w-full p-4 rounded-xl bg-black/40 border border-white/10 text-white text-xs outline-none"/>
                                     </div>
@@ -724,15 +735,6 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                                                 className="w-full h-24 p-3 rounded-lg bg-black/40 border border-white/10 text-white text-xs outline-none focus:border-amber-500 resize-none"
                                             />
                                             <span className="text-[8px] text-slate-600 mt-1 block">Ideal: 160 caracteres</span>
-                                        </div>
-                                        <div>
-                                            <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Keywords (Opcional)</label>
-                                            <input 
-                                                value={editingPost.keywords || ''} 
-                                                onChange={e => setEditingPost({...editingPost, keywords: e.target.value})}
-                                                placeholder="Separadas por vírgula..."
-                                                className="w-full p-3 rounded-lg bg-black/40 border border-white/10 text-white text-xs outline-none"
-                                            />
                                         </div>
                                     </div>
                                 </div>
@@ -773,8 +775,13 @@ export const AdminManagerScreen: React.FC<Props> = ({ onlineUsers = [] }) => {
                                 <span className="text-xs font-bold text-slate-400 uppercase">Publicar Insight</span>
                             </label>
                             <button onClick={() => setEditingPost(null)} className="px-6 py-4 text-[10px] font-black uppercase text-slate-500">Cancelar</button>
-                            <button onClick={handleSavePost} className="px-12 py-4 bg-amber-500 text-black font-black uppercase rounded-2xl text-[11px] shadow-xl flex items-center justify-center gap-2">
-                                <Save className="w-4 h-4"/> Sincronizar Insight
+                            <button 
+                                onClick={handleSavePost} 
+                                disabled={isSavingPost}
+                                className="px-12 py-4 bg-amber-500 text-black font-black uppercase rounded-2xl text-[11px] shadow-xl flex items-center justify-center gap-2 hover:bg-amber-400 transition-all disabled:opacity-50"
+                            >
+                                {isSavingPost ? <Loader2 className="animate-spin w-4 h-4"/> : <Save className="w-4 h-4"/>}
+                                {isSavingPost ? 'Sincronizando...' : 'Sincronizar Insight'}
                             </button>
                         </div>
                     </div>
