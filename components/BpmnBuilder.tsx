@@ -119,11 +119,12 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
                 setNodes(hydratedNodes);
                 await saveStructure(hydratedNodes);
             } else {
-                alert("A IA não conseguiu estruturar o fluxo. Verifique se o PDF contém informações técnicas suficientes.");
+                console.warn("AI returned empty flow:", result);
+                alert("A IA não conseguiu estruturar o fluxo. Tente refinar a descrição ou verifique se o PDF subido possui conteúdo legível.");
             }
         } catch (e) {
             console.error("BPMN Gen Error:", e);
-            alert("Houve uma falha na geração do fluxo técnico via IA.");
+            alert("Houve uma falha na comunicação com o motor de IA.");
         } finally {
             setIsGenerating(false);
         }
@@ -167,7 +168,7 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
             const updatedNodes = await syncBpmnTasks(opportunity.dbProjectId, opportunity.organizationId!, scheduledNodes);
             setNodes(updatedNodes);
             await saveStructure(updatedNodes);
-            alert("Kanban Sincronizado: Atividades do documento/briefing integradas ao cronograma.");
+            alert("Kanban Sincronizado: Atividades integradas ao cronograma industrial.");
         } catch (e) {
             console.error("Sync Error:", e);
             alert("Erro ao sincronizar tarefas no Kanban.");
@@ -249,7 +250,7 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
                         </div>
                         <div>
                             <h4 className="text-xl font-black text-[var(--text-main)]">Engenharia não mapeada.</h4>
-                            <p className="text-xs text-slate-500 font-bold mt-2 leading-relaxed">Clique em "Gestar Fluxo IA" para que o Shinkō Engine proponha as atividades baseadas no seu documento de escopo.</p>
+                            <p className="text-xs text-slate-500 font-bold mt-2 leading-relaxed">Clique em "Gestar Fluxo IA" para que o Shinkō Engine analise o seu escopo e proponha as atividades técnicas.</p>
                         </div>
                     </div>
                 ) : (

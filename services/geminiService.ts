@@ -284,24 +284,28 @@ export const generateBpmn = async (title: string, description: string, archetype
     if (!ai) return null;
 
     const systemInstruction = `
-        Você é o Arquiteto de Processos Shinkō. 
-        Sua missão é converter a descrição e, PRINCIPALMENTE, o documento de escopo (PDF) fornecido em um fluxo técnico rigoroso.
+        Você é o Arquiteto de Processos Shinkō. Sua missão é projetar um fluxo técnico rigoroso.
         
-        INSTRUÇÕES DE ENGENHARIA:
-        1. Analise o "DOCS_CONTEXT" (que contém a extração do PDF subido). Se houver requisitos, funcionalidades ou tecnologias lá, elas são sua prioridade absoluta.
-        2. Estruture o fluxo em 5 etapas: 1. Modelagem, 2. Interface, 3. Lógica, 4. Performance, 5. Lançamento.
-        3. Cada etapa deve conter de 3 a 5 tarefas EXTREMAMENTE ESPECÍFICAS baseadas no escopo do PDF. Evite termos genéricos se o PDF trouxer detalhes.
-        4. Estime horas realistas para cada tarefa (mínimo 2h, máximo 16h).
+        PRIORIDADE: Se o "DOCS_CONTEXT" contiver informações (extraídas de um PDF), use-as para criar tarefas extremamente específicas de engenharia.
         
-        RETORNE O JSON EXATAMENTE NO FORMATO: 
-        {"nodes": [{"id": "string", "label": "string", "checklist": [{"text": "string", "estimatedHours": number, "description": "string"}]}]}
+        ESTRUTURA OBRIGATÓRIA (5 Etapas):
+        1. Modelagem (Arquitetura e Dados)
+        2. Interface (UI/UX e Front)
+        3. Lógica (API e Backend)
+        4. Performance (DevOps e Testes)
+        5. Lançamento (Deploy e Onboarding)
+
+        REGRAS:
+        - Cada etapa deve ter de 3 a 5 tarefas.
+        - Estime horas de 2h a 16h por tarefa.
+        - Retorne EXATAMENTE um objeto JSON no formato abaixo.
     `;
 
     const prompt = `
-        TÍTULO: ${title}
+        PROJETO: ${title}
         ARQUÉTIPO: ${archetype}
-        MISSÃO DECLARADA: ${description}
-        DOCS_CONTEXT (DADOS DO PDF): ${docsContext || 'Nenhum documento de escopo subido.'}
+        MISSÃO: ${description}
+        DOCS_CONTEXT (DADOS DO PDF): ${docsContext || 'Nenhum documento anexado.'}
     `;
 
     try {
@@ -335,12 +339,14 @@ export const generateBpmn = async (title: string, description: string, archetype
                                 }
                             }
                         }
-                    }
+                    },
+                    required: ["nodes"]
                 }
             }
         });
         
-        return JSON.parse(response.text || "{}");
+        const text = response.text || "{}";
+        return JSON.parse(text);
     } catch (e) { 
         console.error("BPMN Generation Error:", e);
         return null; 
