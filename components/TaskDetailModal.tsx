@@ -52,6 +52,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
   const fileInputRef = useRef<HTMLInputElement>(null);
   const commentsEndRef = useRef<HTMLDivElement>(null);
 
+  // Calcula o ID real do banco para buscar os comentários
   const effectiveDbId = formData.dbId || (typeof formData.id === 'string' && !isNaN(Number(formData.id)) ? Number(formData.id) : undefined);
 
   useEffect(() => {
@@ -66,13 +67,18 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
     }
     
     const loadInitialData = async () => {
+        // Carrega usuário atual para permissões de exclusão de comentário
         const { data } = await supabase.auth.getUser();
         if (data.user) {
             setCurrentUser(data.user);
         }
         
+        // Busca comentários se tivermos um ID válido
         if (effectiveDbId) {
+            console.debug(`[TaskDetailModal] Buscando comentários para Task DB ID: ${effectiveDbId}`);
             loadComments(Number(effectiveDbId));
+        } else {
+            console.debug(`[TaskDetailModal] Task ainda não sincronizada. ID Local: ${formData.id}`);
         }
     };
     
@@ -83,9 +89,10 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
     setIsLoadingComments(true);
     try {
         const data = await fetchComments(id);
+        console.debug(`[TaskDetailModal] ${data.length} comentários carregados.`);
         setComments(data || []);
     } catch (err) {
-        console.error("Erro ao carregar comentários:", err);
+        console.error("[TaskDetailModal] Erro ao carregar comentários:", err);
     } finally {
         setIsLoadingComments(false);
     }
@@ -109,7 +116,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
     if (!textToSend || isAddingComment) return;
 
     if (!effectiveDbId) {
-        alert("Sincronize esta tarefa antes de comentar.");
+        alert("Sincronize esta tarefa (botão laranja 'SINCRONIZAR ATIVO') antes de comentar.");
         return;
     }
 
@@ -126,11 +133,19 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
 
         const comment = await addComment(Number(effectiveDbId), user.id, textToSend);
         if (comment) {
-            setComments(prev => [...prev, comment]);
+            // Se o comentário veio sem user_data (fallback), injetamos os dados locais do usuário para a UI
+            const uiComment = {
+                ...comment,
+                user_data: comment.user_data || {
+                    nome: user.user_metadata?.full_name || 'Você',
+                    avatar_url: user.user_metadata?.avatar_url || null
+                }
+            };
+            setComments(prev => [...prev, uiComment]);
             setNewComment('');
             setTimeout(scrollToBottom, 100);
         } else {
-            throw new Error("Falha na persistência.");
+            throw new Error("Erro de persistência no servidor.");
         }
     } catch (err: any) {
         alert(`Não foi possível enviar: ${err.message}`);
@@ -151,16 +166,18 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
       try {
           const finalData = { ...formData, tags: [formData.category || 'Gestão'] };
           const result = await onSave(finalData);
+          
           if (result && (result as any).dbId) {
               setFormData(prev => ({ ...prev, dbId: (result as any).dbId }));
           }
+          
           if (!formData.dbId && !effectiveDbId) {
-              alert("Sincronizada!");
+              alert("Tarefa sincronizada com sucesso! Comentários habilitados.");
           } else {
               onClose();
           }
       } catch (e) {
-          alert("Erro na sincronização.");
+          alert("Erro ao sincronizar dados.");
       } finally {
           setIsSaving(false);
       }
@@ -285,7 +302,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                                                     {comment.user_data?.avatar_url ? <img src={comment.user_data.avatar_url} className="w-full h-full object-cover" /> : <UserIcon className="w-5 h-5 text-slate-400"/>}
                                                 </div>
                                                 <div className="flex-1">
-                                                    <div className="bg-white p-5 rounded-[1.8rem] border border-slate-100 shadow-sm group-hover:border-amber-500/20 transition-all">
+                                                    <div className="bg-white p-4 rounded-[1.5rem] border border-slate-100 shadow-sm group-hover:border-amber-500/20 transition-all">
                                                         <div className="flex justify-between items-center mb-1">
                                                             <span className="text-[10px] font-black text-slate-900 uppercase tracking-wider">{comment.user_data?.nome || 'Membro do Time'}</span>
                                                             <div className="flex items-center gap-3">
