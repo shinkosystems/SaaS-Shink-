@@ -182,7 +182,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
         return;
     }
     if (onDelete && (formData.dbId || formData.id)) {
-        if (confirm("Deseja realmente excluir permanentemente esta tarefa?")) {
+        if (confirm("Deseja realmente excluir permanentemente esta tarefa do fluxo?")) {
             onDelete(formData.id);
         }
     } else {
@@ -288,7 +288,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                         </div>
                     </div>
 
-                    {/* Comentários - NOVA SEÇÃO */}
+                    {/* Comentários */}
                     <div className="flex gap-6 items-start">
                         <div className="mt-1 text-slate-300 shrink-0"><MessageSquare className="w-7 h-7" /></div>
                         <div className="flex-1 space-y-6">
@@ -508,7 +508,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                 {isUploading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Paperclip className="w-4 h-4 text-amber-500" />} ANEXAR ATIVO
             </button>
             <div className="flex gap-10 items-center w-full md:w-auto justify-end">
-                <button onClick={onClose} className="px-4 py-2 text-[11px] font-black text-slate-400 hover:text-red-500 uppercase tracking-[0.3em] transition-colors">{readOnly ? 'FECHAR' : 'DESCARTAR'}</button>
+                <button onClick={handleDiscard} className="px-4 py-2 text-[11px] font-black text-slate-400 hover:text-red-500 uppercase tracking-[0.3em] transition-colors">{readOnly ? 'FECHAR' : 'DESCARTAR'}</button>
                 {!readOnly && (
                     <button onClick={handleSync} disabled={isSaving || isUploading} className="flex-1 md:flex-none flex items-center gap-5 px-16 py-6 bg-[#F59E0B] hover:bg-amber-400 text-white rounded-[2rem] text-xs font-black uppercase tracking-[0.2em] shadow-2xl shadow-amber-500/30 transition-all disabled:opacity-50">
                         {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} SINCRONIZAR ATIVO
