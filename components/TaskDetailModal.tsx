@@ -52,7 +52,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
   const fileInputRef = useRef<HTMLInputElement>(null);
   const commentsEndRef = useRef<HTMLDivElement>(null);
 
-  // Normalização agressiva do ID: prioriza dbId real ou tenta converter o ID string se for numérico
   const effectiveDbId = formData.dbId || (typeof formData.id === 'string' && !isNaN(Number(formData.id)) ? Number(formData.id) : undefined);
 
   useEffect(() => {
@@ -151,7 +150,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
       try {
           const finalData = { ...formData, tags: [formData.category || 'Gestão'] };
           const result = await onSave(finalData);
-          // Se a função onSave retornar a tarefa atualizada, podemos atualizar o ID local
           if (result && (result as any).dbId) {
               setFormData(prev => ({ ...prev, dbId: (result as any).dbId }));
           }
@@ -270,7 +268,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                         </div>
                     </div>
 
-                    {/* SEÇÃO DE COMENTÁRIOS - CORREÇÃO AQUI */}
                     <div className="flex gap-6 items-start">
                         <div className="mt-1 text-slate-300 shrink-0"><MessageSquare className="w-7 h-7" /></div>
                         <div className="flex-1 space-y-6">
@@ -292,12 +289,12 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                                                             <span className="text-[10px] font-black text-slate-900 uppercase tracking-wider">{comment.user_data?.nome || 'Membro'}</span>
                                                             <div className="flex items-center gap-3">
                                                                 <span className="text-[8px] font-bold text-slate-400 uppercase">{new Date(comment.created_at).toLocaleString('pt-BR')}</span>
-                                                                {currentUser?.id === comment.user_id && (
+                                                                {currentUser?.id === comment.usuario && (
                                                                     <button onClick={() => handleDeleteComment(comment.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-all"><Trash2 className="w-3.5 h-3.5"/></button>
                                                                 )}
                                                             </div>
                                                         </div>
-                                                        <p className="text-sm text-slate-600 font-medium leading-relaxed">{comment.text}</p>
+                                                        <p className="text-sm text-slate-600 font-medium leading-relaxed">{comment.mensagem}</p>
                                                     </div>
                                                 </div>
                                             </div>

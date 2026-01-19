@@ -35,7 +35,7 @@ export const fetchOpportunities = async (organizationId?: number, clientId?: str
     if (tasks && tasks.length > 0) {
         const userIds = [...new Set(tasks.map((t: any) => t.responsavel).filter(Boolean))];
         if (userIds.length > 0) {
-            const { data: users } = await supabase.from('users').select('id, nome, desenvolvedor').in('id', userIds);
+            const { data: users } = await supabase.from('users').select('id, nome, avatar_url').in('id', userIds);
             users?.forEach(u => userMap.set(u.id, u));
         }
     }
@@ -74,32 +74,27 @@ export const createOpportunity = async (opp: Opportunity): Promise<Opportunity |
 
         let targetOrgId = opp.organizationId;
 
-        // Recuperação de emergência da Organização se não informada pelo App.tsx
         if (!targetOrgId || targetOrgId === 0) {
-            const { data: u, error: uError } = await supabase.from('users').select('organizacao').eq('id', user.id).single();
-            if (uError) throw new Error("Erro ao validar permissões de organização.");
+            const { data: u } = await supabase.from('users').select('organizacao').eq('id', user.id).single();
             targetOrgId = u?.organizacao;
         }
 
         if (!targetOrgId) {
-            throw new Error("Vínculo de Organização não encontrado no seu perfil.");
+            throw new Error("Vínculo de Organização obrigatório para o Framework.");
         }
 
         const dbPayload = mapOpportunityToDbProject({ ...opp, organizationId: Number(targetOrgId) });
         const { id, ...insertData } = dbPayload;
         
-        const { data: projectData, error } = await supabase
+        const { data, error } = await supabase
             .from(TABLE_NAME)
             .insert(insertData)
             .select()
             .single();
         
-        if (error) {
-            console.error("DB Insert Error:", error.message);
-            throw new Error(error.message);
-        }
+        if (error) throw error;
 
-        return mapDbProjectToOpportunity(projectData, []);
+        return mapDbProjectToOpportunity(data, []);
     } catch (err: any) {
         console.error("createOpportunity error:", err.message);
         throw err;
@@ -113,26 +108,17 @@ export const updateOpportunity = async (opp: Opportunity): Promise<Opportunity |
         const { id, ...updateData } = dbPayload;
         
         const { data, error } = await supabase.from(TABLE_NAME).update(updateData).eq('id', opp.id).select().single();
-        if (error) {
-            console.error("Update Project Error:", error.message);
-            return null;
-        }
+        if (error) return null;
 
-        // Buscamos as tasks novamente para retornar o objeto Opportunity completo e hidratado
         const { data: tasks } = await supabase.from('tasks').select('*').eq('projeto', opp.id);
         return mapDbProjectToOpportunity(data, tasks || []); 
-    } catch (err) { 
-        console.error("updateOpportunity exception:", err);
-        return null; 
-    }
+    } catch (err) { return null; }
 };
 
 export const deleteOpportunity = async (id: string | number): Promise<boolean> => {
     if (!supabase) return false;
-    const numericId = Number(id);
-    if (isNaN(numericId)) return false;
-
     try {
+        const numericId = Number(id);
         const { data: tasks } = await supabase.from('tasks').select('id').eq('projeto', numericId);
         if (tasks && tasks.length > 0) {
             const taskIds = tasks.map((t: any) => t.id);
@@ -187,7 +173,6 @@ const mapOpportunityToDbProject = (opp: Opportunity): any => {
     const updatedBpmn = { ...opp.bpmn, status: opp.status };
 
     return {
-        id: opp.id && !isNaN(Number(opp.id)) ? Number(opp.id) : undefined,
         nome: opp.title || 'Sem Título',
         descricao: opp.description || '',
         cliente: opp.clientId || null,

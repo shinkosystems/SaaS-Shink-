@@ -1,12 +1,8 @@
-
 import { GoogleGenAI, Type, GenerateContentResponse, FunctionDeclaration } from "@google/genai";
 import { Opportunity, Archetype } from "../types";
 
-const getAiClient = () => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) return null;
-  return new GoogleGenAI({ apiKey });
-};
+// Fix: Always use process.env.API_KEY directly for initialization as per guidelines.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 async function retryOperation<T>(operation: () => Promise<T>, retries = 3, delay = 2000): Promise<T> {
     try {
@@ -23,40 +19,42 @@ async function retryOperation<T>(operation: () => Promise<T>, retries = 3, delay
 }
 
 /**
- * IA Document Reader: Extrai contexto estratégico de PDFs
+ * IA Document Reader: Extrai contexto estratégico de PDFs seguindo o Framework Shinkō
  */
 export const extractProjectDetailsFromPdf = async (pdfBase64: string): Promise<any> => {
-    const ai = getAiClient();
-    if (!ai) return null;
-
     const systemInstruction = `
         Você é o Shinkō Document Intelligence. 
         Sua missão é ler um documento de escopo/projeto (PDF) e extrair os fundamentos estratégicos para o Framework Shinkō.
         
-        RETORNE EXATAMENTE UM JSON COM:
-        {
-          "title": "Título curto e impactante",
-          "description": "Resumo executivo focado na dor que o projeto resolve",
-          "archetype": "Um dos valores exatos: 'SaaS de Entrada', 'SaaS Plataforma', 'Serviço Tecnológico' ou 'Interno / Marketing'",
-          "intensity": número de 1 a 4,
-          "suggestedSummary": "Extraia TODOS os requisitos técnicos, funcionalidades mencionadas, tecnologias citadas e restrições. Este texto será usado para gerar a lista de tarefas da engenharia."
-        }
+        REGRAS DO FRAMEWORK:
+        - Matriz RDE: Priorize entre Velocidade, Viabilidade e Receita.
+        - Crivo TADS: Escalabilidade, Integração, Dor Real, Recorrência e Velocidade de MVP.
+        - Arquétipos: SaaS de Entrada, SaaS Plataforma, Serviço Tecnológico ou Interno/Marketing.
     `;
 
     try {
+        // Fix: Use correct contents object structure with parts array as per guidelines.
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
-            contents: [
-                {
-                    parts: [
-                        { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } },
-                        { text: "Analise este documento e extraia os dados conforme instruído." }
-                    ]
-                }
-            ],
+            contents: {
+                parts: [
+                    { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } },
+                    { text: "Analise este documento e extraia o título, descrição, arquétipo (SaaS de Entrada, SaaS Plataforma, Serviço Tecnológico ou Interno / Marketing), intensidade (1 a 4) e um resumo dos requisitos técnicos." }
+                ]
+            },
             config: { 
                 systemInstruction,
-                responseMimeType: "application/json"
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        title: { type: Type.STRING },
+                        description: { type: Type.STRING },
+                        archetype: { type: Type.STRING },
+                        intensity: { type: Type.NUMBER },
+                        suggestedSummary: { type: Type.STRING }
+                    }
+                }
             }
         });
 
@@ -67,7 +65,7 @@ export const extractProjectDetailsFromPdf = async (pdfBase64: string): Promise<a
     }
 };
 
-// --- DICIONÁRIO DE FERRAMENTAS CRUD DO GURU ---
+// --- FERRAMENTAS DO GURU ---
 
 const controlTools: FunctionDeclaration[] = [
     {
@@ -88,25 +86,6 @@ const controlTools: FunctionDeclaration[] = [
         }
     },
     {
-        name: "manage_value_chain",
-        description: "Cria um novo processo/atividade no Fluxo de Valor (Cadeia de Valor).",
-        parameters: {
-            type: Type.OBJECT,
-            properties: {
-                title: { type: Type.STRING, description: "Nome do processo." },
-                category: { 
-                    type: Type.STRING, 
-                    enum: ['Apoio-Adm', 'Apoio-Gestão', 'Primária-Modelagem', 'Primária-Interface', 'Primária-Lógica', 'Primária-Marketing'],
-                    description: "Pilar do Framework Shinkō."
-                },
-                weight: { type: Type.NUMBER, description: "Peso para cálculo de rateio (1 a 10)." },
-                projectId: { type: Type.NUMBER, description: "ID do projeto vinculado." },
-                evidenceUrl: { type: Type.STRING, description: "Link opcional para evidência." }
-            },
-            required: ["title", "category", "projectId"]
-        }
-    },
-    {
         name: "manage_project",
         description: "Cria ou atualiza projetos estratégicos no portfólio.",
         parameters: {
@@ -121,67 +100,15 @@ const controlTools: FunctionDeclaration[] = [
             },
             required: ["action"]
         }
-    },
-    {
-        name: "add_financial_record",
-        description: "Registra uma nova transação financeira (Entrada/Saída).",
-        parameters: {
-            type: Type.OBJECT,
-            properties: {
-                description: { type: Type.STRING, description: "Descrição do lançamento." },
-                amount: { type: Type.NUMBER, description: "Valor monetário." },
-                type: { type: Type.STRING, enum: ["inflow", "outflow"], description: "Natureza da transação." },
-                category: { type: Type.STRING, description: "Categoria (Vendas, Operacional, etc)." }
-            },
-            required: ["description", "amount", "type"]
-        }
-    },
-    {
-        name: "manage_crm_lead",
-        description: "Cria uma nova oportunidade de venda no CRM.",
-        parameters: {
-            type: Type.OBJECT,
-            properties: {
-                title: { type: Type.STRING, description: "Título da negociação." },
-                value: { type: Type.NUMBER, description: "Valor estimado do contrato." },
-                company: { type: Type.STRING, description: "Nome da empresa lead." },
-                contact: { type: Type.STRING, description: "Nome do contato principal." }
-            },
-            required: ["title", "value", "company"]
-        }
-    },
-    {
-        name: "navigate_to",
-        description: "Muda a visualização do usuário para outra tela do sistema.",
-        parameters: {
-            type: Type.OBJECT,
-            properties: {
-                view: { 
-                    type: Type.STRING, 
-                    enum: ["dashboard", "projects", "kanban", "calendar", "crm", "financial", "intelligence", "settings", "value-chain"],
-                    description: "Destino da navegação." 
-                }
-            },
-            required: ["view"]
-        }
     }
 ];
 
 export const askGuru = async (question: string, context: string): Promise<{ text: string, functionCalls?: any[] }> => {
-    const ai = getAiClient();
-    if (!ai) return { text: "Guru offline (Verifique sua API Key)." };
-
     const systemInstruction = `
         Você é o Shinkō Guru, assistente operacional de elite (COO/CTO Virtual).
-        
-        PODERES: Você pode criar tarefas, projetos, processos na cadeia de valor, leads de CRM e registros financeiros via ferramentas.
-        COMPORTAMENTO: Seja direto, técnico e aja como um braço direito do gestor.
+        PODERES: Você pode criar tarefas e projetos via ferramentas.
         CONTEXTO ATUAL: ${context}
-
-        REGRAS DE OURO:
-        1. Se o usuário pedir algo que você pode fazer (ex: 'adiciona um processo no fluxo de valor'), SEMPRE use a ferramenta correspondente.
-        2. Responda em Português do Brasil de forma concisa.
-        3. Use Markdown para clareza.
+        COMPORTAMENTO: Seja direto, técnico e aja como um braço direito do gestor. Responda em Português.
     `;
 
     try {
@@ -200,15 +127,7 @@ export const askGuru = async (question: string, context: string): Promise<{ text
     }
 };
 
-/**
- * AI Smart Schedule Engine
- */
-export const optimizeSchedule = async (tasks: any[], availableTeam: any[], globalCapacity: number = 8): Promise<any[]> => {
-    const ai = getAiClient();
-    if (!ai || tasks.length === 0) return [];
-
-    const systemInstruction = `Você é o Engenheiro de Operações Shinkō. Sua missão é otimizar o cronograma de execução técnica.`;
-
+export const optimizeSchedule = async (tasks: any[], availableTeam: any[]): Promise<any[]> => {
     const prompt = `OTIMIZAR O SEGUINTE PIPELINE DE TAREFAS: ${JSON.stringify(tasks.map(t => ({
         id: t.id,
         titulo: t.titulo,
@@ -220,7 +139,6 @@ export const optimizeSchedule = async (tasks: any[], availableTeam: any[], globa
             model: 'gemini-3-flash-preview',
             contents: prompt,
             config: { 
-                systemInstruction,
                 responseMimeType: "application/json",
                 responseSchema: {
                     type: Type.ARRAY,
@@ -241,72 +159,67 @@ export const optimizeSchedule = async (tasks: any[], availableTeam: any[], globa
     } catch (e) { return []; }
 };
 
-export const analyzeOpportunity = async (title: string, description: string, orgType?: string): Promise<string> => {
-  const ai = getAiClient();
-  if (!ai) return "API Key ausente.";
+export const analyzeOpportunity = async (title: string, description: string): Promise<string> => {
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Analise viabilidade estratégica: ${title} - ${description}.`,
+      contents: `Analise viabilidade estratégica do ativo "${title}" com base na missão: "${description}". Dê um veredito direto de 2 frases.`,
     });
     return response.text || "Sem análise.";
   } catch (error) { return "Erro IA."; }
 };
 
 export const generateDashboardInsight = async (contextSummary: string): Promise<any> => {
-    const ai = getAiClient();
-    if (!ai) return null;
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
-            contents: `Analise contexto e retorne JSON {alertTitle, alertLevel, insightText, actions: [{label, actionId}]}. Contexto: ${contextSummary}`,
-            config: { responseMimeType: "application/json" }
+            contents: `Analise o contexto operacional e retorne um JSON com alertas e insights. Contexto: ${contextSummary}`,
+            config: { 
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        alertTitle: { type: Type.STRING },
+                        alertLevel: { type: Type.STRING, enum: ['critical', 'warning', 'info'] },
+                        insightText: { type: Type.STRING },
+                        actions: {
+                            type: Type.ARRAY,
+                            items: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    label: { type: Type.STRING },
+                                    actionId: { type: Type.STRING }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         });
         return JSON.parse(response.text || "{}");
     } catch (e) { return null; }
 };
 
-export const generateSubtasksForTask = async (taskTitle: string, context: string, orgType?: string, teamMembers?: any[]): Promise<any[]> => {
-    const ai = getAiClient();
-    if (!ai) return [];
-    try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: `Checklist técnico para: ${taskTitle}.`,
-            config: { responseMimeType: "application/json" }
-        });
-        return JSON.parse(response.text || "[]");
-    } catch (e) { return []; }
-};
-
-export const generateBpmn = async (title: string, description: string, archetype: string, docsContext?: string, orgType?: string, availableRoles?: any[]): Promise<any> => {
-    const ai = getAiClient();
-    if (!ai) return null;
-
+/**
+ * Fix: Updated signature to accept 6 arguments as expected by BpmnBuilder.tsx call site.
+ */
+export const generateBpmn = async (
+    title: string, 
+    description: string, 
+    archetype: string, 
+    docsContext?: string, 
+    customPrompt?: string, 
+    roles?: any[]
+): Promise<any> => {
     const systemInstruction = `
-        Você é o Arquiteto de Processos Shinkō. Sua missão é projetar um fluxo técnico rigoroso.
-        
-        PRIORIDADE: Se o "DOCS_CONTEXT" contiver informações (extraídas de um PDF), use-as para criar tarefas extremamente específicas de engenharia.
-        
-        ESTRUTURA OBRIGATÓRIA (5 Etapas):
-        1. Modelagem (Arquitetura e Dados)
-        2. Interface (UI/UX e Front)
-        3. Lógica (API e Backend)
-        4. Performance (DevOps e Testes)
-        5. Lançamento (Deploy e Onboarding)
-
-        REGRAS:
-        - Cada etapa deve ter de 3 a 5 tarefas.
-        - Estime horas de 2h a 16h por tarefa.
-        - Retorne EXATAMENTE um objeto JSON no formato abaixo.
+        Você é o Arquiteto de Processos Shinkō. Projete um fluxo técnico rigoroso em 5 etapas: 1. Modelagem, 2. Interface, 3. Lógica, 4. Performance, 5. Lançamento.
     `;
 
-    const prompt = `
-        PROJETO: ${title}
-        ARQUÉTIPO: ${archetype}
-        MISSÃO: ${description}
-        DOCS_CONTEXT (DADOS DO PDF): ${docsContext || 'Nenhum documento anexado.'}
-    `;
+    let prompt = `PROJETO: ${title} | ARQUÉTIPO: ${archetype} | MISSÃO: ${description} | PDF CONTEXTO: ${docsContext || 'Nenhum'}`;
+    
+    // Fix: Incorporate extra parameters into the prompt if provided to satisfy call from BpmnBuilder.tsx
+    if (customPrompt) prompt += ` | ORIENTAÇÃO ADICIONAL: ${customPrompt}`;
+    if (roles && roles.length > 0) prompt += ` | TIME DISPONÍVEL (CARGOS): ${roles.map(r => r.nome).join(', ')}`;
 
     try {
         const response = await ai.models.generateContent({
@@ -339,16 +252,10 @@ export const generateBpmn = async (title: string, description: string, archetype
                                 }
                             }
                         }
-                    },
-                    required: ["nodes"]
+                    }
                 }
             }
         });
-        
-        const text = response.text || "{}";
-        return JSON.parse(text);
-    } catch (e) { 
-        console.error("BPMN Generation Error:", e);
-        return null; 
-    }
+        return JSON.parse(response.text || "{}");
+    } catch (e) { return null; }
 };

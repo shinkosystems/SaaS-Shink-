@@ -6,8 +6,12 @@ export const fetchComments = async (taskId: number): Promise<Comment[]> => {
     const { data, error } = await supabase
         .from('comentarios')
         .select(`
-            *,
-            user_data:users!user_id(nome, avatar_url)
+            id,
+            task,
+            usuario,
+            mensagem,
+            created_at,
+            user_data:users!usuario(nome, avatar_url)
         `)
         .eq('task', taskId)
         .order('created_at', { ascending: true });
@@ -24,13 +28,17 @@ export const addComment = async (taskId: number, userId: string, text: string): 
         .from('comentarios')
         .insert({
             task: taskId,
-            user_id: userId,
-            text: text,
+            usuario: userId,
+            mensagem: text,
             created_at: new Date().toISOString()
         })
         .select(`
-            *,
-            user_data:users!user_id(nome, avatar_url)
+            id,
+            task,
+            usuario,
+            mensagem,
+            created_at,
+            user_data:users!usuario(nome, avatar_url)
         `)
         .single();
 

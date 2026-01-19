@@ -203,8 +203,8 @@ export interface FinancialTransaction {
 export interface Comment {
     id: string;
     task: number;
-    user_id: string;
-    text: string;
+    usuario: string;
+    mensagem: string;
     created_at: string;
     user_data?: {
         nome: string;
