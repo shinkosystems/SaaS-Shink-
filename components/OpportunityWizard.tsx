@@ -1,7 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Opportunity, Archetype, IntensityLevel, RDEStatus, TadsCriteria, getTerminology, ProjectStatus } from '../types';
-import { Check, Loader2, Target, ShieldCheck, Zap, DollarSign, Sparkles, X, ChevronRight, Layers, Gauge, Info, Coins, Calendar, Ban } from 'lucide-react';
+import { Check, Loader2, Target, ShieldCheck, Zap, DollarSign, Sparkles, X, ChevronRight, Layers, Gauge, Info, Coins, Calendar, Ban, FileUp, FileText, Wand2 } from 'lucide-react';
+import { extractProjectDetailsFromPdf } from '../services/geminiService';
 
 interface Props {
   initialData?: Partial<Opportunity>;
@@ -47,6 +48,7 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
   const [step, setStep] = useState(0);
   const terms = getTerminology(orgType);
   const isEditing = !!initialData?.id;
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState<Partial<Opportunity>>(initialData || {
     title: '', 
@@ -60,11 +62,47 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
     rde: RDEStatus.WARM,
     tads: { scalability: false, integration: false, painPoint: false, recurring: false, mvpSpeed: false },
     archetype: Archetype.SAAS_ENTRY,
-    intensity: IntensityLevel.L1
+    intensity: IntensityLevel.L1,
+    docsContext: ''
   });
   
   const [isSaving, setIsSaving] = useState(false);
+  const [isAnalyzingPdf, setIsAnalyzingPdf] = useState(false);
+  const [analyzedFile, setAnalyzedFile] = useState<string | null>(null);
+
   const isInternal = formData.archetype === Archetype.INTERNAL_MARKETING;
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file || file.type !== 'application/pdf') return alert("Por favor, suba um arquivo PDF.");
+
+      setIsAnalyzingPdf(true);
+      setAnalyzedFile(file.name);
+
+      try {
+          const reader = new FileReader();
+          reader.onload = async () => {
+              const base64 = (reader.result as string).split(',')[1];
+              const result = await extractProjectDetailsFromPdf(base64);
+              
+              if (result) {
+                  setFormData(prev => ({
+                      ...prev,
+                      title: result.title || prev.title,
+                      description: result.description || prev.description,
+                      archetype: (result.archetype as Archetype) || prev.archetype,
+                      intensity: result.intensity || prev.intensity,
+                      docsContext: result.suggestedSummary || ''
+                  }));
+              }
+              setIsAnalyzingPdf(false);
+          };
+          reader.readAsDataURL(file);
+      } catch (err) {
+          alert("Erro ao ler o documento.");
+          setIsAnalyzingPdf(false);
+      }
+  };
 
   const handleSave = async () => {
       if (!formData.title) return alert("Defina um título para o projeto.");
@@ -143,10 +181,51 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                 
                 {step === 0 && (
                     <div className="space-y-8 lg:space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
-                        <div className="space-y-4">
-                            <h3 className="text-4xl lg:text-6xl font-black text-[var(--text-main)] tracking-tighter leading-[1.1]">Onde está o <br/><span className="text-amber-500">Valor?</span></h3>
-                            <p className="text-slate-500 dark:text-slate-400 text-base lg:text-xl font-medium max-w-lg">Nomeie seu ativo e defina sua governança inicial.</p>
+                        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                            <div className="space-y-4">
+                                <h3 className="text-4xl lg:text-6xl font-black text-[var(--text-main)] tracking-tighter leading-[1.1]">Onde está o <br/><span className="text-amber-500">Valor?</span></h3>
+                                <p className="text-slate-500 dark:text-slate-400 text-base lg:text-xl font-medium max-w-lg">Nomeie seu ativo e defina sua governança inicial.</p>
+                            </div>
+                            
+                            {/* PDF UPLOAD ZONE */}
+                            <div className="shrink-0">
+                                <input type="file" ref={fileInputRef} className="hidden" accept=".pdf" onChange={handleFileUpload} />
+                                <button 
+                                    onClick={() => fileInputRef.current?.click()}
+                                    disabled={isAnalyzingPdf}
+                                    className={`relative group px-6 py-8 rounded-[2rem] border-2 border-dashed transition-all flex flex-col items-center gap-3 w-full md:w-56 ${isAnalyzingPdf ? 'border-amber-500 bg-amber-500/5' : analyzedFile ? 'border-emerald-500 bg-emerald-500/5' : 'border-slate-200 dark:border-white/10 hover:border-amber-500 hover:bg-amber-500/5'}`}
+                                >
+                                    {isAnalyzingPdf ? (
+                                        <>
+                                            <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
+                                            <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest animate-pulse">IA Lendo PDF...</span>
+                                        </>
+                                    ) : analyzedFile ? (
+                                        <>
+                                            <Check className="w-8 h-8 text-emerald-500" />
+                                            <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest text-center truncate w-full px-2">{analyzedFile}</span>
+                                            <span className="text-[8px] font-bold text-emerald-600/60 uppercase">DADOS EXTRAÍDOS</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="p-3 bg-slate-100 dark:bg-white/5 rounded-2xl group-hover:bg-amber-500/20 transition-all">
+                                                <FileUp className="w-6 h-6 text-slate-400 group-hover:text-amber-500" />
+                                            </div>
+                                            <div className="text-center">
+                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-amber-500">Subir PDF de Escopo</span>
+                                                <span className="text-[8px] font-bold text-slate-500 block mt-1 uppercase">A IA Proporá o Escopo</span>
+                                            </div>
+                                        </>
+                                    )}
+                                    {isAnalyzingPdf && (
+                                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                            <Wand2 className="w-20 h-20 text-amber-500/10 animate-ping" />
+                                        </div>
+                                    )}
+                                </button>
+                            </div>
                         </div>
+
                         <div className="space-y-8 lg:space-y-10">
                             <div>
                                 <label className="text-[8px] lg:text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-3 block ml-1">Identificação do Ativo</label>

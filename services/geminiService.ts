@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type, GenerateContentResponse, FunctionDeclaration } from "@google/genai";
-import { Opportunity } from "../types";
+import { Opportunity, Archetype } from "../types";
 
 const getAiClient = () => {
   const apiKey = process.env.API_KEY;
@@ -21,6 +21,51 @@ async function retryOperation<T>(operation: () => Promise<T>, retries = 3, delay
         throw error;
     }
 }
+
+/**
+ * IA Document Reader: Extrai contexto estratégico de PDFs
+ */
+export const extractProjectDetailsFromPdf = async (pdfBase64: string): Promise<any> => {
+    const ai = getAiClient();
+    if (!ai) return null;
+
+    const systemInstruction = `
+        Você é o Shinkō Document Intelligence. 
+        Sua missão é ler um documento de escopo/projeto (PDF) e extrair os fundamentos estratégicos para o Framework Shinkō.
+        
+        RETORNE EXATAMENTE UM JSON COM:
+        {
+          "title": "Título curto e impactante",
+          "description": "Resumo executivo focado na dor que o projeto resolve",
+          "archetype": "Um dos valores exatos: 'SaaS de Entrada', 'SaaS Plataforma', 'Serviço Tecnológico' ou 'Interno / Marketing'",
+          "intensity": número de 1 a 4,
+          "suggestedSummary": "Um briefing técnico para a engenharia"
+        }
+    `;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: [
+                {
+                    parts: [
+                        { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } },
+                        { text: "Analise este documento e extraia os dados conforme instruído." }
+                    ]
+                }
+            ],
+            config: { 
+                systemInstruction,
+                responseMimeType: "application/json"
+            }
+        });
+
+        return JSON.parse(response.text || "{}");
+    } catch (e) {
+        console.error("PDF Analysis Error:", e);
+        return null;
+    }
+};
 
 // --- DICIONÁRIO DE FERRAMENTAS CRUD DO GURU ---
 
