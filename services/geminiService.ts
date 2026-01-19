@@ -1,9 +1,8 @@
-
 import { GoogleGenAI, Type, GenerateContentResponse, FunctionDeclaration } from "@google/genai";
 import { Opportunity, Archetype } from "../types";
 
-// Proteção para evitar falha no constructor se a chave estiver indefinida no load
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || 'MISSING_KEY' });
+// Fix: Always use process.env.API_KEY directly for initialization as per guidelines.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 async function retryOperation<T>(operation: () => Promise<T>, retries = 3, delay = 2000): Promise<T> {
     try {
@@ -34,6 +33,7 @@ export const extractProjectDetailsFromPdf = async (pdfBase64: string): Promise<a
     `;
 
     try {
+        // Fix: Use correct contents object structure with parts array as per guidelines.
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
             contents: {
@@ -200,6 +200,9 @@ export const generateDashboardInsight = async (contextSummary: string): Promise<
     } catch (e) { return null; }
 };
 
+/**
+ * Fix: Updated signature to accept 6 arguments as expected by BpmnBuilder.tsx call site.
+ */
 export const generateBpmn = async (
     title: string, 
     description: string, 
@@ -214,6 +217,7 @@ export const generateBpmn = async (
 
     let prompt = `PROJETO: ${title} | ARQUÉTIPO: ${archetype} | MISSÃO: ${description} | PDF CONTEXTO: ${docsContext || 'Nenhum'}`;
     
+    // Fix: Incorporate extra parameters into the prompt if provided to satisfy call from BpmnBuilder.tsx
     if (customPrompt) prompt += ` | ORIENTAÇÃO ADICIONAL: ${customPrompt}`;
     if (roles && roles.length > 0) prompt += ` | TIME DISPONÍVEL (CARGOS): ${roles.map(r => r.nome).join(', ')}`;
 

@@ -65,7 +65,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
         fetchOrgMembers(organizationId).then(setAvailableUsers);
     }
     
-    const loadUserAndComments = async () => {
+    const loadInitialData = async () => {
         const { data } = await supabase.auth.getUser();
         if (data.user) {
             setCurrentUser(data.user);
@@ -76,7 +76,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
         }
     };
     
-    loadUserAndComments();
+    loadInitialData();
   }, [effectiveDbId, organizationId]);
 
   const loadComments = async (id: number) => {
@@ -84,6 +84,8 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
     try {
         const data = await fetchComments(id);
         setComments(data || []);
+    } catch (err) {
+        console.error("Erro ao carregar comentários:", err);
     } finally {
         setIsLoadingComments(false);
     }
@@ -107,7 +109,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
     if (!textToSend || isAddingComment) return;
 
     if (!effectiveDbId) {
-        alert("Sincronize esta tarefa (botão laranja 'SINCRONIZAR ATIVO') antes de comentar para criar o registro no banco de dados.");
+        alert("Sincronize esta tarefa antes de comentar.");
         return;
     }
 
@@ -120,7 +122,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
             setCurrentUser(user);
         }
 
-        if (!user) throw new Error("Usuário não identificado.");
+        if (!user) throw new Error("Usuário não autenticado.");
 
         const comment = await addComment(Number(effectiveDbId), user.id, textToSend);
         if (comment) {
@@ -128,11 +130,10 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
             setNewComment('');
             setTimeout(scrollToBottom, 100);
         } else {
-            throw new Error("Falha na persistência do comentário.");
+            throw new Error("Falha na persistência.");
         }
     } catch (err: any) {
-        console.error("Comment Insertion Failure:", err);
-        alert(`Não foi possível enviar o comentário: ${err.message || "Erro de conexão"}`);
+        alert(`Não foi possível enviar: ${err.message}`);
     } finally {
         setIsAddingComment(false);
     }
@@ -154,12 +155,12 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
               setFormData(prev => ({ ...prev, dbId: (result as any).dbId }));
           }
           if (!formData.dbId && !effectiveDbId) {
-              alert("Tarefa sincronizada com sucesso!");
+              alert("Sincronizada!");
           } else {
               onClose();
           }
       } catch (e) {
-          alert("Erro ao sincronizar dados.");
+          alert("Erro na sincronização.");
       } finally {
           setIsSaving(false);
       }
@@ -284,9 +285,9 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                                                     {comment.user_data?.avatar_url ? <img src={comment.user_data.avatar_url} className="w-full h-full object-cover" /> : <UserIcon className="w-5 h-5 text-slate-400"/>}
                                                 </div>
                                                 <div className="flex-1">
-                                                    <div className="bg-white p-4 rounded-[1.5rem] border border-slate-100 shadow-sm group-hover:border-amber-500/20 transition-all">
+                                                    <div className="bg-white p-5 rounded-[1.8rem] border border-slate-100 shadow-sm group-hover:border-amber-500/20 transition-all">
                                                         <div className="flex justify-between items-center mb-1">
-                                                            <span className="text-[10px] font-black text-slate-900 uppercase tracking-wider">{comment.user_data?.nome || 'Membro'}</span>
+                                                            <span className="text-[10px] font-black text-slate-900 uppercase tracking-wider">{comment.user_data?.nome || 'Membro do Time'}</span>
                                                             <div className="flex items-center gap-3">
                                                                 <span className="text-[8px] font-bold text-slate-400 uppercase">{new Date(comment.created_at).toLocaleString('pt-BR')}</span>
                                                                 {currentUser?.id === comment.usuario && (
@@ -337,7 +338,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
 
             <aside className="w-full lg:w-[400px] border-l border-slate-100 bg-white p-8 lg:p-10 space-y-10 overflow-y-auto custom-scrollbar shrink-0">
                 <div className="space-y-4">
-                    <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em]">CATEGORIA SHINKŌ</label>
+                    <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em]">CATEGORIA SHINKŌ</h3>
                     <div className="bg-slate-50 p-2 rounded-[2rem] border border-slate-100 shadow-inner relative overflow-hidden">
                         <select 
                             disabled={readOnly}
@@ -354,7 +355,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                 </div>
 
                 <div className="space-y-4">
-                    <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em]">RESPONSÁVEL</label>
+                    <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em]">RESPONSÁVEL</h3>
                     <div className="bg-slate-50 p-4 rounded-[2rem] border border-slate-100 shadow-inner flex items-center gap-5 group relative h-24">
                         <div className="w-14 h-14 rounded-full bg-white border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
                             {currentAssignee?.avatar_url ? <img src={currentAssignee.avatar_url} className="w-full h-full object-cover" /> : <UserIcon className="w-7 h-7 text-slate-300"/>}
@@ -372,7 +373,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                 </div>
 
                 <div className="space-y-6">
-                    <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em]">JANELA DE ENTREGA</label>
+                    <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em]">JANELA DE ENTREGA</h3>
                     <div className="flex flex-col gap-4">
                         <div className="bg-slate-50 p-6 rounded-[2.5rem] border border-slate-100 shadow-inner flex items-center gap-6">
                             <div className="p-4 rounded-2xl bg-white text-amber-500 shadow-sm"><Calendar className="w-7 h-7" /></div>
@@ -406,7 +407,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                 )}
             </div>
         </div>
-        <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} multiple={false} />
+        <input type="file" id="file-task-upload" ref={fileInputRef} className="hidden" onChange={handleFileUpload} multiple={false} />
       </div>
     </div>
   );
