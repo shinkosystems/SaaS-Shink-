@@ -1,10 +1,11 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Opportunity, Archetype } from '../types';
 import MatrixChart from './MatrixChart';
 import { 
     Zap, Target, Sparkles, Rocket, Activity, Trophy, DollarSign,
     AlertTriangle, CheckCircle2, BarChart3, Clock, Info, Layers, ChevronRight
-} from 'lucide-react'; // Fix: Corrected typo in import from lucide-center to lucide-react
+} from 'lucide-react';
 import { SuccessJourney } from './SuccessJourney';
 import { getOperationalRates } from '../services/financialService';
 
