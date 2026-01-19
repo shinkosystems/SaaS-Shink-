@@ -7,7 +7,7 @@ export const fetchComments = async (taskId: number): Promise<Comment[]> => {
         .from('comentarios')
         .select(`
             *,
-            user_data:users(nome, avatar_url)
+            user_data:users!user_id(nome, avatar_url)
         `)
         .eq('task', taskId)
         .order('created_at', { ascending: true });
@@ -30,12 +30,12 @@ export const addComment = async (taskId: number, userId: string, text: string): 
         })
         .select(`
             *,
-            user_data:users(nome, avatar_url)
+            user_data:users!user_id(nome, avatar_url)
         `)
         .single();
 
     if (error) {
-        console.error('Erro ao adicionar comentário:', error);
+        console.error('Erro detalhado ao adicionar comentário:', error);
         return null;
     }
     return data as Comment;
