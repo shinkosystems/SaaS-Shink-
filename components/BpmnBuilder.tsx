@@ -86,7 +86,8 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
     };
 
     const handleGenerateAiFlow = async () => {
-        if (!opportunity.description) return alert("Descreva o objetivo técnico do projeto para que a IA possa trabalhar.");
+        const hasContext = !!(opportunity.description || opportunity.docsContext);
+        if (!hasContext) return alert("Adicione uma descrição técnica ou suba um PDF de escopo para que a IA possa projetar as atividades.");
         
         setIsGenerating(true);
         try {
@@ -118,11 +119,11 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
                 setNodes(hydratedNodes);
                 await saveStructure(hydratedNodes);
             } else {
-                alert("A IA não conseguiu estruturar o fluxo. Tente ser mais específico na descrição.");
+                alert("A IA não conseguiu estruturar o fluxo. Verifique se o PDF contém informações técnicas suficientes.");
             }
         } catch (e) {
             console.error("BPMN Gen Error:", e);
-            alert("Houve uma falha na geração do fluxo técnico.");
+            alert("Houve uma falha na geração do fluxo técnico via IA.");
         } finally {
             setIsGenerating(false);
         }
@@ -166,7 +167,7 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
             const updatedNodes = await syncBpmnTasks(opportunity.dbProjectId, opportunity.organizationId!, scheduledNodes);
             setNodes(updatedNodes);
             await saveStructure(updatedNodes);
-            alert("Kanban Sincronizado: Tarefas criadas com cronograma de carga de trabalho aplicado.");
+            alert("Kanban Sincronizado: Atividades do documento/briefing integradas ao cronograma.");
         } catch (e) {
             console.error("Sync Error:", e);
             alert("Erro ao sincronizar tarefas no Kanban.");
@@ -248,7 +249,7 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
                         </div>
                         <div>
                             <h4 className="text-xl font-black text-[var(--text-main)]">Engenharia não mapeada.</h4>
-                            <p className="text-xs text-slate-500 font-bold mt-2 leading-relaxed">Clique em "Gestar Fluxo IA" para que o Shinkō Engine defina o escopo de execução técnica.</p>
+                            <p className="text-xs text-slate-500 font-bold mt-2 leading-relaxed">Clique em "Gestar Fluxo IA" para que o Shinkō Engine proponha as atividades baseadas no seu documento de escopo.</p>
                         </div>
                     </div>
                 ) : (

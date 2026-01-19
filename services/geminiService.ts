@@ -39,7 +39,7 @@ export const extractProjectDetailsFromPdf = async (pdfBase64: string): Promise<a
           "description": "Resumo executivo focado na dor que o projeto resolve",
           "archetype": "Um dos valores exatos: 'SaaS de Entrada', 'SaaS Plataforma', 'Serviço Tecnológico' ou 'Interno / Marketing'",
           "intensity": número de 1 a 4,
-          "suggestedSummary": "Um briefing técnico para a engenharia"
+          "suggestedSummary": "Extraia TODOS os requisitos técnicos, funcionalidades mencionadas, tecnologias citadas e restrições. Este texto será usado para gerar a lista de tarefas da engenharia."
         }
     `;
 
@@ -285,13 +285,24 @@ export const generateBpmn = async (title: string, description: string, archetype
 
     const systemInstruction = `
         Você é o Arquiteto de Processos Shinkō. 
-        Converta a descrição do projeto em um fluxo técnico rigoroso de 5 etapas: 
-        1. Modelagem, 2. Interface, 3. Lógica, 4. Performance, 5. Lançamento.
-        Cada etapa deve conter de 3 a 5 tarefas específicas com estimativa de horas realistas.
-        RETORNE O JSON EXATAMENTE NO FORMATO: {"nodes": [{"id": "string", "label": "string", "checklist": [{"text": "string", "estimatedHours": number, "description": "string"}]}]}
+        Sua missão é converter a descrição e, PRINCIPALMENTE, o documento de escopo (PDF) fornecido em um fluxo técnico rigoroso.
+        
+        INSTRUÇÕES DE ENGENHARIA:
+        1. Analise o "DOCS_CONTEXT" (que contém a extração do PDF subido). Se houver requisitos, funcionalidades ou tecnologias lá, elas são sua prioridade absoluta.
+        2. Estruture o fluxo em 5 etapas: 1. Modelagem, 2. Interface, 3. Lógica, 4. Performance, 5. Lançamento.
+        3. Cada etapa deve conter de 3 a 5 tarefas EXTREMAMENTE ESPECÍFICAS baseadas no escopo do PDF. Evite termos genéricos se o PDF trouxer detalhes.
+        4. Estime horas realistas para cada tarefa (mínimo 2h, máximo 16h).
+        
+        RETORNE O JSON EXATAMENTE NO FORMATO: 
+        {"nodes": [{"id": "string", "label": "string", "checklist": [{"text": "string", "estimatedHours": number, "description": "string"}]}]}
     `;
 
-    const prompt = `PROJETO: ${title}. CONTEXTO: ${description}. ARQUÉTIPO: ${archetype}. DOCS: ${docsContext || 'Nenhum'}.`;
+    const prompt = `
+        TÍTULO: ${title}
+        ARQUÉTIPO: ${archetype}
+        MISSÃO DECLARADA: ${description}
+        DOCS_CONTEXT (DADOS DO PDF): ${docsContext || 'Nenhum documento de escopo subido.'}
+    `;
 
     try {
         const response = await ai.models.generateContent({
