@@ -168,6 +168,7 @@ const mapDbProjectToOpportunity = (row: DbProject, tasks: DbTask[] = []): Opport
         bpmn: bpmnStructure,
         dbProjectId: row.id,
         docsContext: row.contexto_ia || '',
+        pdfUrl: row.pdf_url || '',
         color: row.cor || '#F59E0B',
         mrr: row.mrr || 0,
         meses: row.meses || 12
@@ -198,6 +199,7 @@ const mapOpportunityToDbProject = (opp: Opportunity): any => {
         projoport: opp.status !== 'Active',
         bpmn_structure: updatedBpmn,
         contexto_ia: opp.docsContext || '',
+        pdf_url: opp.pdfUrl || null,
         cor: opp.color || '#F59E0B',
         mrr: Number(opp.mrr) || 0,
         meses: Number(opp.meses) || 12

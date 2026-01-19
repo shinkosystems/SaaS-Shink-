@@ -122,6 +122,7 @@ export interface Opportunity {
         status?: string;
     };
     docsContext?: string;
+    pdfUrl?: string;
     color?: string;
     dbId?: string;
 }
@@ -147,6 +148,7 @@ export interface DbProject {
     created_at: string;
     bpmn_structure?: any;
     contexto_ia?: string;
+    pdf_url?: string;
     cor?: string;
     projoport?: boolean;
     mrr?: number;
@@ -197,8 +199,6 @@ export interface FinancialTransaction {
     orgName?: string;
     modulos?: number[];
 }
-
-// Added missing members below to fix compilation errors
 
 export interface Comment {
     id: string;
@@ -420,7 +420,7 @@ export const getTerminology = (orgType?: string) => {
             [Archetype.SAAS_ENTRY]: { label: "SaaS de Entrada", desc: "Software simples with foco em dor única." },
             [Archetype.SAAS_PLATFORM]: { label: "Plataforma SaaS", desc: "Ecossistema complexo com múltiplas features." },
             [Archetype.SERVICE_TECH]: { label: "Serviço Tech", desc: "Híbrido entre software e consultoria especializada." },
-            [Archetype.INTERNAL_MARKETING]: { label: "Interno / Mkt", desc: "Ferramenta para otimização de processos próprios." }
+            [Archetype.INTERNAL_MARKETING]: { label: "Interno / Marketing", desc: "Ferramenta para otimização de processos próprios." }
         },
         intensities: {
             [IntensityLevel.L1]: "Foco em MVP e validação de hipótese.",

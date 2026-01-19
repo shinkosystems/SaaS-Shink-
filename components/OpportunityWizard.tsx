@@ -3,6 +3,7 @@ import React, { useState, useRef } from 'react';
 import { Opportunity, Archetype, IntensityLevel, RDEStatus, TadsCriteria, getTerminology, ProjectStatus } from '../types';
 import { Check, Loader2, Target, ShieldCheck, Zap, DollarSign, Sparkles, X, ChevronRight, Layers, Gauge, Info, Coins, Calendar, Ban, FileUp, FileText, Wand2 } from 'lucide-react';
 import { extractProjectDetailsFromPdf } from '../services/geminiService';
+import { supabase } from '../services/supabaseClient';
 
 interface Props {
   initialData?: Partial<Opportunity>;
@@ -63,7 +64,8 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
     tads: { scalability: false, integration: false, painPoint: false, recurring: false, mvpSpeed: false },
     archetype: Archetype.SAAS_ENTRY,
     intensity: IntensityLevel.L1,
-    docsContext: ''
+    docsContext: '',
+    pdfUrl: ''
   });
   
   const [isSaving, setIsSaving] = useState(false);
@@ -80,6 +82,19 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
       setAnalyzedFile(file.name);
 
       try {
+          // 1. Upload Físico para o Supabase Storage
+          const fileName = `escopos/${Date.now()}-${file.name}`;
+          const { error: uploadError } = await supabase.storage
+              .from('documentos')
+              .upload(fileName, file);
+          
+          if (uploadError) throw uploadError;
+
+          const { data: urlData } = supabase.storage
+              .from('documentos')
+              .getPublicUrl(fileName);
+
+          // 2. Análise via IA Shinkō
           const reader = new FileReader();
           reader.onload = async () => {
               const base64 = (reader.result as string).split(',')[1];
@@ -92,14 +107,15 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                       description: result.description || prev.description,
                       archetype: (result.archetype as Archetype) || prev.archetype,
                       intensity: result.intensity || prev.intensity,
-                      docsContext: result.suggestedSummary || ''
+                      docsContext: result.suggestedSummary || '',
+                      pdfUrl: urlData.publicUrl // Salva o link real
                   }));
               }
               setIsAnalyzingPdf(false);
           };
           reader.readAsDataURL(file);
-      } catch (err) {
-          alert("Erro ao ler o documento.");
+      } catch (err: any) {
+          alert("Erro no processamento do documento: " + err.message);
           setIsAnalyzingPdf(false);
       }
   };
@@ -198,13 +214,13 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                                     {isAnalyzingPdf ? (
                                         <>
                                             <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
-                                            <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest animate-pulse">IA Lendo PDF...</span>
+                                            <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest animate-pulse">Sincronizando Escopo...</span>
                                         </>
                                     ) : analyzedFile ? (
                                         <>
                                             <Check className="w-8 h-8 text-emerald-500" />
                                             <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest text-center truncate w-full px-2">{analyzedFile}</span>
-                                            <span className="text-[8px] font-bold text-emerald-600/60 uppercase">DADOS EXTRAÍDOS</span>
+                                            <span className="text-[8px] font-bold text-emerald-600/60 uppercase">PDF SALVO & ANALISADO</span>
                                         </>
                                     ) : (
                                         <>
@@ -213,14 +229,9 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                                             </div>
                                             <div className="text-center">
                                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-amber-500">Subir PDF de Escopo</span>
-                                                <span className="text-[8px] font-bold text-slate-500 block mt-1 uppercase">A IA Proporá o Escopo</span>
+                                                <span className="text-[8px] font-bold text-slate-500 block mt-1 uppercase">Salvamento & Análise IA</span>
                                             </div>
                                         </>
-                                    )}
-                                    {isAnalyzingPdf && (
-                                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                            <Wand2 className="w-20 h-20 text-amber-500/10 animate-ping" />
-                                        </div>
                                     )}
                                 </button>
                             </div>

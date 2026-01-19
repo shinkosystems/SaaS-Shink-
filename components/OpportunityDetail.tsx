@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Opportunity, BpmnTask, ProjectStatus } from '../types';
 import { TaskDetailModal } from './TaskDetailModal';
@@ -6,7 +5,7 @@ import {
     Activity, Target, Zap, DollarSign, Calendar, Clock, Lock, 
     ArrowLeft, MoreHorizontal, FileText, Edit2, Check, X, 
     ChevronDown, ChevronUp, Layers, Rocket, ShieldCheck, TrendingUp, Trash2,
-    PlayCircle, PauseCircle, Timer, Archive, CheckCircle2, AlertTriangle
+    PlayCircle, PauseCircle, Timer, Archive, CheckCircle2, AlertTriangle, Download
 } from 'lucide-react';
 import { updateTask, deleteTask } from '../services/projectService';
 import { getOperationalRates } from '../services/financialService';
@@ -30,6 +29,7 @@ const STATUS_OPTIONS: { value: ProjectStatus; label: string; color: string; icon
     { value: 'Archived', label: 'ARQUIVADO', color: 'text-red-400 bg-red-400/10 border-red-400/20', icon: Archive }
 ];
 
+// Added export to the component declaration
 const OpportunityDetail: React.FC<Props> = ({ 
     opportunity, onClose, onDelete, onUpdate, userRole
 }) => {
@@ -120,7 +120,7 @@ const OpportunityDetail: React.FC<Props> = ({
                         <div className="relative" ref={menuRef}>
                             <button 
                                 onClick={() => userRole !== 'cliente' && setIsStatusMenuOpen(!isStatusMenuOpen)}
-                                className={`flex items-center gap-3 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${currentStatusObj.color} hover:scale-[1.02] active:scale-[0.98]`}
+                                className={`flex items-center gap-3 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${currentStatusObj.color} hover:scale-[1.02] active:scale-98`}
                             >
                                 <currentStatusObj.icon className="w-3.5 h-3.5" />
                                 {currentStatusObj.label}
@@ -153,6 +153,15 @@ const OpportunityDetail: React.FC<Props> = ({
                     <h1 className="text-4xl lg:text-6xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">{opportunity.title}</h1>
                 </div>
                 <div className="flex items-center gap-3 w-full lg:w-auto">
+                    {opportunity.pdfUrl && (
+                        <a 
+                            href={opportunity.pdfUrl} 
+                            target="_blank" 
+                            className="flex items-center gap-3 px-6 py-4 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-500 hover:text-black transition-all shadow-md"
+                        >
+                            <Download className="w-4 h-4"/> Documento Escopo
+                        </a>
+                    )}
                     <div className="flex-1 lg:flex-none flex items-center gap-4 p-4 border border-slate-200 dark:border-[#333] rounded-[1.5rem] bg-white dark:bg-white/[0.02]">
                          <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500">
                             <TrendingUp className="w-5 h-5"/>
@@ -241,4 +250,5 @@ const OpportunityDetail: React.FC<Props> = ({
     );
 };
 
+// Added default export to resolve "Module has no default export" error in ProjectWorkspace.tsx
 export default OpportunityDetail;
