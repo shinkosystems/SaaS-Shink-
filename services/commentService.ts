@@ -11,7 +11,7 @@ export const fetchComments = async (taskId: number): Promise<Comment[]> => {
             usuario,
             mensagem,
             created_at,
-            user_data:users!usuario(nome, avatar_url)
+            user_data:users(nome, avatar_url)
         `)
         .eq('task', taskId)
         .order('created_at', { ascending: true });
@@ -24,6 +24,7 @@ export const fetchComments = async (taskId: number): Promise<Comment[]> => {
 };
 
 export const addComment = async (taskId: number, userId: string, text: string): Promise<Comment | null> => {
+    // 1. Inserção do comentário
     const { data, error } = await supabase
         .from('comentarios')
         .insert({
@@ -38,12 +39,31 @@ export const addComment = async (taskId: number, userId: string, text: string): 
             usuario,
             mensagem,
             created_at,
-            user_data:users!usuario(nome, avatar_url)
+            user_data:users(nome, avatar_url)
         `)
         .single();
 
     if (error) {
-        console.error('Erro detalhado ao adicionar comentário:', error);
+        console.error('Erro detalhado Supabase (comentarios):', error.message, error.details, error.hint);
+        // Fallback: Tenta inserir sem o select complexo caso o join falhe
+        if (error.message.includes('relationship') || error.message.includes('column')) {
+             const { data: retryData, error: retryError } = await supabase
+                .from('comentarios')
+                .insert({
+                    task: taskId,
+                    usuario: userId,
+                    mensagem: text,
+                    created_at: new Date().toISOString()
+                })
+                .select()
+                .single();
+             
+             if (retryError) {
+                 console.error('Erro no fallback de inserção:', retryError.message);
+                 return null;
+             }
+             return retryData as Comment;
+        }
         return null;
     }
     return data as Comment;

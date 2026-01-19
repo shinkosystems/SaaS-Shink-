@@ -128,10 +128,10 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
             setNewComment('');
             setTimeout(scrollToBottom, 100);
         } else {
-            throw new Error("Falha na persistência do comentário.");
+            throw new Error("Falha na persistência. Verifique o console do navegador para detalhes técnicos.");
         }
     } catch (err: any) {
-        console.error("Comment Insertion Failure:", err);
+        console.error("Falha ao inserir comentário:", err);
         alert(`Não foi possível enviar o comentário: ${err.message || "Erro de conexão"}`);
     } finally {
         setIsAddingComment(false);
@@ -150,11 +150,14 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
       try {
           const finalData = { ...formData, tags: [formData.category || 'Gestão'] };
           const result = await onSave(finalData);
+          
+          // Se a tarefa acabou de ser criada no banco, precisamos atualizar o dbId localmente para os comentários funcionarem
           if (result && (result as any).dbId) {
               setFormData(prev => ({ ...prev, dbId: (result as any).dbId }));
           }
+          
           if (!formData.dbId && !effectiveDbId) {
-              alert("Tarefa sincronizada com sucesso!");
+              alert("Tarefa sincronizada com sucesso! Agora você já pode adicionar comentários.");
           } else {
               onClose();
           }
