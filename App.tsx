@@ -284,10 +284,14 @@ const App: React.FC = () => {
                         orgType={orgDetails.name}
                         customLogoUrl={orgDetails.logoUrl}
                         onSave={async (opp) => {
-                            const updated = await updateOpportunity(opp);
-                            if (updated) {
-                                await loadUserData(user.id);
-                                onOpenProject(updated);
+                            try {
+                                const updated = await updateOpportunity(opp);
+                                if (updated) {
+                                    await loadUserData(user.id);
+                                    onOpenProject(updated);
+                                }
+                            } catch (e: any) {
+                                alert("Erro ao atualizar: " + e.message);
                             }
                         }}
                         onCancel={() => onOpenProject(editingOpportunity)}
@@ -295,7 +299,10 @@ const App: React.FC = () => {
                 ) : selectedProject ? (
                     <ProjectWorkspace 
                         opportunity={selectedProject} onBack={() => setSelectedProjectState(null)}
-                        onUpdate={(opp) => updateOpportunity(opp).then(() => loadUserData(user.id))}
+                        onUpdate={(opp) => updateOpportunity(opp).then((updated) => {
+                            if (updated) setSelectedProjectState(updated);
+                            loadUserData(user.id);
+                        })}
                         onEdit={(opp) => onEditProject(opp)} 
                         onDelete={(id) => deleteOpportunity(id).then(() => setSelectedProjectState(null))}
                         userRole={userRole} currentPlan={currentPlan} activeModules={activeModules}
@@ -306,17 +313,18 @@ const App: React.FC = () => {
                         orgType={orgDetails.name}
                         customLogoUrl={orgDetails.logoUrl}
                         onSave={async (opp) => {
-                            const newOpp = await createOpportunity({ 
-                                ...opp, 
-                                organizationId: userOrgId || undefined 
-                            });
-                            if (newOpp) {
-                                await loadUserData(user.id);
-                                onOpenProject(newOpp);
-                            } else {
-                                // Tratamento de erro robusto conforme solicitado
-                                alert("Erro de Sincronização: O Framework Shinkō exige uma Organização Ativa e permissões de Dono/Delineador para persistir ativos. Verifique sua conta.");
-                                setView('dashboard');
+                            try {
+                                // Forçamos o ID da organização se disponível no estado global
+                                const newOpp = await createOpportunity({ 
+                                    ...opp, 
+                                    organizationId: userOrgId || opp.organizationId 
+                                });
+                                if (newOpp) {
+                                    await loadUserData(user.id);
+                                    onOpenProject(newOpp);
+                                }
+                            } catch (err: any) {
+                                alert(`Falha de Sincronização: ${err.message || "O Framework Shinkō exige uma Organização Ativa."}`);
                             }
                         }}
                         onCancel={() => setView('dashboard')}
@@ -329,11 +337,13 @@ const App: React.FC = () => {
                             onGuruPrompt={(p) => setGuruInitialPrompt(p)}
                         />}
                         {view === 'framework-system' && <FrameworkPage orgName={orgDetails.name} onBack={() => setView('dashboard')} onSaveToProject={async (opp) => {
-                            const newOpp = await createOpportunity({ ...opp, organizationId: userOrgId || undefined });
-                            if (newOpp) {
-                                await loadUserData(user.id);
-                                onOpenProject(newOpp);
-                            } else setView('dashboard');
+                            try {
+                                const newOpp = await createOpportunity({ ...opp, organizationId: userOrgId || undefined });
+                                if (newOpp) {
+                                    await loadUserData(user.id);
+                                    onOpenProject(newOpp);
+                                }
+                            } catch (e: any) { alert(e.message); }
                         }} />}
                         {view === 'list' && <ProjectsPage opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} onRefresh={() => loadUserData(user.id)} />}
                         

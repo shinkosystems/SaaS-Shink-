@@ -70,21 +70,22 @@ export const createOpportunity = async (opp: Opportunity): Promise<Opportunity |
 
     try {
         const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error("Usuário não autenticado.");
+
         let targetOrgId = opp.organizationId;
 
-        if (!targetOrgId && user) {
-            const { data: u } = await supabase.from('users').select('organizacao').eq('id', user.id).single();
+        // Recuperação de emergência da Organização se não informada pelo App.tsx
+        if (!targetOrgId || targetOrgId === 0) {
+            const { data: u, error: uError } = await supabase.from('users').select('organizacao').eq('id', user.id).single();
+            if (uError) throw new Error("Erro ao validar permissões de organização.");
             targetOrgId = u?.organizacao;
         }
 
         if (!targetOrgId) {
-            console.error("createOpportunity: organizationId not found.");
-            return null;
+            throw new Error("Vínculo de Organização não encontrado no seu perfil.");
         }
 
         const dbPayload = mapOpportunityToDbProject({ ...opp, organizationId: Number(targetOrgId) });
-        
-        // Remove ID to allow serial generation
         const { id, ...insertData } = dbPayload;
         
         const { data: projectData, error } = await supabase
@@ -95,13 +96,13 @@ export const createOpportunity = async (opp: Opportunity): Promise<Opportunity |
         
         if (error) {
             console.error("DB Insert Error:", error.message);
-            throw new Error(`Falha no banco: ${error.message}`);
+            throw new Error(error.message);
         }
 
         return mapDbProjectToOpportunity(projectData, []);
     } catch (err: any) {
-        console.error("createOpportunity error:", err);
-        return null;
+        console.error("createOpportunity error:", err.message);
+        throw err;
     }
 };
 
@@ -112,11 +113,18 @@ export const updateOpportunity = async (opp: Opportunity): Promise<Opportunity |
         const { id, ...updateData } = dbPayload;
         
         const { data, error } = await supabase.from(TABLE_NAME).update(updateData).eq('id', opp.id).select().single();
-        if (error) return null;
+        if (error) {
+            console.error("Update Project Error:", error.message);
+            return null;
+        }
 
+        // Buscamos as tasks novamente para retornar o objeto Opportunity completo e hidratado
         const { data: tasks } = await supabase.from('tasks').select('*').eq('projeto', opp.id);
         return mapDbProjectToOpportunity(data, tasks || []); 
-    } catch (err) { return null; }
+    } catch (err) { 
+        console.error("updateOpportunity exception:", err);
+        return null; 
+    }
 };
 
 export const deleteOpportunity = async (id: string | number): Promise<boolean> => {
@@ -179,7 +187,7 @@ const mapOpportunityToDbProject = (opp: Opportunity): any => {
     const updatedBpmn = { ...opp.bpmn, status: opp.status };
 
     return {
-        id: opp.id ? Number(opp.id) : undefined,
+        id: opp.id && !isNaN(Number(opp.id)) ? Number(opp.id) : undefined,
         nome: opp.title || 'Sem Título',
         descricao: opp.description || '',
         cliente: opp.clientId || null,
