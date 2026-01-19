@@ -4,7 +4,7 @@ import { Opportunity, BpmnNode, BpmnTask } from '../types';
 import { TaskDetailModal } from './TaskDetailModal';
 import { 
     Plus, BrainCircuit, Zap, Loader2 as Loader, Sparkles, RefreshCw,
-    ChevronRight, Workflow, Clock, Trash2, X
+    ChevronRight, Workflow, Clock, X
 } from 'lucide-react';
 import { updateTask, deleteTask, syncTaskChecklist, syncBpmnTasks } from '../services/projectService';
 import { generateBpmn } from '../services/geminiService';
@@ -40,7 +40,7 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
         if (readOnly) return;
         const newTask: BpmnTask = {
             id: crypto.randomUUID(),
-            text: 'Nova Tarefa de Engenharia',
+            text: 'Novo Ativo de Engenharia',
             description: '',
             category: 'Gestão',
             status: 'todo',
@@ -86,7 +86,7 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
     };
 
     const handleGenerateAiFlow = async () => {
-        if (!opportunity.description) return alert("Adicione uma missão/contexto ao projeto antes de gerar o fluxo.");
+        if (!opportunity.description) return alert("Descreva o objetivo técnico do projeto para que a IA possa trabalhar.");
         
         setIsGenerating(true);
         try {
@@ -100,7 +100,7 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
                 roles
             );
 
-            if (result && result.nodes) {
+            if (result && result.nodes && result.nodes.length > 0) {
                 const hydratedNodes = result.nodes.map((n: any, nIdx: number) => ({
                     id: n.id || `node-${nIdx}-${Date.now()}`,
                     label: n.label,
@@ -111,56 +111,62 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
                         category: n.label,
                         status: 'todo',
                         completed: false,
-                        estimatedHours: Number(t.estimatedHours) || 2
+                        estimatedHours: Number(t.estimatedHours) || 4
                     }))
                 }));
                 
                 setNodes(hydratedNodes);
                 await saveStructure(hydratedNodes);
             } else {
-                alert("A IA não retornou um fluxo válido. Tente refinar a missão estratégica.");
+                alert("A IA não conseguiu estruturar o fluxo. Tente ser mais específico na descrição.");
             }
         } catch (e) {
-            console.error("Erro na geração de fluxo IA:", e);
-            alert("Falha na rede. Verifique sua chave de IA.");
+            console.error("BPMN Gen Error:", e);
+            alert("Houve uma falha na geração do fluxo técnico.");
         } finally {
             setIsGenerating(false);
         }
     };
 
     const handleSyncTasks = async () => {
-        if (!opportunity.organizationId || !opportunity.dbProjectId) return alert("Projeto não sincronizado com o banco.");
+        if (!opportunity.dbProjectId) return alert("Este projeto ainda não está sincronizado com o banco de dados.");
         setIsSyncing(true);
         try {
-            // Lógica de Carga de Trabalho: Agendamento Cascata
-            let currentScheduleDate = new Date();
+            // Lógica de Agendamento Industrial: 8h por dia úteis
+            let currentCursorDate = new Date();
             let accumulatedHours = 0;
 
             const scheduledNodes = nodes.map(node => {
                 return {
                     ...node,
                     checklist: (node.checklist || []).map(task => {
-                        // Calcula dias de offset baseado em 8h/dia útil
-                        const daysOffset = Math.floor(accumulatedHours / 8);
-                        const scheduleDate = new Date(currentScheduleDate);
-                        scheduleDate.setDate(scheduleDate.getDate() + daysOffset);
+                        const effort = task.estimatedHours || 4;
                         
-                        // Incrementa horas para a próxima tarefa
-                        accumulatedHours += (task.estimatedHours || 2);
+                        // Determina a data de início baseada no acumulado
+                        const startOffsetDays = Math.floor(accumulatedHours / 8);
+                        const startDate = new Date(currentCursorDate);
+                        startDate.setDate(startDate.getDate() + startOffsetDays);
                         
+                        accumulatedHours += effort;
+                        
+                        // Determina a data de fim
+                        const endOffsetDays = Math.floor(accumulatedHours / 8);
+                        const endDate = new Date(currentCursorDate);
+                        endDate.setDate(endDate.getDate() + endOffsetDays);
+
                         return {
                             ...task,
-                            startDate: task.startDate || scheduleDate.toISOString(),
-                            dueDate: task.dueDate || scheduleDate.toISOString()
+                            startDate: task.startDate || startDate.toISOString(),
+                            dueDate: task.dueDate || endDate.toISOString()
                         };
                     })
                 };
             });
 
-            const updatedNodes = await syncBpmnTasks(opportunity.dbProjectId, opportunity.organizationId, scheduledNodes);
+            const updatedNodes = await syncBpmnTasks(opportunity.dbProjectId, opportunity.organizationId!, scheduledNodes);
             setNodes(updatedNodes);
             await saveStructure(updatedNodes);
-            alert("Sucesso: Kanban sincronizado com cronograma de carga de trabalho!");
+            alert("Kanban Sincronizado: Tarefas criadas com cronograma de carga de trabalho aplicado.");
         } catch (e) {
             console.error("Sync Error:", e);
             alert("Erro ao sincronizar tarefas no Kanban.");
@@ -195,30 +201,19 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
                 duracaohoras: updatedTask.estimatedHours,
                 datafim: updatedTask.dueDate
             });
-
-            if (updatedTask.subtasks && opportunity.organizationId) {
-                await syncTaskChecklist(
-                    updatedTask.dbId, 
-                    updatedTask.subtasks, 
-                    opportunity.organizationId, 
-                    opportunity.dbProjectId, 
-                    updatedTask.assigneeId
-                );
-            }
         }
     };
 
     return (
         <div className="h-full flex flex-col bg-[var(--bg-color)]">
-            {/* Header Interno do Workflow */}
             <div className="px-8 h-20 border-b border-[var(--border-color)] bg-[var(--surface)] flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500 border border-amber-500/20 shadow-glow-amber">
+                    <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500 border border-amber-500/20">
                         <Sparkles className="w-5 h-5"/>
                     </div>
                     <div>
                         <h3 className="font-black text-sm text-[var(--text-main)] uppercase tracking-widest leading-none">Workflow Engine</h3>
-                        <p className="text-[9px] text-slate-500 font-bold uppercase mt-1">Snapshot de Processo Shinkō</p>
+                        <p className="text-[9px] text-slate-500 font-bold uppercase mt-1">Gestão Técnica Industrial</p>
                     </div>
                 </div>
 
@@ -229,7 +224,7 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
                         className="flex items-center gap-2 px-5 py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg disabled:opacity-50"
                     >
                         {isGenerating ? <Loader className="w-4 h-4 animate-spin"/> : <BrainCircuit className="w-4 h-4"/>}
-                        Gerar Fluxo IA
+                        Gestar Fluxo IA
                     </button>
                     
                     <button 
@@ -243,18 +238,17 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
                 </div>
             </div>
 
-            {/* Canvas de Processos */}
             <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar p-12 relative bg-slate-50 dark:bg-black/10">
                 <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03] pointer-events-none"></div>
                 
                 {nodes.length === 0 && !isGenerating ? (
                     <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto space-y-6 relative z-10">
-                        <div className="w-20 h-20 rounded-[2rem] bg-slate-200 dark:bg-white/5 border border-[var(--border-color)] flex items-center justify-center text-slate-400">
+                        <div className="w-20 h-20 rounded-[2.5rem] bg-slate-200 dark:bg-white/5 border border-[var(--border-color)] flex items-center justify-center text-slate-400">
                             <Workflow className="w-10 h-10"/>
                         </div>
                         <div>
-                            <h4 className="text-xl font-black text-[var(--text-main)]">Nenhum fluxo mapeado.</h4>
-                            <p className="text-xs text-slate-500 font-bold mt-2 leading-relaxed">Converta sua estratégia em etapas técnicas via IA para iniciar a engenharia.</p>
+                            <h4 className="text-xl font-black text-[var(--text-main)]">Engenharia não mapeada.</h4>
+                            <p className="text-xs text-slate-500 font-bold mt-2 leading-relaxed">Clique em "Gestar Fluxo IA" para que o Shinkō Engine defina o escopo de execução técnica.</p>
                         </div>
                     </div>
                 ) : (
@@ -263,13 +257,12 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
                             <div key={node.id} className="flex items-center gap-6">
                                 <div className="w-80 glass-panel p-2 border-[var(--border-color)] flex flex-col shadow-2xl rounded-[2.5rem] overflow-hidden min-h-[300px]">
                                     <div className="p-5 border-b border-[var(--border-color)] flex justify-between items-center bg-black/5 dark:bg-white/5 mb-3">
-                                        <h3 className="font-black text-xs uppercase tracking-widest text-[var(--text-main)] truncate max-w-[70%]" title={node.label}>{node.label}</h3>
+                                        <h3 className="font-black text-xs uppercase tracking-widest text-[var(--text-main)] truncate max-w-[70%]">{node.label}</h3>
                                         <div className="flex items-center gap-2">
                                             {!readOnly && (
                                                 <button 
                                                     onClick={() => handleAddTask(node.id)}
                                                     className="p-1.5 hover:bg-amber-500/10 text-amber-500 rounded-lg transition-all"
-                                                    title="Adicionar Ativo Manual"
                                                 >
                                                     <Plus className="w-4 h-4"/>
                                                 </button>
@@ -300,7 +293,7 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
                                                     <div className="flex items-center gap-2 text-slate-400">
                                                         <Clock className="w-3.5 h-3.5"/>
                                                         <span className="text-[9px] font-black uppercase">
-                                                            {task.estimatedHours || 2}h
+                                                            {task.estimatedHours || 4}h
                                                         </span>
                                                     </div>
                                                     <div className={`w-2 h-2 rounded-full ${task.status === 'done' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]'}`}></div>

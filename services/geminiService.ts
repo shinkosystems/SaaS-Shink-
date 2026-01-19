@@ -162,30 +162,17 @@ export const optimizeSchedule = async (tasks: any[], availableTeam: any[], globa
     const ai = getAiClient();
     if (!ai || tasks.length === 0) return [];
 
-    const systemInstruction = `Você é o Engenheiro de Operações Shinkō. 
-    Sua missão é otimizar o cronograma de execução técnica, fazendo o balanceamento de carga da equipe.
-    
-    REGRAS DE BALANCEAMENTO:
-    1. Priorize tarefas com maior score GUT (Gravidade x Urgência x Tendência).
-    2. Respeite a capacidade de ${globalCapacity} horas por dia por pessoa.
-    3. Distribua as tarefas de forma que ninguém fique sobrecarregado enquanto outros estão ociosos.
-    4. Projete as datas de início (startDate) e fim (dueDate) em formato YYYY-MM-DD.
-    5. Atribua as tarefas aos membros da equipe (assigneeId) que possuam o perfil adequado.
-    
-    EQUIPE DISPONÍVEL: ${JSON.stringify(availableTeam.map(m => ({ id: m.id, nome: m.nome, area: m.area })))}
-    `;
+    const systemInstruction = `Você é o Engenheiro de Operações Shinkō. Sua missão é otimizar o cronograma de execução técnica.`;
 
     const prompt = `OTIMIZAR O SEGUINTE PIPELINE DE TAREFAS: ${JSON.stringify(tasks.map(t => ({
         id: t.id,
         titulo: t.titulo,
-        duracaohoras: t.duracaohoras || 2,
-        gut: (t.gravidade || 1) * (t.urgencia || 1) * (t.tendencia || 1),
-        responsavel_id_atual: t.responsavel
+        duracaohoras: t.duracaohoras || 2
     })))}`;
 
     try {
         const response: GenerateContentResponse = await retryOperation(() => ai.models.generateContent({
-            model: 'gemini-3-pro-preview',
+            model: 'gemini-3-flash-preview',
             contents: prompt,
             config: { 
                 systemInstruction,
@@ -195,22 +182,18 @@ export const optimizeSchedule = async (tasks: any[], availableTeam: any[], globa
                     items: {
                         type: Type.OBJECT,
                         properties: {
-                            id: { type: Type.NUMBER, description: "O ID numérico original da tarefa" },
-                            startDate: { type: Type.STRING, description: "Nova data de início YYYY-MM-DD" },
-                            dueDate: { type: Type.STRING, description: "Nova data de término YYYY-MM-DD" },
-                            assigneeId: { type: Type.STRING, description: "UUID do responsável ideal" }
-                        },
-                        required: ["id", "startDate", "dueDate", "assigneeId"]
+                            id: { type: Type.NUMBER },
+                            startDate: { type: Type.STRING },
+                            dueDate: { type: Type.STRING },
+                            assigneeId: { type: Type.STRING }
+                        }
                     }
                 }
             }
         }));
 
         return JSON.parse(response.text || "[]");
-    } catch (e) {
-        console.error("AI Smart Schedule Error:", e);
-        return [];
-    }
+    } catch (e) { return []; }
 };
 
 export const analyzeOpportunity = async (title: string, description: string, orgType?: string): Promise<string> => {
@@ -219,7 +202,7 @@ export const analyzeOpportunity = async (title: string, description: string, org
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Analise: ${title} - ${description}. Setor: ${orgType}.`,
+      contents: `Analise viabilidade estratégica: ${title} - ${description}.`,
     });
     return response.text || "Sem análise.";
   } catch (error) { return "Erro IA."; }
@@ -231,7 +214,7 @@ export const generateDashboardInsight = async (contextSummary: string): Promise<
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
-            contents: `Analise portfólio e sugira ações REAIS (ex: 'Mapear Iniciativa', 'Verificar Caixa', 'Otimizar Kanban'). Contexto: ${contextSummary}. Retorne JSON {alertTitle, alertLevel, insightText, actions: [{label, actionId}]}.`,
+            contents: `Analise contexto e retorne JSON {alertTitle, alertLevel, insightText, actions: [{label, actionId}]}. Contexto: ${contextSummary}`,
             config: { responseMimeType: "application/json" }
         });
         return JSON.parse(response.text || "{}");
@@ -243,22 +226,9 @@ export const generateSubtasksForTask = async (taskTitle: string, context: string
     if (!ai) return [];
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-3-pro-preview',
-            contents: `Checklist para: ${taskTitle}. Membros: ${JSON.stringify(teamMembers)}`,
-            config: { 
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.ARRAY,
-                    items: {
-                        type: Type.OBJECT,
-                        properties: {
-                            title: { type: Type.STRING },
-                            hours: { type: Type.NUMBER },
-                            assigneeId: { type: Type.STRING }
-                        }
-                    }
-                }
-            }
+            model: 'gemini-3-flash-preview',
+            contents: `Checklist técnico para: ${taskTitle}.`,
+            config: { responseMimeType: "application/json" }
         });
         return JSON.parse(response.text || "[]");
     } catch (e) { return []; }
@@ -269,29 +239,18 @@ export const generateBpmn = async (title: string, description: string, archetype
     if (!ai) return null;
 
     const systemInstruction = `
-        Você é o Arquiteto de Processos Shinkō de elite. 
-        Sua missão é converter uma visão estratégica em um fluxo técnico de engenharia (WBS).
-        Crie exatamente 5 colunas (etapas) lógicas que respeitem o ciclo de vida Shinkō:
-        1. Modelagem (Fundação)
-        2. Interface (Experiência)
-        3. Lógica (Core Dev)
-        4. Performance (DevOps/QA)
-        5. Lançamento (Marketing/GTM)
-
-        Para o arquétipo ${archetype}, gere de 3 a 5 tarefas de alta granularidade por coluna.
-        Atribua horas estimadas realistas (2h a 16h por tarefa).
+        Você é o Arquiteto de Processos Shinkō. 
+        Converta a descrição do projeto em um fluxo técnico rigoroso de 5 etapas: 
+        1. Modelagem, 2. Interface, 3. Lógica, 4. Performance, 5. Lançamento.
+        Cada etapa deve conter de 3 a 5 tarefas específicas com estimativa de horas realistas.
+        RETORNE O JSON EXATAMENTE NO FORMATO: {"nodes": [{"id": "string", "label": "string", "checklist": [{"text": "string", "estimatedHours": number, "description": "string"}]}]}
     `;
 
-    const prompt = `
-        PROJETO: ${title}
-        CONTEXTO E MISSÃO: ${description}
-        DOCS DE REFERÊNCIA: ${docsContext || 'Nenhum'}
-        EQUIPE (CARGOS): ${JSON.stringify(availableRoles)}
-    `;
+    const prompt = `PROJETO: ${title}. CONTEXTO: ${description}. ARQUÉTIPO: ${archetype}. DOCS: ${docsContext || 'Nenhum'}.`;
 
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-3-pro-preview',
+            model: 'gemini-3-flash-preview',
             contents: prompt,
             config: { 
                 systemInstruction,
@@ -305,15 +264,15 @@ export const generateBpmn = async (title: string, description: string, archetype
                                 type: Type.OBJECT,
                                 properties: {
                                     id: { type: Type.STRING },
-                                    label: { type: Type.STRING, description: "Nome do Pilar (Modelagem, Interface, etc)" },
+                                    label: { type: Type.STRING },
                                     checklist: {
                                         type: Type.ARRAY,
                                         items: {
                                             type: Type.OBJECT,
                                             properties: {
-                                                text: { type: Type.STRING, description: "Título técnico da tarefa" },
-                                                estimatedHours: { type: Type.NUMBER, description: "Esforço em horas" },
-                                                description: { type: Type.STRING, description: "Briefing da execução" }
+                                                text: { type: Type.STRING },
+                                                estimatedHours: { type: Type.NUMBER },
+                                                description: { type: Type.STRING }
                                             }
                                         }
                                     }
@@ -324,6 +283,7 @@ export const generateBpmn = async (title: string, description: string, archetype
                 }
             }
         });
+        
         return JSON.parse(response.text || "{}");
     } catch (e) { 
         console.error("BPMN Generation Error:", e);
