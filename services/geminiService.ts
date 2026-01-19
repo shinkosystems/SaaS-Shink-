@@ -269,17 +269,24 @@ export const generateBpmn = async (title: string, description: string, archetype
     if (!ai) return null;
 
     const systemInstruction = `
-        Você é o Arquiteto de Processos Shinkō. 
-        Sua missão é converter uma estratégia em um fluxo técnico de execução (WBS - Work Breakdown Structure).
-        Crie de 4 a 6 colunas (nodes) lógicas para o arquétipo ${archetype}.
-        Cada coluna deve ter uma lista de tarefas (checklist) com estimativas de horas.
+        Você é o Arquiteto de Processos Shinkō de elite. 
+        Sua missão é converter uma visão estratégica em um fluxo técnico de engenharia (WBS).
+        Crie exatamente 5 colunas (etapas) lógicas que respeitem o ciclo de vida Shinkō:
+        1. Modelagem (Fundação)
+        2. Interface (Experiência)
+        3. Lógica (Core Dev)
+        4. Performance (DevOps/QA)
+        5. Lançamento (Marketing/GTM)
+
+        Para o arquétipo ${archetype}, gere de 3 a 5 tarefas de alta granularidade por coluna.
+        Atribua horas estimadas realistas (2h a 16h por tarefa).
     `;
 
     const prompt = `
         PROJETO: ${title}
-        MISSÃO: ${description}
-        ARQUÉTIPO: ${archetype}
-        EQUIPE DISPONÍVEL (CARGOS): ${JSON.stringify(availableRoles)}
+        CONTEXTO E MISSÃO: ${description}
+        DOCS DE REFERÊNCIA: ${docsContext || 'Nenhum'}
+        EQUIPE (CARGOS): ${JSON.stringify(availableRoles)}
     `;
 
     try {
@@ -298,15 +305,15 @@ export const generateBpmn = async (title: string, description: string, archetype
                                 type: Type.OBJECT,
                                 properties: {
                                     id: { type: Type.STRING },
-                                    label: { type: Type.STRING, description: "Nome da etapa/coluna" },
+                                    label: { type: Type.STRING, description: "Nome do Pilar (Modelagem, Interface, etc)" },
                                     checklist: {
                                         type: Type.ARRAY,
                                         items: {
                                             type: Type.OBJECT,
                                             properties: {
-                                                text: { type: Type.STRING, description: "Título da tarefa" },
-                                                estimatedHours: { type: Type.NUMBER },
-                                                description: { type: Type.STRING }
+                                                text: { type: Type.STRING, description: "Título técnico da tarefa" },
+                                                estimatedHours: { type: Type.NUMBER, description: "Esforço em horas" },
+                                                description: { type: Type.STRING, description: "Briefing da execução" }
                                             }
                                         }
                                     }
