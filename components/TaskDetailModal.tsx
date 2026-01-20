@@ -14,7 +14,6 @@ interface Props {
   task: BpmnTask;
   nodeTitle: string;
   opportunityTitle?: string;
-  // Fix for line 155: Changed return type from void to any to allow truthiness check on the result of onSave
   onSave: (updatedTask: BpmnTask) => Promise<any> | any;
   onClose: () => void;
   onDelete?: (id: string) => void;
@@ -53,6 +52,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
   const fileInputRef = useRef<HTMLInputElement>(null);
   const commentsEndRef = useRef<HTMLDivElement>(null);
 
+  // Calcula o ID real do banco (dbId ou id se for numérico)
   const effectiveDbId = formData.dbId || (typeof formData.id === 'string' && !isNaN(Number(formData.id)) ? Number(formData.id) : undefined);
 
   useEffect(() => {
@@ -129,7 +129,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
             setNewComment('');
             setTimeout(scrollToBottom, 100);
         } else {
-            throw new Error("Falha na persistência. Verifique o console do navegador para detalhes técnicos.");
+            throw new Error("Falha na persistência.");
         }
     } catch (err: any) {
         console.error("Falha ao inserir comentário:", err);
@@ -152,7 +152,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
           const finalData = { ...formData, tags: [formData.category || 'Gestão'] };
           const result = await onSave(finalData);
           
-          // Se a tarefa acabou de ser criada no banco, precisamos atualizar o dbId localmente para os comentários funcionarem
           if (result && (result as any).dbId) {
               setFormData(prev => ({ ...prev, dbId: (result as any).dbId }));
           }
@@ -194,11 +193,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
           setIsUploading(false);
           if (fileInputRef.current) fileInputRef.current.value = '';
       }
-  };
-
-  const removeAttachment = (id: string) => {
-      if (readOnly) return;
-      setFormData(prev => ({ ...prev, attachments: prev.attachments?.filter(a => a.id !== id) }));
   };
 
   const currentAssignee = availableUsers.find(u => u.id === formData.assigneeId);
@@ -285,12 +279,18 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                                         {comments.map((comment) => (
                                             <div key={comment.id} className="flex gap-4 group">
                                                 <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
-                                                    {comment.user_data?.avatar_url ? <img src={comment.user_data.avatar_url} className="w-full h-full object-cover" /> : <UserIcon className="w-5 h-5 text-slate-400"/>}
+                                                    {comment.user_data?.avatar_url ? (
+                                                        <img src={comment.user_data.avatar_url} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <UserIcon className="w-5 h-5 text-slate-400"/>
+                                                    )}
                                                 </div>
                                                 <div className="flex-1">
                                                     <div className="bg-white p-4 rounded-[1.5rem] border border-slate-100 shadow-sm group-hover:border-amber-500/20 transition-all">
                                                         <div className="flex justify-between items-center mb-1">
-                                                            <span className="text-[10px] font-black text-slate-900 uppercase tracking-wider">{comment.user_data?.nome || 'Membro'}</span>
+                                                            <span className="text-[10px] font-black text-slate-900 uppercase tracking-wider">
+                                                                {comment.user_data?.nome || 'Membro do Time'}
+                                                            </span>
                                                             <div className="flex items-center gap-3">
                                                                 <span className="text-[8px] font-bold text-slate-400 uppercase">{new Date(comment.created_at).toLocaleString('pt-BR')}</span>
                                                                 {currentUser?.id === comment.usuario && (
@@ -298,7 +298,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                                                                 )}
                                                             </div>
                                                         </div>
-                                                        <p className="text-sm text-slate-600 font-medium leading-relaxed">{comment.mensagem}</p>
+                                                        <p className="text-sm text-slate-600 font-medium leading-relaxed whitespace-pre-wrap">{comment.mensagem}</p>
                                                     </div>
                                                 </div>
                                             </div>

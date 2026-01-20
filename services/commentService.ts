@@ -2,30 +2,49 @@
 import { supabase } from './supabaseClient';
 import { Comment } from '../types';
 
+/**
+ * Busca comentários de uma tarefa com hidratação manual de usuários.
+ * Evita falhas de join do Supabase se o schema não estiver perfeitamente relacionado.
+ */
 export const fetchComments = async (taskId: number): Promise<Comment[]> => {
-    const { data, error } = await supabase
+    // 1. Busca os comentários crus
+    const { data: rawComments, error } = await supabase
         .from('comentarios')
-        .select(`
-            id,
-            task,
-            usuario,
-            mensagem,
-            created_at,
-            user_data:users(nome, avatar_url)
-        `)
+        .select('*')
         .eq('task', taskId)
         .order('created_at', { ascending: true });
 
-    if (error) {
+    if (error || !rawComments) {
         console.error('Erro ao buscar comentários:', error);
         return [];
     }
-    return data as Comment[];
+
+    // 2. Extrai IDs únicos de usuários
+    const userIds = Array.from(new Set(rawComments.map(c => c.usuario).filter(Boolean)));
+    
+    if (userIds.length === 0) return rawComments as any[];
+
+    // 3. Busca dados dos usuários na tabela 'users'
+    const { data: usersData } = await supabase
+        .from('users')
+        .select('id, nome, avatar_url')
+        .in('id', userIds);
+
+    const userMap = new Map(usersData?.map(u => [u.id, u]) || []);
+
+    // 4. Injeta os dados do usuário em cada comentário
+    return rawComments.map(c => ({
+        ...c,
+        user_data: userMap.get(c.usuario) || { nome: 'Membro do Time', avatar_url: null }
+    })) as Comment[];
 };
 
+/**
+ * Adiciona um comentário e retorna o objeto já hidratado para atualização imediata da UI.
+ */
 export const addComment = async (taskId: number, userId: string, text: string): Promise<Comment | null> => {
-    // 1. Inserção do comentário
-    const { data, error } = await supabase
+    // 1. Inserção
+    const { data: newComment, error } = await supabase
         .from('comentarios')
         .insert({
             task: taskId,
@@ -33,40 +52,25 @@ export const addComment = async (taskId: number, userId: string, text: string): 
             mensagem: text,
             created_at: new Date().toISOString()
         })
-        .select(`
-            id,
-            task,
-            usuario,
-            mensagem,
-            created_at,
-            user_data:users(nome, avatar_url)
-        `)
+        .select()
         .single();
 
-    if (error) {
-        console.error('Erro detalhado Supabase (comentarios):', error.message, error.details, error.hint);
-        // Fallback: Tenta inserir sem o select complexo caso o join falhe
-        if (error.message.includes('relationship') || error.message.includes('column')) {
-             const { data: retryData, error: retryError } = await supabase
-                .from('comentarios')
-                .insert({
-                    task: taskId,
-                    usuario: userId,
-                    mensagem: text,
-                    created_at: new Date().toISOString()
-                })
-                .select()
-                .single();
-             
-             if (retryError) {
-                 console.error('Erro no fallback de inserção:', retryError.message);
-                 return null;
-             }
-             return retryData as Comment;
-        }
+    if (error || !newComment) {
+        console.error('Erro ao inserir comentário:', error?.message);
         return null;
     }
-    return data as Comment;
+
+    // 2. Busca dados do autor para hidratação imediata
+    const { data: userData } = await supabase
+        .from('users')
+        .select('nome, avatar_url')
+        .eq('id', userId)
+        .maybeSingle();
+
+    return {
+        ...newComment,
+        user_data: userData || { nome: 'Você', avatar_url: null }
+    } as Comment;
 };
 
 export const deleteComment = async (commentId: string): Promise<boolean> => {
