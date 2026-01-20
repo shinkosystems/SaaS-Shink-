@@ -14,7 +14,8 @@ interface Props {
   task: BpmnTask;
   nodeTitle: string;
   opportunityTitle?: string;
-  onSave: (updatedTask: BpmnTask) => Promise<void> | void;
+  // Fix for line 155: Changed return type from void to any to allow truthiness check on the result of onSave
+  onSave: (updatedTask: BpmnTask) => Promise<any> | any;
   onClose: () => void;
   onDelete?: (id: string) => void;
   organizationId?: number;
