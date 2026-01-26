@@ -79,7 +79,7 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
   // Quick Client Creation State
   const [showQuickClient, setShowQuickClient] = useState(false);
   const [isCreatingQuickClient, setIsCreatingQuickClient] = useState(false);
-  const [quickClientForm, setQuickClientForm] = useState({ nome: '', email: '', senha: '' });
+  const [quickClientForm, setQuickClientForm] = useState({ nome: '', email: '' });
 
   useEffect(() => {
     if (organizationId) {
@@ -99,8 +99,8 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
           return;
       }
 
-      if (!quickClientForm.nome || !quickClientForm.email || !quickClientForm.senha) {
-          alert("Preencha todos os campos do cliente (Nome, Email e Senha).");
+      if (!quickClientForm.nome || !quickClientForm.email) {
+          alert("Preencha todos os campos do cliente (Nome e Email).");
           return;
       }
 
@@ -113,13 +113,13 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
               status: 'Ativo',
               contrato: 'Draft',
               projetos: []
-          }, quickClientForm.senha);
+          });
 
           if (newClient) {
               setClients(prev => [...prev, newClient]);
               setFormData(prev => ({ ...prev, clientId: newClient.id }));
               setShowQuickClient(false);
-              setQuickClientForm({ nome: '', email: '', senha: '' });
+              setQuickClientForm({ nome: '', email: '' });
           }
       } catch (err: any) {
           console.error("Falha na Sincronização:", err);
@@ -129,8 +129,8 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
       }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
       if (!file || file.type !== 'application/pdf') return alert("Por favor, suba um arquivo PDF.");
 
       setIsAnalyzingPdf(true);
@@ -189,7 +189,7 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
               tadsScore: tadsScore,
               createdAt: initialData?.createdAt || new Date().toISOString(),
               status: formData.status || 'Future',
-              organizationId: organizationId // Garante que o ID da org flua corretamente
+              organizationId: organizationId 
           } as Opportunity);
       } catch (e: any) {
           console.error("Wizard Save Error:", e);
@@ -556,7 +556,7 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                     <header className="p-8 pb-4 flex justify-between items-center bg-slate-50 dark:bg-white/5">
                         <div>
                             <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tighter">Novo Stakeholder.</h2>
-                            <p className="text-[8px] text-slate-500 uppercase font-black tracking-widest mt-1">Criação Instantânea de Acesso</p>
+                            <p className="text-[8px] text-slate-500 uppercase font-black tracking-widest mt-1">Criação Instantânea de Registro</p>
                         </div>
                         <button onClick={() => setShowQuickClient(false)} className="p-2 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-all text-slate-400"><X className="w-5 h-5"/></button>
                     </header>
@@ -569,10 +569,6 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                             <div className="space-y-1.5">
                                 <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-2"><Mail className="w-3 h-3 text-blue-500"/> E-mail Corporativo</label>
                                 <input required type="email" value={quickClientForm.email} onChange={e => setQuickClientForm({...quickClientForm, email: e.target.value})} className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl p-4 text-sm font-bold text-slate-900 dark:text-white outline-none focus:border-amber-500 transition-all shadow-inner" placeholder="contato@empresa.com"/>
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-2"><Lock className="w-3 h-3 text-emerald-500"/> Senha de Acesso</label>
-                                <input required type="password" value={quickClientForm.senha} onChange={e => setQuickClientForm({...quickClientForm, senha: e.target.value})} className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl p-4 text-sm font-bold text-slate-900 dark:text-white outline-none focus:border-amber-500 transition-all shadow-inner" placeholder="••••••••"/>
                             </div>
                         </div>
                         <button 

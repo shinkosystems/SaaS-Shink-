@@ -19,11 +19,10 @@ export const fetchClients = async (organizationId: number): Promise<DbClient[]> 
 };
 
 /**
- * Cria um cliente/stakeholder. 
- * Se uma senha for fornecida, tenta criar o acesso de autenticação.
+ * Cria um cliente/stakeholder e gera suas credenciais de acesso no Auth.
  */
 export const createClient = async (client: Partial<DbClient>, password?: string): Promise<DbClient | null> => {
-    // 1. Validação de Organização (Obrigatório para RLS)
+    // 1. Validação de Organização
     let orgId = client.organizacao;
     if (!orgId) {
         const { data: { user } } = await supabase.auth.getUser();
@@ -34,45 +33,52 @@ export const createClient = async (client: Partial<DbClient>, password?: string)
     }
 
     if (!orgId) {
-        throw new Error("Não foi possível identificar sua organização. Tente recarregar o sistema.");
+        throw new Error("Organização não identificada.");
     }
 
-    let authUserId = null;
+    if (!client.email || !password) {
+        throw new Error("E-mail e Senha são obrigatórios para criar acesso.");
+    }
 
-    // 2. Criação de Acesso no Auth do Supabase
-    if (password && client.email) {
-        try {
-            const { data: authData, error: authError } = await supabase.auth.signUp({
-                email: client.email,
-                password: password,
-                options: {
-                    data: {
-                        full_name: client.nome,
-                        perfil: 'cliente',
-                        organizacao: orgId
-                    }
-                }
-            });
-
-            if (authError) {
-                console.warn("Aviso: O acesso de login não pôde ser criado ou e-mail duplicado.", authError.message);
-            } else if (authData.user) {
-                authUserId = authData.user.id;
+    // 2. Criar Usuário no Auth do Supabase
+    // Nota: Em ambientes de produção com RLS estrito, isso pode exigir uma Edge Function se o admin não puder criar outros usuários.
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: client.email,
+        password: password,
+        options: {
+            data: {
+                full_name: client.nome,
+                perfil: 'cliente'
             }
-        } catch (e) {
-            console.error("Erro na camada de Auth:", e);
         }
+    });
+
+    if (authError) {
+        throw new Error(`Erro ao criar acesso: ${authError.message}`);
     }
 
-    // 3. Persistência na Tabela Clientes
+    const authUserId = authData.user?.id;
+    if (!authUserId) throw new Error("Falha ao gerar ID de acesso.");
+
+    // 3. Criar Perfil na tabela 'users' (necessário para o sistema reconhecer o login)
+    await supabase.from('users').upsert({
+        id: authUserId,
+        nome: client.nome,
+        email: client.email,
+        organizacao: orgId,
+        perfil: 'cliente',
+        ativo: true
+    });
+
+    // 4. Persistência na Tabela Clientes
     const payload: any = {
-        id: authUserId || crypto.randomUUID(), 
+        id: authUserId, // O ID do cliente é o mesmo do Auth para facilitar o vínculo
         nome: client.nome || 'Novo Stakeholder',
         email: client.email || '',
         telefone: client.telefone || '',
         cnpj: client.cnpj || '00.000.000/0000-00',
         endereco: client.endereco || '',
-        valormensal: client.valormensal || 0,
+        valormensal: 0,
         meses: client.meses || 12,
         data_inicio: client.data_inicio || new Date().toISOString().split('T')[0],
         status: client.status || 'Ativo',
@@ -89,28 +95,12 @@ export const createClient = async (client: Partial<DbClient>, password?: string)
 
     if (error) {
         console.error('Erro na tabela clientes:', error);
-        throw new Error(`Falha ao salvar no banco: ${error.message}`);
-    }
-    
-    if (authUserId) {
-        await supabase.from('users').upsert({
-            id: authUserId,
-            nome: payload.nome,
-            email: payload.email,
-            organizacao: orgId,
-            perfil: 'cliente',
-            status: 'Ativo',
-            ativo: true
-        });
+        throw new Error(`Falha ao salvar dados do cliente: ${error.message}`);
     }
     
     return data as DbClient;
 };
 
-/**
- * Adiciona ou remove um projeto da array de projetos do cliente.
- * Uso de maybeSingle para evitar quebras se o cliente for deletado durante a operação.
- */
 export const linkProjectToClient = async (clientId: string, projectId: number) => {
     try {
         const { data: client, error } = await supabase
@@ -127,7 +117,7 @@ export const linkProjectToClient = async (clientId: string, projectId: number) =
             await supabase.from('clientes').update({ projetos: updated }).eq('id', clientId);
         }
     } catch (e) {
-        console.warn("Falha não crítica ao vincular projeto ao cliente:", e);
+        console.warn("Falha ao vincular projeto:", e);
     }
 };
 
