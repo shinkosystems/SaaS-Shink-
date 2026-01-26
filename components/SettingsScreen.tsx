@@ -4,7 +4,7 @@ import {
     Settings, Sun, Moon, Palette, Building2, UploadCloud, Save, Monitor, Users, 
     Briefcase, Plus, Trash2, Check, User, BrainCircuit, Sparkles,
     Loader2, DollarSign, Calendar, TrendingUp, ShieldCheck, 
-    X, ImageIcon, ChevronRight, Zap, Target, Activity, ChevronDown, RefreshCw, AlertCircle, Database, Layout
+    X, ImageIcon, ChevronRight, Zap, Target, Activity, ChevronDown, RefreshCw, AlertCircle, Database, Layout, Link as LinkIcon, Copy, CheckCircle2, ExternalLink
 } from 'lucide-react';
 import { 
     fetchRoles, createRole, deleteRole, updateRoleCost,
@@ -38,6 +38,7 @@ export const SettingsScreen: React.FC<Props> = ({
   const [isSavingCosts, setIsSavingCosts] = useState(false);
   const [isSavingAi, setIsSavingAi] = useState(false);
   const [newRoleName, setNewRoleName] = useState('');
+  const [isCopied, setIsCopied] = useState(false);
 
   // Estados para IA
   const [aiSector, setAiSector] = useState(orgDetails?.aiSector || '');
@@ -152,6 +153,15 @@ export const SettingsScreen: React.FC<Props> = ({
     }
   };
 
+  const ticketPortalUrl = userOrgId ? `${window.location.origin}/ticket/${userOrgId}` : '';
+
+  const handleCopyLink = () => {
+      if (!ticketPortalUrl) return;
+      navigator.clipboard.writeText(ticketPortalUrl);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+  };
+
   const tabs = [
       { id: 'general', label: 'GERAL' },
       { id: 'team', label: 'TIME' },
@@ -177,18 +187,60 @@ export const SettingsScreen: React.FC<Props> = ({
         <div className="flex-1 overflow-y-auto custom-scrollbar pb-32">
             {activeTab === 'general' && (
                 <div className="max-w-4xl space-y-10 animate-in slide-in-from-bottom-4 duration-500">
-                    <div className="bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-[3rem] p-10 space-y-8 shadow-sm">
-                        <div className="flex items-center justify-between p-6 bg-slate-50 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10">
-                            <div className="flex items-center gap-4">
-                                <div className="p-3 bg-white dark:bg-white/10 rounded-2xl shadow-sm">
-                                    {theme === 'dark' ? <Moon className="w-5 h-5 text-orange-500"/> : <Sun className="w-5 h-5 text-orange-500"/>}
+                    <div className="bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-[3rem] p-10 space-y-10 shadow-sm">
+                        
+                        {/* Seção de Aparência */}
+                        <div className="space-y-4">
+                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2">
+                                <Palette className="w-4 h-4 text-orange-500"/> Personalização Visual
+                            </h3>
+                            <div className="flex items-center justify-between p-6 bg-slate-50 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-3 bg-white dark:bg-white/10 rounded-2xl shadow-sm">
+                                        {theme === 'dark' ? <Moon className="w-5 h-5 text-orange-500"/> : <Sun className="w-5 h-5 text-orange-500"/>}
+                                    </div>
+                                    <div>
+                                        <div className="text-sm font-black text-slate-900 dark:text-white">Modo de Exibição</div>
+                                        <div className="text-[10px] font-bold text-slate-400 uppercase">Alternar Light/Dark</div>
+                                    </div>
                                 </div>
-                                <div>
-                                    <div className="text-sm font-black text-slate-900 dark:text-white">Modo de Exibição</div>
-                                    <div className="text-[10px] font-bold text-slate-400 uppercase">Alternar Light/Dark</div>
+                                <ElasticSwitch checked={theme === 'dark'} onChange={onToggleTheme} />
+                            </div>
+                        </div>
+
+                        {/* Seção de Suporte Externo */}
+                        <div className="space-y-4">
+                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2">
+                                <LinkIcon className="w-4 h-4 text-blue-500"/> Portais Externos
+                            </h3>
+                            <div className="p-8 bg-slate-50 dark:bg-white/5 rounded-[2rem] border border-slate-200 dark:border-white/10 space-y-6">
+                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                    <div className="flex items-center gap-4">
+                                        <div className="p-3 bg-blue-500/10 text-blue-500 rounded-2xl border border-blue-500/20">
+                                            <Activity className="w-6 h-6"/>
+                                        </div>
+                                        <div>
+                                            <div className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">Portal de Tickets Shinkō</div>
+                                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Link para clientes abrirem chamados</div>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 w-full md:w-auto">
+                                        <a href={ticketPortalUrl} target="_blank" className="p-3 bg-white dark:bg-white/10 rounded-xl border border-slate-200 dark:border-white/10 text-slate-400 hover:text-blue-500 transition-all">
+                                            <ExternalLink className="w-4 h-4"/>
+                                        </a>
+                                        <button 
+                                            onClick={handleCopyLink}
+                                            className={`flex-1 md:flex-none flex items-center gap-2 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${isCopied ? 'bg-emerald-500 text-white shadow-glow-emerald' : 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-lg'}`}
+                                        >
+                                            {isCopied ? <CheckCircle2 className="w-4 h-4"/> : <Copy className="w-4 h-4"/>}
+                                            {isCopied ? 'Copiado!' : 'Copiar Link Público'}
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="text-[9px] text-slate-500 font-medium leading-relaxed bg-white/50 dark:bg-black/20 p-4 rounded-xl border border-slate-100 dark:border-white/5 italic">
+                                    DICA: Compartilhe este link com seus stakeholders. Todos os chamados abertos através dele cairão automaticamente no seu card "Central de Suporte & Voz do Cliente".
                                 </div>
                             </div>
-                            <ElasticSwitch checked={theme === 'dark'} onChange={onToggleTheme} />
                         </div>
                     </div>
                 </div>
