@@ -3,13 +3,12 @@ import { supabase } from './supabaseClient';
 import { DbClient } from '../types';
 
 export const fetchClients = async (organizationId: number): Promise<DbClient[]> => {
-    // Security: If no organization ID is provided, do not return any data.
     if (!organizationId) return [];
 
     const { data, error } = await supabase
         .from('clientes')
         .select('*')
-        .eq('organizacao', organizationId) // Strict Organization Filter
+        .eq('organizacao', organizationId)
         .order('nome');
     
     if (error) {
@@ -19,83 +18,72 @@ export const fetchClients = async (organizationId: number): Promise<DbClient[]> 
     return data as DbClient[];
 };
 
+/**
+ * Cria um cliente/stakeholder. 
+ * Se uma senha for fornecida, tenta criar o acesso de autenticação.
+ */
 export const createClient = async (client: Partial<DbClient>, password?: string): Promise<DbClient | null> => {
-    console.log("Iniciando criação de cliente...", { client, hasPassword: !!password });
-    
-    const { data: user } = await supabase.auth.getUser();
-    
-    // Ensure we use the Organization ID passed in the object or fetch from current user if missing
+    // 1. Validação de Organização (Obrigatório para RLS)
     let orgId = client.organizacao;
-    
-    if (!orgId && user?.user) {
-         const { data: userData } = await supabase.from('users').select('organizacao').eq('id', user.user.id).single();
-         orgId = userData?.organizacao;
+    if (!orgId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            const { data: userData } = await supabase.from('users').select('organizacao').eq('id', user.id).single();
+            orgId = userData?.organizacao;
+        }
     }
 
     if (!orgId) {
-        console.error("Erro Crítico: ID da Organização é obrigatório para criar um cliente.");
-        throw new Error("Falha de Segurança: Organização não identificada. Ação bloqueada.");
+        throw new Error("Não foi possível identificar sua organização. Tente recarregar o sistema.");
     }
 
-    let newClientId = undefined;
+    let authUserId = null;
 
-    // 1. If password is provided, create Auth User first
+    // 2. Criação de Acesso (Opcional, mas desejado)
     if (password && client.email) {
         try {
-            // Note: This might sign out the current admin if not handled carefully in certain environments.
-            // However, with Supabase JS v2, this is the standard way to sign up a user client-side.
-            // If email confirmation is enabled, the user won't be signed in automatically.
+            // Nota: signUp padrão em SPAs pode tentar trocar a sessão. 
+            // Em produção idealmente usa-se uma Edge Function com Admin Auth API.
             const { data: authData, error: authError } = await supabase.auth.signUp({
                 email: client.email,
                 password: password,
                 options: {
                     data: {
                         full_name: client.nome,
-                        role: 'cliente',
                         perfil: 'cliente',
-                        org_id: orgId
+                        organizacao: orgId
                     }
                 }
             });
 
             if (authError) {
-                console.error('Erro ao criar usuário de autenticação:', authError);
-                throw new Error(`Erro ao criar login: ${authError.message}`);
+                console.warn("Aviso: O acesso de login não pôde ser criado (o e-mail já pode existir), mas tentaremos salvar os dados do cliente.", authError.message);
+            } else if (authData.user) {
+                authUserId = authData.user.id;
             }
-
-            if (authData.user) {
-                newClientId = authData.user.id;
-            } else {
-                console.warn("Usuário criado, mas ID não retornado imediatamente (possível confirmação de email pendente).");
-            }
-        } catch (e: any) {
-            console.error("Exceção no cadastro de Auth:", e);
-            throw new Error(`Falha no registro de usuário: ${e.message}`);
+        } catch (e) {
+            console.error("Erro na camada de Auth:", e);
         }
     }
 
-    // 2. Create the Client record in `clientes` table
+    // 3. Persistência na Tabela Clientes
     const payload: any = {
-        nome: client.nome || '',
+        nome: client.nome || 'Novo Stakeholder',
         email: client.email || '',
         telefone: client.telefone || '',
         cnpj: client.cnpj || '00.000.000/0000-00',
         endereco: client.endereco || '',
-        numcolaboradores: client.numcolaboradores || 1,
         valormensal: client.valormensal || 0,
         meses: client.meses || 12,
         data_inicio: client.data_inicio || new Date().toISOString().split('T')[0],
-        contrato: client.contrato || '',
-        logo_url: client.logo_url || '',
         status: client.status || 'Ativo',
-        organizacao: orgId // Force Organization Link
+        organizacao: orgId
     };
 
-    if (newClientId) {
-        payload.id = newClientId;
+    // Se conseguimos um ID de usuário, vinculamos para que ele possa logar
+    if (authUserId) {
+        payload.id = authUserId;
     }
-
-    console.log("Tentando inserir cliente na tabela DB...", payload);
 
     const { data, error } = await supabase
         .from('clientes')
@@ -104,11 +92,10 @@ export const createClient = async (client: Partial<DbClient>, password?: string)
         .single();
 
     if (error) {
-        console.error('Erro ao criar cliente na tabela:', error);
-        throw new Error(`Erro no banco de dados: ${error.message}`);
+        console.error('Erro na tabela clientes:', error);
+        throw new Error(`Falha ao salvar no banco: ${error.message}`);
     }
     
-    console.log("Cliente criado com sucesso:", data);
     return data as DbClient;
 };
 
@@ -120,22 +107,11 @@ export const updateClient = async (id: string, client: Partial<DbClient>): Promi
         .select()
         .single();
 
-    if (error) {
-        console.error('Erro ao atualizar cliente:', error);
-        throw new Error(error.message);
-    }
+    if (error) throw new Error(error.message);
     return data as DbClient;
 };
 
 export const deleteClient = async (id: string): Promise<boolean> => {
-    const { error } = await supabase
-        .from('clientes')
-        .delete()
-        .eq('id', id);
-
-    if (error) {
-        console.error('Erro ao deletar cliente:', error);
-        return false;
-    }
-    return true;
+    const { error } = await supabase.from('clientes').delete().eq('id', id);
+    return !error;
 };

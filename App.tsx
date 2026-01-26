@@ -283,6 +283,7 @@ const App: React.FC = () => {
                         initialData={editingOpportunity} 
                         orgType={orgDetails.name}
                         customLogoUrl={orgDetails.logoUrl}
+                        organizationId={userOrgId || undefined}
                         onSave={async (opp) => {
                             try {
                                 const updated = await updateOpportunity(opp);
@@ -312,6 +313,7 @@ const App: React.FC = () => {
                     <OpportunityWizard 
                         orgType={orgDetails.name}
                         customLogoUrl={orgDetails.logoUrl}
+                        organizationId={userOrgId || undefined}
                         onSave={async (opp) => {
                             try {
                                 // Forçamos o ID da organização se disponível no estado global
@@ -368,8 +370,24 @@ const App: React.FC = () => {
 
         {showCreateTask && <QuickTaskModal opportunities={opportunities} onClose={() => setShowCreateTask(false)} onSave={async (task, pid) => {
             if (!userOrgId || !user) return;
-            const { id, ...taskWithoutId } = task as any;
-            await createTask({...taskWithoutId, projeto: pid ? Number(pid) : null, responsavel: task.assigneeId || user.id, organizacao: userOrgId});
+            
+            // MAPEAR CAMPOS PARA O BANCO (Sincronização Industrial Shinkō)
+            const dbPayload = {
+                titulo: task.text,
+                descricao: task.description,
+                projeto: pid ? Number(pid) : null,
+                responsavel: task.assigneeId || user.id,
+                organizacao: userOrgId,
+                status: 'todo',
+                category: (task as any).category || 'Gestão',
+                gravidade: task.gut?.g || 1,
+                urgencia: task.gut?.u || 1,
+                tendencia: task.gut?.t || 1,
+                datafim: task.dueDate,
+                duracaohoras: task.estimatedHours
+            };
+
+            await createTask(dbPayload);
             loadUserData(user.id);
             setShowCreateTask(false);
         }} userRole={userRole} />}

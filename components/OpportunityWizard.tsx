@@ -1,9 +1,10 @@
 
-import React, { useState, useRef } from 'react';
-import { Opportunity, Archetype, IntensityLevel, RDEStatus, TadsCriteria, getTerminology, ProjectStatus } from '../types';
-import { Check, Loader2, Target, ShieldCheck, Zap, DollarSign, Sparkles, X, ChevronRight, Layers, Gauge, Info, Coins, Calendar, Ban, FileUp, FileText, Wand2 } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Opportunity, Archetype, IntensityLevel, RDEStatus, TadsCriteria, getTerminology, ProjectStatus, DbClient } from '../types';
+import { Check, Loader2, Target, ShieldCheck, Zap, DollarSign, Sparkles, X, ChevronRight, Layers, Gauge, Info, Coins, Calendar, Ban, FileUp, FileText, Wand2, Users, Building2, Plus, Mail, Lock, Save } from 'lucide-react';
 import { extractProjectDetailsFromPdf } from '../services/geminiService';
 import { supabase } from '../services/supabaseClient';
+import { fetchClients, createClient } from '../services/clientService';
 
 interface Props {
   initialData?: Partial<Opportunity>;
@@ -11,6 +12,7 @@ interface Props {
   onCancel: () => void;
   orgType?: string;
   customLogoUrl?: string | null;
+  organizationId?: number;
 }
 
 const Logo = ({ customLogoUrl, orgName }: { customLogoUrl?: string | null, orgName?: string }) => (
@@ -45,7 +47,7 @@ const STATUS_OPTIONS: { value: ProjectStatus; label: string }[] = [
     { value: 'Active', label: 'Ativar na Engenharia' }
 ];
 
-export default function OpportunityWizard({ initialData, onSave, onCancel, orgType, customLogoUrl }: Props) {
+export default function OpportunityWizard({ initialData, onSave, onCancel, orgType, customLogoUrl, organizationId }: Props) {
   const [step, setStep] = useState(0);
   const terms = getTerminology(orgType);
   const isEditing = !!initialData?.id;
@@ -65,14 +67,71 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
     archetype: Archetype.SAAS_ENTRY,
     intensity: IntensityLevel.L1,
     docsContext: '',
-    pdfUrl: ''
+    pdfUrl: '',
+    clientId: undefined
   });
   
+  const [clients, setClients] = useState<DbClient[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isAnalyzingPdf, setIsAnalyzingPdf] = useState(false);
   const [analyzedFile, setAnalyzedFile] = useState<string | null>(null);
 
+  // Quick Client Creation State
+  const [showQuickClient, setShowQuickClient] = useState(false);
+  const [isCreatingQuickClient, setIsCreatingQuickClient] = useState(false);
+  const [quickClientForm, setQuickClientForm] = useState({ nome: '', email: '', senha: '' });
+
+  useEffect(() => {
+    if (organizationId) {
+        fetchClients(organizationId).then(setClients);
+    }
+  }, [organizationId]);
+
   const isInternal = formData.archetype === Archetype.INTERNAL_MARKETING;
+
+  const handleQuickClientCreate = async (e: React.FormEvent) => {
+      e.preventDefault();
+      
+      // LOG de depuração para entender por que nada acontece
+      console.log("Iniciando Sincronização de Stakeholder...", { organizationId, isCreatingQuickClient });
+
+      if (isCreatingQuickClient) return;
+      
+      if (!organizationId) {
+          alert("Erro: ID da organização não carregado. Tente recarregar a página.");
+          return;
+      }
+
+      if (!quickClientForm.nome || !quickClientForm.email || !quickClientForm.senha) {
+          alert("Preencha todos os campos do cliente (Nome, Email e Senha).");
+          return;
+      }
+
+      setIsCreatingQuickClient(true);
+      try {
+          const newClient = await createClient({
+              nome: quickClientForm.nome,
+              email: quickClientForm.email,
+              organizacao: organizationId,
+              status: 'Ativo'
+          }, quickClientForm.senha);
+
+          if (newClient) {
+              setClients(prev => [...prev, newClient]);
+              setFormData(prev => ({ ...prev, clientId: newClient.id }));
+              setShowQuickClient(false);
+              setQuickClientForm({ nome: '', email: '', senha: '' });
+              console.log("Stakeholder sincronizado com sucesso:", newClient.id);
+          } else {
+              throw new Error("O servidor não retornou os dados do novo cliente.");
+          }
+      } catch (err: any) {
+          console.error("Falha na Sincronização:", err);
+          alert("Erro ao criar stakeholder: " + (err.message || "Falha de comunicação com o banco."));
+      } finally {
+          setIsCreatingQuickClient(false);
+      }
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -249,19 +308,47 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                                 />
                             </div>
 
-                            <div className="space-y-3">
-                                <label className="text-[8px] lg:text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-3 block ml-1">Governança</label>
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                    {STATUS_OPTIONS.map(opt => (
-                                        <button
-                                            key={opt.value}
-                                            type="button"
-                                            onClick={() => setFormData({...formData, status: opt.value})}
-                                            className={`p-4 rounded-2xl border text-[10px] font-black uppercase tracking-widest transition-all ${formData.status === opt.value ? 'bg-amber-500 border-amber-400 text-black shadow-lg scale-105' : 'bg-white/5 border-white/10 text-slate-500 hover:bg-white/10'}`}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-10">
+                                <div className="space-y-3">
+                                    <div className="flex justify-between items-center mb-3">
+                                        <label className="text-[8px] lg:text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] ml-1">Stakeholder Responsável</label>
+                                        <button 
+                                            onClick={() => setShowQuickClient(true)}
+                                            className="text-[9px] font-black text-amber-500 hover:text-amber-600 uppercase tracking-widest flex items-center gap-1 transition-colors"
                                         >
-                                            {opt.label}
+                                            <Plus className="w-3 h-3"/> Novo Stakeholder
                                         </button>
-                                    ))}
+                                    </div>
+                                    <div className="relative group">
+                                        <Users className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-amber-500 transition-colors z-10" />
+                                        <select 
+                                            value={formData.clientId || ''}
+                                            onChange={e => setFormData({...formData, clientId: e.target.value || undefined})}
+                                            className="w-full bg-[var(--input-bg)] border border-[var(--border-color)] rounded-[1.5rem] p-5 pl-14 text-sm font-bold text-[var(--text-main)] outline-none focus:border-amber-500/50 transition-all shadow-inner appearance-none cursor-pointer"
+                                        >
+                                            <option value="">Sem Cliente Associado</option>
+                                            {clients.map(c => (
+                                                <option key={c.id} value={c.id}>{c.nome.toUpperCase()}</option>
+                                            ))}
+                                        </select>
+                                        <ChevronRight className="absolute right-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 rotate-90 pointer-events-none" />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <label className="text-[8px] lg:text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-3 block ml-1">Governança</label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        {STATUS_OPTIONS.map(opt => (
+                                            <button
+                                                key={opt.value}
+                                                type="button"
+                                                onClick={() => setFormData({...formData, status: opt.value})}
+                                                className={`p-4 rounded-2xl border text-[10px] font-black uppercase tracking-widest transition-all ${formData.status === opt.value ? 'bg-amber-500 border-amber-400 text-black shadow-lg scale-105' : 'bg-white/5 border-white/10 text-slate-500 hover:bg-white/10'}`}
+                                            >
+                                                {opt.label}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
 
@@ -467,6 +554,45 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                 )}
             </div>
         </main>
+
+        {/* QUICK CLIENT MODAL */}
+        {showQuickClient && (
+            <div className="fixed inset-0 z-[700] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
+                <div className="w-full max-w-md bg-white dark:bg-[#0A0A0C] rounded-[2.5rem] shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden animate-ios-pop flex flex-col">
+                    <header className="p-8 pb-4 flex justify-between items-center bg-slate-50 dark:bg-white/5">
+                        <div>
+                            <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tighter">Novo Stakeholder.</h2>
+                            <p className="text-[8px] text-slate-500 uppercase font-black tracking-widest mt-1">Criação Instantânea de Acesso</p>
+                        </div>
+                        <button onClick={() => setShowQuickClient(false)} className="p-2 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-all text-slate-400"><X className="w-5 h-5"/></button>
+                    </header>
+                    <form onSubmit={handleQuickClientCreate} className="p-8 space-y-6">
+                        <div className="space-y-4">
+                            <div className="space-y-1.5">
+                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-2"><Building2 className="w-3 h-3 text-amber-500"/> Nome da Empresa / Pessoa</label>
+                                <input required value={quickClientForm.nome} onChange={e => setQuickClientForm({...quickClientForm, nome: e.target.value})} className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl p-4 text-sm font-bold text-slate-900 dark:text-white outline-none focus:border-amber-500 transition-all shadow-inner" placeholder="Ex: Acme Corp"/>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-2"><Mail className="w-3 h-3 text-blue-500"/> E-mail Corporativo</label>
+                                <input required type="email" value={quickClientForm.email} onChange={e => setQuickClientForm({...quickClientForm, email: e.target.value})} className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl p-4 text-sm font-bold text-slate-900 dark:text-white outline-none focus:border-amber-500 transition-all shadow-inner" placeholder="contato@empresa.com"/>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-2"><Lock className="w-3 h-3 text-emerald-500"/> Senha de Acesso</label>
+                                <input required type="password" value={quickClientForm.senha} onChange={e => setQuickClientForm({...quickClientForm, senha: e.target.value})} className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl p-4 text-sm font-bold text-slate-900 dark:text-white outline-none focus:border-amber-500 transition-all shadow-inner" placeholder="••••••••"/>
+                            </div>
+                        </div>
+                        <button 
+                            type="submit" 
+                            disabled={isCreatingQuickClient}
+                            className="w-full py-5 bg-slate-900 dark:bg-white text-white dark:text-black rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-30"
+                        >
+                            {isCreatingQuickClient ? <Loader2 className="animate-spin w-5 h-5"/> : <Save className="w-5 h-5"/>}
+                            Sincronizar Novo Stakeholder
+                        </button>
+                    </form>
+                </div>
+            </div>
+        )}
     </div>
   );
 }
