@@ -73,30 +73,25 @@ export const TasksPage: React.FC<Props> = ({ opportunities, onOpenProject, userR
             return;
         }
 
-        if (!confirm(`O Shinkō Engine analisará ${pendingTasks.length} tarefas para otimizar prazos e responsáveis. Deseja prosseguir?`)) return;
+        if (!confirm(`O Shinkō Engine analisará ${pendingTasks.length} tarefas. Este processo pode levar até 20 segundos devido ao volume de dados. Deseja prosseguir?`)) return;
 
         setIsOptimizing(true);
         try {
-            // SHINKŌ SMART PAYLOAD: Envia apenas o essencial para a IA decidir
+            // PAYLOAD ULTRA-LEVE: Apenas o necessário para matemática de alocação
             const taskPayload = pendingTasks.map(t => ({
-                id: t.id,
-                title: t.titulo,
-                effortHours: t.duracaohoras || 2,
-                currentAssigneeId: t.responsavel,
-                projectId: t.projeto,
-                deadline: t.datafim || t.dataproposta
+                id: String(t.id),
+                h: t.duracaohoras || 2,
+                uId: t.responsavel
             }));
 
             const memberPayload = members.map(m => ({
-                id: m.id,
-                name: m.nome,
-                capacityHoursPerDay: 8
+                id: String(m.id),
+                h: 8 // Capacidade fixa
             }));
 
             const optimized = await optimizeSchedule(taskPayload, memberPayload);
             
             if (optimized && Array.isArray(optimized) && optimized.length > 0) {
-                // Atualização em lote no banco
                 let successCount = 0;
                 
                 await Promise.all(optimized.map(async (item) => {
@@ -111,14 +106,14 @@ export const TasksPage: React.FC<Props> = ({ opportunities, onOpenProject, userR
                     if (res) successCount++;
                 }));
                 
-                alert(`Pipeline Sincronizado! ${successCount} tarefas foram realocadas com sucesso.`);
+                alert(`Pipeline Sincronizado! ${successCount} tarefas foram realocadas no cronograma industrial.`);
                 await loadData();
             } else {
-                alert("A IA analisou os dados mas não sugeriu mudanças significativas no cronograma atual.");
+                alert("A IA processou os dados mas recomendou manter o cronograma atual.");
             }
         } catch (e: any) {
             console.error("Erro no balanceamento IA:", e);
-            alert("Falha técnica no Motor de Planejamento: " + (e.message || "Erro desconhecido"));
+            alert("Falha técnica no Motor: " + (e.message || "Erro desconhecido"));
         } finally {
             setIsOptimizing(false);
         }
@@ -182,7 +177,6 @@ export const TasksPage: React.FC<Props> = ({ opportunities, onOpenProject, userR
                 </div>
 
                 <div className="flex flex-wrap items-center gap-4">
-                    {/* Filtro por Projeto */}
                     <div className="flex items-center gap-3 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-1.5 rounded-xl min-w-[180px]">
                         <Briefcase className="w-4 h-4 text-slate-400 ml-2" />
                         <select 
@@ -197,7 +191,6 @@ export const TasksPage: React.FC<Props> = ({ opportunities, onOpenProject, userR
                         </select>
                     </div>
 
-                    {/* Filtro por Estágio */}
                     <div className="flex items-center gap-3 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-1.5 rounded-xl min-w-[160px]">
                         <Activity className="w-4 h-4 text-slate-400 ml-2" />
                         <select 

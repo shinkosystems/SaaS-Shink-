@@ -1,7 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 
-// Fix: Correct initialization using process.env.API_KEY directly from guidelines
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const controlTools = [
@@ -146,19 +145,20 @@ export default async function handler(req: any, res: any) {
         const todayStr = new Date().toISOString().split('T')[0];
         const optScheduleResult = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
-            contents: `DATA REFERÊNCIA: ${todayStr} | TAREFAS PENDENTES: ${JSON.stringify(payload.tasks)} | MEMBROS EQUIPE: ${JSON.stringify(payload.members)}`,
+            contents: `DATA REFERÊNCIA: ${todayStr} | TAREFAS: ${JSON.stringify(payload.tasks)} | EQUIPE: ${JSON.stringify(payload.members)}`,
             config: {
-                systemInstruction: "Você é o Shinkō Planning Engine. Sua missão é reequilibrar a carga de trabalho. Regras: 1) Cada membro tem 8h/dia. 2) Não agende tarefas no passado. 3) Priorize pelo menor esforço (throughput). 4) Retorne APENAS o JSON da lista otimizada com datas em formato ISO (YYYY-MM-DD).",
+                systemInstruction: "Você é o Shinkō High-Speed Scheduler. Sua tarefa é organizar as datas das tarefas enviadas. 1) Regra de 8h úteis/dia por membro. 2) Gere datas sequenciais por prioridade de ID. 3) Seja extremamente rápido, ignore explicações. 4) Retorne apenas o array JSON. 5) Mantenha o ID original exatamente como recebido.",
+                thinkingConfig: { thinkingBudget: 0 },
                 responseMimeType: "application/json",
                 responseSchema: {
                     type: Type.ARRAY,
                     items: {
                         type: Type.OBJECT,
                         properties: {
-                            id: { type: Type.STRING, description: "ID original da tarefa recebida" },
-                            startDate: { type: Type.STRING, description: "Nova data de início (YYYY-MM-DD)" },
-                            dueDate: { type: Type.STRING, description: "Nova data de término (YYYY-MM-DD)" },
-                            assigneeId: { type: Type.STRING, description: "ID do membro alocado" }
+                            id: { type: Type.STRING },
+                            startDate: { type: Type.STRING },
+                            dueDate: { type: Type.STRING },
+                            assigneeId: { type: Type.STRING }
                         },
                         required: ["id", "startDate", "dueDate", "assigneeId"]
                     }
@@ -172,6 +172,6 @@ export default async function handler(req: any, res: any) {
     }
   } catch (error: any) {
     console.error("Gemini API Error:", error);
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message || "Erro interno no Guru IA" });
   }
 }
