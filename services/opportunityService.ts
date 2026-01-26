@@ -71,7 +71,7 @@ export const createOpportunity = async (opp: Opportunity): Promise<Opportunity |
 
     try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error("Usuário não autenticado.");
+        if (!user) throw new Error("Sessão expirada. Faça login novamente.");
 
         let targetOrgId = opp.organizationId;
 
@@ -81,7 +81,7 @@ export const createOpportunity = async (opp: Opportunity): Promise<Opportunity |
         }
 
         if (!targetOrgId) {
-            throw new Error("Vínculo de Organização obrigatório para o Framework.");
+            throw new Error("Não foi possível detectar sua organização ativa.");
         }
 
         const dbPayload = mapOpportunityToDbProject({ ...opp, organizationId: Number(targetOrgId) });
@@ -93,16 +93,23 @@ export const createOpportunity = async (opp: Opportunity): Promise<Opportunity |
             .select()
             .single();
         
-        if (error) throw error;
+        if (error) {
+            console.error("Erro no Insert Supabase:", error.message);
+            throw new Error(`Erro do Banco: ${error.message}`);
+        }
 
-        // NOVO: Se houver um cliente associado, atualizamos a array de projetos do cliente
+        // Vínculo secundário com cliente (não deve travar o salvamento do projeto)
         if (data.cliente && data.id) {
-            await linkProjectToClient(data.cliente, data.id);
+            try {
+                await linkProjectToClient(data.cliente, data.id);
+            } catch (linkErr) {
+                console.warn("Aviso: Projeto criado, mas falha ao atualizar lista no cliente.");
+            }
         }
 
         return mapDbProjectToOpportunity(data, []);
     } catch (err: any) {
-        console.error("createOpportunity error:", err.message);
+        console.error("createOpportunity catch:", err.message);
         throw err;
     }
 };
@@ -117,7 +124,6 @@ export const updateOpportunity = async (opp: Opportunity): Promise<Opportunity |
         
         if (error) throw error;
 
-        // Se houver um cliente associado, garantimos o vínculo na array projetos[] do cliente
         if (data.cliente && data.id) {
             await linkProjectToClient(data.cliente, data.id);
         }

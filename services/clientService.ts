@@ -66,7 +66,7 @@ export const createClient = async (client: Partial<DbClient>, password?: string)
 
     // 3. Persistência na Tabela Clientes
     const payload: any = {
-        id: authUserId || crypto.randomUUID(), // Tenta usar o ID do Auth se houver, senão gera um novo
+        id: authUserId || crypto.randomUUID(), 
         nome: client.nome || 'Novo Stakeholder',
         email: client.email || '',
         telefone: client.telefone || '',
@@ -77,8 +77,8 @@ export const createClient = async (client: Partial<DbClient>, password?: string)
         data_inicio: client.data_inicio || new Date().toISOString().split('T')[0],
         status: client.status || 'Ativo',
         organizacao: orgId,
-        contrato: client.contrato || 'Draft', // Campo obrigatório
-        projetos: client.projetos || [] // Inicializa array vazia de projetos
+        contrato: client.contrato || 'Draft',
+        projetos: client.projetos || []
     };
 
     const { data, error } = await supabase
@@ -92,7 +92,6 @@ export const createClient = async (client: Partial<DbClient>, password?: string)
         throw new Error(`Falha ao salvar no banco: ${error.message}`);
     }
     
-    // 4. Também cria o perfil na tabela 'users' para que ele apareça no sistema
     if (authUserId) {
         await supabase.from('users').upsert({
             id: authUserId,
@@ -109,16 +108,26 @@ export const createClient = async (client: Partial<DbClient>, password?: string)
 };
 
 /**
- * Adiciona ou remove um projeto da array de projetos do cliente
+ * Adiciona ou remove um projeto da array de projetos do cliente.
+ * Uso de maybeSingle para evitar quebras se o cliente for deletado durante a operação.
  */
 export const linkProjectToClient = async (clientId: string, projectId: number) => {
-    const { data: client } = await supabase.from('clientes').select('projetos').eq('id', clientId).single();
-    if (!client) return;
+    try {
+        const { data: client, error } = await supabase
+            .from('clientes')
+            .select('projetos')
+            .eq('id', clientId)
+            .maybeSingle();
+            
+        if (error || !client) return;
 
-    const currentProjects = client.projetos || [];
-    if (!currentProjects.includes(projectId)) {
-        const updated = [...currentProjects, projectId];
-        await supabase.from('clientes').update({ projetos: updated }).eq('id', clientId);
+        const currentProjects = client.projetos || [];
+        if (!currentProjects.includes(projectId)) {
+            const updated = [...currentProjects, projectId];
+            await supabase.from('clientes').update({ projetos: updated }).eq('id', clientId);
+        }
+    } catch (e) {
+        console.warn("Falha não crítica ao vincular projeto ao cliente:", e);
     }
 };
 

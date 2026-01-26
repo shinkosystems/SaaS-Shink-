@@ -106,7 +106,6 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
 
       setIsCreatingQuickClient(true);
       try {
-          // Passamos 'contrato' como 'Draft' para evitar o erro de constraint NOT NULL
           const newClient = await createClient({
               nome: quickClientForm.nome,
               email: quickClientForm.email,
@@ -189,10 +188,12 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
               prioScore: prioScore,
               tadsScore: tadsScore,
               createdAt: initialData?.createdAt || new Date().toISOString(),
-              status: formData.status || 'Future'
+              status: formData.status || 'Future',
+              organizationId: organizationId // Garante que o ID da org flua corretamente
           } as Opportunity);
-      } catch (e) {
+      } catch (e: any) {
           console.error("Wizard Save Error:", e);
+          alert("Erro técnico ao salvar projeto: " + (e.message || "Erro de banco de dados."));
       } finally {
           setIsSaving(false);
       }

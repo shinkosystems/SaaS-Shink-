@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, useMemo } from 'react';
 import { supabase } from './services/supabaseClient';
 import { Opportunity, BpmnTask } from './types';
 import { fetchOpportunities, createOpportunity, updateOpportunity, deleteOpportunity, fetchOpportunityById } from './services/opportunityService';
@@ -286,7 +286,7 @@ const App: React.FC = () => {
                         organizationId={userOrgId || undefined}
                         onSave={async (opp) => {
                             try {
-                                const updated = await updateOpportunity(opp);
+                                const updated = await updateOpportunity({ ...opp, organizationId: userOrgId || opp.organizationId });
                                 if (updated) {
                                     await loadUserData(user.id);
                                     onOpenProject(updated);
@@ -316,17 +316,21 @@ const App: React.FC = () => {
                         organizationId={userOrgId || undefined}
                         onSave={async (opp) => {
                             try {
-                                // Forçamos o ID da organização se disponível no estado global
+                                const finalOrgId = userOrgId || opp.organizationId;
+                                if (!finalOrgId) throw new Error("ID da organização não identificado.");
+
                                 const newOpp = await createOpportunity({ 
                                     ...opp, 
-                                    organizationId: userOrgId || opp.organizationId 
+                                    organizationId: Number(finalOrgId) 
                                 });
+
                                 if (newOpp) {
                                     await loadUserData(user.id);
                                     onOpenProject(newOpp);
                                 }
                             } catch (err: any) {
-                                alert(`Falha de Sincronização: ${err.message || "O Framework Shinkō exige uma Organização Ativa."}`);
+                                console.error("Create Project Error:", err);
+                                alert(`Falha ao salvar: ${err.message || "Erro desconhecido no banco de dados."}`);
                             }
                         }}
                         onCancel={() => setView('dashboard')}
@@ -337,6 +341,7 @@ const App: React.FC = () => {
                             opportunities={opportunities} onOpenProject={onOpenProject} 
                             onNavigate={setView} user={user} theme={theme} 
                             onGuruPrompt={(p) => setGuruInitialPrompt(p)}
+                            organizationId={userOrgId || undefined}
                         />}
                         {view === 'framework-system' && <FrameworkPage orgName={orgDetails.name} onBack={() => setView('dashboard')} onSaveToProject={async (opp) => {
                             try {
@@ -371,7 +376,6 @@ const App: React.FC = () => {
         {showCreateTask && <QuickTaskModal opportunities={opportunities} onClose={() => setShowCreateTask(false)} onSave={async (task, pid) => {
             if (!userOrgId || !user) return;
             
-            // MAPEAR CAMPOS PARA O BANCO (Sincronização Industrial Shinkō)
             const dbPayload = {
                 titulo: task.text,
                 descricao: task.description,
