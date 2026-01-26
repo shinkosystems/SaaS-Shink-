@@ -163,7 +163,7 @@ export const KanbanBoard: React.FC<Props> = ({ tasks, organizationId, readOnly, 
                         gut: { g: editingTaskCtx.gravidade || 1, u: editingTaskCtx.urgencia || 1, t: editingTaskCtx.tendencia || 1 },
                         dbId: editingTaskCtx.id
                     }}
-                    opportunityTitle={editingTaskCtx.projectData?.nome}
+                    opportunityTitle={editingTaskCtx.projetoData?.nome || 'PROJETO ATIVO'}
                     nodeTitle={editingTaskCtx.category || 'Tarefa'}
                     organizationId={organizationId} onClose={() => setEditingTaskCtx(null)}
                     onSave={async (updated) => {

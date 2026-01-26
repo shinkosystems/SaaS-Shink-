@@ -69,7 +69,7 @@ export const GanttView: React.FC<Props> = ({
             assigneeId: task.responsavel, gut: { g: task.gravidade, u: task.urgencia, t: task.tendencia },
             createdAt: task.createdat
         };
-        setEditingTaskCtx({ task: hydrated, projectData: task.projetoData });
+        setEditingTaskCtx({ task: hydrated, projetoData: task.projetoData });
     };
 
     return (
@@ -136,7 +136,10 @@ export const GanttView: React.FC<Props> = ({
             </div>
             {editingTaskCtx && (
                 <TaskDetailModal 
-                    task={editingTaskCtx.task} nodeTitle={editingTaskCtx.projectData?.nome || 'Tarefa'} organizationId={organizationId} onClose={() => setEditingTaskCtx(null)}
+                    task={editingTaskCtx.task} 
+                    nodeTitle={editingTaskCtx.projetoData?.nome || 'Tarefa'} 
+                    opportunityTitle={editingTaskCtx.projetoData?.nome || 'PROJETO ATIVO'}
+                    organizationId={organizationId} onClose={() => setEditingTaskCtx(null)}
                     onSave={async (updated) => {
                         await updateTask(Number(updated.id), { titulo: updated.text, status: updated.status, responsavel: updated.assigneeId, duracaohoras: updated.estimatedHours, datafim: updated.dueDate, datainicio: updated.startDate });
                         onTaskUpdate(); setEditingTaskCtx(null);

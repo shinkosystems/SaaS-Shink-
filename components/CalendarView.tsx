@@ -109,7 +109,7 @@ export const CalendarView: React.FC<Props> = ({
                                 <span className={`text-[10px] font-black w-7 h-7 flex items-center justify-center rounded-xl ${isToday ? 'bg-amber-500 text-black shadow-glow-amber' : 'text-slate-400'}`}>{date.getDate()}</span>
                                 <div className="flex-1 space-y-1.5">
                                     {dayTasks.map(task => (
-                                        <div key={task.id} onClick={() => setEditingTaskCtx({ task, projectData: task.projetoData })} className={`p-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider truncate cursor-pointer border ${task.status === 'done' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-amber-500/10 text-amber-600 border-amber-500/20'}`}>
+                                        <div key={task.id} onClick={() => setEditingTaskCtx({ task, projetoData: task.projetoData })} className={`p-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider truncate cursor-pointer border ${task.status === 'done' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-amber-500/10 text-amber-600 border-amber-500/20'}`}>
                                             {task.titulo}
                                         </div>
                                     ))}
@@ -127,13 +127,12 @@ export const CalendarView: React.FC<Props> = ({
                         text: editingTaskCtx.task.titulo, 
                         description: editingTaskCtx.task.descricao,
                         status: editingTaskCtx.task.status as any,
-                        // Add missing required property 'completed' derived from task status
                         completed: editingTaskCtx.task.status === 'done',
                         assigneeId: editingTaskCtx.task.responsavel,
                         dueDate: editingTaskCtx.task.datafim,
                         category: editingTaskCtx.task.category
                     }}
-                    opportunityTitle={editingTaskCtx.projectData?.nome}
+                    opportunityTitle={editingTaskCtx.projetoData?.nome || 'PROJETO ATIVO'}
                     nodeTitle={editingTaskCtx.task.category || 'Tarefa'} organizationId={organizationId} onClose={() => setEditingTaskCtx(null)}
                     onSave={async (updated) => { 
                         await updateTask(Number(updated.id), { 
