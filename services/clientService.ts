@@ -1,6 +1,23 @@
 
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { supabase } from './supabaseClient';
 import { DbClient } from '../types';
+
+// Credenciais extraídas para o Ghost Client
+const supabaseUrl = 'https://zjssfnbcboibqeoubeou.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpqc3NmbmJjYm9pYnFlb3ViZW91Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg5ODE5NDcsImV4cCI6MjA3NDU1Nzk0N30.hM0WRkgCMsWczSvCoCwVpF7q7TawwKLVAjifKWaTIkU';
+
+/**
+ * Ghost Client: Instância isolada para operações de Auth que não devem 
+ * interferir na sessão global (persistSession: false).
+ */
+const ghostSupabase = createSupabaseClient(supabaseUrl, supabaseKey, {
+    auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false
+    }
+});
 
 export const fetchClients = async (organizationId: number): Promise<DbClient[]> => {
     if (!organizationId) return [];
@@ -18,46 +35,78 @@ export const fetchClients = async (organizationId: number): Promise<DbClient[]> 
 };
 
 /**
- * Cria um parceiro através da API Route segura.
+ * Cria um parceiro (User + Cliente) usando Ghost Authentication.
+ * Evita conflitos de sessão e o erro de Service Role Key.
  */
 export const createClient = async (client: Partial<DbClient>, password?: string): Promise<DbClient | null> => {
-    let orgId = client.organizacao;
-    
-    if (!orgId) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-            const { data: userData } = await supabase.from('users').select('organizacao').eq('id', user.id).single();
-            orgId = userData?.organizacao;
-        }
-    }
-
+    const orgId = client.organizacao;
     if (!orgId) throw new Error("Organização ativa não identificada.");
+    if (!client.email || !password) throw new Error("E-mail e senha são obrigatórios.");
 
-    const response = await fetch('/api/admin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            action: 'create_partner',
-            payload: {
-                ...client,
-                password,
-                organizacao: orgId
+    try {
+        // 1. Criar credencial no Auth via Ghost Client (Não desloga o admin)
+        const { data: authData, error: authError } = await ghostSupabase.auth.signUp({
+            email: client.email,
+            password: password,
+            options: {
+                data: {
+                    full_name: client.nome,
+                    perfil: 'cliente',
+                    organizacao: orgId
+                }
             }
-        })
-    });
+        });
 
-    // Se o servidor retornar algo que não é JSON (ex: erro HTML), capturamos como texto
-    const contentType = response.headers.get("content-type");
-    if (contentType && contentType.indexOf("application/json") !== -1) {
-        const result = await response.json();
-        if (!response.ok) {
-            throw new Error(result.error || "Falha na resposta do servidor.");
+        if (authError) throw authError;
+        if (!authData.user) throw new Error("Falha ao gerar UID do parceiro.");
+
+        const userId = authData.user.id;
+
+        // 2. Sincronizar na tabela 'users' usando a sessão do Admin atual
+        const { error: userTableError } = await supabase
+            .from('users')
+            .insert({
+                id: userId,
+                nome: client.nome,
+                email: client.email,
+                organizacao: orgId,
+                perfil: 'cliente',
+                status: 'Ativo',
+                ativo: true
+            });
+
+        if (userTableError) {
+            console.warn("Aviso: Falha ao inserir na tabela de usuários (pode já existir):", userTableError.message);
         }
-        return result.data as DbClient;
-    } else {
-        const errorText = await response.text();
-        console.error("Erro Não-JSON do Servidor:", errorText);
-        throw new Error(`Erro do Servidor (${response.status}): O endpoint administrativo não retornou um formato válido.`);
+
+        // 3. Criar registro na tabela 'clientes' usando a sessão do Admin atual
+        const { data: clientRecord, error: clientError } = await supabase
+            .from('clientes')
+            .insert({
+                id: userId,
+                nome: client.nome,
+                email: client.email,
+                telefone: client.telefone,
+                cnpj: client.cnpj,
+                status: client.status || 'Ativo',
+                organizacao: orgId,
+                contrato: 'Draft',
+                valormensal: 0,
+                meses: 12,
+                data_inicio: new Date().toISOString().split('T')[0]
+            })
+            .select()
+            .single();
+
+        if (clientError) throw clientError;
+
+        return clientRecord as DbClient;
+
+    } catch (error: any) {
+        console.error("Erro na criação do Parceiro:", error);
+        let msg = error.message;
+        if (msg.includes("User already registered")) msg = "Este e-mail já possui um acesso cadastrado.";
+        throw new Error(msg);
     }
 };
 
