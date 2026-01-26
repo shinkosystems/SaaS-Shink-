@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Opportunity, DbTask } from '../types';
-import { RefreshCw, Clock, Lock, Trash2, Edit, DollarSign } from 'lucide-react';
+import { RefreshCw, Clock, Lock, Trash2, Edit, DollarSign, BarChart3, AlignLeft } from 'lucide-react';
 import { TaskDetailModal } from './TaskDetailModal';
 import { updateTask, deleteTask, syncTaskChecklist, fetchOrgMembers } from '../services/projectService';
 import { getOperationalRates } from '../services/financialService';
@@ -61,7 +61,7 @@ export const KanbanBoard: React.FC<Props> = ({ tasks, organizationId, readOnly, 
             <div className="flex-1 overflow-x-auto custom-scrollbar p-6">
                 <div className="flex gap-6 h-full min-w-[1300px]">
                     {COLUMNS.map(col => (
-                        <div key={col.id} onDragOver={e => !readOnly && e.preventDefault()} onDrop={() => !readOnly && draggedTask && handleStatusChange(draggedTask, col.id)} className="flex-1 min-w-[280px] flex flex-col h-full bg-slate-100/30 dark:bg-white/[0.01] rounded-[2rem] border border-slate-200/50 dark:border-white/5 p-3">
+                        <div key={col.id} onDragOver={e => !readOnly && e.preventDefault()} onDrop={() => !readOnly && draggedTask && handleStatusChange(draggedTask, col.id)} className="flex-1 min-w-[300px] flex flex-col h-full bg-slate-100/30 dark:bg-white/[0.01] rounded-[2rem] border border-slate-200/50 dark:border-white/5 p-3">
                             <div className="flex items-center justify-between mb-4 px-3 py-1">
                                 <div className="flex items-center gap-2">
                                     <div className={`w-2 h-2 rounded-full ${col.color}`}></div>
@@ -72,36 +72,49 @@ export const KanbanBoard: React.FC<Props> = ({ tasks, organizationId, readOnly, 
 
                             <div className="flex-1 space-y-4 overflow-y-auto custom-scrollbar px-1">
                                 {columnsData[col.id]?.map(task => {
-                                    const score = (task.gravidade || 1) * (task.urgencia || 1) * (task.tendencia || 1);
+                                    const g = task.gravidade || 1;
+                                    const u = task.urgencia || 1;
+                                    const t = task.tendencia || 1;
+                                    const score = g * u * t;
                                     const productionCost = (task.duracaohoras || 2) * (rates?.totalRate || 0);
                                     
                                     return (
-                                        <div key={task.id} draggable={!readOnly} onDragStart={() => setDraggedTask(task)} onDragEnd={() => setDraggedTask(null)} onClick={() => setEditingTaskCtx(task)} className="bg-white dark:bg-[#0a0a0c] p-5 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm hover:border-amber-500/30 transition-all cursor-grab active:cursor-grabbing group">
+                                        <div key={task.id} draggable={!readOnly} onDragStart={() => setDraggedTask(task)} onDragEnd={() => setDraggedTask(null)} onClick={() => setEditingTaskCtx(task)} className="bg-white dark:bg-[#0a0a0c] p-5 rounded-3xl border border-slate-200 dark:border-white/5 shadow-sm hover:border-amber-500/30 transition-all cursor-grab active:cursor-grabbing group relative overflow-hidden">
                                             <div className="flex justify-between items-start mb-3">
                                                 <div className="flex flex-col">
                                                     <div className="text-[8px] font-black text-amber-500 uppercase tracking-widest truncate max-w-[140px]">{task.projetoData?.nome || 'Ad-hoc'}</div>
                                                     <div className="text-[7px] font-bold text-slate-400 uppercase tracking-tight mt-0.5 opacity-60">ID: {task.id}</div>
                                                 </div>
                                                 <div className="flex items-center gap-1.5">
-                                                    <div className={`px-1.5 py-0.5 rounded text-[8px] font-black border ${score >= 60 ? 'bg-red-500/10 text-red-500' : 'bg-slate-100 dark:bg-white/5 text-slate-400'}`}>GUT {score}</div>
+                                                    <div className={`px-2 py-1 rounded-lg text-[8px] font-black border flex items-center gap-1 ${score >= 60 ? 'bg-red-500/10 text-red-500 border-red-500/20' : score >= 27 ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'}`}>
+                                                        <BarChart3 className="w-2.5 h-2.5"/> {g}/{u}/{t}
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div className="text-xs font-bold text-slate-800 dark:text-white leading-relaxed line-clamp-3 mb-4">{task.titulo}</div>
+                                            
+                                            <div className="text-xs font-bold text-slate-900 dark:text-white leading-relaxed mb-3">{task.titulo}</div>
+                                            
+                                            {task.descricao && (
+                                                <div className="flex items-start gap-2 mb-4 opacity-50">
+                                                    <AlignLeft className="w-3 h-3 mt-0.5 shrink-0"/>
+                                                    <div className="text-[9px] font-medium line-clamp-2 leading-relaxed">{task.descricao}</div>
+                                                </div>
+                                            )}
                                             
                                             <div className="flex flex-col gap-2 mb-4">
-                                                <div className="flex items-center justify-between text-[9px] font-black text-emerald-500 bg-emerald-500/5 px-2 py-1 rounded-lg border border-emerald-500/10">
+                                                <div className="flex items-center justify-between text-[9px] font-black text-emerald-600 bg-emerald-500/5 px-2 py-1.5 rounded-xl border border-emerald-500/10">
                                                     <span className="flex items-center gap-1 uppercase tracking-widest"><DollarSign className="w-2.5 h-2.5"/> Custo ABC</span>
-                                                    <span>R$ {productionCost.toFixed(2)}</span>
+                                                    <span>{productionCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                                                 </div>
                                             </div>
 
-                                            <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-white/5">
-                                                <div className="w-6 h-6 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[9px] font-black text-slate-500 dark:text-white overflow-hidden shadow-inner">
+                                            <div className="flex items-center justify-between pt-3 border-t border-slate-50 dark:border-white/5">
+                                                <div className="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[10px] font-black text-slate-500 dark:text-white overflow-hidden shadow-inner border border-slate-200 dark:border-white/10">
                                                     {task.responsavelData?.avatar_url ? <img src={task.responsavelData.avatar_url} className="w-full h-full object-cover"/> : task.responsavelData?.nome?.charAt(0)}
                                                 </div>
                                                 {task.datafim && (
-                                                    <div className={`text-[8px] font-black uppercase flex items-center gap-1 ${new Date(task.datafim) < new Date() && task.status !== 'done' ? 'text-red-500' : 'text-slate-400'}`}>
-                                                        <Clock className="w-2.5 h-2.5"/> 
+                                                    <div className={`text-[8px] font-black uppercase flex items-center gap-1.5 px-2 py-1 rounded-lg ${new Date(task.datafim) < new Date() && task.status !== 'done' ? 'bg-red-500/10 text-red-500' : 'bg-slate-50 dark:bg-white/5 text-slate-500'}`}>
+                                                        <Clock className="w-3 h-3"/> 
                                                         {new Date(task.datafim).toLocaleDateString('pt-BR', {day:'2-digit', month:'short'})}
                                                     </div>
                                                 )}
@@ -124,7 +137,7 @@ export const KanbanBoard: React.FC<Props> = ({ tasks, organizationId, readOnly, 
                         dueDate: editingTaskCtx.datafim, 
                         startDate: editingTaskCtx.datainicio, 
                         assigneeId: editingTaskCtx.responsavel,
-                        gut: { g: editingTaskCtx.gravidade, u: editingTaskCtx.urgencia, t: editingTaskCtx.tendencia },
+                        gut: { g: editingTaskCtx.gravidade || 1, u: editingTaskCtx.urgencia || 1, t: editingTaskCtx.tendencia || 1 },
                         dbId: editingTaskCtx.id
                     }}
                     opportunityTitle={editingTaskCtx.projetoData?.nome}
@@ -140,7 +153,8 @@ export const KanbanBoard: React.FC<Props> = ({ tasks, organizationId, readOnly, 
                             duracaohoras: updated.estimatedHours, 
                             gravidade: updated.gut?.g, 
                             urgencia: updated.gut?.u, 
-                            tendencia: updated.gut?.t 
+                            tendencia: updated.gut?.t,
+                            descricao: updated.description
                         });
                         onRefresh?.(); setEditingTaskCtx(null);
                     }}

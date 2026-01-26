@@ -86,11 +86,20 @@ export const createOpportunity = async (opp: Opportunity): Promise<Opportunity |
         const dbPayload = mapOpportunityToDbProject({ ...opp, organizationId: Number(targetOrgId) });
         const { id, ...insertData } = dbPayload;
         
-        const { data, error } = await supabase
+        let { data, error } = await supabase
             .from(TABLE_NAME)
             .insert(insertData)
             .select()
             .single();
+        
+        // SHINKŌ ROBUST FALLBACK: Se a coluna 'pdf_url' não existir no banco do cliente
+        if (error && (error.message.includes('pdf_url') || error.message.includes('column'))) {
+            console.warn("Detectada incompatibilidade de schema (pdf_url). Tentando fallback...");
+            const { pdf_url, ...fallbackData } = insertData;
+            const retry = await supabase.from(TABLE_NAME).insert(fallbackData).select().single();
+            data = retry.data;
+            error = retry.error;
+        }
         
         if (error) throw error;
 
@@ -107,7 +116,16 @@ export const updateOpportunity = async (opp: Opportunity): Promise<Opportunity |
         const dbPayload = mapOpportunityToDbProject(opp);
         const { id, ...updateData } = dbPayload;
         
-        const { data, error } = await supabase.from(TABLE_NAME).update(updateData).eq('id', opp.id).select().single();
+        let { data, error } = await supabase.from(TABLE_NAME).update(updateData).eq('id', opp.id).select().single();
+        
+        // SHINKŌ ROBUST FALLBACK: Se a coluna 'pdf_url' não existir no banco do cliente
+        if (error && (error.message.includes('pdf_url') || error.message.includes('column'))) {
+            const { pdf_url, ...fallbackData } = updateData;
+            const retry = await supabase.from(TABLE_NAME).update(fallbackData).eq('id', opp.id).select().single();
+            data = retry.data;
+            error = retry.error;
+        }
+
         if (error) return null;
 
         const { data: tasks } = await supabase.from('tasks').select('*').eq('projeto', opp.id);

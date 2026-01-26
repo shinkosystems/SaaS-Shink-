@@ -4,7 +4,7 @@ import { BpmnTask, Attachment, Comment } from '../types';
 import { 
     X, AlignLeft, Trash2, Clock, 
     Save, Calendar, User as UserIcon, Loader2,
-    Paperclip, MessageSquare, Send, ListTodo, FileText, Download, ExternalLink, Film, File as FileIcon, ChevronDown
+    Paperclip, MessageSquare, Send, ListTodo, FileText, Download, ExternalLink, Film, File as FileIcon, ChevronDown, BarChart3
 } from 'lucide-react';
 import { fetchOrgMembers } from '../services/projectService';
 import { fetchComments, addComment, deleteComment } from '../services/commentService';
@@ -52,7 +52,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
   const fileInputRef = useRef<HTMLInputElement>(null);
   const commentsEndRef = useRef<HTMLDivElement>(null);
 
-  // Calcula o ID real do banco (dbId ou id se for numérico)
   const effectiveDbId = formData.dbId || (typeof formData.id === 'string' && !isNaN(Number(formData.id)) ? Number(formData.id) : undefined);
 
   useEffect(() => {
@@ -108,7 +107,7 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
     if (!textToSend || isAddingComment) return;
 
     if (!effectiveDbId) {
-        alert("Sincronize esta tarefa (botão laranja 'SINCRONIZAR ATIVO') antes de comentar para criar o registro no banco de dados.");
+        alert("Sincronize esta tarefa antes de comentar.");
         return;
     }
 
@@ -133,7 +132,6 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
         }
     } catch (err: any) {
         console.error("Falha ao inserir comentário:", err);
-        alert(`Não foi possível enviar o comentário: ${err.message || "Erro de conexão"}`);
     } finally {
         setIsAddingComment(false);
     }
@@ -150,17 +148,8 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
       setIsSaving(true);
       try {
           const finalData = { ...formData, tags: [formData.category || 'Gestão'] };
-          const result = await onSave(finalData);
-          
-          if (result && (result as any).dbId) {
-              setFormData(prev => ({ ...prev, dbId: (result as any).dbId }));
-          }
-          
-          if (!formData.dbId && !effectiveDbId) {
-              alert("Tarefa sincronizada com sucesso! Agora você já pode adicionar comentários.");
-          } else {
-              onClose();
-          }
+          await onSave(finalData);
+          onClose();
       } catch (e) {
           alert("Erro ao sincronizar dados.");
       } finally {
@@ -196,6 +185,15 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
   };
 
   const currentAssignee = availableUsers.find(u => u.id === formData.assigneeId);
+  const gutScore = (formData.gut?.g || 1) * (formData.gut?.u || 1) * (formData.gut?.t || 1);
+
+  const updateGut = (field: 'g' | 'u' | 't', val: number) => {
+      if (readOnly) return;
+      setFormData(prev => ({
+          ...prev,
+          gut: { ...prev.gut!, [field]: val }
+      }));
+  };
 
   return (
     <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -303,31 +301,26 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
                                                 </div>
                                             </div>
                                         ))}
-                                        {comments.length === 0 && (
-                                            <div className="p-10 border-2 border-dashed border-slate-200 rounded-[2rem] text-center">
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nenhum comentário registrado</p>
-                                            </div>
-                                        )}
                                         <div ref={commentsEndRef} />
                                     </div>
                                 )}
 
                                 <div className="relative group">
-                                    <form onSubmit={handleAddComment} className="w-full bg-white border border-slate-200 rounded-[2rem] p-2 flex items-center shadow-soft focus-within:ring-4 focus-within:ring-amber-500/5 transition-all">
+                                    <form onSubmit={handleAddComment} className="w-full bg-white border border-slate-200 rounded-[2rem] p-2 flex items-center shadow-soft transition-all">
                                         <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center ml-2 shrink-0 overflow-hidden">
                                             {currentUser?.user_metadata?.avatar_url ? <img src={currentUser.user_metadata.avatar_url} className="w-full h-full object-cover" /> : <UserIcon className="w-5 h-5 text-slate-300"/>}
                                         </div>
                                         <input 
                                             value={newComment}
                                             onChange={e => setNewComment(e.target.value)}
-                                            placeholder={effectiveDbId ? "Adicionar comentário técnico..." : "Sincronize para habilitar comentários"}
+                                            placeholder={effectiveDbId ? "Comentar..." : "Sincronize primeiro"}
                                             disabled={!effectiveDbId || isAddingComment}
                                             className="flex-1 bg-transparent px-4 text-sm font-medium outline-none text-slate-800 disabled:opacity-50"
                                         />
                                         <button 
                                             type="submit"
                                             disabled={!newComment.trim() || isAddingComment || !effectiveDbId}
-                                            className="p-3 bg-amber-500 text-white rounded-2xl hover:bg-amber-600 transition-all shadow-lg active:scale-95 disabled:opacity-30 mr-1"
+                                            className="p-3 bg-amber-500 text-white rounded-2xl hover:bg-amber-600 transition-all shadow-lg disabled:opacity-30 mr-1"
                                         >
                                             {isAddingComment ? <Loader2 className="w-5 h-5 animate-spin"/> : <Send className="w-5 h-5" />}
                                         </button>
@@ -340,6 +333,49 @@ export const TaskDetailModal: React.FC<Props> = ({ task, nodeTitle, opportunityT
             </div>
 
             <aside className="w-full lg:w-[400px] border-l border-slate-100 bg-white p-8 lg:p-10 space-y-10 overflow-y-auto custom-scrollbar shrink-0">
+                
+                {/* MATRIZ GUT DISPLAY */}
+                <div className="space-y-6 bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100 shadow-inner">
+                    <div className="flex justify-between items-center mb-6">
+                        <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-3">
+                            <BarChart3 className="w-4 h-4 text-amber-500"/> Prioridade GUT
+                        </label>
+                        <span className={`text-[10px] font-black px-3 py-1.5 rounded-full border ${gutScore >= 60 ? 'bg-red-500/10 text-red-500 border-red-500/20' : gutScore >= 27 ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'}`}>
+                            SCORE: {gutScore}
+                        </span>
+                    </div>
+
+                    <div className="space-y-8">
+                        {[
+                            { id: 'g', label: 'Gravidade', val: formData.gut?.g || 1 },
+                            { id: 'u', label: 'Urgência', val: formData.gut?.u || 1 },
+                            { id: 't', label: 'Tendência', val: formData.gut?.t || 1 }
+                        ].map(item => (
+                            <div key={item.id} className="space-y-4">
+                                <div className="flex justify-between text-[10px] text-slate-500 font-black uppercase tracking-widest">
+                                    <span>{item.label}</span>
+                                    <span className="text-slate-900">{item.val}</span>
+                                </div>
+                                <div className="relative h-1.5 w-full bg-slate-200 rounded-full">
+                                    <input 
+                                        type="range" min="1" max="5" 
+                                        value={item.val} 
+                                        disabled={readOnly}
+                                        onChange={e => updateGut(item.id as any, parseInt(e.target.value))} 
+                                        className="absolute inset-0 w-full h-1.5 opacity-0 cursor-pointer z-10"
+                                    />
+                                    <div 
+                                        className="h-full bg-amber-500 rounded-full relative transition-all" 
+                                        style={{ width: `${(item.val - 1) * 25}%` }}
+                                    >
+                                        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 bg-amber-500 rounded-full border-2 border-white shadow-lg"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
                 <div className="space-y-4">
                     <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em]">CATEGORIA SHINKŌ</label>
                     <div className="bg-slate-50 p-2 rounded-[2rem] border border-slate-100 shadow-inner relative overflow-hidden">

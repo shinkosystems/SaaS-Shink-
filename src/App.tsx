@@ -4,10 +4,10 @@ import { supabase } from './services/supabaseClient';
 import { Opportunity, BpmnTask } from './types';
 import { fetchOpportunities, createOpportunity, updateOpportunity, deleteOpportunity, fetchOpportunityById } from './services/opportunityService';
 import { createTask } from './services/projectService';
-import { getPublicOrgDetails, updateOrgDetails, uploadLogo, fetchActiveOrgModules, getPlanDefaultModules, SYSTEM_MODULES_DEF } from './services/organizationService';
+import { updateOrgDetails, fetchActiveOrgModules, getPlanDefaultModules } from './services/organizationService';
 import { subscribeToPresence } from './services/presenceService';
 import { trackUserAccess } from './services/analyticsService';
-import { getCurrentUserPlan, mapDbPlanIdToString } from './services/asaasService';
+import { mapDbPlanIdToString } from './services/asaasService';
 
 // Navigation Components
 import { Sidebar, MobileDrawer } from './components/Navigation';
@@ -24,6 +24,10 @@ import { IntelligencePage } from './pages/IntelligencePage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { AdminPage } from './pages/AdminPage';
+import { EcosystemPage } from './pages/EcosystemPage';
+import { ValueChainDashboard } from './pages/ValueChainDashboard';
+import { AssetsPage } from './pages/AssetsPage';
+import { TicketPortalPage } from './pages/TicketPortalPage';
 
 // Utility Components
 import AuthScreen from './components/AuthScreen';
@@ -35,10 +39,12 @@ import { GuruFab } from './components/GuruFab';
 import { FeedbackModal } from './components/FeedbackModal';
 import { LandingPage } from './components/LandingPage';
 import { InsightCenter } from './components/InsightCenter';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 
 const ROUTES: Record<string, string> = {
     'dashboard': '/',
+    'value-chain': '/value-chain',
+    'ecosystem': '/ecosystem',
     'framework-system': '/framework',
     'list': '/projects',
     'create-project': '/project/new',
@@ -49,6 +55,7 @@ const ROUTES: Record<string, string> = {
     'financial': '/finance',
     'clients': '/clients',
     'intelligence': '/intelligence',
+    'assets': '/assets',
     'settings': '/settings',
     'profile': '/profile',
     'admin-manager': '/admin'
@@ -87,10 +94,15 @@ const App: React.FC = () => {
   const [orgDetails, setOrgDetails] = useState({ 
       name: '', limit: 1, logoUrl: null, primaryColor: '#F59E0B', aiSector: '', aiTone: '', aiContext: '' 
   });
-  const [dbStatus, setDbStatus] = useState<'connected'|'disconnected'>('connected');
 
   const handleRouting = async () => {
       let path = window.location.pathname;
+
+      if (path.startsWith('/ticket/')) {
+          setViewState('ticket-portal');
+          return;
+      }
+
       if (path.startsWith('/blog')) {
           const slug = path.split('/')[2];
           setShowBlog(true);
@@ -224,7 +236,6 @@ const App: React.FC = () => {
           }
       } catch (e) { 
           console.error("Erro no carregamento:", e);
-          setDbStatus('disconnected'); 
       } finally { 
           setLoading(false); 
       }
@@ -233,6 +244,10 @@ const App: React.FC = () => {
   const toggleTheme = () => {
       setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
+
+  if (view === 'ticket-portal') {
+      return <TicketPortalPage />;
+  }
 
   if (!user && !loading) {
       if (showBlog) return ( <InsightCenter initialPostSlug={blogPostSlug} onBack={() => { setShowBlog(false); navigateTo('/'); }} onEnter={() => setShowAuth(true)} /> );
@@ -250,10 +265,10 @@ const App: React.FC = () => {
       onOpenCreateTask: () => setShowCreateTask(true),
       onToggleTheme: toggleTheme, onLogout: () => supabase.auth.signOut(),
       onSearch: () => {}, onOpenFeedback: () => setShowFeedback(true),
-      theme: theme, dbStatus, isMobileOpen, setIsMobileOpen, userRole,
+      theme: theme, dbStatus: 'connected' as const, isMobileOpen, setIsMobileOpen, userRole,
       userData: userData || { name: '...', avatar: null, email: user?.email },
       currentPlan, orgName: orgDetails.name, activeModules, customLogoUrl: orgDetails.logoUrl,
-      organizationId: userOrgId
+      organizationId: userOrgId || undefined
   };
 
   return (
@@ -269,16 +284,25 @@ const App: React.FC = () => {
                         orgType={orgDetails.name}
                         customLogoUrl={orgDetails.logoUrl}
                         onSave={async (opp) => {
-                            await updateOpportunity(opp);
-                            loadUserData(user.id);
-                            onOpenProject(opp);
+                            try {
+                                const updated = await updateOpportunity(opp);
+                                if (updated) {
+                                    await loadUserData(user.id);
+                                    onOpenProject(updated);
+                                }
+                            } catch (e: any) {
+                                alert("Erro ao atualizar: " + e.message);
+                            }
                         }}
                         onCancel={() => onOpenProject(editingOpportunity)}
                     />
                 ) : selectedProject ? (
                     <ProjectWorkspace 
                         opportunity={selectedProject} onBack={() => setSelectedProjectState(null)}
-                        onUpdate={(opp) => updateOpportunity(opp).then(() => loadUserData(user.id))}
+                        onUpdate={(opp) => updateOpportunity(opp).then((updated) => {
+                            if (updated) setSelectedProjectState(updated);
+                            loadUserData(user.id);
+                        })}
                         onEdit={(opp) => onEditProject(opp)} 
                         onDelete={(id) => deleteOpportunity(id).then(() => setSelectedProjectState(null))}
                         userRole={userRole} currentPlan={currentPlan} activeModules={activeModules}
@@ -289,16 +313,18 @@ const App: React.FC = () => {
                         orgType={orgDetails.name}
                         customLogoUrl={orgDetails.logoUrl}
                         onSave={async (opp) => {
-                            const newOpp = await createOpportunity({ 
-                                ...opp, 
-                                organizationId: userOrgId || undefined 
-                            });
-                            if (newOpp) {
-                                await loadUserData(user.id);
-                                onOpenProject(newOpp);
-                            } else {
-                                alert("Falha ao salvar o projeto.");
-                                setView('dashboard');
+                            try {
+                                // Forçamos o ID da organização se disponível no estado global
+                                const newOpp = await createOpportunity({ 
+                                    ...opp, 
+                                    organizationId: userOrgId || opp.organizationId 
+                                });
+                                if (newOpp) {
+                                    await loadUserData(user.id);
+                                    onOpenProject(newOpp);
+                                }
+                            } catch (err: any) {
+                                alert(`Falha de Sincronização: ${err.message || "O Framework Shinkō exige uma Organização Ativa."}`);
                             }
                         }}
                         onCancel={() => setView('dashboard')}
@@ -311,11 +337,13 @@ const App: React.FC = () => {
                             onGuruPrompt={(p) => setGuruInitialPrompt(p)}
                         />}
                         {view === 'framework-system' && <FrameworkPage orgName={orgDetails.name} onBack={() => setView('dashboard')} onSaveToProject={async (opp) => {
-                            const newOpp = await createOpportunity({ ...opp, organizationId: userOrgId || undefined });
-                            if (newOpp) {
-                                await loadUserData(user.id);
-                                onOpenProject(newOpp);
-                            } else setView('dashboard');
+                            try {
+                                const newOpp = await createOpportunity({ ...opp, organizationId: userOrgId || undefined });
+                                if (newOpp) {
+                                    await loadUserData(user.id);
+                                    onOpenProject(newOpp);
+                                }
+                            } catch (e: any) { alert(e.message); }
                         }} />}
                         {view === 'list' && <ProjectsPage opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} onRefresh={() => loadUserData(user.id)} />}
                         
@@ -326,7 +354,10 @@ const App: React.FC = () => {
                         {view === 'crm' && <CrmPage organizationId={userOrgId || undefined} />}
                         {view === 'financial' && <FinancialPage orgType={orgDetails.name} />}
                         {view === 'clients' && <ClientsPage userRole={userRole} onlineUsers={onlineUsers} organizationId={userOrgId || undefined} onOpenProject={onOpenProject} />}
+                        {view === 'value-chain' && <ValueChainDashboard organizationId={userOrgId || undefined} />}
+                        {view === 'ecosystem' && <EcosystemPage organizationId={userOrgId || undefined} userRole={userRole} />}
                         {view === 'intelligence' && <IntelligencePage organizationId={userOrgId || undefined} opportunities={opportunities} />}
+                        {view === 'assets' && <AssetsPage organizationId={userOrgId || undefined} />}
                         {view === 'settings' && <SettingsPage theme={theme} onToggleTheme={toggleTheme} onlineUsers={onlineUsers} userOrgId={userOrgId} orgDetails={orgDetails} onUpdateOrgDetails={() => {}} setView={setView} userRole={userRole} userData={userData} activeModules={activeModules} onRefreshModules={() => loadUserData(user.id)} />}
                         {view === 'profile' && <ProfilePage currentPlan={currentPlan} onRefresh={() => loadUserData(user.id)} />}
                         {view === 'admin-manager' && (userData?.email === 'peboorba@gmail.com') && <AdminPage onlineUsers={onlineUsers} />}
@@ -337,7 +368,24 @@ const App: React.FC = () => {
 
         {showCreateTask && <QuickTaskModal opportunities={opportunities} onClose={() => setShowCreateTask(false)} onSave={async (task, pid) => {
             if (!userOrgId || !user) return;
-            await createTask({...task, projeto: pid ? Number(pid) : null, responsavel: task.assigneeId || user.id, organizacao: userOrgId});
+            
+            // MAPEAR CAMPOS PARA O BANCO (Sincronização Industrial Shinkō)
+            const dbPayload = {
+                titulo: task.text,
+                descricao: task.description,
+                projeto: pid ? Number(pid) : null,
+                responsavel: task.assigneeId || user.id,
+                organizacao: userOrgId,
+                status: 'todo',
+                category: (task as any).category || 'Gestão',
+                gravidade: task.gut?.g || 1,
+                urgencia: task.gut?.u || 1,
+                tendencia: task.gut?.t || 1,
+                datafim: task.dueDate,
+                duracaohoras: task.estimatedHours
+            };
+
+            await createTask(dbPayload);
             loadUserData(user.id);
             setShowCreateTask(false);
         }} userRole={userRole} />}

@@ -46,8 +46,8 @@ export const fetchProjects = async (organizationId?: number): Promise<DbProject[
             .select(`*, clienteData:clientes(nome, logo_url)`)
             .eq('organizacao', organizationId)
             .order('created_at', { ascending: false });
-        const { data, error } = await query;
-        if (error) return [];
+        const { data, error: actualError } = await query;
+        if (actualError) return [];
         return data as any[];
     } catch (error: any) { return []; }
 };
@@ -138,22 +138,26 @@ export const fetchAllTasks = async (organizationId?: number): Promise<DbTask[]> 
 export const createTask = async (task: Partial<DbTask>): Promise<DbTask | null> => {
     try {
         const { projetoData, responsavelData, createdat, id, anexos, ...cleanTask } = task as any;
-        const packedDescription = packAttachments(cleanTask.descricao || '', anexos || []);
+        
+        // EXTRAÇÃO INTELIGENTE DE CAMPOS (FRONT -> DB)
+        const tituloFinal = cleanTask.titulo || cleanTask.text || 'Nova Tarefa';
+        const descricaoOriginal = cleanTask.descricao || cleanTask.description || '';
+        const packedDescription = packAttachments(descricaoOriginal, anexos || []);
 
         const payload = {
             projeto: cleanTask.projeto || null,
-            titulo: cleanTask.titulo || 'Nova Tarefa',
+            titulo: tituloFinal,
             descricao: packedDescription,
             status: cleanTask.status || 'todo',
-            responsavel: cleanTask.responsavel,
+            responsavel: cleanTask.responsavel || cleanTask.assigneeId,
             category: cleanTask.category || 'Gestão',
-            gravidade: cleanTask.gravidade || 1,
-            urgencia: cleanTask.urgencia || 1,
-            tendencia: cleanTask.tendencia || 1,
-            dataproposta: cleanTask.datafim || new Date().toISOString(),
-            datainicio: cleanTask.datainicio || new Date().toISOString(),
-            datafim: cleanTask.datafim || new Date().toISOString(),
-            duracaohoras: Math.round(Number(cleanTask.duracaohoras || 2)), 
+            gravidade: cleanTask.gravidade || cleanTask.gut?.g || 1,
+            urgencia: cleanTask.urgencia || cleanTask.gut?.u || 1,
+            tendencia: cleanTask.tendencia || cleanTask.gut?.t || 1,
+            dataproposta: cleanTask.datafim || cleanTask.dueDate || new Date().toISOString(),
+            datainicio: cleanTask.datainicio || cleanTask.startDate || new Date().toISOString(),
+            datafim: cleanTask.datafim || cleanTask.dueDate || new Date().toISOString(),
+            duracaohoras: Math.round(Number(cleanTask.duracaohoras || cleanTask.estimatedHours || 2)), 
             organizacao: cleanTask.organizacao,
             sutarefa: cleanTask.sutarefa || false,
             tarefamae: cleanTask.tarefamae || null
@@ -169,13 +173,34 @@ export const createTask = async (task: Partial<DbTask>): Promise<DbTask | null> 
 };
 
 export const updateTask = async (id: number, updates: Partial<DbTask>): Promise<DbTask | null> => {
-    const { projetoData, responsavelData, createdat, id: _, anexos, ...payload } = updates as any;
-    if (updates.descricao !== undefined) {
-        payload.descricao = packAttachments(updates.descricao, anexos);
+    try {
+        const { projetoData, responsavelData, createdat, id: _, anexos, ...cleanUpdates } = updates as any;
+        
+        const payload: any = { ...cleanUpdates };
+        
+        // Mapeamento Inteligente (Shinkō OS Proxy)
+        if (cleanUpdates.text && !cleanUpdates.titulo) payload.titulo = cleanUpdates.text;
+        
+        // CORREÇÃO CRÍTICA: Garantir que a descrição seja mapeada para a coluna correta
+        const finalDesc = cleanUpdates.descricao !== undefined ? cleanUpdates.descricao : cleanUpdates.description;
+        if (finalDesc !== undefined) {
+            payload.descricao = packAttachments(finalDesc, anexos);
+        }
+
+        // Mapeamento GUT
+        if (cleanUpdates.gut) {
+            payload.gravidade = cleanUpdates.gut.g;
+            payload.urgencia = cleanUpdates.gut.u;
+            payload.tendencia = cleanUpdates.gut.t;
+        }
+
+        const { data, error } = await supabase.from(TASKS_TABLE).update(payload).eq('id', id).select().maybeSingle();
+        if (error) throw error;
+        return data;
+    } catch (e: any) {
+        console.error("Error updating task:", e.message);
+        return null;
     }
-    const { data, error } = await supabase.from(TASKS_TABLE).update(payload).eq('id', id).select().maybeSingle();
-    if (error) return null;
-    return data;
 };
 
 export const deleteTask = async (id: number): Promise<boolean> => {
@@ -184,7 +209,6 @@ export const deleteTask = async (id: number): Promise<boolean> => {
 };
 
 export const syncTaskChecklist = async (parentId: number, subtasks: BpmnSubTask[], organizationId: number, projectId?: number, defaultAssigneeId?: string) => {
-    // Sincronização básica de subtasks (visto em BpmnBuilder)
     for (const sub of subtasks) {
         if (!sub.dbId) {
             await createTask({
@@ -200,9 +224,6 @@ export const syncTaskChecklist = async (parentId: number, subtasks: BpmnSubTask[
     }
 };
 
-/**
- * Persistência Inteligente do Fluxo BPMN para o Kanban
- */
 export const syncBpmnTasks = async (projectId: number, organizationId: number, nodes: BpmnNode[]): Promise<BpmnNode[]> => {
     const updatedNodes = JSON.parse(JSON.stringify(nodes));
     const { data: { user } } = await supabase.auth.getUser();
