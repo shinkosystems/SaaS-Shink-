@@ -6,7 +6,7 @@ import { GanttView } from './GanttView';
 import { CalendarView } from './CalendarView';
 import OpportunityDetail from './OpportunityDetail'; 
 import BpmnBuilder from './BpmnBuilder';
-import { ArrowLeft, LayoutDashboard, Trello, GanttChartSquare, Calendar as CalendarIcon, Edit, Workflow, ChevronRight, ChevronLeft, Sparkles, Lock, Loader2, Filter, Users, Clock, X } from 'lucide-react';
+import { ArrowLeft, LayoutDashboard, Trello, GanttChartSquare, Calendar as CalendarIcon, Edit, Workflow, ChevronRight, ChevronLeft, Sparkles, Lock, Loader2, Filter, Users, Clock, X, Search } from 'lucide-react';
 import { fetchAllTasks, fetchOrgMembers } from '../services/projectService';
 
 interface Props {
@@ -53,6 +53,7 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
   // Filtros de Snapshot
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
   const [memberFilter, setMemberFilter] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState<string>('');
   const [viewDate, setViewDate] = useState(new Date());
 
   const isClient = userRole === 'cliente';
@@ -82,9 +83,9 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
   const handleNavigateTime = (direction: 'prev' | 'next') => {
       const mod = direction === 'next' ? 1 : -1;
       const newDate = new Date(viewDate);
-      if (timeFilter === 'day') newDate.setDate(viewDate.getDate() + mod);
-      else if (timeFilter === 'week') newDate.setDate(viewDate.getDate() + (mod * 7));
-      else if (timeFilter === 'month') newDate.setMonth(viewDate.getMonth() + mod);
+      if (timeFilter === 'day') newDate.setDate(newDate.getDate() + mod);
+      else if (timeFilter === 'week') newDate.setDate(newDate.getDate() + (mod * 7));
+      else if (timeFilter === 'month') newDate.setMonth(newDate.getMonth() + mod);
       setViewDate(newDate);
   };
 
@@ -112,12 +113,23 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
   };
 
   const filteredTasks = useMemo(() => {
+      const searchLower = searchTerm.toLowerCase().trim();
+      
       return projectTasks.filter(task => {
-          // 1. Filtro de Membro
+          // 1. Busca por Texto (Título, ID ou Descrição)
+          if (searchLower) {
+              const matchesTitle = task.titulo?.toLowerCase().includes(searchLower);
+              const matchesId = task.id?.toString().includes(searchLower);
+              const matchesDesc = task.descricao?.toLowerCase().includes(searchLower);
+              
+              if (!matchesTitle && !matchesId && !matchesDesc) return false;
+          }
+
+          // 2. Filtro de Membro
           const matchesMember = memberFilter === 'all' || task.responsavel === memberFilter;
           if (!matchesMember) return false;
 
-          // 2. Filtro de Tempo
+          // 3. Filtro de Tempo
           if (timeFilter === 'all') return true;
 
           const basis = parseSafeDate(task.datafim || task.datainicio || task.createdat);
@@ -146,7 +158,7 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
 
           return true;
       });
-  }, [projectTasks, timeFilter, memberFilter, viewDate]);
+  }, [projectTasks, timeFilter, memberFilter, viewDate, searchTerm]);
 
   const tabs = [
       { id: 'overview', label: 'Geral', icon: LayoutDashboard, moduleId: 'projects' },
@@ -224,6 +236,18 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
               <div className="flex items-center gap-4 py-2 overflow-x-auto no-scrollbar">
                   <div className="h-6 w-px bg-slate-200 dark:bg-white/10 hidden md:block"></div>
                   
+                  {/* Busca por Texto */}
+                  <div className="relative group min-w-[140px] md:min-w-[200px]">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 group-focus-within:text-amber-500 transition-colors"/>
+                      <input 
+                        type="text"
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                        placeholder="ID, TÍTULO OU DESC..."
+                        className="w-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 pl-9 pr-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest outline-none focus:ring-1 focus:ring-amber-500/30 transition-all text-slate-600 dark:text-slate-300"
+                      />
+                  </div>
+
                   {/* Tempo */}
                   <div className="flex items-center bg-slate-100 dark:bg-white/5 p-1 rounded-xl border border-slate-200 dark:border-white/10 shrink-0 gap-1">
                       {['all', 'day', 'week', 'month'].map((t) => (
@@ -261,9 +285,9 @@ export const ProjectWorkspace: React.FC<Props> = ({ opportunity, onBack, onUpdat
                       </div>
                   </div>
 
-                  {(timeFilter !== 'all' || memberFilter !== 'all') && (
+                  {(timeFilter !== 'all' || memberFilter !== 'all' || searchTerm !== '') && (
                       <button 
-                        onClick={() => { setTimeFilter('all'); setMemberFilter('all'); setViewDate(new Date()); }}
+                        onClick={() => { setTimeFilter('all'); setMemberFilter('all'); setSearchTerm(''); setViewDate(new Date()); }}
                         className="p-2 text-red-500 hover:bg-red-500/10 rounded-full transition-all shrink-0"
                         title="Limpar Filtros"
                       >
