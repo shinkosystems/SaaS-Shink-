@@ -65,34 +65,60 @@ export const TasksPage: React.FC<Props> = ({ opportunities, onOpenProject, userR
     const handleGlobalOptimize = async () => {
         if (!organizationId || isOptimizing) return;
         
+        // Selecionar apenas tarefas que não estão prontas
+        const pendingTasks = tasks.filter(t => t.status !== 'done' && t.status !== 'approval');
+        
+        if (pendingTasks.length === 0) {
+            alert("Nenhuma tarefa pendente para otimizar.");
+            return;
+        }
+
+        if (!confirm(`O Shinkō Engine analisará ${pendingTasks.length} tarefas para otimizar prazos e responsáveis. Deseja prosseguir?`)) return;
+
         setIsOptimizing(true);
         try {
-            const pendingTasks = tasks.filter(t => t.status !== 'done' && t.status !== 'approval');
-            if (pendingTasks.length === 0) {
-                alert("Nenhuma tarefa pendente para otimizar.");
-                setIsOptimizing(false);
-                return;
-            }
+            // SHINKŌ SMART PAYLOAD: Envia apenas o essencial para a IA decidir
+            const taskPayload = pendingTasks.map(t => ({
+                id: t.id,
+                title: t.titulo,
+                effortHours: t.duracaohoras || 2,
+                currentAssigneeId: t.responsavel,
+                projectId: t.projeto,
+                deadline: t.datafim || t.dataproposta
+            }));
 
-            const optimized = await optimizeSchedule(pendingTasks, members);
+            const memberPayload = members.map(m => ({
+                id: m.id,
+                name: m.nome,
+                capacityHoursPerDay: 8
+            }));
+
+            const optimized = await optimizeSchedule(taskPayload, memberPayload);
             
-            if (optimized && optimized.length > 0) {
-                await Promise.all(optimized.map(item => 
-                    updateTask(Number(item.id), { 
+            if (optimized && Array.isArray(optimized) && optimized.length > 0) {
+                // Atualização em lote no banco
+                let successCount = 0;
+                
+                await Promise.all(optimized.map(async (item) => {
+                    if (!item.id) return;
+                    
+                    const res = await updateTask(Number(item.id), { 
                         datainicio: item.startDate, 
                         datafim: item.dueDate, 
                         responsavel: item.assigneeId 
-                    })
-                ));
+                    });
+                    
+                    if (res) successCount++;
+                }));
                 
-                alert("Pipeline balanceado e otimizado com IA!");
+                alert(`Pipeline Sincronizado! ${successCount} tarefas foram realocadas com sucesso.`);
                 await loadData();
             } else {
-                alert("A IA não conseguiu gerar um novo plano. Verifique as horas estimadas das tarefas.");
+                alert("A IA analisou os dados mas não sugeriu mudanças significativas no cronograma atual.");
             }
-        } catch (e) {
+        } catch (e: any) {
             console.error("Erro no balanceamento IA:", e);
-            alert("Falha técnica ao processar balanceamento.");
+            alert("Falha técnica no Motor de Planejamento: " + (e.message || "Erro desconhecido"));
         } finally {
             setIsOptimizing(false);
         }
@@ -171,7 +197,7 @@ export const TasksPage: React.FC<Props> = ({ opportunities, onOpenProject, userR
                         </select>
                     </div>
 
-                    {/* NOVO: Filtro por Estágio */}
+                    {/* Filtro por Estágio */}
                     <div className="flex items-center gap-3 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-1.5 rounded-xl min-w-[160px]">
                         <Activity className="w-4 h-4 text-slate-400 ml-2" />
                         <select 
@@ -210,12 +236,19 @@ export const TasksPage: React.FC<Props> = ({ opportunities, onOpenProject, userR
             </header>
 
             <div className="flex-1 flex flex-col overflow-hidden relative">
-                <div className="flex-1 overflow-hidden">
-                    {subView === 'kanban' && <KanbanBoard tasks={filteredTasks} onSelectOpportunity={onOpenProject} userRole={userRole} organizationId={organizationId} onRefresh={loadData} />}
-                    {subView === 'gantt' && <GanttView tasks={filteredTasks} opportunities={opportunities} onSelectOpportunity={onOpenProject} onTaskUpdate={loadData} organizationId={organizationId} />}
-                    {subView === 'calendar' && <CalendarView tasks={filteredTasks} opportunities={opportunities} onSelectOpportunity={onOpenProject} onTaskUpdate={loadData} organizationId={organizationId} />}
-                    {subView === 'workload' && <WorkloadView tasks={filteredTasks} members={members} organizationId={organizationId} />}
-                </div>
+                {loading ? (
+                    <div className="flex-1 flex flex-col items-center justify-center gap-4 text-slate-400">
+                        <Loader2 className="w-12 h-12 animate-spin text-amber-500"/>
+                        <span className="text-[10px] font-black uppercase tracking-widest">Sincronizando Workflow...</span>
+                    </div>
+                ) : (
+                    <div className="flex-1 overflow-hidden">
+                        {subView === 'kanban' && <KanbanBoard tasks={filteredTasks} onSelectOpportunity={onOpenProject} userRole={userRole} organizationId={organizationId} onRefresh={loadData} />}
+                        {subView === 'gantt' && <GanttView tasks={filteredTasks} opportunities={opportunities} onSelectOpportunity={onOpenProject} onTaskUpdate={loadData} organizationId={organizationId} />}
+                        {subView === 'calendar' && <CalendarView tasks={filteredTasks} opportunities={opportunities} onSelectOpportunity={onOpenProject} onTaskUpdate={loadData} organizationId={organizationId} />}
+                        {subView === 'workload' && <WorkloadView tasks={filteredTasks} members={members} organizationId={organizationId} />}
+                    </div>
+                )}
             </div>
         </div>
     );

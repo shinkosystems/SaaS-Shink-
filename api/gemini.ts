@@ -73,7 +73,6 @@ export default async function handler(req: any, res: any) {
       case 'generate_bpmn':
         const bpmnResponse = await ai.models.generateContent({
           model: 'gemini-3-flash-preview',
-          // Fix: Enhanced prompt using extra context passed from BpmnBuilder.tsx to resolve signature mismatch
           contents: `PROJETO: ${payload.title} | ARQUÉTIPO: ${payload.archetype} | MISSÃO: ${payload.description} | CONTEXTO: ${payload.docsContext || ''} | CARGOS DISPONÍVEIS: ${JSON.stringify(payload.roles || [])}`,
           config: {
             responseMimeType: "application/json",
@@ -114,7 +113,6 @@ export default async function handler(req: any, res: any) {
         });
         return res.status(200).json({ text: analResponse.text });
 
-      // Fix: Implemented real dashboard_insight action handler
       case 'dashboard_insight':
         const insightResult = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
@@ -144,24 +142,25 @@ export default async function handler(req: any, res: any) {
         });
         return res.status(200).json(JSON.parse(insightResult.text || "{}"));
 
-      // Fix for TasksPage.tsx line 77: Implemented optimize_schedule handler
       case 'optimize_schedule':
+        const todayStr = new Date().toISOString().split('T')[0];
         const optScheduleResult = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
-            contents: `Tarefas Pendentes: ${JSON.stringify(payload.tasks)} | Membros Equipe: ${JSON.stringify(payload.members)}`,
+            contents: `DATA REFERÊNCIA: ${todayStr} | TAREFAS PENDENTES: ${JSON.stringify(payload.tasks)} | MEMBROS EQUIPE: ${JSON.stringify(payload.members)}`,
             config: {
-                systemInstruction: "Você é o Shinkō Planning Engine. Realoque datas e responsabilidades para otimizar o throughput do time.",
+                systemInstruction: "Você é o Shinkō Planning Engine. Sua missão é reequilibrar a carga de trabalho. Regras: 1) Cada membro tem 8h/dia. 2) Não agende tarefas no passado. 3) Priorize pelo menor esforço (throughput). 4) Retorne APENAS o JSON da lista otimizada com datas em formato ISO (YYYY-MM-DD).",
                 responseMimeType: "application/json",
                 responseSchema: {
                     type: Type.ARRAY,
                     items: {
                         type: Type.OBJECT,
                         properties: {
-                            id: { type: Type.STRING },
-                            startDate: { type: Type.STRING },
-                            dueDate: { type: Type.STRING },
-                            assigneeId: { type: Type.STRING }
-                        }
+                            id: { type: Type.STRING, description: "ID original da tarefa recebida" },
+                            startDate: { type: Type.STRING, description: "Nova data de início (YYYY-MM-DD)" },
+                            dueDate: { type: Type.STRING, description: "Nova data de término (YYYY-MM-DD)" },
+                            assigneeId: { type: Type.STRING, description: "ID do membro alocado" }
+                        },
+                        required: ["id", "startDate", "dueDate", "assigneeId"]
                     }
                 }
             }
