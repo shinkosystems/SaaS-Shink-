@@ -13,8 +13,6 @@ export const getPlanDefaultModules = (planId: number): string[] => {
     return SYSTEM_MODULES_DEF;
 };
 
-// --- FUNÇÕES DE GESTÃO DE MÓDULOS ---
-
 export const fetchSystemModuleMap = async (): Promise<Record<string, number>> => {
     try {
         const { data, error } = await supabase.from('modulos').select('id, nome');
@@ -25,7 +23,6 @@ export const fetchSystemModuleMap = async (): Promise<Record<string, number>> =>
         });
         return map;
     } catch (e) {
-        console.error("Error fetching module map:", e);
         return {};
     }
 };
@@ -52,7 +49,6 @@ export const fetchActiveOrgModules = async (orgId: number): Promise<string[]> =>
         if (nameError) throw nameError;
         return (moduleNames || []).map((m: any) => m.nome).filter(Boolean);
     } catch (e: any) {
-        console.error("Error fetching modules:", e.message);
         return [];
     }
 };
@@ -77,17 +73,19 @@ export const updateOrgModules = async (orgId: number, moduleList: string[]) => {
         }
         return true;
     } catch (e: any) {
-        console.error("Error updating modules:", e.message);
         return false;
     }
 };
 
+// Add updateOrgModulesByIds to fix "has no exported member" error in adminService.ts
 export const updateOrgModulesByIds = async (orgId: number, moduleIds: number[]) => {
     try {
         if (!orgId) return false;
         
+        // Remove existing module associations
         await supabase.from('organizacao_modulo').delete().eq('organizacao', orgId);
         
+        // Insert new associations by their IDs
         if (moduleIds.length > 0) {
             const rows = moduleIds.map(id => ({ organizacao: orgId, modulo: id }));
             const { error: insertError } = await supabase.from('organizacao_modulo').insert(rows);
@@ -95,15 +93,14 @@ export const updateOrgModulesByIds = async (orgId: number, moduleIds: number[]) 
         }
         return true;
     } catch (e: any) {
-        console.error("Error updating modules by IDs:", e.message);
+        console.error("Error updating organization modules by ID:", e);
         return false;
     }
 };
 
 export const createOrganization = async (userId: string, name: string, sector: string, dna?: string, userEmail?: string, userName?: string) => {
     try {
-        // Tenta inserir com o campo 'plano'
-        let { data: org, error: orgError } = await supabase
+        const { data: org, error: orgError } = await supabase
             .from(ORG_TABLE)
             .insert({ 
                 nome: name, 
@@ -117,52 +114,27 @@ export const createOrganization = async (userId: string, name: string, sector: s
             .select()
             .single();
         
-        // Fallback robusto: se a coluna 'plano' falhar por erro de cache de schema, tenta sem ela
-        if (orgError && orgError.message.includes('plano')) {
-            const { data: fallbackOrg, error: fallbackError } = await supabase
-                .from(ORG_TABLE)
-                .insert({ 
-                    nome: name, 
-                    setor: sector, 
-                    dna: dna || '',
-                    colaboradores: 100,
-                    pedidoia: 0,
-                    cor: '#F59E0B'
-                })
-                .select()
-                .single();
-            
-            if (fallbackError) throw fallbackError;
-            org = fallbackOrg;
-        } else if (orgError) {
-            throw orgError;
-        }
+        if (orgError) throw orgError;
+        if (!org) throw new Error("Falha ao criar registro da organização.");
 
-        if (!org) throw new Error("Falha ao retornar organização criada.");
-
-        // Criar usuário Dono
-        const { error: userError } = await supabase
-            .from('users')
-            .upsert({ 
-                id: userId,
-                nome: userName || 'Proprietário',
-                email: userEmail || '',
-                organizacao: org.id, 
-                perfil: 'dono',
-                status: 'Ativo',
-                ativo: true 
-            });
-        
-        if (userError) throw userError;
+        // Criar usuário Dono na tabela users (para o sistema carregar)
+        await supabase.from('users').upsert({ 
+            id: userId,
+            nome: userName || 'Proprietário',
+            email: userEmail || '',
+            organizacao: org.id, 
+            perfil: 'dono',
+            status: 'Ativo',
+            ativo: true 
+        });
 
         // Ativar módulos iniciais
         await updateOrgModules(org.id, ['projects', 'kanban', 'ia', 'clients']);
 
-        // --- AUTOMATIZAÇÃO SHINKŌ: CRIAR PROJETO DE SUPORTE DEFAULT ---
-        // Correção: Adicionado 'rde: Morno' para evitar erro NOT NULL
-        const { error: supportError } = await supabase.from('projetos').insert({
+        // Criar projeto de suporte default com campos RDE obrigatórios preenchidos
+        await supabase.from('projetos').insert({
             nome: 'Central de Suporte & Voz do Cliente',
-            descricao: 'Processo padrão para recebimento de feedbacks e chamados técnicos. Este projeto recebe cards automaticamente do portal de tickets.',
+            descricao: 'Gestão de feedbacks e chamados técnicos. Cards gerados automaticamente via portal de tickets.',
             organizacao: org.id,
             arquetipo: 'Serviço Tecnológico',
             intensidade: 1,
@@ -175,23 +147,10 @@ export const createOrganization = async (userId: string, name: string, sector: s
             rde: 'Morno'
         });
 
-        if (supportError) console.error("Erro ao criar projeto suporte default:", supportError);
-
-        await supabase.from('clientes').insert({
-            nome: name,
-            email: userEmail || '',
-            status: 'Ativo',
-            organizacao: org.id,
-            valormensal: 0,
-            meses: 12,
-            data_inicio: new Date().toISOString().split('T')[0],
-            contrato: 'Draft'
-        });
-
         return org;
     } catch (err: any) {
-        console.error("Erro fatal na criação de org:", err);
-        throw new Error(`Falha ao criar organização: ${err.message}`);
+        console.error("Erro na criação de org:", err);
+        throw new Error(`Falha ao configurar empresa: ${err.message}`);
     }
 };
 
@@ -226,17 +185,12 @@ export const updateOrgDetails = async (orgId: number, updates: any) => {
 };
 
 export const fetchOrganizationMembersWithRoles = async (orgId: number) => {
-    try {
-        const { data, error } = await supabase
-            .from('users')
-            .select(`id, nome, email, avatar_url, perfil, cargo, ativo, custo_mensal`)
-            .eq('organizacao', orgId);
-        if (error) throw error;
-        return data || [];
-    } catch (e) {
-        const { data } = await supabase.from('users').select(`id, nome, email, avatar_url, perfil, cargo, ativo`).eq('organizacao', orgId);
-        return (data || []).map((u: any) => ({ ...u, custo_mensal: 0 }));
-    }
+    const { data, error } = await supabase
+        .from('users')
+        .select(`id, nome, email, avatar_url, perfil, cargo, ativo, custo_mensal`)
+        .eq('organizacao', orgId);
+    if (error) return [];
+    return data || [];
 };
 
 export const updateUserRole = async (userId: string, roleId: number | null) => {

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Users, Search, Plus, Building2, Edit, X, ArrowUpRight, Loader2, Save, CheckCircle2, Briefcase, ShieldCheck, Lock, Globe, Target, Zap, Mail, Phone, Key } from 'lucide-react';
+import { Users, Search, Plus, Building2, Edit, X, ArrowUpRight, Loader2, Save, CheckCircle2, Briefcase, ShieldCheck, Lock, Globe, Target, Zap, Mail, Phone, Key, AlertTriangle } from 'lucide-react';
 import { fetchClients, createClient, updateClient } from '../services/clientService';
 import { fetchProjects } from '../services/projectService';
 import { DbClient, DbProject } from '../types';
@@ -19,14 +19,14 @@ export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [], org
     const [searchTerm, setSearchTerm] = useState('');
     const [showAddModal, setShowAddModal] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
     
-    // Gestão de Projetos do Cliente
     const [selectedClientForProjects, setSelectedClientForProjects] = useState<DbClient | null>(null);
     const [localProjectSelection, setLocalProjectSelection] = useState<number[]>([]);
     const [isUpdatingProjects, setIsUpdatingProjects] = useState(false);
 
     const [newClient, setNewClient] = useState({
-        nome: '', email: '', senha: '', telefone: '', cnpj: '', endereco: '', status: 'Ativo'
+        nome: '', email: '', senha: '', confirmarSenha: '', telefone: '', cnpj: '', status: 'Ativo'
     });
 
     useEffect(() => { 
@@ -45,19 +45,58 @@ export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [], org
         setIsLoading(false);
     };
 
+    // Máscara para CNPJ/CPF
+    const maskCpfCnpj = (val: string) => {
+        const cleanVal = val.replace(/\D/g, "");
+        if (cleanVal.length <= 11) {
+            return cleanVal
+                .replace(/(\md{3})(\d)/, "$1.$2")
+                .replace(/(\md{3})(\d)/, "$1.$2")
+                .replace(/(\md{3})(\d{1,2})$/, "$1-$2");
+        } else {
+            return cleanVal
+                .substring(0, 14)
+                .replace(/^(\d{2})(\d)/, "$1.$2")
+                .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
+                .replace(/\.(\d{3})(\d)/, ".$1/$2")
+                .replace(/(\d{4})(\d)/, "$1-$2");
+        }
+    };
+
+    // Máscara para Telefone
+    const maskPhone = (val: string) => {
+        return val
+            .replace(/\D/g, "")
+            .replace(/(\d{2})(\d)/, "($1) $2")
+            .replace(/(\d{5})(\d)/, "$1-$2")
+            .substring(0, 15);
+    };
+
     const handleCreateClient = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newClient.email || !newClient.nome || !newClient.senha) return alert("Nome, E-mail e Senha são obrigatórios.");
+        setErrorMsg(null);
+
+        if (!newClient.email || !newClient.nome || !newClient.senha) {
+            setErrorMsg("Preencha os campos obrigatórios (Nome, E-mail e Senha).");
+            return;
+        }
+
+        if (newClient.senha !== newClient.confirmarSenha) {
+            setErrorMsg("A confirmação de senha não coincide com a senha inicial.");
+            return;
+        }
+
         setIsSaving(true);
         try {
-            const success = await createClient({ ...newClient, organizacao: organizationId }, newClient.senha);
-            if (success) {
+            const { confirmarSenha, ...payload } = newClient;
+            const result = await createClient({ ...payload, organizacao: organizationId }, newClient.senha);
+            if (result) {
                 setShowAddModal(false);
-                setNewClient({ nome: '', email: '', senha: '', telefone: '', cnpj: '', endereco: '', status: 'Ativo' });
+                setNewClient({ nome: '', email: '', senha: '', confirmarSenha: '', telefone: '', cnpj: '', status: 'Ativo' });
                 loadClients();
             }
         } catch (err: any) {
-            alert("Erro ao criar parceiro: " + err.message);
+            setErrorMsg(err.message || "Erro desconhecido ao sincronizar stakeholder.");
         } finally { setIsSaving(false); }
     };
 
@@ -118,7 +157,9 @@ export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [], org
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 pb-24">
-                {filteredClients.map(client => (
+                {isLoading ? (
+                    <div className="col-span-full py-20 flex justify-center"><Loader2 className="w-10 h-10 animate-spin text-amber-500"/></div>
+                ) : filteredClients.map(client => (
                     <div 
                         key={client.id} 
                         onClick={() => handleOpenProjectManager(client)}
@@ -139,8 +180,8 @@ export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [], org
                         </div>
                         <div className="pt-8 mt-8 border-t border-slate-100 dark:border-white/5 flex items-end justify-between">
                             <div className="space-y-1">
-                                <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">LOCALIZAÇÃO / ENDEREÇO</div>
-                                <div className="text-sm font-bold text-slate-900 dark:text-white truncate max-w-[200px]">{client.endereco || 'Não informado'}</div>
+                                <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">LOCALIZAÇÃO / IDENTIFICAÇÃO</div>
+                                <div className="text-sm font-bold text-slate-900 dark:text-white truncate max-w-[200px]">{client.cnpj || 'Sem Documento'}</div>
                             </div>
                             <button className="w-14 h-14 rounded-2xl border border-slate-200 dark:border-[#333] group-hover:bg-amber-500 group-hover:text-black group-hover:border-amber-500 transition-all shadow-sm"><ArrowUpRight className="w-7 h-7 mx-auto"/></button>
                         </div>
@@ -148,9 +189,88 @@ export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [], org
                 ))}
             </div>
 
-            {/* MODAL: GESTÃO DE ACESSO A PROJETOS */}
+            {/* MODAL: NOVO PARCEIRO */}
+            {showAddModal && (
+                <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
+                    <div className="w-full max-w-2xl bg-white dark:bg-[#0A0A0C] rounded-[3.5rem] shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden animate-ios-pop flex flex-col">
+                        <form onSubmit={handleCreateClient} className="flex flex-col">
+                            <div className="p-10 border-b border-slate-100 dark:border-white/5 flex justify-between items-center bg-slate-50 dark:bg-white/5">
+                                <div>
+                                    <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">Novo <span className="text-amber-500">Parceiro</span>.</h2>
+                                    <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.3em] mt-3">CADASTRO E ACESSO DO STAKEHOLDER</p>
+                                </div>
+                                <button type="button" onClick={() => setShowAddModal(false)} className="p-3 text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-all"><X className="w-7 h-7"/></button>
+                            </div>
+
+                            <div className="p-10 space-y-8 overflow-y-auto max-h-[60vh] custom-scrollbar">
+                                {errorMsg && (
+                                    <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center gap-3 text-red-500 text-xs font-bold animate-in shake duration-300">
+                                        <AlertTriangle className="w-5 h-5 shrink-0"/> {errorMsg}
+                                    </div>
+                                )}
+
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">E-mail de Login</label>
+                                    <div className="relative group">
+                                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"/>
+                                        <input required type="email" value={newClient.email} onChange={e => setNewClient({...newClient, email: e.target.value})} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 pl-12 text-sm font-bold dark:text-white outline-none focus:border-amber-500 shadow-inner" placeholder="contato@empresa.com"/>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">Senha Inicial</label>
+                                        <div className="relative group">
+                                            <Key className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"/>
+                                            <input required type="password" value={newClient.senha} onChange={e => setNewClient({...newClient, senha: e.target.value})} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 pl-12 text-sm font-bold dark:text-white outline-none focus:border-amber-500 shadow-inner" placeholder="••••••••"/>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">Confirmar Senha</label>
+                                        <div className="relative group">
+                                            <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"/>
+                                            <input required type="password" value={newClient.confirmarSenha} onChange={e => setNewClient({...newClient, confirmarSenha: e.target.value})} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 pl-12 text-sm font-bold dark:text-white outline-none focus:border-amber-500 shadow-inner" placeholder="••••••••"/>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">Nome Completo / Razão Social</label>
+                                    <div className="relative group">
+                                        <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"/>
+                                        <input required value={newClient.nome} onChange={e => setNewClient({...newClient, nome: e.target.value})} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 pl-12 text-sm font-bold dark:text-white outline-none focus:border-amber-500 shadow-inner" placeholder="Ex: Shinkō Sistemas Ltda"/>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">CNPJ / CPF</label>
+                                        <input value={newClient.cnpj} onChange={e => setNewClient({...newClient, cnpj: maskCpfCnpj(e.target.value)})} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 text-sm font-bold dark:text-white outline-none" placeholder="00.000.000/0001-00"/>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Telefone</label>
+                                        <div className="relative group">
+                                            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"/>
+                                            <input value={newClient.telefone} onChange={e => setNewClient({...newClient, telefone: maskPhone(e.target.value)})} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 pl-12 text-sm font-bold dark:text-white outline-none" placeholder="(00) 00000-0000"/>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="p-10 border-t border-slate-100 dark:border-white/5 flex gap-6 bg-slate-50 dark:bg-white/5">
+                                <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 py-4 text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all">Descartar</button>
+                                <button type="submit" disabled={isSaving} className="flex-[2] py-5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-50">
+                                    {isSaving ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>} 
+                                    {isSaving ? 'SINCRONIZANDO...' : 'SINCRONIZAR LOGIN & CADASTRO'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+            
             {selectedClientForProjects && (
-                <div className="fixed inset-0 z-[2100] flex items-center justify-center p-4 bg-black/20 backdrop-blur-md animate-in fade-in duration-300">
+                 <div className="fixed inset-0 z-[2100] flex items-center justify-center p-4 bg-black/20 backdrop-blur-md animate-in fade-in duration-300">
                     <div className="w-full max-w-2xl bg-white dark:bg-[#0A0A0C] rounded-[3.5rem] shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden animate-ios-pop flex flex-col max-h-[90vh]">
                         <header className="p-10 border-b border-slate-100 dark:border-white/5 flex justify-between items-start bg-slate-50 dark:bg-white/5 shrink-0">
                             <div className="flex items-center gap-6">
@@ -166,11 +286,6 @@ export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [], org
                         </header>
 
                         <div className="flex-1 overflow-y-auto custom-scrollbar p-10 space-y-8 bg-slate-50/50 dark:bg-black/20">
-                            <div className="flex items-center gap-3">
-                                <Zap className="w-4 h-4 text-amber-500 animate-pulse"/>
-                                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Ativos Disponíveis no Workspace</span>
-                            </div>
-
                             <div className="grid grid-cols-1 gap-4">
                                 {allProjects.map(project => {
                                     const isSelected = localProjectSelection.includes(project.id);
@@ -195,12 +310,6 @@ export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [], org
                                         </button>
                                     );
                                 })}
-                                {allProjects.length === 0 && (
-                                    <div className="py-20 text-center opacity-30">
-                                        <Lock className="w-12 h-12 mx-auto mb-4"/>
-                                        <p className="text-xs font-black uppercase tracking-widest">Nenhum projeto cadastrado</p>
-                                    </div>
-                                )}
                             </div>
                         </div>
 
@@ -209,81 +318,12 @@ export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [], org
                             <button 
                                 onClick={handleSaveProjectAccess}
                                 disabled={isUpdatingProjects}
-                                className="flex-[2] py-5 bg-slate-900 dark:bg-white text-white dark:text-black rounded-[1.8rem] font-black text-xs uppercase tracking-[0.2em] shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-50"
+                                className="flex-[2] py-5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[1.8rem] font-black text-xs uppercase tracking-[0.2em] shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-50"
                             >
                                 {isUpdatingProjects ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>}
                                 Sincronizar Portfólio
                             </button>
                         </div>
-                    </div>
-                </div>
-            )}
-
-            {showAddModal && (
-                <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/20 backdrop-blur-md animate-in fade-in duration-300">
-                    <div className="w-full max-w-2xl bg-white dark:bg-[#0A0A0C] rounded-[3.5rem] shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden animate-ios-pop flex flex-col">
-                        <form onSubmit={handleCreateClient} className="flex flex-col">
-                            <div className="p-10 border-b border-slate-100 dark:border-white/5 flex justify-between items-center bg-slate-50 dark:bg-white/5">
-                                <div>
-                                    <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">Novo <span className="text-amber-500">Parceiro</span>.</h2>
-                                    <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.3em] mt-3">CADASTRO E ACESSO DO STAKEHOLDER</p>
-                                </div>
-                                <button type="button" onClick={() => setShowAddModal(false)} className="p-3 text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-all"><X className="w-7 h-7"/></button>
-                            </div>
-
-                            <div className="p-10 space-y-8">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">E-mail de Login</label>
-                                        <div className="relative group">
-                                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"/>
-                                            <input required type="email" value={newClient.email} onChange={e => setNewClient({...newClient, email: e.target.value})} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 pl-12 text-sm font-bold dark:text-white outline-none focus:border-amber-500 shadow-inner" placeholder="contato@empresa.com"/>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">Senha Inicial</label>
-                                        <div className="relative group">
-                                            <Key className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"/>
-                                            <input required type="text" value={newClient.senha} onChange={e => setNewClient({...newClient, senha: e.target.value})} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 pl-12 text-sm font-bold dark:text-white outline-none focus:border-amber-500 shadow-inner" placeholder="••••••••"/>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">Nome Completo / Razão Social</label>
-                                    <div className="relative group">
-                                        <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"/>
-                                        <input required value={newClient.nome} onChange={e => setNewClient({...newClient, nome: e.target.value})} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 pl-12 text-sm font-bold dark:text-white outline-none focus:border-amber-500 shadow-inner" placeholder="Ex: Shinkō Sistemas Ltda"/>
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">CNPJ / CPF</label>
-                                        <input value={newClient.cnpj} onChange={e => setNewClient({...newClient, cnpj: e.target.value})} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 text-sm font-bold dark:text-white outline-none" placeholder="00.000.000/0001-00"/>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Telefone</label>
-                                        <div className="relative group">
-                                            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"/>
-                                            <input value={newClient.telefone} onChange={e => setNewClient({...newClient, telefone: e.target.value})} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 pl-12 text-sm font-bold dark:text-white outline-none" placeholder="(00) 00000-0000"/>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">Endereço Principal</label>
-                                    <input value={newClient.endereco} onChange={e => setNewClient({...newClient, endereco: e.target.value})} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 text-sm font-bold dark:text-white outline-none focus:border-amber-500 shadow-inner" placeholder="Ex: Av. Paulista, 1000..."/>
-                                </div>
-                            </div>
-
-                            <div className="p-10 border-t border-slate-100 dark:border-white/5 flex gap-6 bg-slate-50 dark:bg-white/5">
-                                <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 py-4 text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all">Descartar</button>
-                                <button type="submit" disabled={isSaving} className="flex-[2] py-5 bg-slate-900 dark:bg-white text-white dark:text-black rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all">
-                                    {isSaving ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>} SINCRONIZAR LOGIN & CADASTRO
-                                </button>
-                            </div>
-                        </form>
                     </div>
                 </div>
             )}
