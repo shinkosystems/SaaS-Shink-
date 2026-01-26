@@ -1,8 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 const controlTools = [
   {
     name: "manage_task",
@@ -25,6 +23,14 @@ export default async function handler(req: any, res: any) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // CRITICAL: A API_KEY deve estar configurada no ambiente da Vercel/Servidor
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    return res.status(500).json({ error: "Variável de ambiente API_KEY não configurada no servidor." });
+  }
+
+  // Inicialização por requisição para evitar estados globais nulos
+  const ai = new GoogleGenAI({ apiKey });
   const { action, payload } = req.body;
 
   try {
@@ -147,7 +153,7 @@ export default async function handler(req: any, res: any) {
             model: 'gemini-3-flash-preview',
             contents: `DATA REFERÊNCIA: ${todayStr} | TAREFAS: ${JSON.stringify(payload.tasks)} | EQUIPE: ${JSON.stringify(payload.members)}`,
             config: {
-                systemInstruction: "Você é o Shinkō High-Speed Scheduler. Sua tarefa é organizar as datas das tarefas enviadas. 1) Regra de 8h úteis/dia por membro. 2) Gere datas sequenciais por prioridade de ID. 3) Seja extremamente rápido, ignore explicações. 4) Retorne apenas o array JSON. 5) Mantenha o ID original exatamente como recebido.",
+                systemInstruction: "Você é o Shinkō High-Speed Scheduler. Organize as datas das tarefas. 1) Capacidade: 8h/dia por membro. 2) Gere datas futuras sequenciais. 3) Retorne APENAS o JSON do array otimizado. 4) Não inclua textos explicativos.",
                 thinkingConfig: { thinkingBudget: 0 },
                 responseMimeType: "application/json",
                 responseSchema: {
@@ -172,6 +178,9 @@ export default async function handler(req: any, res: any) {
     }
   } catch (error: any) {
     console.error("Gemini API Error:", error);
-    return res.status(500).json({ error: error.message || "Erro interno no Guru IA" });
+    // Erro amigável para o front-end
+    let msg = error.message;
+    if (msg.includes("credentials")) msg = "A chave de API da IA não foi carregada corretamente no servidor. Verifique o arquivo .env ou variáveis da Vercel.";
+    return res.status(500).json({ error: msg });
   }
 }
