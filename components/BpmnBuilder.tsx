@@ -4,7 +4,7 @@ import { Opportunity, BpmnNode, BpmnTask } from '../types';
 import { TaskDetailModal } from './TaskDetailModal';
 import { 
     Plus, BrainCircuit, Zap, Loader2 as Loader, Sparkles, RefreshCw,
-    ChevronRight, Workflow, Clock, X
+    ChevronRight, Workflow, Clock, Trash2
 } from 'lucide-react';
 import { updateTask, deleteTask, syncTaskChecklist, syncBpmnTasks } from '../services/projectService';
 import { generateBpmn } from '../services/geminiService';
@@ -283,9 +283,9 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
                                                 {!readOnly && (
                                                     <button 
                                                         onClick={(e) => handleQuickDelete(e, node.id, task.id)}
-                                                        className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-20 shadow-xl"
+                                                        className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-20 shadow-xl hover:bg-red-600"
                                                     >
-                                                        <X className="w-4 h-4"/>
+                                                        <Trash2 className="w-3.5 h-3.5"/>
                                                     </button>
                                                 )}
                                                 <p className={`text-[11px] font-bold leading-relaxed mb-4 ${task.status === 'done' ? 'text-slate-400 line-through' : 'text-slate-800 dark:text-slate-200'}`}>

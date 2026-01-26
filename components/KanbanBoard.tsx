@@ -46,6 +46,20 @@ export const KanbanBoard: React.FC<Props> = ({ tasks, organizationId, readOnly, 
         if (onRefresh) onRefresh();
     };
 
+    const handleDeleteDirect = async (e: React.MouseEvent, taskId: number) => {
+        e.stopPropagation();
+        if (readOnly) return;
+        
+        if (confirm("Deseja permanentemente excluir esta tarefa?")) {
+            const success = await deleteTask(taskId);
+            if (success && onRefresh) {
+                onRefresh();
+            } else if (!success) {
+                alert("Erro ao excluir tarefa.");
+            }
+        }
+    };
+
     const columnsData = COLUMNS.reduce((acc, col) => {
         const filtered = tasks.filter(t => !t.sutarefa && (t.status || 'todo').toLowerCase() === col.id);
         acc[col.id] = filtered.sort((a, b) => {
@@ -86,6 +100,15 @@ export const KanbanBoard: React.FC<Props> = ({ tasks, organizationId, readOnly, 
                                                     <div className="text-[7px] font-bold text-slate-400 uppercase tracking-tight mt-0.5 opacity-60">ID: {task.id}</div>
                                                 </div>
                                                 <div className="flex items-center gap-1.5">
+                                                    {!readOnly && (
+                                                        <button 
+                                                            onClick={(e) => handleDeleteDirect(e, task.id)}
+                                                            className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                                            title="Excluir Tarefa"
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5"/>
+                                                        </button>
+                                                    )}
                                                     <div className={`px-2 py-1 rounded-lg text-[8px] font-black border flex items-center gap-1 ${score >= 60 ? 'bg-red-500/10 text-red-500 border-red-500/20' : score >= 27 ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'}`}>
                                                         <BarChart3 className="w-2.5 h-2.5"/> {g}/{u}/{t}
                                                     </div>
@@ -140,7 +163,7 @@ export const KanbanBoard: React.FC<Props> = ({ tasks, organizationId, readOnly, 
                         gut: { g: editingTaskCtx.gravidade || 1, u: editingTaskCtx.urgencia || 1, t: editingTaskCtx.tendencia || 1 },
                         dbId: editingTaskCtx.id
                     }}
-                    opportunityTitle={editingTaskCtx.projetoData?.nome}
+                    opportunityTitle={editingTaskCtx.projectData?.nome}
                     nodeTitle={editingTaskCtx.category || 'Tarefa'}
                     organizationId={organizationId} onClose={() => setEditingTaskCtx(null)}
                     onSave={async (updated) => {
