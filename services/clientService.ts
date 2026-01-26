@@ -19,7 +19,6 @@ export const fetchClients = async (organizationId: number): Promise<DbClient[]> 
 
 /**
  * Cria um parceiro através da API Route segura.
- * Isso evita conflitos de sessão e bypassa restrições de RLS/Auth no frontend.
  */
 export const createClient = async (client: Partial<DbClient>, password?: string): Promise<DbClient | null> => {
     let orgId = client.organizacao;
@@ -47,13 +46,19 @@ export const createClient = async (client: Partial<DbClient>, password?: string)
         })
     });
 
-    const result = await response.json();
-
-    if (!response.ok) {
-        throw new Error(result.error || "Falha ao processar criação de parceiro no servidor.");
+    // Se o servidor retornar algo que não é JSON (ex: erro HTML), capturamos como texto
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.indexOf("application/json") !== -1) {
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.error || "Falha na resposta do servidor.");
+        }
+        return result.data as DbClient;
+    } else {
+        const errorText = await response.text();
+        console.error("Erro Não-JSON do Servidor:", errorText);
+        throw new Error(`Erro do Servidor (${response.status}): O endpoint administrativo não retornou um formato válido.`);
     }
-
-    return result.data as DbClient;
 };
 
 export const linkProjectToClient = async (clientId: string, projectId: number) => {
