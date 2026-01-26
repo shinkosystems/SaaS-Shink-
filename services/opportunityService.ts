@@ -1,6 +1,7 @@
 
 import { supabase } from './supabaseClient';
 import { Opportunity, DbProject, RDEStatus, Archetype, IntensityLevel, TadsCriteria, DbTask, BpmnTask, BpmnNode } from '../types';
+import { linkProjectToClient } from './clientService';
 
 const TABLE_NAME = 'projetos';
 
@@ -92,16 +93,12 @@ export const createOpportunity = async (opp: Opportunity): Promise<Opportunity |
             .select()
             .single();
         
-        // SHINKŌ ROBUST FALLBACK: Se a coluna 'pdf_url' não existir no banco do cliente
-        if (error && (error.message.includes('pdf_url') || error.message.includes('column'))) {
-            console.warn("Detectada incompatibilidade de schema (pdf_url). Tentando fallback...");
-            const { pdf_url, ...fallbackData } = insertData;
-            const retry = await supabase.from(TABLE_NAME).insert(fallbackData).select().single();
-            data = retry.data;
-            error = retry.error;
-        }
-        
         if (error) throw error;
+
+        // NOVO: Se houver um cliente associado, atualizamos a array de projetos do cliente
+        if (data.cliente && data.id) {
+            await linkProjectToClient(data.cliente, data.id);
+        }
 
         return mapDbProjectToOpportunity(data, []);
     } catch (err: any) {
@@ -118,15 +115,12 @@ export const updateOpportunity = async (opp: Opportunity): Promise<Opportunity |
         
         let { data, error } = await supabase.from(TABLE_NAME).update(updateData).eq('id', opp.id).select().single();
         
-        // SHINKŌ ROBUST FALLBACK: Se a coluna 'pdf_url' não existir no banco do cliente
-        if (error && (error.message.includes('pdf_url') || error.message.includes('column'))) {
-            const { pdf_url, ...fallbackData } = updateData;
-            const retry = await supabase.from(TABLE_NAME).update(fallbackData).eq('id', opp.id).select().single();
-            data = retry.data;
-            error = retry.error;
-        }
+        if (error) throw error;
 
-        if (error) return null;
+        // Se houver um cliente associado, garantimos o vínculo na array projetos[] do cliente
+        if (data.cliente && data.id) {
+            await linkProjectToClient(data.cliente, data.id);
+        }
 
         const { data: tasks } = await supabase.from('tasks').select('*').eq('projeto', opp.id);
         return mapDbProjectToOpportunity(data, tasks || []); 

@@ -92,13 +92,10 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
   const handleQuickClientCreate = async (e: React.FormEvent) => {
       e.preventDefault();
       
-      // LOG de depuração para entender por que nada acontece
-      console.log("Iniciando Sincronização de Stakeholder...", { organizationId, isCreatingQuickClient });
-
       if (isCreatingQuickClient) return;
       
       if (!organizationId) {
-          alert("Erro: ID da organização não carregado. Tente recarregar a página.");
+          alert("Erro: ID da organização não carregado.");
           return;
       }
 
@@ -109,11 +106,14 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
 
       setIsCreatingQuickClient(true);
       try {
+          // Passamos 'contrato' como 'Draft' para evitar o erro de constraint NOT NULL
           const newClient = await createClient({
               nome: quickClientForm.nome,
               email: quickClientForm.email,
               organizacao: organizationId,
-              status: 'Ativo'
+              status: 'Ativo',
+              contrato: 'Draft',
+              projetos: []
           }, quickClientForm.senha);
 
           if (newClient) {
@@ -121,9 +121,6 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
               setFormData(prev => ({ ...prev, clientId: newClient.id }));
               setShowQuickClient(false);
               setQuickClientForm({ nome: '', email: '', senha: '' });
-              console.log("Stakeholder sincronizado com sucesso:", newClient.id);
-          } else {
-              throw new Error("O servidor não retornou os dados do novo cliente.");
           }
       } catch (err: any) {
           console.error("Falha na Sincronização:", err);
@@ -141,7 +138,6 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
       setAnalyzedFile(file.name);
 
       try {
-          // 1. Upload Físico para o Supabase Storage
           const fileName = `escopos/${Date.now()}-${file.name}`;
           const { error: uploadError } = await supabase.storage
               .from('documentos')
@@ -153,7 +149,6 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
               .from('documentos')
               .getPublicUrl(fileName);
 
-          // 2. Análise via IA Shinkō
           const reader = new FileReader();
           reader.onload = async () => {
               const base64 = (reader.result as string).split(',')[1];
@@ -167,7 +162,7 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                       archetype: (result.archetype as Archetype) || prev.archetype,
                       intensity: result.intensity || prev.intensity,
                       docsContext: result.suggestedSummary || '',
-                      pdfUrl: urlData.publicUrl // Salva o link real
+                      pdfUrl: urlData.publicUrl 
                   }));
               }
               setIsAnalyzingPdf(false);
@@ -262,7 +257,6 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                                 <p className="text-slate-500 dark:text-slate-400 text-base lg:text-xl font-medium max-w-lg">Nomeie seu ativo e defina sua governança inicial.</p>
                             </div>
                             
-                            {/* PDF UPLOAD ZONE */}
                             <div className="shrink-0">
                                 <input type="file" ref={fileInputRef} className="hidden" accept=".pdf" onChange={handleFileUpload} />
                                 <button 
@@ -555,7 +549,6 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
             </div>
         </main>
 
-        {/* QUICK CLIENT MODAL */}
         {showQuickClient && (
             <div className="fixed inset-0 z-[700] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
                 <div className="w-full max-w-md bg-white dark:bg-[#0A0A0C] rounded-[2.5rem] shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden animate-ios-pop flex flex-col">

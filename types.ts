@@ -273,6 +273,7 @@ export interface DbClient {
     status: string;
     organizacao: number;
     tipo_pessoa?: 'Física' | 'Jurídica';
+    projetos?: number[]; // Lista de IDs de projetos associados
 }
 
 export interface ProductMetricsData {
