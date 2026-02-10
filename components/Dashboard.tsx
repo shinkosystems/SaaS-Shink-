@@ -1,3 +1,4 @@
+
 import React, { useMemo, useEffect, useState } from 'react';
 import { Opportunity } from '../types';
 import MatrixChart from './MatrixChart';
@@ -25,7 +26,7 @@ interface Props {
 }
 
 export const Dashboard: React.FC<Props> = ({ 
-    opportunities, onOpenProject, userData, organizationId, onNavigate, theme, onOpenCreate
+    opportunities, onOpenProject, userData, organizationId, onNavigate, theme, onOpenCreate, onGuruPrompt
 }) => {
     const [rates, setRates] = useState<any>(null);
     const [showValues, setShowValues] = useState(true);
@@ -56,16 +57,24 @@ export const Dashboard: React.FC<Props> = ({
         </div>
     );
 
-    const InsightCard = ({ title, desc, icon: Icon, color }: any) => (
-        <div className="min-w-[260px] bg-slate-100 dark:bg-white/5 p-5 rounded-2xl flex flex-col justify-between h-36 border border-transparent hover:border-slate-200 dark:hover:border-white/10 transition-all cursor-pointer">
-            <div className={`p-2 w-fit rounded-lg ${color} bg-opacity-10 mb-2`}>
-                <Icon className={`w-4 h-4 ${color.replace('bg-', 'text-')}`} />
+    const InsightCard = ({ title, desc, icon: Icon, color, onClick }: any) => (
+        <button 
+            onClick={onClick}
+            className="min-w-[280px] bg-white dark:bg-white/5 p-6 rounded-[2rem] flex flex-col justify-between h-44 border border-slate-100 dark:border-white/5 shadow-xl hover:shadow-2xl dark:shadow-none transition-all text-left group active:scale-95"
+        >
+            <div className={`p-3 w-fit rounded-xl ${color} bg-opacity-10 mb-2 group-hover:scale-110 transition-transform`}>
+                <Icon className={`w-5 h-5 ${color.replace('bg-', 'text-')}`} />
             </div>
-            <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
-                <span className={`font-bold ${color.replace('bg-', 'text-')}`}>{title} </span>
-                {desc}
-            </p>
-        </div>
+            <div className="space-y-2">
+                <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                    <span className={`font-black uppercase tracking-tight ${color.replace('bg-', 'text-')}`}>{title} </span>
+                    {desc}
+                </p>
+                <div className="flex items-center gap-1 text-[8px] font-black text-slate-300 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all">
+                    Abrir Detalhes <ChevronRight className="w-2 h-2"/>
+                </div>
+            </div>
+        </button>
     );
 
     const SectionRow = ({ title, value, subtext, onClick, icon: Icon }: any) => (
@@ -120,7 +129,7 @@ export const Dashboard: React.FC<Props> = ({
                                 onClick={() => onNavigate('settings')}
                                 className="p-3 rounded-full hover:bg-white/10 text-white transition-all"
                             >
-                                <Settings className="w-5 h-5" />
+                                <Settings className="w-4 h-4" />
                             </button>
                         </div>
                     </div>
@@ -165,26 +174,29 @@ export const Dashboard: React.FC<Props> = ({
                     </button>
                 </div>
 
-                {/* Insight Carousel */}
+                {/* Insight Carousel - Interactive Implementation with Deeper Shadows */}
                 <div className="px-6 overflow-hidden">
-                    <div className="flex gap-4 overflow-x-auto no-scrollbar pb-8">
+                    <div className="flex gap-6 overflow-x-auto no-scrollbar pb-10 pt-2 -mx-2 px-2">
                         <InsightCard 
-                            title="Desempenho:" 
+                            title="Desempenho" 
                             desc={`Crescimento de 12% no trimestre.`} 
                             icon={TrendingUp} 
                             color="bg-emerald-500" 
+                            onClick={() => onNavigate('intelligence')}
                         />
                         <InsightCard 
-                            title="Foco Técnico:" 
-                            desc="Aguardando validação em 3 projetos." 
+                            title="Foco Técnico" 
+                            desc={`${stats.validationCount} projetos aguardando validação.`} 
                             icon={Target} 
                             color="bg-amber-500" 
+                            onClick={() => onNavigate('list')}
                         />
                         <InsightCard 
-                            title="Guru IA:" 
+                            title="Guru IA" 
                             desc="Novo insight sobre ROI disponível." 
                             icon={Sparkles} 
                             color="bg-purple-500" 
+                            onClick={() => onGuruPrompt ? onGuruPrompt("Quais são os novos insights sobre ROI para o meu portfólio atual?") : onNavigate('guru')}
                         />
                     </div>
                 </div>

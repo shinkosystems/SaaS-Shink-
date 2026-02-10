@@ -157,25 +157,33 @@ export const deleteOpportunity = async (id: string | number): Promise<boolean> =
     try {
         const numericId = Number(id);
         
-        // 1. Localizar todas as tarefas ligadas ao projeto
+        // 1. Apagar processos da Cadeia de Valor vinculados ao projeto
+        await supabase.from('tasks_process').delete().eq('projeto_id', numericId);
+
+        // 2. Localizar todas as tarefas ligadas ao projeto
         const { data: tasks } = await supabase.from('tasks').select('id').eq('projeto', numericId);
         
         if (tasks && tasks.length > 0) {
             const taskIds = tasks.map((t: any) => t.id);
             
-            // 2. Apagar comentários das tarefas para evitar erro de FK
+            // 3. Apagar comentários das tarefas para evitar erro de FK
             await supabase.from('comentarios').delete().in('task', taskIds);
             
-            // 3. Apagar as tarefas propriamente ditas
+            // 4. Apagar as tarefas propriamente ditas
             await supabase.from('tasks').delete().eq('projeto', numericId);
         }
         
-        // 4. Apagar o projeto ( Ativo )
+        // 5. Apagar o projeto ( Ativo )
         const { error } = await supabase.from(TABLE_NAME).delete().eq('id', numericId);
         
-        return !error;
+        if (error) {
+            console.error("Erro Supabase ao deletar projeto:", error.message);
+            return false;
+        }
+        
+        return true;
     } catch (err) { 
-        console.error("Erro ao deletar ativo em cascata:", err);
+        console.error("Erro excepcional ao deletar ativo em cascata:", err);
         return false; 
     }
 };

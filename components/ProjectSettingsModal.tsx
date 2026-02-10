@@ -27,6 +27,15 @@ export const ProjectSettingsModal: React.FC<Props> = ({ opportunity, onClose, on
     const [deleteProgress, setDeleteProgress] = useState(0);
     const deleteTimerRef = useRef<any | null>(null);
 
+    // Esconder navegação global ao abrir
+    useEffect(() => {
+        const navElements = document.querySelectorAll('aside, .fixed.bottom-6');
+        navElements.forEach(el => (el as HTMLElement).style.display = 'none');
+        return () => {
+            navElements.forEach(el => (el as HTMLElement).style.display = '');
+        };
+    }, []);
+
     // Project State
     const [projectForm, setProjectForm] = useState<Opportunity>({ ...opportunity });
     
@@ -81,11 +90,11 @@ export const ProjectSettingsModal: React.FC<Props> = ({ opportunity, onClose, on
         }
     };
 
-    // Sistema de Confirmação por Retenção (Segurança Industrial)
-    const startDeleting = () => {
+    const startDeleting = (e: React.MouseEvent | React.TouchEvent) => {
+        if (isDeleting) return;
         setDeleteProgress(0);
         const startTime = Date.now();
-        const duration = 2000; // 2 segundos segurando
+        const duration = 1500;
 
         deleteTimerRef.current = setInterval(() => {
             const elapsed = Date.now() - startTime;
@@ -111,10 +120,8 @@ export const ProjectSettingsModal: React.FC<Props> = ({ opportunity, onClose, on
         setIsDeleting(true);
         try {
             await onDeleteProject(opportunity.id);
-            onClose();
         } catch (e) {
             alert("Falha crítica na exclusão.");
-        } finally {
             setIsDeleting(false);
             setDeleteProgress(0);
         }
@@ -260,7 +267,7 @@ export const ProjectSettingsModal: React.FC<Props> = ({ opportunity, onClose, on
                             <div className="pt-10 flex flex-col gap-6">
                                 <button 
                                     onClick={handleSaveProject}
-                                    disabled={isSaving}
+                                    disabled={isSaving || isDeleting}
                                     className="w-full py-6 bg-slate-900 dark:bg-white text-white dark:text-black rounded-[2rem] font-black text-xs uppercase tracking-[0.3em] shadow-xl flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
                                 >
                                     {isSaving ? <Loader2 className="w-5 h-5 animate-spin"/> : <ShieldCheck className="w-5 h-5"/>}
@@ -273,7 +280,7 @@ export const ProjectSettingsModal: React.FC<Props> = ({ opportunity, onClose, on
                                             <h5 className="text-[10px] font-black text-red-500 uppercase tracking-widest flex items-center gap-2">
                                                 <AlertTriangle className="w-4 h-4"/> Zona de Exclusão
                                             </h5>
-                                            <p className="text-[10px] text-slate-500 font-bold uppercase mt-2">Segure para destruir o ativo e suas tarefas permanentemente</p>
+                                            <p className="text-[10px] text-slate-500 font-bold uppercase mt-2">Segure por 1.5s para destruir permanentemente</p>
                                         </div>
                                         <button 
                                             onMouseDown={startDeleting}
@@ -281,11 +288,12 @@ export const ProjectSettingsModal: React.FC<Props> = ({ opportunity, onClose, on
                                             onMouseLeave={stopDeleting}
                                             onTouchStart={startDeleting}
                                             onTouchEnd={stopDeleting}
-                                            className="relative overflow-hidden w-full md:w-auto px-10 py-4 bg-red-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 group"
+                                            disabled={isDeleting}
+                                            className="relative overflow-hidden w-full md:w-auto px-10 py-4 bg-red-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 group disabled:opacity-50"
                                         >
                                             <span className="relative z-10 flex items-center justify-center gap-2">
                                                 {isDeleting ? <Loader2 className="w-4 h-4 animate-spin"/> : <Trash2 className="w-4 h-4"/>}
-                                                Remover Ativo
+                                                {isDeleting ? 'Removendo...' : 'Remover Ativo'}
                                             </span>
                                             <div 
                                                 className="absolute inset-0 bg-red-700 transition-all duration-75"
@@ -298,7 +306,6 @@ export const ProjectSettingsModal: React.FC<Props> = ({ opportunity, onClose, on
                         </div>
                     )}
                     {activeTab === 'client' && (
-                        /* ... restante do código da aba cliente mantido ... */
                         <div className="py-20 text-center text-slate-400 font-bold uppercase text-xs">Gestão de Stakeholder ativa.</div>
                     )}
                 </div>

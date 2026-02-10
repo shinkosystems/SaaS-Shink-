@@ -37,6 +37,15 @@ export const QuickTaskModal: React.FC<Props> = ({ opportunities, onClose, onSave
   
   const [orgMembers, setOrgMembers] = useState<OrgMember[]>([]);
 
+  // Esconder navegação global ao abrir
+  useEffect(() => {
+    const navElements = document.querySelectorAll('aside, .fixed.bottom-6');
+    navElements.forEach(el => (el as HTMLElement).style.display = 'none');
+    return () => {
+        navElements.forEach(el => (el as HTMLElement).style.display = '');
+    };
+  }, []);
+
   useEffect(() => {
       const fetchMembers = async () => {
           const { data: { user } } = await supabase.auth.getUser();
@@ -71,10 +80,10 @@ export const QuickTaskModal: React.FC<Props> = ({ opportunities, onClose, onSave
           dueDate: dueDate,
           estimatedHours: estimatedHours,
           gut: { g: gravidade, u: urgencia, t: tendencia },
-          tags: [category] // Usando tags para armazenar a categoria principal
+          tags: [category]
       };
 
-      // @ts-ignore - Enviando categoria extra no payload para o service
+      // @ts-ignore
       newTask.category = category;
 
       onSave(newTask, projectId || null);

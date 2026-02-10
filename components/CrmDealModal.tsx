@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CrmOpportunity, CrmActivity } from '../types';
 import { X, User, Building2, Calendar, Phone, Mail, Globe, MapPin, CheckCircle2, Clock, Plus, Trash2, Save, MessageSquare, DollarSign } from 'lucide-react';
 
@@ -15,6 +15,15 @@ export const CrmDealModal: React.FC<Props> = ({ opportunity, onClose, onSave, on
     const [activeTab, setActiveTab] = useState<'details' | 'activities'>('details');
     const [newActivity, setNewActivity] = useState<Partial<CrmActivity>>({ type: 'call', status: 'pending' });
 
+    // Esconder navegação global ao abrir
+    useEffect(() => {
+        const navElements = document.querySelectorAll('aside, .fixed.bottom-6');
+        navElements.forEach(el => (el as HTMLElement).style.display = 'none');
+        return () => {
+            navElements.forEach(el => (el as HTMLElement).style.display = '');
+        };
+    }, []);
+
     const handleSave = () => {
         onSave(formData);
         onClose();
@@ -29,7 +38,7 @@ export const CrmDealModal: React.FC<Props> = ({ opportunity, onClose, onSave, on
             subject: newActivity.subject,
             date: newActivity.date || new Date().toISOString().split('T')[0],
             status: 'pending',
-            owner: 'Eu' // Em produção, pegar do usuário logado
+            owner: 'Eu'
         };
 
         setFormData(prev => ({
@@ -139,7 +148,6 @@ export const CrmDealModal: React.FC<Props> = ({ opportunity, onClose, onSave, on
                                     </div>
                                 </div>
 
-                                {/* FINANCE SECTION */}
                                 <div className="pt-6">
                                     <div className="bg-amber-500/5 border border-amber-500/10 p-6 rounded-[2rem] space-y-4">
                                         <h4 className="text-[10px] font-black text-amber-500 uppercase tracking-[0.3em] flex items-center gap-2">
@@ -160,7 +168,6 @@ export const CrmDealModal: React.FC<Props> = ({ opportunity, onClose, onSave, on
                                 </div>
                             </div>
 
-                            {/* Company Section */}
                             <div className="space-y-6">
                                 <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] border-b border-white/5 pb-3 flex items-center gap-2">
                                     <Building2 className="w-4 h-4 text-amber-500"/> Empresa / Conta
@@ -222,7 +229,6 @@ export const CrmDealModal: React.FC<Props> = ({ opportunity, onClose, onSave, on
 
                     {activeTab === 'activities' && (
                         <div className="space-y-8 animate-in fade-in duration-500">
-                            {/* New Activity Input */}
                             <div className="bg-white/5 p-6 rounded-[2rem] border border-white/10 shadow-xl">
                                 <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-4">Novo Registro de Interação</h4>
                                 <div className="flex flex-col md:flex-row gap-3">
@@ -258,7 +264,6 @@ export const CrmDealModal: React.FC<Props> = ({ opportunity, onClose, onSave, on
                                 </div>
                             </div>
 
-                            {/* Timeline */}
                             <div className="space-y-6">
                                 {formData.activities?.map((act, idx) => (
                                     <div key={act.id} className="flex gap-6 group animate-in slide-in-from-left-4" style={{ animationDelay: `${idx * 100}ms` }}>
@@ -295,19 +300,11 @@ export const CrmDealModal: React.FC<Props> = ({ opportunity, onClose, onSave, on
                                         </div>
                                     </div>
                                 ))}
-                                {(!formData.activities || formData.activities.length === 0) && (
-                                    <div className="text-center py-20 bg-black/10 rounded-[2rem] border-2 border-dashed border-white/5">
-                                        <MessageSquare className="w-12 h-12 text-slate-700 mx-auto mb-4 opacity-30"/>
-                                        <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Nenhum histórico de atividades para este lead.</p>
-                                    </div>
-                                )}
                             </div>
                         </div>
                     )}
-
                 </div>
 
-                {/* Footer */}
                 <div className="p-8 border-t border-white/10 bg-white/5 flex justify-between items-center shrink-0">
                     <button onClick={onClose} className="px-6 py-2 text-slate-500 hover:text-red-500 font-black text-[11px] uppercase tracking-[0.2em] transition-all">Descartar Mudanças</button>
                     <button onClick={handleSave} className="px-12 py-5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-[1.8rem] font-black text-xs uppercase tracking-[0.2em] shadow-2xl flex items-center gap-4 transition-all hover:scale-[1.02] active:scale-95">
