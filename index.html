@@ -19,6 +19,7 @@
     
     <link rel="icon" href="https://zjssfnbcboibqeoubeou.supabase.co/storage/v1/object/public/fotoperfil/fotoperfil/3.png" />
     <link rel="apple-touch-icon" href="https://zjssfnbcboibqeoubeou.supabase.co/storage/v1/object/public/fotoperfil/fotoperfil/3.png" />
+    <link rel="manifest" href="/manifest.json" />
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -154,5 +155,16 @@
   <body class="light">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').then(registration => {
+            console.log('SW registrado com sucesso:', registration.scope);
+          }).catch(err => {
+            console.warn('Falha ao registrar Service Worker:', err);
+          });
+        });
+      }
+    </script>
   </body>
 </html>
