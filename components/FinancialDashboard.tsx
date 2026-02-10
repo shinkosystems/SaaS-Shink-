@@ -69,12 +69,9 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [], o
         setViewDate(newDate);
     };
 
-    // Parsing de data resiliente para evitar bugs de fuso horário e strings ISO
     const safeParse = (dateStr: string) => {
         if (!dateStr) return new Date();
-        // Se já contiver informações de tempo ou for ISO, apenas analisa
         if (dateStr.includes('T') || dateStr.includes(' ')) return new Date(dateStr);
-        // Se for apenas data (YYYY-MM-DD), adiciona meio-dia para evitar shift de timezone
         return new Date(dateStr + 'T12:00:00');
     };
 
@@ -94,7 +91,6 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [], o
                 const history: FinancialRecord[] = [];
                 const currentYear = viewDate.getFullYear();
                 
-                // Gerar histórico de 24 meses baseado no ano atual visualizado
                 for (let y = currentYear - 1; y <= currentYear; y++) {
                     for (let m = 0; m < 12; m++) {
                         let monthMrr = 0;
@@ -137,7 +133,7 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [], o
             } catch (e) { console.error(e); } finally { setIsLoading(false); }
         };
         loadDashboardData();
-    }, [viewDate.getFullYear(), manualTransactions]); // Depender do array completo garante atualização em edições
+    }, [viewDate.getFullYear(), manualTransactions]);
 
     const metrics = useMemo(() => {
         if (financialHistory.length === 0) return null;
@@ -145,7 +141,6 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [], o
         const currentMonth = viewDate.getMonth();
         const currentYear = viewDate.getFullYear();
         
-        // Filtragem robusta para os cards de destaque do mês selecionado
         const currentMonthTransactions = manualTransactions.filter(t => {
             const d = safeParse(t.date);
             return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
@@ -163,7 +158,6 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [], o
 
         const totalRevenue = record.mrr + manualInflow;
 
-        // --- 1. Cloud Showback Logic ---
         const infraCost = currentMonthTransactions
             .filter(t => t.category === 'Tecnológico')
             .reduce((acc, t) => acc + Number(t.amount), 0) || (totalRevenue * 0.18); 
@@ -177,14 +171,12 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [], o
             };
         }).sort((a, b) => b.cost - a.cost);
 
-        // --- 2. SaaS Health Metrics ---
         const avgMrr = record.mrr / (record.active_customers || 1);
         const ltv = avgMrr * 24; 
         const cac = (record.marketing_spend + record.sales_spend) / (record.new_customers || 1);
         const infraEfficiency = totalRevenue > 0 ? ((totalRevenue - infraCost) / totalRevenue) * 100 : 0;
         const netProfit = totalRevenue - totalOutflow;
 
-        // --- 3. Budget Alerts ---
         const budgetConsumption = (totalOutflow / monthlyBudget) * 100;
         let budgetLevel: 'safe' | 'warning' | 'critical' = 'safe';
         if (budgetConsumption >= 90) budgetLevel = 'critical';
@@ -212,7 +204,6 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [], o
     return (
         <div className="flex flex-col gap-10 animate-in fade-in duration-700">
             
-            {/* Control Header */}
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
                 <div className="space-y-2">
                     <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-none flex items-center gap-3">
@@ -233,7 +224,6 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [], o
                 </div>
             </div>
 
-            {/* Row 0: Core Financials */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-white dark:bg-slate-900 p-8 rounded-[3rem] border border-slate-100 dark:border-white/5 flex flex-col justify-between h-56 shadow-soft relative overflow-hidden group">
                     <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform"><ArrowUpRight className="w-20 h-20 text-emerald-500"/></div>
@@ -263,7 +253,6 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [], o
                 </div>
             </div>
 
-            {/* Row 1: Core SaaS Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <StatCard 
                     title="Eficiência de Infra" 
@@ -303,7 +292,6 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [], o
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* Infra Showback Column */}
                 <div className="lg:col-span-4 space-y-6">
                     <div className="bg-white dark:bg-slate-900 p-8 rounded-[3rem] border border-slate-100 dark:border-white/5 shadow-soft flex flex-col h-full min-h-[500px]">
                         <div className="mb-8 border-b border-slate-50 dark:border-white/5 pb-6">
@@ -346,7 +334,6 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [], o
                     </div>
                 </div>
 
-                {/* Main Trend Column */}
                 <div className="lg:col-span-8">
                     <div className="bg-white dark:bg-slate-900 p-10 rounded-[3.5rem] border border-slate-100 dark:border-white/5 shadow-soft h-full min-h-[500px] flex flex-col">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-4">
@@ -382,7 +369,6 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [], o
                 </div>
             </div>
 
-            {/* Row 3: Final Indicators */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pb-12">
                 <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white relative overflow-hidden border border-white/5">
                     <div className="absolute top-0 right-0 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl -mr-24 -mt-24"></div>
@@ -414,7 +400,7 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [], o
                             <div className="space-y-2">
                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">LTV / CAC Ratio</span>
                                 <div className={`text-4xl font-black ${metrics.ltvCacRatio >= 3 ? 'text-emerald-500' : 'text-amber-500'}`}>{metrics.ltvCacRatio.toFixed(1)}x</div>
-                                <div className="text-[8px] font-black uppercase text-slate-500 tracking-widest">Benchmark Ideal: > 3.0</div>
+                                <div className="text-[8px] font-black uppercase text-slate-500 tracking-widest">Benchmark Ideal: &gt; 3.0</div>
                             </div>
                             <div className="space-y-2">
                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Margem de Lucro</span>
