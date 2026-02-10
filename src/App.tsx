@@ -35,7 +35,6 @@ import OpportunityWizard from './components/OpportunityWizard';
 import { QuickTaskModal } from './components/QuickTaskModal';
 import { ProjectWorkspace } from './components/ProjectWorkspace';
 import { NpsSurvey } from './components/NpsSurvey';
-import { GuruFab } from './components/GuruFab';
 import { FeedbackModal } from './components/FeedbackModal';
 import { LandingPage } from './components/LandingPage';
 import { InsightCenter } from './components/InsightCenter';
@@ -82,7 +81,6 @@ const App: React.FC = () => {
   const [showFeedback, setShowFeedback] = useState(false);
   const [selectedProject, setSelectedProjectState] = useState<Opportunity | null>(null);
   const [editingOpportunity, setEditingOpportunity] = useState<Opportunity | null>(null);
-  const [guruInitialPrompt, setGuruInitialPrompt] = useState<string | null>(null);
   
   const [theme, setTheme] = useState<'light'|'dark'>(() => {
     const saved = localStorage.getItem('shinko_theme');
@@ -95,8 +93,19 @@ const App: React.FC = () => {
       name: '', limit: 1, logoUrl: null, primaryColor: '#F59E0B', aiSector: '', aiTone: '', aiContext: '' 
   });
 
+  // Sincronização segura de URL para evitar erros de bloqueio de frame
+  const syncUrl = (path: string) => {
+      try { 
+        if (window.location.protocol.startsWith('http')) {
+            window.history.pushState({}, '', path); 
+        }
+      } catch (e) { 
+        // Silenciosamente ignora se o pushState for bloqueado pelo ambiente
+      }
+  };
+
   const handleRouting = async () => {
-      let path = window.location.pathname;
+      const path = window.location.pathname;
 
       if (path.startsWith('/ticket/')) {
           setViewState('ticket-portal');
@@ -112,8 +121,6 @@ const App: React.FC = () => {
 
       if (path === '/project/new') {
           setViewState('create-project');
-          setSelectedProjectState(null);
-          setEditingOpportunity(null);
           return;
       }
 
@@ -126,29 +133,17 @@ const App: React.FC = () => {
           if (opp) {
               if (subAction === 'edit') {
                   setEditingOpportunity(opp);
-                  setSelectedProjectState(null);
                   setViewState('edit-project');
               } else {
                   setSelectedProjectState(opp);
-                  setEditingOpportunity(null);
                   setViewState('project-view');
               }
-          } else setView('dashboard');
+          } else setViewState('dashboard');
           return;
       }
 
       const mappedView = REVERSE_ROUTES[path];
       if (mappedView) setViewState(mappedView);
-      else setViewState('dashboard');
-  };
-
-  const navigateTo = (path: string) => {
-      try { 
-        window.history.pushState({}, '', path); 
-        handleRouting(); 
-      } catch (e) { 
-        console.warn("Routing blocked:", e); 
-      }
   };
 
   const setView = (newView: string) => {
@@ -156,19 +151,21 @@ const App: React.FC = () => {
       setSelectedProjectState(null); 
       setEditingOpportunity(null);
       setIsMobileOpen(false);
-      navigateTo(ROUTES[newView] || '/');
+      syncUrl(ROUTES[newView] || '/');
   };
 
   const onOpenProject = (opp: Opportunity) => {
       setSelectedProjectState(opp);
       setEditingOpportunity(null);
-      navigateTo(`/project/${opp.id}`);
+      setViewState('project-view');
+      syncUrl(`/project/${opp.id}`);
   };
 
   const onEditProject = (opp: Opportunity) => {
       setEditingOpportunity(opp);
       setSelectedProjectState(null);
-      navigateTo(`/project/${opp.id}/edit`);
+      setViewState('edit-project');
+      syncUrl(`/project/${opp.id}/edit`);
   };
 
   useEffect(() => {
@@ -198,7 +195,12 @@ const App: React.FC = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       if (session?.user) loadUserData(session.user.id);
-      else { setUserData(null); setOpportunities([]); setLoading(false); }
+      else { 
+          setUserData(null); 
+          setOpportunities([]); 
+          setLoading(false);
+          setViewState('dashboard'); // Reset state upon logout
+      }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -245,17 +247,31 @@ const App: React.FC = () => {
       setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
 
+  // PORTAL DE TICKETS (VISÃO PÚBLICA)
   if (view === 'ticket-portal') {
       return <TicketPortalPage />;
   }
 
+  // AUTH GUARD: SE NÃO LOGADO, OBRIGATÓRIO LANDING OU BLOG
   if (!user && !loading) {
-      if (showBlog) return ( <InsightCenter initialPostSlug={blogPostSlug} onBack={() => { setShowBlog(false); navigateTo('/'); }} onEnter={() => setShowAuth(true)} /> );
+      if (showBlog) return ( <InsightCenter initialPostSlug={blogPostSlug} onBack={() => { setShowBlog(false); syncUrl('/'); }} onEnter={() => setShowAuth(true)} /> );
       return (
           <>
-            <LandingPage onEnter={() => setShowAuth(true)} customName={orgDetails.name} onOpenBlog={() => { setShowBlog(true); navigateTo('/blog'); }} />
+            <LandingPage onEnter={() => setShowAuth(true)} customName={orgDetails.name} onOpenBlog={() => { setShowBlog(true); syncUrl('/blog'); }} />
             {showAuth && <AuthScreen onClose={() => setShowAuth(false)} onGuestLogin={() => {}} customOrgName={orgDetails.name} />}
           </>
+      );
+  }
+
+  // LOADING STATE
+  if (loading) {
+      return (
+          <div className="flex h-screen w-full items-center justify-center bg-white dark:bg-[#020203]">
+              <div className="flex flex-col items-center gap-4">
+                  <Loader2 className="animate-spin text-amber-500 w-10 h-10"/>
+                  <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Sincronizando Workspace...</span>
+              </div>
+          </div>
       );
   }
 
@@ -272,7 +288,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen w-full bg-[var(--bg-color)] text-slate-900 transition-colors duration-300">
+    <div className="flex h-screen w-full bg-[var(--bg-color)] text-slate-900 transition-colors duration-300 overflow-hidden">
         {view !== 'create-project' && !editingOpportunity && <Sidebar {...commonProps} />}
         {view !== 'create-project' && !editingOpportunity && <MobileDrawer {...commonProps} />}
         
@@ -304,7 +320,10 @@ const App: React.FC = () => {
                             loadUserData(user.id);
                         })}
                         onEdit={(opp) => onEditProject(opp)} 
-                        onDelete={(id) => deleteOpportunity(id).then(() => setSelectedProjectState(null))}
+                        onDelete={(id) => deleteOpportunity(id).then(() => {
+                            setSelectedProjectState(null);
+                            loadUserData(user.id);
+                        })}
                         userRole={userRole} currentPlan={currentPlan} activeModules={activeModules}
                         customLogoUrl={orgDetails.logoUrl} orgName={orgDetails.name}
                     />
@@ -314,7 +333,6 @@ const App: React.FC = () => {
                         customLogoUrl={orgDetails.logoUrl}
                         onSave={async (opp) => {
                             try {
-                                // Forçamos o ID da organização se disponível no estado global
                                 const newOpp = await createOpportunity({ 
                                     ...opp, 
                                     organizationId: userOrgId || opp.organizationId 
@@ -330,11 +348,10 @@ const App: React.FC = () => {
                         onCancel={() => setView('dashboard')}
                     />
                 ) : (
-                    <>
+                    <div className="h-full overflow-y-auto custom-scrollbar">
                         {view === 'dashboard' && <DashboardPage 
                             opportunities={opportunities} onOpenProject={onOpenProject} 
                             onNavigate={setView} user={user} theme={theme} 
-                            onGuruPrompt={(p) => setGuruInitialPrompt(p)}
                         />}
                         {view === 'framework-system' && <FrameworkPage orgName={orgDetails.name} onBack={() => setView('dashboard')} onSaveToProject={async (opp) => {
                             try {
@@ -345,7 +362,7 @@ const App: React.FC = () => {
                                 }
                             } catch (e: any) { alert(e.message); }
                         }} />}
-                        {view === 'list' && <ProjectsPage opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} onRefresh={() => loadUserData(user.id)} />}
+                        {view === 'list' && <ProjectsPage opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} onRefresh={() => loadUserData(user.id)} onOpenCreate={() => setView('create-project')} />}
                         
                         {view === 'kanban' && <TasksPage initialSubView="kanban" opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} />}
                         {view === 'calendar' && <TasksPage initialSubView="calendar" opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} />}
@@ -361,15 +378,13 @@ const App: React.FC = () => {
                         {view === 'settings' && <SettingsPage theme={theme} onToggleTheme={toggleTheme} onlineUsers={onlineUsers} userOrgId={userOrgId} orgDetails={orgDetails} onUpdateOrgDetails={() => {}} setView={setView} userRole={userRole} userData={userData} activeModules={activeModules} onRefreshModules={() => loadUserData(user.id)} />}
                         {view === 'profile' && <ProfilePage currentPlan={currentPlan} onRefresh={() => loadUserData(user.id)} />}
                         {view === 'admin-manager' && (userData?.email === 'peboorba@gmail.com') && <AdminPage onlineUsers={onlineUsers} />}
-                    </>
+                    </div>
                 )}
             </Suspense>
         </main>
 
         {showCreateTask && <QuickTaskModal opportunities={opportunities} onClose={() => setShowCreateTask(false)} onSave={async (task, pid) => {
             if (!userOrgId || !user) return;
-            
-            // MAPEAR CAMPOS PARA O BANCO (Sincronização Industrial Shinkō)
             const dbPayload = {
                 titulo: task.text,
                 descricao: task.description,
@@ -384,20 +399,11 @@ const App: React.FC = () => {
                 datafim: task.dueDate,
                 duracaohoras: task.estimatedHours
             };
-
             await createTask(dbPayload);
             loadUserData(user.id);
             setShowCreateTask(false);
         }} userRole={userRole} />}
         {showFeedback && user && <FeedbackModal userId={user.id} onClose={() => setShowFeedback(false)} />}
-        {user && userRole !== 'cliente' && activeModules.includes('ia') && (
-            <GuruFab 
-                opportunities={opportunities} user={user} organizationId={userOrgId || undefined} 
-                onAction={(aid) => aid === 'create_task' ? setShowCreateTask(true) : setView(aid.replace('nav_', ''))} 
-                externalPrompt={guruInitialPrompt}
-                onExternalPromptConsumed={() => setGuruInitialPrompt(null)}
-            />
-        )}
         <NpsSurvey userId={user?.id} userRole={userRole} />
     </div>
   );

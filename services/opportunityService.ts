@@ -98,7 +98,6 @@ export const createOpportunity = async (opp: Opportunity): Promise<Opportunity |
             throw new Error(`Erro do Banco: ${error.message}`);
         }
 
-        // Vínculo secundário com cliente (não deve travar o salvamento do projeto)
         if (data.cliente && data.id) {
             try {
                 await linkProjectToClient(data.cliente, data.id);
@@ -117,7 +116,6 @@ export const createOpportunity = async (opp: Opportunity): Promise<Opportunity |
 export const updateOpportunity = async (opp: Opportunity): Promise<Opportunity | null> => {
     if (!supabase) return null;
     
-    // Garantimos que o ID seja tratado como número para a coluna bigint
     const numericId = Number(opp.id);
     if (isNaN(numericId)) {
         console.error("Tentativa de atualizar registro sem ID numérico válido:", opp.id);
@@ -126,7 +124,6 @@ export const updateOpportunity = async (opp: Opportunity): Promise<Opportunity |
 
     try {
         const dbPayload = mapOpportunityToDbProject(opp);
-        // O id não deve ser enviado no corpo do update, apenas na cláusula eq
         const { id, ...updateData } = dbPayload;
         
         let { data, error } = await supabase
@@ -141,7 +138,6 @@ export const updateOpportunity = async (opp: Opportunity): Promise<Opportunity |
             throw new Error(`Erro ao atualizar banco: ${error.message}`);
         }
 
-        // Atualização de vínculo de cliente não deve bloquear o retorno do sucesso do projeto
         if (data.cliente && data.id) {
             linkProjectToClient(data.cliente, data.id).catch(err => 
                 console.warn("Falha silenciosa ao vincular cliente no update:", err)
@@ -152,7 +148,7 @@ export const updateOpportunity = async (opp: Opportunity): Promise<Opportunity |
         return mapDbProjectToOpportunity(data, tasks || []); 
     } catch (err: any) {
         console.error("Falha crítica no updateOpportunity:", err.message);
-        throw err; // Lançar o erro permite que o UI mostre o alerta adequado
+        throw err;
     }
 };
 
@@ -167,7 +163,7 @@ export const deleteOpportunity = async (id: string | number): Promise<boolean> =
         if (tasks && tasks.length > 0) {
             const taskIds = tasks.map((t: any) => t.id);
             
-            // 2. Apagar comentários das tarefas
+            // 2. Apagar comentários das tarefas para evitar erro de FK
             await supabase.from('comentarios').delete().in('task', taskIds);
             
             // 3. Apagar as tarefas propriamente ditas
