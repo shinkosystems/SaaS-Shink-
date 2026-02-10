@@ -113,8 +113,6 @@ const App: React.FC = () => {
 
       if (path === '/project/new') {
           setViewState('create-project');
-          setSelectedProjectState(null);
-          setEditingOpportunity(null);
           return;
       }
 
@@ -127,28 +125,24 @@ const App: React.FC = () => {
           if (opp) {
               if (subAction === 'edit') {
                   setEditingOpportunity(opp);
-                  setSelectedProjectState(null);
                   setViewState('edit-project');
               } else {
                   setSelectedProjectState(opp);
-                  setEditingOpportunity(null);
                   setViewState('project-view');
               }
-          } else setView('dashboard');
+          } else setViewState('dashboard');
           return;
       }
 
       const mappedView = REVERSE_ROUTES[path];
       if (mappedView) setViewState(mappedView);
-      else setViewState('dashboard');
   };
 
-  const navigateTo = (path: string) => {
+  const syncUrl = (path: string) => {
       try { 
         window.history.pushState({}, '', path); 
-        handleRouting(); 
       } catch (e) { 
-        console.warn("Routing blocked:", e); 
+        console.warn("URL sync blocked by environment:", e); 
       }
   };
 
@@ -157,19 +151,21 @@ const App: React.FC = () => {
       setSelectedProjectState(null); 
       setEditingOpportunity(null);
       setIsMobileOpen(false);
-      navigateTo(ROUTES[newView] || '/');
+      syncUrl(ROUTES[newView] || '/');
   };
 
   const onOpenProject = (opp: Opportunity) => {
       setSelectedProjectState(opp);
       setEditingOpportunity(null);
-      navigateTo(`/project/${opp.id}`);
+      setViewState('project-view');
+      syncUrl(`/project/${opp.id}`);
   };
 
   const onEditProject = (opp: Opportunity) => {
       setEditingOpportunity(opp);
       setSelectedProjectState(null);
-      navigateTo(`/project/${opp.id}/edit`);
+      setViewState('edit-project');
+      syncUrl(`/project/${opp.id}/edit`);
   };
 
   useEffect(() => {
@@ -251,10 +247,10 @@ const App: React.FC = () => {
   }
 
   if (!user && !loading) {
-      if (showBlog) return ( <InsightCenter initialPostSlug={blogPostSlug} onBack={() => { setShowBlog(false); navigateTo('/'); }} onEnter={() => setShowAuth(true)} /> );
+      if (showBlog) return ( <InsightCenter initialPostSlug={blogPostSlug} onBack={() => { setShowBlog(false); syncUrl('/'); }} onEnter={() => setShowAuth(true)} /> );
       return (
           <>
-            <LandingPage onEnter={() => setShowAuth(true)} customName={orgDetails.name} onOpenBlog={() => { setShowBlog(true); navigateTo('/blog'); }} />
+            <LandingPage onEnter={() => setShowAuth(true)} customName={orgDetails.name} onOpenBlog={() => { setShowBlog(true); syncUrl('/blog'); }} />
             {showAuth && <AuthScreen onClose={() => setShowAuth(false)} onGuestLogin={() => {}} customOrgName={orgDetails.name} />}
           </>
       );
@@ -262,7 +258,10 @@ const App: React.FC = () => {
 
   const commonProps = {
       currentView: view, onChangeView: setView,
-      onOpenCreate: () => setView('create-project'), 
+      onOpenCreate: () => {
+          setViewState('create-project');
+          syncUrl('/project/new');
+      }, 
       onOpenCreateTask: () => setShowCreateTask(true),
       onOpenGuru: () => setView('guru'),
       onToggleTheme: toggleTheme, onLogout: () => supabase.auth.signOut(),
@@ -307,7 +306,10 @@ const App: React.FC = () => {
                             loadUserData(user.id);
                         })}
                         onEdit={(opp) => onEditProject(opp)} 
-                        onDelete={(id) => deleteOpportunity(id).then(() => setSelectedProjectState(null))}
+                        onDelete={(id) => deleteOpportunity(id).then(() => {
+                            setSelectedProjectState(null);
+                            loadUserData(user.id);
+                        })}
                         userRole={userRole} currentPlan={currentPlan} activeModules={activeModules}
                         customLogoUrl={orgDetails.logoUrl} orgName={orgDetails.name}
                     />
@@ -349,7 +351,7 @@ const App: React.FC = () => {
                                 }
                             } catch (e: any) { alert(e.message); }
                         }} />}
-                        {view === 'list' && <ProjectsPage opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} onRefresh={() => loadUserData(user.id)} onOpenCreate={() => setView('create-project')} />}
+                        {view === 'list' && <ProjectsPage opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} onRefresh={() => loadUserData(user.id)} onOpenCreate={() => { setViewState('create-project'); syncUrl('/project/new'); }} />}
                         
                         {view === 'kanban' && <TasksPage initialSubView="kanban" opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} />}
                         {view === 'calendar' && <TasksPage initialSubView="calendar" opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} />}
