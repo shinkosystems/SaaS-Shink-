@@ -18,7 +18,7 @@ const MENU_ITEMS = [
     { id: 'guru', label: 'Guru AI', icon: BrainCircuit, disabled: false },
     { id: 'kanban', label: 'Trabalho', icon: Layers, disabled: false },
     { id: 'financial', label: 'Dinheiro', icon: DollarSign, disabled: false },
-    { id: 'clients', label: 'Stakeholders', icon: Users, disabled: false },
+    { id: 'clients', label: 'Clientes', icon: Users, disabled: false },
     { id: 'settings', label: 'Ajustes', icon: Settings, disabled: false },
 ];
 
@@ -78,7 +78,6 @@ export const MobileDrawer: React.FC<Props> = (props) => {
                 <span className="text-[8px] font-bold uppercase tracking-tight">Ativos</span>
             </button>
             
-            {/* Botão Central de Nova Tarefa */}
             <button 
                 onClick={props.onOpenCreateTask} 
                 className="flex items-center justify-center w-12 h-12 bg-amber-500 text-black rounded-2xl shadow-lg shadow-amber-500/30 active:scale-90 transition-all -translate-y-4"

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     TrendingUp, Activity, Calendar, ArrowUpRight, ArrowDownRight, 
@@ -207,9 +206,9 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [], o
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
                 <div className="space-y-2">
                     <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-none flex items-center gap-3">
-                        <TrendingUp className="w-8 h-8 text-amber-500"/> Visão de <span className="text-amber-500">Fluxo</span>.
+                        <TrendingUp className="w-8 h-8 text-amber-500"/> Panorama <span className="text-amber-500">Geral</span>.
                     </h2>
-                    <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Controle de Budget, Unit Economics e Showback de Nuvem.</p>
+                    <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Snapshot de performance e auditória de nuvem.</p>
                 </div>
                 
                 <div className="flex items-center gap-4 bg-white dark:bg-white/5 p-3 rounded-[2rem] border border-slate-200 dark:border-white/10 shadow-soft">
@@ -224,31 +223,29 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [], o
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white dark:bg-slate-900 p-8 rounded-[3rem] border border-slate-100 dark:border-white/5 flex flex-col justify-between h-56 shadow-soft relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform"><ArrowUpRight className="w-20 h-20 text-emerald-500"/></div>
-                    <span className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2">Total de Entradas</span>
-                    <div>
-                        <div className="text-5xl font-black text-emerald-500 tracking-tighter leading-none">R$ {metrics.totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}</div>
-                        <p className="text-[9px] text-slate-500 font-bold uppercase mt-4 tracking-widest">MRR + Aportes Manuais</p>
+            {/* DESTAQUE PRINCIPAL: LUCRO LÍQUIDO */}
+            <div className="bg-slate-900 dark:bg-white p-12 rounded-[3.5rem] flex flex-col md:flex-row justify-between items-center gap-10 shadow-2xl relative overflow-hidden group">
+                <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 via-transparent to-transparent opacity-50"></div>
+                <div className="relative z-10 text-center md:text-left">
+                    <span className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.4em] mb-4 block">Resultado Operacional Líquido</span>
+                    <div className={`text-6xl md:text-8xl font-black tracking-tighter leading-none ${metrics.netProfit >= 0 ? 'text-amber-500' : 'text-rose-500'}`}>
+                        R$ {metrics.netProfit.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
                     </div>
-                </div>
-                <div className="bg-white dark:bg-slate-900 p-8 rounded-[3rem] border border-slate-100 dark:border-white/5 flex flex-col justify-between h-56 shadow-soft relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform"><ArrowDownRight className="w-20 h-20 text-red-500"/></div>
-                    <span className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2">Total de Despesas</span>
-                    <div>
-                        <div className="text-5xl font-black text-red-500 tracking-tighter leading-none">R$ {metrics.totalOutflow.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}</div>
-                        <p className="text-[9px] text-slate-500 font-bold uppercase mt-4 tracking-widest">Saídas Reais do Período</p>
-                    </div>
-                </div>
-                <div className="bg-slate-900 dark:bg-white p-8 rounded-[3rem] flex flex-col justify-between h-56 shadow-2xl relative overflow-hidden group">
-                    <div className="absolute inset-0 bg-gradient-to-br from-amber-500/20 to-transparent opacity-50"></div>
-                    <span className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em] relative z-10">Lucro Líquido do Mês</span>
-                    <div className="relative z-10">
-                        <div className={`text-5xl font-black tracking-tighter leading-none ${metrics.netProfit >= 0 ? 'text-amber-500 dark:text-amber-600' : 'text-red-400'}`}>
-                            R$ {metrics.netProfit.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
+                    <div className="flex items-center justify-center md:justify-start gap-4 mt-6">
+                         <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${metrics.netProfit >= 0 ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-rose-500/10 text-rose-500 border-rose-500/20'}`}>
+                            {metrics.netProfit >= 0 ? 'Operação em Superávit' : 'Operação em Déficit'}
                         </div>
-                        <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase mt-4 tracking-widest">Resultado Final do Fluxo</p>
+                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">v2.6 Performance Engine</span>
+                    </div>
+                </div>
+                <div className="relative z-10 grid grid-cols-2 gap-4 shrink-0">
+                    <div className="p-6 bg-white/5 dark:bg-black/5 rounded-3xl border border-white/10 dark:border-black/10">
+                        <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Entradas</div>
+                        <div className="text-xl font-black text-emerald-500">+{formatCurrency(metrics.totalRevenue)}</div>
+                    </div>
+                    <div className="p-6 bg-white/5 dark:bg-black/5 rounded-3xl border border-white/10 dark:border-black/10">
+                        <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Saídas</div>
+                        <div className="text-xl font-black text-rose-500">-{formatCurrency(metrics.totalOutflow)}</div>
                     </div>
                 </div>
             </div>
@@ -291,7 +288,7 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [], o
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pb-20">
                 <div className="lg:col-span-4 space-y-6">
                     <div className="bg-white dark:bg-slate-900 p-8 rounded-[3rem] border border-slate-100 dark:border-white/5 shadow-soft flex flex-col h-full min-h-[500px]">
                         <div className="mb-8 border-b border-slate-50 dark:border-white/5 pb-6">
@@ -368,55 +365,8 @@ export const FinancialDashboard: React.FC<Props> = ({ manualTransactions = [], o
                     </div>
                 </div>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pb-12">
-                <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white relative overflow-hidden border border-white/5">
-                    <div className="absolute top-0 right-0 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl -mr-24 -mt-24"></div>
-                    <div className="relative z-10">
-                        <div className="flex items-center gap-4 mb-8">
-                            <div className="p-4 bg-purple-500/20 text-purple-400 rounded-2xl border border-purple-500/20 shadow-lg"><Target className="w-8 h-8"/></div>
-                            <div>
-                                <h4 className="text-2xl font-black tracking-tight">Lifetime Value (LTV)</h4>
-                                <p className="text-[9px] text-slate-500 font-black uppercase tracking-[0.3em]">Projeção de Valor por Contrato</p>
-                            </div>
-                        </div>
-                        <div className="flex items-baseline gap-4 mb-6">
-                            <span className="text-7xl font-black tracking-tighter">R$ {metrics.ltv.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
-                        </div>
-                        <p className="text-[10px] text-slate-500 leading-relaxed max-w-sm font-black uppercase tracking-widest">Baseado em ciclo de 24 meses e ticket médio atual.</p>
-                    </div>
-                </div>
-
-                <div className="bg-white dark:bg-slate-900 p-10 rounded-[2.5rem] border border-slate-100 dark:border-white/5 shadow-soft flex flex-col justify-between">
-                    <div>
-                        <div className="flex items-center gap-4 mb-8">
-                            <div className="p-4 bg-amber-500/10 text-amber-500 rounded-2xl border border-amber-500/20 shadow-lg"><Zap className="w-8 h-8"/></div>
-                            <div>
-                                <h4 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Veredito SaaS</h4>
-                                <p className="text-[9px] text-slate-500 font-black uppercase tracking-[0.3em]">Diagnóstico de Sustentabilidade</p>
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-10">
-                            <div className="space-y-2">
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">LTV / CAC Ratio</span>
-                                <div className={`text-4xl font-black ${metrics.ltvCacRatio >= 3 ? 'text-emerald-500' : 'text-amber-500'}`}>{metrics.ltvCacRatio.toFixed(1)}x</div>
-                                <div className="text-[8px] font-black uppercase text-slate-500 tracking-widest">Benchmark Ideal: &gt; 3.0</div>
-                            </div>
-                            <div className="space-y-2">
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Margem de Lucro</span>
-                                <div className="text-4xl font-black text-blue-500">{(metrics.totalRevenue > 0 ? ((metrics.totalRevenue - metrics.totalOutflow) / metrics.totalRevenue * 100) : 0).toFixed(0)}%</div>
-                                <div className="text-[8px] font-black uppercase text-slate-500 tracking-widest">Lucro Operacional Líquido</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="mt-8 pt-8 border-t border-slate-50 dark:border-white/5 flex items-center gap-4">
-                        <div className={`p-2.5 rounded-xl ${metrics.ltvCacRatio >= 3 ? 'bg-emerald-500/10 text-emerald-500 shadow-glow-emerald' : 'bg-amber-500/10 text-amber-500 shadow-glow-amber'}`}><CheckCircle2 className="w-5 h-5"/></div>
-                        <span className="text-[9px] font-black uppercase text-slate-500 tracking-widest leading-tight">
-                            {metrics.ltvCacRatio >= 3 ? 'Tração de Alta Escalabilidade Detectada' : 'Operação em Fase de Ajuste de Custo de Aquisição'}
-                        </span>
-                    </div>
-                </div>
-            </div>
         </div>
     );
 };
+
+const formatCurrency = (val: number) => `R$ ${val.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`;

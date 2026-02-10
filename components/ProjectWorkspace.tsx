@@ -14,6 +14,7 @@ import {
     Briefcase, Layers, Zap
 } from 'lucide-react';
 import { fetchAllTasks, fetchOrgMembers } from '../services/projectService';
+import { ProjectSettingsModal } from './ProjectSettingsModal';
 
 interface Props {
   opportunity: Opportunity;
@@ -40,6 +41,7 @@ export const ProjectWorkspace: React.FC<Props> = ({
   const [isExiting, setIsExiting] = useState(false);
   const [projectTasks, setProjectTasks] = useState<DbTask[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   
   const isClient = userRole === 'cliente';
   const readOnly = isClient || isSharedMode;
@@ -98,12 +100,14 @@ export const ProjectWorkspace: React.FC<Props> = ({
               </div>
           </div>
           
-          <button 
-              onClick={() => !readOnly && onEdit(opportunity)}
-              className="p-2 rounded-full hover:bg-white/10 text-white transition-all active:scale-90"
-          >
-              <Settings className="w-4 h-4" />
-          </button>
+          {!readOnly && (
+            <button 
+                onClick={() => setShowSettings(true)}
+                className="p-2 rounded-full hover:bg-white/10 text-white transition-all active:scale-90"
+            >
+                <Settings className="w-4 h-4" />
+            </button>
+          )}
       </div>
 
       {/* TABS (CARTEIRAS) - FORMATO SEGMENTED CONTROL NATIVO */}
@@ -168,6 +172,20 @@ export const ProjectWorkspace: React.FC<Props> = ({
             )}
           </div>
       </div>
+
+      {/* MODAL DE CONFIGURAÇÕES AVANÇADAS (CRUD PROJETO + CLIENTE) */}
+      {showSettings && (
+        <ProjectSettingsModal 
+            opportunity={opportunity}
+            onClose={() => setShowSettings(false)}
+            onUpdateProject={async (updated) => {
+                await onUpdate(updated);
+            }}
+            onDeleteProject={async (id) => {
+                await onDelete(id);
+            }}
+        />
+      )}
     </div>
   );
 };

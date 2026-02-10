@@ -1,7 +1,6 @@
-
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { FinancialTransaction } from '../types';
-import { Plus, Trash2, ChevronLeft, ChevronRight, Search, RefreshCw, Edit, FileText, Save, ArrowUpRight, ArrowDownRight, X, DollarSign, Calendar, Tag, Repeat, Filter } from 'lucide-react';
+import { Plus, Trash2, ChevronLeft, ChevronRight, Search, RefreshCw, Edit, FileText, Save, ArrowUpRight, ArrowDownRight, X, DollarSign, Calendar, Tag, Repeat, Filter, CreditCard, Cpu, ArrowRight } from 'lucide-react';
 import { ElasticSwitch } from './ElasticSwitch';
 
 interface Props {
@@ -26,31 +25,20 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
     const [filterType, setFilterType] = useState<'all' | 'inflow' | 'outflow'>('all');
     const [listPeriod, setListPeriod] = useState<ListPeriod>('month');
     const [viewDate, setViewDate] = useState(new Date());
+    
+    const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
+    const [flippedCardId, setFlippedCardId] = useState<string | null>(null);
 
-    const [newTrans, setNewTrans] = useState<Partial<FinancialTransaction>>({
-        type: 'outflow',
-        date: new Date().toISOString().split('T')[0],
-        amount: 0,
-        description: '',
-        category: 'Financeiro',
-        isRecurring: false,
-        periodicity: 'monthly',
-        installments: 1,
-        metadata: {}
-    });
+    // RESET CRÍTICO: Limpa estados de expansão ao navegar para evitar o "vácuo" (cards órfãos)
+    useEffect(() => {
+        setExpandedCardId(null);
+        setFlippedCardId(null);
+    }, [viewDate, listPeriod, searchTerm, filterType]);
 
-    const handleEditClick = (e: React.MouseEvent, t: FinancialTransaction) => {
-        e.stopPropagation();
+    const handleOpenEdit = (t: FinancialTransaction) => {
         setNewTrans({ ...t });
         setShowModal(true);
     };
-
-    const handleDeleteClick = (e: React.MouseEvent, id: string) => {
-        e.stopPropagation();
-        if(confirm("Deseja realmente excluir este lançamento?")) {
-            onDeleteTransaction(id);
-        }
-    }
 
     const handleCreateClick = () => {
         setNewTrans({
@@ -67,6 +55,18 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
         });
         setShowModal(true);
     };
+
+    const [newTrans, setNewTrans] = useState<Partial<FinancialTransaction>>({
+        type: 'outflow',
+        date: new Date().toISOString().split('T')[0],
+        amount: 0,
+        description: '',
+        category: 'Financeiro',
+        isRecurring: false,
+        periodicity: 'monthly',
+        installments: 1,
+        metadata: {}
+    });
 
     const handleSave = () => {
         if (!newTrans.description || !newTrans.amount) {
@@ -106,7 +106,9 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
             endRange.setDate(startRange.getDate() + 6);
         } else if (listPeriod === 'month') {
             startRange.setDate(1);
+            startRange.setHours(0,0,0,0);
             endRange = new Date(startRange.getFullYear(), startRange.getMonth() + 1, 0);
+            endRange.setHours(23,59,59,999);
         } else if (listPeriod === 'quarter') {
             const q = Math.floor(startRange.getMonth() / 3);
             startRange = new Date(startRange.getFullYear(), q * 3, 1);
@@ -136,133 +138,212 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
         setViewDate(newDate);
     };
 
-    const extractClientInfo = (desc: string) => {
-        if (desc.includes('Mensalidade - ')) {
-            return desc.replace('Mensalidade - ', '').split('(')[0].trim();
-        }
-        return desc;
-    };
+    // Dimensões Shinkō Standard
+    const CARD_HEADER_OFFSET = 85;
+    const EXPANDED_HEIGHT = 460;
+    const BASE_HEIGHT = 180;
+
+    const containerHeight = useMemo(() => {
+        if (filtered.length === 0) return 400;
+        const currentExpandedIdx = filtered.findIndex(t => t.id === expandedCardId);
+        const baseStackHeight = (filtered.length - 1) * CARD_HEADER_OFFSET + BASE_HEIGHT + 150;
+        return currentExpandedIdx !== -1 ? baseStackHeight + (EXPANDED_HEIGHT - BASE_HEIGHT) : baseStackHeight;
+    }, [filtered.length, expandedCardId, filtered]);
 
     return (
-        <div className="w-full flex flex-col bg-white dark:bg-[#0A0A0C] rounded-[3rem] border border-slate-200 dark:border-white/5 shadow-soft animate-in fade-in duration-500 pb-20">
+        <div className="w-full flex flex-col animate-in fade-in duration-500 pb-40" onClick={() => { setExpandedCardId(null); setFlippedCardId(null); }}>
             
-            <div className="p-8 border-b border-slate-100 dark:border-white/5 bg-slate-50/20 dark:bg-white/[0.01] space-y-6">
-                <div className="flex flex-col lg:flex-row gap-6 justify-between items-center">
-                    <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
-                        <div className="relative flex-1 md:min-w-[320px]">
-                            <Search className="absolute left-4 top-3.5 w-4.5 h-4.5 text-slate-400"/>
-                            <input 
-                                type="text" 
-                                placeholder="Buscar lançamento..." 
-                                value={searchTerm}
-                                onChange={e => setSearchTerm(e.target.value)}
-                                className="w-full pl-12 pr-6 py-3.5 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl text-sm font-bold outline-none focus:border-amber-500 transition-all shadow-inner"
-                            />
-                        </div>
-                        <div className="flex items-center bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-1 shadow-sm">
-                            <button onClick={() => handleNavigate('prev')} className="p-2.5 hover:bg-black/5 rounded-xl transition-all"><ChevronLeft className="w-4 h-4 text-slate-400"/></button>
-                            <span className="text-[10px] font-black tracking-widest px-4 uppercase text-slate-600 dark:text-slate-300">
-                                {listPeriod === 'all' ? 'TODO O HISTÓRICO' : listPeriod === 'year' ? viewDate.getFullYear() : listPeriod === 'month' ? viewDate.toLocaleDateString('pt-BR', {month:'short', year:'numeric'}) : 'FILTRO ATIVO'}
-                            </span>
-                            <button onClick={() => handleNavigate('next')} className="p-2.5 hover:bg-black/5 rounded-xl transition-all"><ChevronRight className="w-4 h-4 text-slate-400"/></button>
-                        </div>
+            {/* TOOLBAR INDUSTRIAL */}
+            <div className="flex flex-col lg:flex-row gap-6 justify-between items-center mb-12" onClick={e => e.stopPropagation()}>
+                <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
+                    <div className="relative flex-1 md:min-w-[320px]">
+                        <Search className="absolute left-4 top-3.5 w-4.5 h-4.5 text-slate-400"/>
+                        <input 
+                            type="text" 
+                            placeholder="Buscar lançamento..." 
+                            value={searchTerm}
+                            onChange={e => setSearchTerm(e.target.value)}
+                            className="w-full pl-12 pr-6 py-3.5 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl text-sm font-bold outline-none focus:border-amber-500 transition-all shadow-inner"
+                        />
                     </div>
+                    <div className="flex items-center bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-1 shadow-sm">
+                        <button onClick={() => handleNavigate('prev')} className="p-2.5 hover:bg-black/5 rounded-xl transition-all"><ChevronLeft className="w-4 h-4 text-slate-400"/></button>
+                        <span className="text-[10px] font-black tracking-widest px-4 uppercase text-slate-600 dark:text-slate-300">
+                            {listPeriod === 'all' ? 'HISTÓRICO' : listPeriod === 'year' ? viewDate.getFullYear() : listPeriod === 'month' ? viewDate.toLocaleDateString('pt-BR', {month:'short', year:'numeric'}) : 'FILTRO'}
+                        </span>
+                        <button onClick={() => handleNavigate('next')} className="p-2.5 hover:bg-black/5 rounded-xl transition-all"><ChevronRight className="w-4 h-4 text-slate-400"/></button>
+                    </div>
+                </div>
 
-                    <div className="flex flex-wrap gap-3 w-full lg:w-auto justify-center">
-                         <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-2xl border border-slate-200 dark:border-white/10">
-                            {[
-                                { id: 'day', label: 'Dia' },
-                                { id: 'week', label: 'Sem' },
-                                { id: 'month', label: 'Mês' },
-                                { id: 'quarter', label: 'Tri' },
-                                { id: 'year', label: 'Ano' },
-                                { id: 'all', label: 'Tudo' }
-                            ].map(p => (
-                                <button key={p.id} onClick={() => setListPeriod(p.id as any)} className={`px-4 py-2 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all ${listPeriod === p.id ? 'bg-white dark:bg-white/10 shadow-md text-slate-900 dark:text-white' : 'text-slate-400'}`}>{p.label}</button>
-                            ))}
-                        </div>
-                        <button onClick={onSyncContracts} title="Sincronizar Contratos" className="p-3.5 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl hover:scale-105 transition-all text-slate-400">
-                            <RefreshCw className={`w-4.5 h-4.5 ${isSyncing ? 'animate-spin' : ''}`}/>
-                        </button>
-                        <button 
-                            onClick={handleCreateClick} 
-                            className="px-8 py-3.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3 hover:scale-105 active:scale-95 transition-all shadow-xl shadow-slate-900/10"
+                <div className="flex flex-wrap gap-3 w-full lg:w-auto justify-center">
+                    <button onClick={onSyncContracts} className="p-3.5 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl hover:scale-105 transition-all text-slate-400">
+                        <RefreshCw className={`w-4.5 h-4.5 ${isSyncing ? 'animate-spin' : ''}`}/>
+                    </button>
+                    <button 
+                        onClick={handleCreateClick} 
+                        className="px-8 py-3.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3 hover:scale-105 active:scale-95 transition-all shadow-xl"
+                    >
+                        <Plus className="w-4.5 h-4.5"/> Novo Registro
+                    </button>
+                </div>
+            </div>
+
+            {/* CARD STACK VIEW - KEY DINÂMICO PARA FORÇAR REDESENHO LIMPO NA TROCA DE MÊS */}
+            <div 
+                key={`${viewDate.toISOString()}-${filtered.length}`}
+                className="relative transition-all duration-700 ease-in-out" 
+                style={{ minHeight: `${containerHeight}px`, perspective: '2000px' }}
+            >
+                {filtered.map((t, idx) => {
+                    const isExpanded = expandedCardId === t.id;
+                    const isFlipped = flippedCardId === t.id;
+                    const isOutflow = t.type === 'outflow';
+                    const expandedIdx = filtered.findIndex(item => item.id === expandedCardId);
+                    
+                    let translateY = idx * CARD_HEADER_OFFSET;
+                    if (expandedIdx !== -1 && idx > expandedIdx) {
+                        translateY += (EXPANDED_HEIGHT - CARD_HEADER_OFFSET - 20);
+                    }
+
+                    return (
+                        <div 
+                            key={t.id}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (isExpanded) {
+                                    setFlippedCardId(isFlipped ? null : t.id);
+                                } else {
+                                    setExpandedCardId(t.id);
+                                    setFlippedCardId(null);
+                                }
+                            }}
+                            className={`
+                                w-full transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] cursor-pointer absolute top-0 left-0
+                                ${isExpanded ? 'scale-[1.02]' : 'hover:-translate-y-2'}
+                            `}
+                            style={{
+                                transform: `translateY(${translateY}px)`,
+                                zIndex: isExpanded ? 100 : idx + 10,
+                                transformStyle: 'preserve-3d'
+                            }}
                         >
-                            <Plus className="w-4.5 h-4.5"/> Novo Registro
-                        </button>
-                    </div>
-                </div>
-
-                <div className="flex gap-2">
-                    <button onClick={() => setFilterType('all')} className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all ${filterType === 'all' ? 'bg-slate-900 text-white border-slate-900' : 'bg-transparent text-slate-400 border-slate-200'}`}>Tudo</button>
-                    <button onClick={() => setFilterType('inflow')} className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all ${filterType === 'inflow' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-transparent text-slate-400 border-slate-200'}`}>Entradas</button>
-                    <button onClick={() => setFilterType('outflow')} className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all ${filterType === 'outflow' ? 'bg-red-500 text-white border-red-500' : 'bg-transparent text-slate-400 border-slate-200'}`}>Saídas</button>
-                </div>
-            </div>
-
-            <div className="overflow-x-auto custom-scrollbar">
-                <table className="w-full text-left table-auto">
-                    <thead className="bg-slate-50/50 dark:bg-white/[0.02] text-slate-400 border-b border-slate-100 dark:border-white/5 text-[9px] font-black uppercase tracking-[0.2em]">
-                        <tr>
-                            <th className="px-8 py-5 w-28">Data</th>
-                            <th className="px-8 py-5">Descrição do Ativo</th>
-                            <th className="px-8 py-5 w-32">Categoria</th>
-                            <th className="px-8 py-5 w-40 text-right">Valor Consolidado</th>
-                            <th className="px-8 py-5 w-24 text-center">Controle</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-white/5">
-                        {filtered.length === 0 && (
-                            <tr><td colSpan={5} className="py-32 text-center">
-                                <div className="flex flex-col items-center gap-4 opacity-30">
-                                    <Filter className="w-12 h-12"/>
-                                    <span className="text-xs font-black uppercase tracking-[0.4em]">Nenhum lançamento</span>
-                                </div>
-                            </td></tr>
-                        )}
-                        {filtered.map(t => (
-                            <tr key={t.id} className="hover:bg-slate-50/50 dark:hover:bg-white/5 group transition-colors cursor-pointer">
-                                <td className="px-8 py-5">
-                                    <div className="flex flex-col">
-                                        <span className="font-black text-xs text-slate-900 dark:text-white">{new Date(t.date).getDate()}</span>
-                                        <span className="text-[9px] font-bold text-slate-400 uppercase">{new Date(t.date).toLocaleDateString('pt-BR', {month:'short'})}</span>
-                                    </div>
-                                </td>
-                                <td className="px-8 py-5">
-                                    <div className="flex items-center gap-3">
-                                        <div className={`p-2 rounded-xl ${t.type === 'inflow' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
-                                            {t.type === 'inflow' ? <ArrowUpRight className="w-4 h-4"/> : <ArrowDownRight className="w-4 h-4"/>}
-                                        </div>
-                                        <div className="flex flex-col">
-                                            <div className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
-                                                {(t.isContract || t.isRecurring) && <Repeat className="w-3 h-3 text-emerald-500 shrink-0" />}
-                                                <span className="truncate max-w-[400px]">{extractClientInfo(t.description)}</span>
+                            <div 
+                                className={`relative w-full transition-transform duration-[800ms] ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isFlipped ? 'rotate-y-180' : ''}`}
+                                style={{ transformStyle: 'preserve-3d', height: isExpanded ? `${EXPANDED_HEIGHT}px` : `${BASE_HEIGHT}px` }}
+                            >
+                                {/* LADO A: FRENTE DO LANÇAMENTO */}
+                                <div 
+                                    className={`absolute inset-0 w-full rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col border border-white/10 transition-all duration-500 backface-hidden bg-white dark:bg-[#1a1a1e]`}
+                                    style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'translateZ(1px)' }}
+                                >
+                                    {/* CABEÇALHO COLORIDO DINÂMICO */}
+                                    <div className={`p-8 pb-7 flex justify-between items-start transition-colors duration-500 rounded-t-[2.5rem] ${isOutflow ? 'bg-rose-50/70 dark:bg-rose-500/10' : 'bg-emerald-50/70 dark:bg-emerald-500/10'} border-b border-slate-100 dark:border-white/5`}>
+                                        <div className="space-y-1.5 min-w-0 flex-1">
+                                            <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                                                <Calendar className="w-3 h-3"/> {new Date(t.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
                                             </div>
-                                            {t.isRecurring && <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest mt-0.5">Recorrência Ativa</span>}
+                                            <h3 className="text-2xl font-black tracking-tighter text-slate-900 dark:text-white truncate pr-4">{t.description}</h3>
+                                        </div>
+                                        <div className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border shrink-0 transition-all ${isOutflow ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'}`}>
+                                            {t.category}
                                         </div>
                                     </div>
-                                </td>
-                                <td className="px-8 py-5">
-                                    <span className="text-[8px] font-black uppercase tracking-widest bg-slate-100 dark:bg-white/5 px-2.5 py-1 rounded-lg text-slate-500 border border-slate-200 dark:border-white/10">{t.category}</span>
-                                </td>
-                                <td className={`px-8 py-5 text-right font-black text-lg ${t.type === 'inflow' ? 'text-emerald-500' : 'text-red-500'}`}>
-                                    <span className="text-[10px] mr-1.5 opacity-40 font-bold">R$</span>{t.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                                </td>
-                                <td className="px-8 py-5">
-                                    <div className="flex justify-center gap-2 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={(e) => handleEditClick(e, t)} className="p-2 text-slate-400 hover:text-amber-500 transition-all hover:bg-amber-50 rounded-lg"><Edit className="w-4 h-4"/></button>
-                                        <button onClick={(e) => handleDeleteClick(e, t.id)} className="p-2 text-slate-400 hover:text-red-500 transition-all hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4"/></button>
+
+                                    {/* CORPO DO CARD - VOLUMES */}
+                                    <div className="p-8 pt-7 flex-1 flex flex-col justify-end">
+                                        <div className="flex justify-between items-end relative">
+                                            <div>
+                                                <div className="text-[9px] font-black uppercase tracking-[0.2em] mb-1 text-slate-400">Volume Consolidado</div>
+                                                <div className={`text-5xl font-black ${isOutflow ? 'text-rose-500' : 'text-emerald-500'} tracking-tighter leading-none`}>
+                                                    <span className="text-sm font-bold mr-1.5 opacity-50">R$</span>
+                                                    {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-[9px] font-black uppercase tracking-[0.2em] mb-1 text-slate-400">Status Flow</div>
+                                                <div className={`flex items-center gap-1.5 font-black text-[10px] uppercase tracking-widest ${isOutflow ? 'text-rose-500' : 'text-emerald-500'}`}>
+                                                    {isOutflow ? <ArrowDownRight className="w-4 h-4"/> : <ArrowUpRight className="w-4 h-4"/>}
+                                                    {isOutflow ? 'Débito' : 'Crédito'}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {isExpanded && !isFlipped && (
+                                            <div className="mt-10 pt-6 border-t border-slate-100 dark:border-white/5 flex justify-center items-center animate-pulse shrink-0">
+                                                <span className="text-[8px] font-black uppercase tracking-[0.5em] text-slate-400">Toque para Auditoria Técnica</span>
+                                            </div>
+                                        )}
                                     </div>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+                                </div>
+
+                                {/* LADO B: VERSO DO LANÇAMENTO */}
+                                <div 
+                                    className={`absolute inset-0 w-full rounded-[2.5rem] shadow-2xl p-10 flex flex-col rotate-y-180 backface-hidden border border-white/20 bg-[#0a0a0b]`}
+                                    style={{ transform: 'rotateY(180deg) translateZ(1px)', backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
+                                >
+                                    <div className="flex justify-between items-center mb-10 relative z-20">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2.5 bg-amber-500/10 rounded-xl">
+                                                <Cpu className="w-6 h-6 text-amber-500"/>
+                                            </div>
+                                            <div>
+                                                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 block">Ledger Industrial</span>
+                                                <span className="text-[8px] font-bold text-slate-600 uppercase tracking-widest">Protocolo Shinkō v2.6</span>
+                                            </div>
+                                        </div>
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); onDeleteTransaction(t.id); }}
+                                            className="p-2 text-slate-500 hover:text-red-500 transition-colors"
+                                        >
+                                            <Trash2 className="w-6 h-6"/>
+                                        </button>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-10 mb-8 relative z-20 flex-1">
+                                        <div className="space-y-8">
+                                            <div className="space-y-3">
+                                                <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">Natureza do Ativo</h4>
+                                                <div className="p-5 bg-white/5 rounded-2xl border border-white/5 flex items-center gap-3">
+                                                    {t.isRecurring ? <Repeat className="w-5 h-5 text-emerald-500"/> : <CreditCard className="w-5 h-5 text-blue-500"/>}
+                                                    <span className="text-xs font-black uppercase text-white">{t.isRecurring ? `Recorrência (${t.periodicity})` : 'Pagamento Único'}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="space-y-8">
+                                             <button 
+                                                onClick={(e) => { e.stopPropagation(); handleOpenEdit(t); }}
+                                                className="w-full py-6 rounded-[2rem] bg-white text-black font-black text-xs uppercase tracking-[0.3em] transition-all flex items-center justify-center gap-4 hover:bg-amber-500 shadow-glow-white active:scale-95 group"
+                                            >
+                                                Refinar Registro <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1"/>
+                                            </button>
+                                            <div className="p-5 bg-white/5 rounded-[1.8rem] border border-white/5 text-[10px] text-slate-500 leading-relaxed font-medium italic text-center">
+                                                Registro sincronizado. Auditoria industrial ativa.
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="mt-auto text-center relative z-20 opacity-30">
+                                        <span className="text-[8px] font-black uppercase tracking-[0.6em] text-slate-600">ID: {t.id}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
+
+                {filtered.length === 0 && (
+                    <div className="py-40 text-center border-2 border-dashed border-slate-200 dark:border-white/5 rounded-[3rem] opacity-30 w-full">
+                        <DollarSign className="w-16 h-16 mx-auto mb-4 text-slate-300"/>
+                        <p className="text-xs font-black uppercase tracking-[0.4em]">Nenhum lançamento no radar</p>
+                    </div>
+                )}
             </div>
 
+            {/* MODAL DE EDIÇÃO/CRIAÇÃO */}
             {showModal && (
-                <div className="fixed inset-0 z-[3000] flex items-center justify-center p-6 md:p-16 bg-black/90 backdrop-blur-2xl animate-in fade-in duration-300">
-                    <div className="w-full max-w-lg rounded-[3rem] shadow-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-[#0A0A0C] overflow-hidden animate-ios-pop flex flex-col max-h-[95vh]">
+                <div className="fixed inset-0 z-[3000] flex items-center justify-center p-6 md:p-16 bg-black/90 backdrop-blur-xl animate-in fade-in duration-300" onClick={e => e.stopPropagation()}>
+                    <div className="w-full max-w-lg rounded-[3rem] shadow-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-[#0A0A0C] overflow-hidden animate-ios-pop flex flex-col max-h-[95vh]" onClick={e => e.stopPropagation()}>
                         
                         <div className="p-8 border-b border-slate-100 dark:border-white/5 flex justify-between items-start bg-slate-50/50 dark:bg-white/5">
                             <div>
@@ -274,7 +355,6 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
                                         {newTrans.id ? 'Refinar' : 'Novo'} Lançamento.
                                     </h3>
                                 </div>
-                                <p className="text-[9px] text-slate-400 font-black uppercase tracking-[0.3em] ml-1">REGISTRO DE FLUXO</p>
                             </div>
                             <button onClick={() => setShowModal(false)} className="p-2.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-all text-slate-400"><X className="w-6 h-6"/></button>
                         </div>
@@ -288,26 +368,17 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
                             <div className="space-y-6">
                                 <div>
                                     <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Descrição</label>
-                                    <div className="relative group">
-                                        <FileText className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400" />
-                                        <input value={newTrans.description} onChange={e => setNewTrans({...newTrans, description: e.target.value})} placeholder="Ex: Pagamento Consultoria..." className="w-full pl-12 pr-6 py-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm font-bold outline-none focus:border-amber-500 transition-all shadow-inner dark:text-white"/>
-                                    </div>
+                                    <input value={newTrans.description} onChange={e => setNewTrans({...newTrans, description: e.target.value})} placeholder="Ex: Pagamento Consultoria..." className="w-full px-6 py-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm font-bold outline-none focus:border-amber-500 transition-all shadow-inner dark:text-white"/>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Valor</label>
-                                        <div className="relative group">
-                                            <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-emerald-500" />
-                                            <input type="number" value={newTrans.amount} onChange={e => setNewTrans({...newTrans, amount: Number(e.target.value)})} className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-lg font-black outline-none focus:border-amber-500 transition-all shadow-inner dark:text-white"/>
-                                        </div>
+                                        <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Valor (R$)</label>
+                                        <input type="number" value={newTrans.amount} onChange={e => setNewTrans({...newTrans, amount: Number(e.target.value)})} className="w-full px-6 py-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-lg font-black outline-none focus:border-amber-500 transition-all shadow-inner dark:text-white"/>
                                     </div>
                                     <div>
                                         <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Data</label>
-                                        <div className="relative group">
-                                            <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400" />
-                                            <input type="date" value={newTrans.date} onChange={e => setNewTrans({...newTrans, date: e.target.value})} className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xs font-bold outline-none focus:border-amber-500 transition-all uppercase shadow-inner dark:text-white"/>
-                                        </div>
+                                        <input type="date" value={newTrans.date} onChange={e => setNewTrans({...newTrans, date: e.target.value})} className="w-full px-6 py-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xs font-bold outline-none focus:border-amber-500 transition-all uppercase shadow-inner dark:text-white"/>
                                     </div>
                                 </div>
 
@@ -331,26 +402,6 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
                                         </div>
                                         <ElasticSwitch checked={newTrans.isRecurring || false} onChange={() => setNewTrans({...newTrans, isRecurring: !newTrans.isRecurring})} />
                                     </div>
-
-                                    {newTrans.isRecurring && (
-                                        <div className="space-y-6 animate-in slide-in-from-top-2 duration-300">
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Periodicidade</label>
-                                                    <select value={newTrans.periodicity} onChange={e => setNewTrans({...newTrans, periodicity: e.target.value as any})} className="w-full p-3.5 rounded-xl bg-white dark:bg-black/40 border border-slate-200 dark:border-white/10 text-xs font-bold outline-none focus:border-amber-500 dark:text-white">
-                                                        <option value="monthly">Mensal</option>
-                                                        <option value="quarterly">Trimestral</option>
-                                                        <option value="semiannual">Semestral</option>
-                                                        <option value="yearly">Anual</option>
-                                                    </select>
-                                                </div>
-                                                <div>
-                                                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Ocorrências</label>
-                                                    <input type="number" min="1" max="60" value={newTrans.installments} onChange={e => setNewTrans({...newTrans, installments: parseInt(e.target.value)})} className="w-full p-3.5 rounded-xl bg-white dark:bg-black/40 border border-slate-200 dark:border-white/10 text-sm font-black outline-none focus:border-amber-500 dark:text-white"/>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
                                 </div>
                             </div>
                         </div>
@@ -362,6 +413,12 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
                     </div>
                 </div>
             )}
+
+            <style>{`
+                .rotate-y-180 { transform: rotateY(180deg); }
+                .backface-hidden { backface-visibility: hidden !important; -webkit-backface-visibility: hidden !important; }
+                .shadow-glow-white { box-shadow: 0 0 20px rgba(255, 255, 255, 0.2); }
+            `}</style>
         </div>
     );
 };

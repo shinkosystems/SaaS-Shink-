@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { SettingsScreen } from '../components/SettingsScreen';
 
@@ -19,8 +20,10 @@ interface Props {
 
 export const SettingsPage: React.FC<Props> = (props) => {
     return (
-        <div className="h-full p-4 md:p-8 overflow-y-auto custom-scrollbar">
-            <SettingsScreen {...props} />
+        <div className="h-full overflow-y-auto no-scrollbar md:custom-scrollbar bg-white dark:bg-[#020203]">
+            <div className="p-4 md:p-8">
+                <SettingsScreen {...props} />
+            </div>
         </div>
     );
 };

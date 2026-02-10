@@ -8,9 +8,10 @@ interface Props {
     onOpenProject: (opp: Opportunity) => void;
     userRole: string;
     onRefresh: () => void;
+    onOpenCreate?: () => void;
 }
 
-export const ProjectsPage: React.FC<Props> = ({ opportunities, onOpenProject, userRole, onRefresh }) => {
+export const ProjectsPage: React.FC<Props> = ({ opportunities, onOpenProject, userRole, onRefresh, onOpenCreate }) => {
     return (
         <div className="h-full p-6 md:p-12 overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-transparent">
             <ProjectList 
@@ -18,11 +19,7 @@ export const ProjectsPage: React.FC<Props> = ({ opportunities, onOpenProject, us
                 onOpenProject={onOpenProject} 
                 userRole={userRole} 
                 onRefresh={onRefresh}
-                onOpenCreate={() => {
-                    // Redireciona para o Wizard de criação através do histórico de navegação
-                    window.history.pushState({}, '', '/project/new');
-                    window.dispatchEvent(new PopStateEvent('popstate'));
-                }}
+                onOpenCreate={onOpenCreate}
             />
         </div>
     );

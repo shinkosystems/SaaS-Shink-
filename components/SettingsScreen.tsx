@@ -1,10 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-    Settings, Sun, Moon, Palette, Building2, UploadCloud, Save, Monitor, Users, 
-    Briefcase, Plus, Trash2, Check, User, BrainCircuit, Sparkles,
-    Loader2, DollarSign, Calendar, TrendingUp, ShieldCheck, 
-    X, ImageIcon, ChevronRight, Zap, Target, Activity, ChevronDown, RefreshCw, AlertCircle, Database, Layout, Link as LinkIcon, Copy, CheckCircle2, ExternalLink
+    Settings, Sun, Moon, Palette, Building2, Save, Users, 
+    Plus, Trash2, User, BrainCircuit, Loader2, DollarSign, 
+    ChevronDown, ChevronUp, Link as LinkIcon, Copy, CheckCircle2, ExternalLink, Activity, Target, Zap, Clock
 } from 'lucide-react';
 import { 
     fetchRoles, createRole, deleteRole, updateRoleCost,
@@ -40,12 +39,10 @@ export const SettingsScreen: React.FC<Props> = ({
   const [newRoleName, setNewRoleName] = useState('');
   const [isCopied, setIsCopied] = useState(false);
 
-  // Estados para IA
   const [aiSector, setAiSector] = useState(orgDetails?.aiSector || '');
   const [aiTone, setAiTone] = useState(orgDetails?.aiTone || '');
   const [aiContext, setAiContext] = useState(orgDetails?.aiContext || '');
 
-  // Estados locais para edição em lote (Bulk Edit)
   const [localCosts, setLocalCosts] = useState<Record<string, number>>({});
   const [localRoles, setLocalRoles] = useState<Record<string, number | null>>({});
 
@@ -73,7 +70,8 @@ export const SettingsScreen: React.FC<Props> = ({
                     email: userData.email,
                     perfil: userRole,
                     cargo: null,
-                    custo_mensal: 0
+                    custo_mensal: 0,
+                    ultimo_acesso: new Date().toISOString()
                 }];
             }
         }
@@ -85,12 +83,7 @@ export const SettingsScreen: React.FC<Props> = ({
         
         finalMembers.forEach(member => {
             memberRoles[member.id] = member.cargo || null;
-            if (!member.custo_mensal || member.custo_mensal === 0) {
-                const roleObj = r.find((role: any) => role.id === member.cargo);
-                costs[member.id] = roleObj?.custo_base || 0;
-            } else {
-                costs[member.id] = member.custo_mensal;
-            }
+            costs[member.id] = member.custo_mensal || 0;
         });
         
         setLocalCosts(costs);
@@ -100,6 +93,20 @@ export const SettingsScreen: React.FC<Props> = ({
     } finally {
         setLoadingMembers(false);
     }
+  };
+
+  const formatLastSeen = (dateStr?: string) => {
+    if (!dateStr) return 'Nunca acessou';
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    
+    if (minutes < 1) return 'Agora mesmo';
+    if (minutes < 60) return `Há ${minutes}m`;
+    if (minutes < 1440) return `Há ${Math.floor(minutes / 60)}h`;
+    
+    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
   };
 
   const handleRoleChange = (memberId: string, roleId: number | null) => {
@@ -127,7 +134,7 @@ export const SettingsScreen: React.FC<Props> = ({
           });
           await Promise.all(promises);
           await loadTeamData();
-          alert(failures > 0 ? "Atenção: Alguns dados não puderam ser sincronizados." : "Engenharia de Custos sincronizada!");
+          alert(failures > 0 ? "Atenção: Alguns dados não puderam ser sincronizados." : "RH Sincronizado!");
       } catch (e) {
           alert("Erro operacional ao salvar.");
       } finally {
@@ -170,34 +177,32 @@ export const SettingsScreen: React.FC<Props> = ({
   ];
 
   return (
-    <div className="flex flex-col h-full animate-in fade-in duration-700 max-w-7xl mx-auto p-4 md:p-8 space-y-12">
+    <div className="flex flex-col animate-in fade-in duration-700 max-w-7xl mx-auto space-y-12">
         <div className="space-y-3 pt-4">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-orange-50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-900/30 rounded-full text-[10px] font-black text-orange-600 uppercase tracking-widest">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 rounded-full text-[10px] font-black text-amber-600 uppercase tracking-widest">
                 <Settings className="w-3.5 h-3.5"/> SISTEMA OPERACIONAL
             </div>
-            <h1 className="text-5xl md:text-7xl font-black text-slate-900 dark:text-white tracking-tighter">Ajustes <span className="text-orange-500">Mestres</span>.</h1>
+            <h1 className="text-5xl md:text-7xl font-black text-slate-900 dark:text-white tracking-tighter">Ajustes <span className="text-amber-500">Mestres</span>.</h1>
         </div>
 
         <div className="flex bg-white dark:bg-white/5 p-1.5 rounded-[2rem] border border-slate-100 dark:border-white/5 w-fit shadow-soft overflow-x-auto no-scrollbar max-w-full">
             {tabs.map(tab => (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`px-8 py-3.5 rounded-[1.5rem] text-[11px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-orange-500 text-white shadow-xl scale-105' : 'text-slate-400 hover:text-slate-600'}`}>{tab.label}</button>
+                <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`px-8 py-3.5 rounded-[1.5rem] text-[11px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-amber-500 text-white shadow-xl scale-105' : 'text-slate-400 hover:text-slate-600'}`}>{tab.label}</button>
             ))}
         </div>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar pb-32">
+        <div className="pb-32 space-y-10">
             {activeTab === 'general' && (
                 <div className="max-w-4xl space-y-10 animate-in slide-in-from-bottom-4 duration-500">
                     <div className="bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-[3rem] p-10 space-y-10 shadow-sm">
-                        
-                        {/* Seção de Aparência */}
                         <div className="space-y-4">
                             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2">
-                                <Palette className="w-4 h-4 text-orange-500"/> Personalização Visual
+                                <Palette className="w-4 h-4 text-amber-500"/> Personalização Visual
                             </h3>
                             <div className="flex items-center justify-between p-6 bg-slate-50 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10">
                                 <div className="flex items-center gap-4">
                                     <div className="p-3 bg-white dark:bg-white/10 rounded-2xl shadow-sm">
-                                        {theme === 'dark' ? <Moon className="w-5 h-5 text-orange-500"/> : <Sun className="w-5 h-5 text-orange-500"/>}
+                                        {theme === 'dark' ? <Moon className="w-5 h-5 text-amber-500"/> : <Sun className="w-5 h-5 text-amber-500"/>}
                                     </div>
                                     <div>
                                         <div className="text-sm font-black text-slate-900 dark:text-white">Modo de Exibição</div>
@@ -208,7 +213,6 @@ export const SettingsScreen: React.FC<Props> = ({
                             </div>
                         </div>
 
-                        {/* Seção de Suporte Externo */}
                         <div className="space-y-4">
                             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2">
                                 <LinkIcon className="w-4 h-4 text-blue-500"/> Portais Externos
@@ -237,11 +241,178 @@ export const SettingsScreen: React.FC<Props> = ({
                                         </button>
                                     </div>
                                 </div>
-                                <div className="text-[9px] text-slate-500 font-medium leading-relaxed bg-white/50 dark:bg-black/20 p-4 rounded-xl border border-slate-100 dark:border-white/5 italic">
-                                    DICA: Compartilhe este link com seus stakeholders. Todos os chamados abertos através dele cairão automaticamente no seu card "Central de Suporte & Voz do Cliente".
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'costs' && (
+                <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-500">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                        <div className="lg:col-span-4 space-y-6">
+                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2">
+                                <Target className="w-4 h-4 text-amber-500"/> Estrutura de Cargos
+                            </h3>
+                            <div className="bg-white dark:bg-white/5 border border-slate-100 dark:border-white/5 p-6 rounded-[2.5rem] space-y-4 shadow-sm">
+                                <div className="flex gap-2 mb-4">
+                                    <input value={newRoleName} onChange={e => setNewRoleName(e.target.value)} placeholder="Novo Cargo..." className="flex-1 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl p-3 text-xs font-bold outline-none dark:text-white" />
+                                    <button onClick={() => { if(newRoleName) createRole(newRoleName, userOrgId!).then(() => { setNewRoleName(''); loadTeamData(); }); }} className="p-3 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl hover:scale-105 transition-all"><Plus className="w-4 h-4"/></button>
+                                </div>
+                                <div className="space-y-3">
+                                    {roles.map(r => (
+                                        <div key={r.id} className="p-4 bg-slate-50 dark:bg-black/20 border border-slate-100 dark:border-white/5 rounded-2xl flex items-center justify-between group">
+                                            <span className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">{r.nome}</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[9px] font-bold text-slate-400">R$</span>
+                                                <input 
+                                                    type="number"
+                                                    defaultValue={r.custo_base}
+                                                    onBlur={(e) => updateRoleCost(r.id, Number(e.target.value)).then(loadTeamData)}
+                                                    className="w-20 bg-white dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-lg p-1.5 text-right text-[10px] font-black outline-none"
+                                                />
+                                                <button onClick={() => deleteRole(r.id).then(loadTeamData)} className="p-1.5 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><Trash2 className="w-3.5 h-3.5"/></button>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         </div>
+
+                        <div className="lg:col-span-8 space-y-8">
+                            <div className="flex justify-between items-center px-2">
+                                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.4em] flex items-center gap-3">
+                                    <Users className="w-5 h-5 text-blue-500"/> Apontamento Industrial
+                                </h3>
+                                <button 
+                                    onClick={handleSaveAllCosts}
+                                    disabled={isSavingCosts || loadingMembers}
+                                    className="flex items-center gap-3 px-8 py-3.5 bg-[#00a86b] hover:bg-[#008f5a] text-white rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                                >
+                                    {isSavingCosts ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4"/>}
+                                    Sincronizar RH
+                                </button>
+                            </div>
+
+                            <div className="bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-[3.5rem] overflow-hidden shadow-soft p-6 md:p-10">
+                                <div className="hidden md:grid grid-cols-12 px-8 mb-8 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                                    <div className="col-span-6">Colaborador</div>
+                                    <div className="col-span-3 text-center">Cargo Shinkō</div>
+                                    <div className="col-span-3 text-right">Custo Mensal (Salário)</div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    {loadingMembers ? (
+                                        <div className="py-20 flex flex-col items-center justify-center gap-4 text-slate-400">
+                                            <Loader2 className="w-10 h-10 animate-spin text-amber-500" />
+                                            <span className="text-[10px] font-black uppercase tracking-widest">Auditoria em tempo real...</span>
+                                        </div>
+                                    ) : members.map(m => (
+                                        <div key={m.id} className="flex flex-col md:grid md:grid-cols-12 items-center gap-6 p-6 rounded-[2.5rem] bg-white dark:bg-white/[0.02] border border-slate-50 dark:border-white/5 hover:border-amber-500/20 transition-all group shadow-sm">
+                                            
+                                            <div className="col-span-6 flex items-center gap-5 w-full">
+                                                <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 border-[3px] border-white dark:border-white/10 overflow-hidden shrink-0 shadow-lg">
+                                                    {m.avatar_url ? (
+                                                        <img src={m.avatar_url} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center font-black text-xl text-slate-400">
+                                                            {m.nome ? m.nome.charAt(0) : '?'}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="text-[17px] font-black text-slate-900 dark:text-white leading-tight tracking-tight">{m.nome}</div>
+                                                    <div className="text-[11px] font-bold text-slate-400 mt-1 truncate lowercase">{m.email}</div>
+                                                </div>
+                                            </div>
+
+                                            <div className="col-span-3 flex justify-center w-full">
+                                                <div className="relative w-full max-w-[140px]">
+                                                    <select 
+                                                        value={localRoles[m.id] || ''} 
+                                                        onChange={e => handleRoleChange(m.id, e.target.value ? parseInt(e.target.value) : null)}
+                                                        className="w-full bg-slate-50 dark:bg-black/20 border-none rounded-2xl py-3 px-6 text-[10px] font-black tracking-[0.2em] text-center uppercase appearance-none cursor-pointer outline-none transition-all hover:bg-slate-100 dark:hover:bg-white/5"
+                                                    >
+                                                        <option value="">---</option>
+                                                        {roles.map(r => (
+                                                            <option key={r.id} value={r.id}>
+                                                                {r.nome.substring(0, 3).toUpperCase()}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                    <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none opacity-20">
+                                                        <ChevronDown className="w-3.5 h-3.5" />
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="col-span-3 flex items-center justify-end gap-3 w-full">
+                                                <div className="flex items-center gap-3 bg-slate-50 dark:bg-black/20 px-5 py-3 rounded-2xl w-full md:w-auto">
+                                                    <span className="text-xs font-black text-slate-400">R$</span>
+                                                    <input 
+                                                        type="number"
+                                                        value={localCosts[m.id] || 0}
+                                                        onChange={(e) => setLocalCosts({...localCosts, [m.id]: Number(e.target.value)})}
+                                                        className="bg-transparent border-none outline-none text-[16px] font-black text-slate-900 dark:text-white w-full text-right"
+                                                    />
+                                                    <div className="flex flex-col gap-0.5 ml-2 opacity-30 group-hover:opacity-100 transition-opacity">
+                                                        <button 
+                                                            onClick={() => setLocalCosts({...localCosts, [m.id]: (localCosts[m.id] || 0) + 100})}
+                                                            className="hover:text-amber-500"
+                                                        >
+                                                            <ChevronUp className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => setLocalCosts({...localCosts, [m.id]: Math.max(0, (localCosts[m.id] || 0) - 100)})}
+                                                            className="hover:text-amber-500"
+                                                        >
+                                                            <ChevronDown className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'team' && (
+                <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-500">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        {loadingMembers ? (
+                            <div className="col-span-full py-20 flex justify-center"><Loader2 className="w-10 h-10 animate-spin text-amber-500"/></div>
+                        ) : members.map(m => {
+                            const isOnline = onlineUsers.includes(m.id);
+                            return (
+                                <div key={m.id} className="p-8 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-[2.5rem] flex items-center justify-between group hover:border-amber-500/30 transition-all shadow-sm">
+                                    <div className="flex items-center gap-5">
+                                        <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-white/5 flex items-center justify-center font-black text-xs text-slate-500 border-[3px] border-white dark:border-white/10 shrink-0 overflow-hidden shadow-lg">
+                                            {m.avatar_url ? <img src={m.avatar_url} className="w-full h-full object-cover" /> : (m.nome ? m.nome.charAt(0) : '?')}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <div className="text-base font-black text-slate-900 dark:text-white truncate leading-tight">{m.nome}</div>
+                                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">
+                                                {roles.find(r => r.id === m.cargo)?.nome || m.perfil.toUpperCase()}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col items-end gap-2 shrink-0">
+                                        <span className={`px-4 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all ${isOnline ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-slate-100 dark:bg-white/5 text-slate-400 border-slate-200 dark:border-white/10'}`}>
+                                            {isOnline ? 'Online' : 'Offline'}
+                                        </span>
+                                        {!isOnline && (
+                                            <div className="flex items-center gap-1.5 text-[8px] font-bold text-slate-400 uppercase tracking-tighter">
+                                                <Clock className="w-2.5 h-2.5"/> {formatLastSeen(m.ultimo_acesso)}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             )}
@@ -294,132 +465,6 @@ export const SettingsScreen: React.FC<Props> = ({
                                 Sincronizar Mente IA
                             </button>
                         </div>
-                    </div>
-                </div>
-            )}
-
-            {activeTab === 'costs' && (
-                <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-500">
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-                        <div className="lg:col-span-4 space-y-6">
-                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2">
-                                <Target className="w-4 h-4 text-amber-500"/> Estrutura de Cargos
-                            </h3>
-                            <div className="bg-white dark:bg-white/5 border border-slate-100 dark:border-white/5 p-6 rounded-[2.5rem] space-y-4 shadow-sm">
-                                <div className="flex gap-2 mb-4">
-                                    <input value={newRoleName} onChange={e => setNewRoleName(e.target.value)} placeholder="Novo Cargo..." className="flex-1 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl p-3 text-xs font-bold outline-none dark:text-white" />
-                                    <button onClick={() => { if(newRoleName) createRole(newRoleName, userOrgId!).then(() => { setNewRoleName(''); loadTeamData(); }); }} className="p-3 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl hover:scale-105 transition-all"><Plus className="w-4 h-4"/></button>
-                                </div>
-                                <div className="space-y-3">
-                                    {roles.map(r => (
-                                        <div key={r.id} className="p-4 bg-slate-50 dark:bg-black/20 border border-slate-100 dark:border-white/5 rounded-2xl flex items-center justify-between group">
-                                            <span className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">{r.nome}</span>
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-[9px] font-bold text-slate-400">R$</span>
-                                                <input 
-                                                    type="number"
-                                                    defaultValue={r.custo_base}
-                                                    onBlur={(e) => updateRoleCost(r.id, Number(e.target.value)).then(loadTeamData)}
-                                                    className="w-20 bg-white dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-lg p-1.5 text-right text-[10px] font-black outline-none"
-                                                />
-                                                <button onClick={() => deleteRole(r.id).then(loadTeamData)} className="p-1.5 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><Trash2 className="w-3.5 h-3.5"/></button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                        <div className="lg:col-span-8 space-y-6">
-                            <div className="flex justify-between items-center">
-                                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2">
-                                    <Users className="w-4 h-4 text-blue-500"/> Apontamento Industrial
-                                </h3>
-                                <button 
-                                    onClick={handleSaveAllCosts}
-                                    disabled={isSavingCosts || loadingMembers}
-                                    className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:opacity-50"
-                                >
-                                    {isSavingCosts ? <Loader2 className="w-3 h-3 animate-spin"/> : <Save className="w-3 h-3"/>}
-                                    Sincronizar RH
-                                </button>
-                            </div>
-                            <div className="bg-white dark:bg-white/5 border border-slate-100 dark:border-white/5 rounded-[2.5rem] overflow-hidden shadow-sm">
-                                <table className="w-full text-left">
-                                    <thead className="bg-slate-50 dark:bg-white/[0.02] border-b border-slate-100 dark:border-white/5">
-                                        <tr>
-                                            <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Colaborador</th>
-                                            <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Cargo Shinkō</th>
-                                            <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Custo Mensal (Salário)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100 dark:divide-white/5">
-                                        {members.map(m => (
-                                            <tr key={m.id} className="group hover:bg-slate-50 dark:hover:bg-white/[0.01] transition-colors">
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-black text-xs border border-slate-200 dark:border-white/5 overflow-hidden shrink-0 shadow-inner">
-                                                            {m.avatar_url ? <img src={m.avatar_url} className="w-full h-full object-cover" /> : (m.nome ? m.nome.charAt(0) : '?')}
-                                                        </div>
-                                                        <div className="min-w-0">
-                                                            <div className="text-[11px] font-black text-slate-900 dark:text-white truncate">{m.nome}</div>
-                                                            <div className="text-[9px] font-medium text-slate-400 truncate">{m.email}</div>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="relative">
-                                                        <select 
-                                                            value={localRoles[m.id] || ''} 
-                                                            onChange={e => handleRoleChange(m.id, e.target.value ? parseInt(e.target.value) : null)}
-                                                            className={`w-full bg-slate-100 dark:bg-black/40 border-2 rounded-xl p-2.5 text-[10px] font-black uppercase appearance-none outline-none transition-all ${localRoles[m.id] !== m.cargo ? 'border-amber-500/50' : 'border-transparent'}`}
-                                                        >
-                                                            <option value="">Sem Cargo...</option>
-                                                            {roles.map(r => <option key={r.id} value={r.id}>{r.nome.toUpperCase()}</option>)}
-                                                        </select>
-                                                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center justify-end gap-3">
-                                                        <span className="text-[10px] font-bold text-slate-400">R$</span>
-                                                        <input 
-                                                            type="number"
-                                                            value={localCosts[m.id] || ''}
-                                                            placeholder="0"
-                                                            onChange={(e) => setLocalCosts({...localCosts, [m.id]: Number(e.target.value)})}
-                                                            className={`w-32 bg-slate-100 dark:bg-black/40 border-2 rounded-xl p-2.5 text-right text-xs font-black outline-none transition-all ${localCosts[m.id] !== m.custo_mensal ? 'border-emerald-500/50' : 'border-transparent'} dark:text-white`}
-                                                        />
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {activeTab === 'team' && (
-                <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-500">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {members.map(m => (
-                            <div key={m.id} className="p-6 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-3xl flex items-center justify-between group">
-                                <div className="flex items-center gap-5">
-                                    <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-white/5 flex items-center justify-center font-black text-xs text-slate-500 border border-slate-200 dark:border-white/10 shrink-0">
-                                        {m.avatar_url ? <img src={m.avatar_url} className="w-full h-full object-cover rounded-2xl" /> : (m.nome ? m.nome.charAt(0) : '?')}
-                                    </div>
-                                    <div className="min-w-0">
-                                        <div className="text-sm font-black text-slate-900 dark:text-white truncate">{m.nome}</div>
-                                        <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{m.perfil}</div>
-                                    </div>
-                                </div>
-                                <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${onlineUsers.includes(m.id) ? 'bg-emerald-500/10 text-emerald-500' : 'bg-slate-100 dark:bg-white/5 text-slate-400'}`}>
-                                    {onlineUsers.includes(m.id) ? 'Online' : 'Offline'}
-                                </span>
-                            </div>
-                        ))}
                     </div>
                 </div>
             )}

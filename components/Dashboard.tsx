@@ -1,4 +1,3 @@
-
 import React, { useMemo, useEffect, useState } from 'react';
 import { Opportunity } from '../types';
 import MatrixChart from './MatrixChart';
@@ -149,9 +148,7 @@ export const Dashboard: React.FC<Props> = ({
                 <div className="px-6 py-6 overflow-hidden">
                     <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
                         <ActionButton icon={Plus} label="Novo Ativo" onClick={onOpenCreate} />
-                        <ActionButton icon={PlayCircle} label="Simular" onClick={() => onNavigate('framework-system')} />
-                        <ActionButton icon={Layers} label="Módulos" onClick={() => onNavigate('ecosystem')} />
-                        <ActionButton icon={CreditCard} label="Fatura" onClick={() => onNavigate('financial')} />
+                        <ActionButton icon={CreditCard} label="Financeiro" onClick={() => onNavigate('financial')} />
                         <ActionButton icon={TrendingUp} label="Insights" onClick={() => onNavigate('intelligence')} />
                     </div>
                 </div>

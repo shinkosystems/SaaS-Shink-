@@ -221,7 +221,7 @@ const App: React.FC = () => {
                     setCurrentPlan(mapDbPlanIdToString(orgData.plano || 4));
                     setOrgDetails({
                         name: orgData.nome, limit: orgData.colaboradores, logoUrl: orgData.logo, primaryColor: orgData.cor || '#F59E0B',
-                        aiSector: orgData.setor || '', aiTone: orgData.tomdevoz || '', aiContext: orgData.dna || ''
+                        aiSector: orgData.setor || '', aiTone: orgData.tomdevoz || '', aiContext: orgDetails.aiContext
                     });
 
                     const modules = await fetchActiveOrgModules(data.organizacao);
@@ -278,13 +278,14 @@ const App: React.FC = () => {
         {view !== 'create-project' && !editingOpportunity && <Sidebar {...commonProps} />}
         {view !== 'create-project' && !editingOpportunity && <MobileDrawer {...commonProps} />}
         
-        <main className={`flex-1 overflow-hidden relative pt-16 lg:pt-0`}>
+        <main className={`flex-1 overflow-y-auto overflow-x-hidden relative pt-16 lg:pt-0 custom-scrollbar`}>
             <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-amber-500 w-8 h-8"/></div>}>
                 {editingOpportunity ? (
                     <OpportunityWizard 
                         initialData={editingOpportunity} 
                         orgType={orgDetails.name}
                         customLogoUrl={orgDetails.logoUrl}
+                        organizationId={userOrgId || undefined}
                         onSave={async (opp) => {
                             try {
                                 const updated = await updateOpportunity(opp);
@@ -314,6 +315,7 @@ const App: React.FC = () => {
                     <OpportunityWizard 
                         orgType={orgDetails.name}
                         customLogoUrl={orgDetails.logoUrl}
+                        organizationId={userOrgId || undefined}
                         onSave={async (opp) => {
                             try {
                                 const newOpp = await createOpportunity({ 
@@ -347,7 +349,7 @@ const App: React.FC = () => {
                                 }
                             } catch (e: any) { alert(e.message); }
                         }} />}
-                        {view === 'list' && <ProjectsPage opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} onRefresh={() => loadUserData(user.id)} />}
+                        {view === 'list' && <ProjectsPage opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} onRefresh={() => loadUserData(user.id)} onOpenCreate={() => setView('create-project')} />}
                         
                         {view === 'kanban' && <TasksPage initialSubView="kanban" opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} />}
                         {view === 'calendar' && <TasksPage initialSubView="calendar" opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} />}

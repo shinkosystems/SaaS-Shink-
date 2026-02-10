@@ -119,12 +119,15 @@ export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [], org
     const filteredClients = clients.filter(c => c.nome.toLowerCase().includes(searchTerm.toLowerCase()));
 
     return (
-        <div className="h-full flex flex-col p-6 md:p-10 space-y-10 animate-in fade-in duration-700">
+        <div className="h-full flex flex-col space-y-10 animate-in fade-in duration-700">
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6">
                 <div className="space-y-1">
-                    <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter">
-                        Base de <span className="text-amber-500">Stakeholders</span>.
+                    <h1 className="text-5xl font-black text-slate-900 dark:text-white tracking-tighter">
+                        Base de <span className="text-amber-500">Clientes</span>.
                     </h1>
+                    <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.3em] mt-3 flex items-center gap-2">
+                        <Globe className="w-3 h-3"/> GESTÃO DE PARCEIROS E ACESSOS EXTERNOS
+                    </p>
                 </div>
                 
                 <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
@@ -133,8 +136,8 @@ export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [], org
                         <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Buscar parceiro..." className="w-full pl-11 pr-4 py-3.5 bg-white dark:bg-white/5 border border-slate-200 dark:border-[#333] rounded-2xl text-sm outline-none focus:border-amber-500 transition-all shadow-sm" />
                     </div>
                     {userRole !== 'cliente' && (
-                        <button onClick={() => setShowAddModal(true)} className="px-8 py-3.5 bg-slate-900 dark:bg-white text-white dark:text-black rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-amber-500 transition-all shadow-soft">
-                            <Plus className="w-4 h-4"/> NOVO PARCEIRO
+                        <button onClick={() => setShowAddModal(true)} className="px-8 py-3.5 bg-slate-900 dark:bg-white text-white dark:text-black rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-amber-500 transition-all shadow-soft active:scale-95">
+                            <Plus className="w-4 h-4"/> NOVO CLIENTE
                         </button>
                     )}
                 </div>
@@ -173,15 +176,14 @@ export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [], org
                 ))}
             </div>
 
-            {/* MODAL: NOVO PARCEIRO - ALINHADO COM A IMAGEM */}
             {showAddModal && (
                 <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
                     <div className="w-full max-w-2xl bg-white dark:bg-[#0A0A0C] rounded-[3.5rem] shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden animate-ios-pop flex flex-col">
                         <form onSubmit={handleCreateClient}>
                             <div className="p-10 border-b border-slate-100 dark:border-white/5 flex justify-between items-center bg-white dark:bg-white/5">
                                 <div>
-                                    <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">Novo <span className="text-amber-500">Parceiro</span>.</h2>
-                                    <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.3em] mt-3">CADASTRO E ACESSO DO STAKEHOLDER</p>
+                                    <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">Novo <span className="text-amber-500">Cliente</span>.</h2>
+                                    <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.3em] mt-3">CADASTRO E ACESSO DO PARCEIRO</p>
                                 </div>
                                 <button type="button" onClick={() => setShowAddModal(false)} className="p-3 text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-all"><X className="w-7 h-7"/></button>
                             </div>
@@ -243,7 +245,7 @@ export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [], org
 
                             <div className="p-10 border-t border-slate-100 dark:border-white/5 bg-white dark:bg-white/5 flex gap-10 items-center justify-center shrink-0">
                                 <button type="button" onClick={() => setShowAddModal(false)} className="px-8 py-4 text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all">DESCARTAR</button>
-                                <button type="submit" disabled={isSaving} className="px-12 py-6 bg-[#111827] dark:bg-white text-white dark:text-slate-900 rounded-[1.5rem] font-black text-[10px] uppercase tracking-[0.2em] shadow-xl flex items-center justify-center gap-4 active:scale-95 transition-all disabled:opacity-50">
+                                <button type="submit" disabled={isSaving} className="px-12 py-6 bg-amber-500 text-black rounded-[1.5rem] font-black text-[10px] uppercase tracking-[0.2em] shadow-xl flex items-center justify-center gap-4 active:scale-95 transition-all disabled:opacity-50">
                                     {isSaving ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>} 
                                     SINCRONIZAR LOGIN & CADASTRO
                                 </button>
@@ -253,7 +255,6 @@ export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [], org
                 </div>
             )}
             
-            {/* MODAL: GESTÃO DE ACESSO A PROJETOS */}
             {selectedClientForProjects && (
                  <div className="fixed inset-0 z-[2100] flex items-center justify-center p-4 bg-black/20 backdrop-blur-md animate-in fade-in duration-300">
                     <div className="w-full max-w-2xl bg-white dark:bg-[#0A0A0C] rounded-[3.5rem] shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden animate-ios-pop flex flex-col max-h-[90vh]">
