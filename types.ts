@@ -21,10 +21,10 @@ export enum RDEStatus {
 }
 
 export enum Archetype {
-    SAAS_ENTRY = 'SaaS de Entrada',
-    SAAS_PLATFORM = 'SaaS Plataforma',
-    SERVICE_TECH = 'Serviço Tecnológico',
-    INTERNAL_MARKETING = 'Interno / Marketing'
+    SAAS_ENTRY = 'SaaS Simples',
+    SAAS_PLATFORM = 'Plataforma Complexa',
+    SERVICE_TECH = 'Consultoria Tech',
+    INTERNAL_MARKETING = 'Uso Interno'
 }
 
 export enum IntensityLevel {
@@ -148,7 +148,6 @@ export interface DbProject {
     created_at: string;
     bpmn_structure?: any;
     contexto_ia?: string;
-    pdf_url?: string;
     cor?: string;
     projoport?: boolean;
     mrr?: number;
@@ -273,7 +272,7 @@ export interface DbClient {
     status: string;
     organizacao: number;
     tipo_pessoa?: 'Física' | 'Jurídica';
-    projetos?: number[]; // Lista de IDs de projetos associados
+    projetos?: number[]; 
 }
 
 export interface ProductMetricsData {
@@ -409,25 +408,25 @@ export interface CrmOpportunity {
 
 export const getTerminology = (orgType?: string) => {
     return {
-        painPointLabel: "Dor do Usuário",
-        mvpLabel: "Tempo para MVP",
-        viabilityLabel: "Viabilidade Técnica",
-        revenueLabel: "Potencial de Receita",
-        scalabilityLabel: "Escalabilidade",
+        painPointLabel: "Necessidade",
+        mvpLabel: "Prazo MVP",
+        viabilityLabel: "Complexidade",
+        revenueLabel: "Retorno",
+        scalabilityLabel: "Escala",
         integrationLabel: "Integração",
         recurringLabel: "Recorrência",
-        mrrLabel: "MRR",
+        mrrLabel: "Ganhos",
         archetypes: {
-            [Archetype.SAAS_ENTRY]: { label: "SaaS de Entrada", desc: "Software simples with foco em dor única." },
-            [Archetype.SAAS_PLATFORM]: { label: "Plataforma SaaS", desc: "Ecossistema complexo com múltiplas features." },
-            [Archetype.SERVICE_TECH]: { label: "Serviço Tech", desc: "Híbrido entre software e consultoria especializada." },
-            [Archetype.INTERNAL_MARKETING]: { label: "Interno / Marketing", desc: "Ferramenta para otimização de processos próprios." }
+            [Archetype.SAAS_ENTRY]: { label: "Projeto Simples", desc: "Software focado em uma única necessidade." },
+            [Archetype.SAAS_PLATFORM]: { label: "Plataforma", desc: "Ecossistema robusto com várias funções." },
+            [Archetype.SERVICE_TECH]: { label: "Serviço Tech", desc: "Híbrido de software e atendimento." },
+            [Archetype.INTERNAL_MARKETING]: { label: "Uso Interno", desc: "Ferramenta para processos da própria empresa." }
         },
         intensities: {
-            [IntensityLevel.L1]: "Foco em MVP e validação de hipótese.",
-            [IntensityLevel.L2]: "Desenvolvimento de core features.",
-            [IntensityLevel.L3]: "Escalonamento e otimização de performance.",
-            [IntensityLevel.L4]: "Manutenção crítica e expansão de mercado."
+            [IntensityLevel.L1]: "Início: Validando a ideia.",
+            [IntensityLevel.L2]: "Construção: Criando o coração do projeto.",
+            [IntensityLevel.L3]: "Escala: Otimizando para crescer.",
+            [IntensityLevel.L4]: "Elite: Manutenção de alta performance."
         }
     };
 };

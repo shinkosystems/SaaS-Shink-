@@ -45,14 +45,13 @@ export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [], org
         setIsLoading(false);
     };
 
-    // Máscara para CNPJ/CPF
     const maskCpfCnpj = (val: string) => {
         const cleanVal = val.replace(/\D/g, "");
         if (cleanVal.length <= 11) {
             return cleanVal
-                .replace(/(\md{3})(\d)/, "$1.$2")
-                .replace(/(\md{3})(\d)/, "$1.$2")
-                .replace(/(\md{3})(\d{1,2})$/, "$1-$2");
+                .replace(/(\d{3})(\d)/, "$1.$2")
+                .replace(/(\d{3})(\d)/, "$1.$2")
+                .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
         } else {
             return cleanVal
                 .substring(0, 14)
@@ -63,26 +62,17 @@ export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [], org
         }
     };
 
-    // Máscara para Telefone
-    const maskPhone = (val: string) => {
-        return val
-            .replace(/\D/g, "")
-            .replace(/(\d{2})(\d)/, "($1) $2")
-            .replace(/(\d{5})(\d)/, "$1-$2")
-            .substring(0, 15);
-    };
-
     const handleCreateClient = async (e: React.FormEvent) => {
         e.preventDefault();
         setErrorMsg(null);
 
         if (!newClient.email || !newClient.nome || !newClient.senha) {
-            setErrorMsg("Preencha os campos obrigatórios (Nome, E-mail e Senha).");
+            setErrorMsg("E-mail, Nome e Senha são obrigatórios.");
             return;
         }
 
         if (newClient.senha !== newClient.confirmarSenha) {
-            setErrorMsg("A confirmação de senha não coincide com a senha inicial.");
+            setErrorMsg("As senhas informadas não coincidem.");
             return;
         }
 
@@ -96,22 +86,16 @@ export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [], org
                 loadClients();
             }
         } catch (err: any) {
-            setErrorMsg(err.message || "Erro desconhecido ao sincronizar stakeholder.");
-        } finally { setIsSaving(false); }
+            setErrorMsg(err.message);
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const handleOpenProjectManager = (client: DbClient) => {
         if (userRole === 'cliente') return;
         setSelectedClientForProjects(client);
         setLocalProjectSelection(client.projetos || []);
-    };
-
-    const toggleProject = (projectId: number) => {
-        setLocalProjectSelection(prev => 
-            prev.includes(projectId) 
-            ? prev.filter(id => id !== projectId) 
-            : [...prev, projectId]
-        );
     };
 
     const handleSaveProjectAccess = async () => {
@@ -126,7 +110,7 @@ export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [], org
                 setSelectedClientForProjects(null);
             }
         } catch (e: any) {
-            alert("Erro ao salvar acessos: " + e.message);
+            alert("Erro: " + e.message);
         } finally {
             setIsUpdatingProjects(false);
         }
@@ -149,8 +133,8 @@ export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [], org
                         <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Buscar parceiro..." className="w-full pl-11 pr-4 py-3.5 bg-white dark:bg-white/5 border border-slate-200 dark:border-[#333] rounded-2xl text-sm outline-none focus:border-amber-500 transition-all shadow-sm" />
                     </div>
                     {userRole !== 'cliente' && (
-                        <button onClick={() => setShowAddModal(true)} className="px-8 py-3.5 bg-slate-900 dark:bg-white text-white dark:text-black rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-amber-500 hover:text-black transition-all shadow-soft active:scale-95">
-                            <Plus className="w-4 h-4"/> NOVO CLIENTE
+                        <button onClick={() => setShowAddModal(true)} className="px-8 py-3.5 bg-slate-900 dark:bg-white text-white dark:text-black rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-amber-500 transition-all shadow-soft">
+                            <Plus className="w-4 h-4"/> NOVO PARCEIRO
                         </button>
                     )}
                 </div>
@@ -167,7 +151,7 @@ export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [], org
                     >
                         <div>
                             <div className="flex justify-between items-start mb-10">
-                                <div className="w-20 h-20 rounded-[1.5rem] bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-[#333] overflow-hidden flex items-center justify-center">
+                                <div className="w-20 h-20 rounded-[1.5rem] bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 overflow-hidden flex items-center justify-center">
                                     {client.logo_url ? <img src={client.logo_url} className="w-full h-full object-cover"/> : <Building2 className="w-10 h-10 text-slate-300"/>}
                                 </div>
                                 <div className="flex flex-col items-end gap-2">
@@ -189,12 +173,12 @@ export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [], org
                 ))}
             </div>
 
-            {/* MODAL: NOVO PARCEIRO */}
+            {/* MODAL: NOVO PARCEIRO - ALINHADO COM A IMAGEM */}
             {showAddModal && (
                 <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
                     <div className="w-full max-w-2xl bg-white dark:bg-[#0A0A0C] rounded-[3.5rem] shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden animate-ios-pop flex flex-col">
-                        <form onSubmit={handleCreateClient} className="flex flex-col">
-                            <div className="p-10 border-b border-slate-100 dark:border-white/5 flex justify-between items-center bg-slate-50 dark:bg-white/5">
+                        <form onSubmit={handleCreateClient}>
+                            <div className="p-10 border-b border-slate-100 dark:border-white/5 flex justify-between items-center bg-white dark:bg-white/5">
                                 <div>
                                     <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">Novo <span className="text-amber-500">Parceiro</span>.</h2>
                                     <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.3em] mt-3">CADASTRO E ACESSO DO STAKEHOLDER</p>
@@ -204,64 +188,64 @@ export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [], org
 
                             <div className="p-10 space-y-8 overflow-y-auto max-h-[60vh] custom-scrollbar">
                                 {errorMsg && (
-                                    <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center gap-3 text-red-500 text-xs font-bold animate-in shake duration-300">
+                                    <div className="p-4 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-3 text-red-600 text-xs font-bold animate-in shake duration-300">
                                         <AlertTriangle className="w-5 h-5 shrink-0"/> {errorMsg}
                                     </div>
                                 )}
 
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">E-mail de Login</label>
-                                    <div className="relative group">
-                                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"/>
-                                        <input required type="email" value={newClient.email} onChange={e => setNewClient({...newClient, email: e.target.value})} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 pl-12 text-sm font-bold dark:text-white outline-none focus:border-amber-500 shadow-inner" placeholder="contato@empresa.com"/>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">E-MAIL DE LOGIN</label>
+                                    <div className="relative">
+                                        <Mail className="absolute left-6 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400"/>
+                                        <input required type="email" value={newClient.email} onChange={e => setNewClient({...newClient, email: e.target.value})} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-[1.5rem] p-6 pl-14 text-sm font-bold dark:text-white outline-none focus:border-amber-500 shadow-inner" placeholder="cliente@teste.com"/>
                                     </div>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">Senha Inicial</label>
-                                        <div className="relative group">
-                                            <Key className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"/>
-                                            <input required type="password" value={newClient.senha} onChange={e => setNewClient({...newClient, senha: e.target.value})} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 pl-12 text-sm font-bold dark:text-white outline-none focus:border-amber-500 shadow-inner" placeholder="••••••••"/>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">SENHA INICIAL</label>
+                                        <div className="relative">
+                                            <Key className="absolute left-6 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400"/>
+                                            <input required type="password" value={newClient.senha} onChange={e => setNewClient({...newClient, senha: e.target.value})} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-[1.5rem] p-6 pl-14 text-sm font-bold dark:text-white outline-none focus:border-amber-500 shadow-inner" placeholder="••••••"/>
                                         </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">Confirmar Senha</label>
-                                        <div className="relative group">
-                                            <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"/>
-                                            <input required type="password" value={newClient.confirmarSenha} onChange={e => setNewClient({...newClient, confirmarSenha: e.target.value})} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 pl-12 text-sm font-bold dark:text-white outline-none focus:border-amber-500 shadow-inner" placeholder="••••••••"/>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">CONFIRMAR SENHA</label>
+                                        <div className="relative">
+                                            <ShieldCheck className="absolute left-6 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400"/>
+                                            <input required type="password" value={newClient.confirmarSenha} onChange={e => setNewClient({...newClient, confirmarSenha: e.target.value})} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-[1.5rem] p-6 pl-14 text-sm font-bold dark:text-white outline-none focus:border-amber-500 shadow-inner" placeholder="••••••"/>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">Nome Completo / Razão Social</label>
-                                    <div className="relative group">
-                                        <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"/>
-                                        <input required value={newClient.nome} onChange={e => setNewClient({...newClient, nome: e.target.value})} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 pl-12 text-sm font-bold dark:text-white outline-none focus:border-amber-500 shadow-inner" placeholder="Ex: Shinkō Sistemas Ltda"/>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">NOME COMPLETO / RAZÃO SOCIAL</label>
+                                    <div className="relative">
+                                        <Building2 className="absolute left-6 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400"/>
+                                        <input required value={newClient.nome} onChange={e => setNewClient({...newClient, nome: e.target.value})} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-[1.5rem] p-6 pl-14 text-sm font-bold dark:text-white outline-none focus:border-amber-500 shadow-inner" placeholder="Nome do Parceiro"/>
                                     </div>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">CNPJ / CPF</label>
-                                        <input value={newClient.cnpj} onChange={e => setNewClient({...newClient, cnpj: maskCpfCnpj(e.target.value)})} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 text-sm font-bold dark:text-white outline-none" placeholder="00.000.000/0001-00"/>
+                                        <input value={newClient.cnpj} onChange={e => setNewClient({...newClient, cnpj: maskCpfCnpj(e.target.value)})} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-[1.5rem] p-6 text-sm font-bold dark:text-white outline-none" placeholder="00.000.000/0001-00"/>
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Telefone</label>
-                                        <div className="relative group">
-                                            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"/>
-                                            <input value={newClient.telefone} onChange={e => setNewClient({...newClient, telefone: maskPhone(e.target.value)})} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 pl-12 text-sm font-bold dark:text-white outline-none" placeholder="(00) 00000-0000"/>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">TELEFONE</label>
+                                        <div className="relative">
+                                            <Phone className="absolute left-6 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400"/>
+                                            <input value={newClient.telefone} onChange={e => setNewClient({...newClient, telefone: e.target.value})} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-[1.5rem] p-6 pl-14 text-sm font-bold dark:text-white outline-none" placeholder="(00) 00000-0000"/>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="p-10 border-t border-slate-100 dark:border-white/5 flex gap-6 bg-slate-50 dark:bg-white/5">
-                                <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 py-4 text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all">Descartar</button>
-                                <button type="submit" disabled={isSaving} className="flex-[2] py-5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-50">
+                            <div className="p-10 border-t border-slate-100 dark:border-white/5 bg-white dark:bg-white/5 flex gap-10 items-center justify-center shrink-0">
+                                <button type="button" onClick={() => setShowAddModal(false)} className="px-8 py-4 text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all">DESCARTAR</button>
+                                <button type="submit" disabled={isSaving} className="px-12 py-6 bg-[#111827] dark:bg-white text-white dark:text-slate-900 rounded-[1.5rem] font-black text-[10px] uppercase tracking-[0.2em] shadow-xl flex items-center justify-center gap-4 active:scale-95 transition-all disabled:opacity-50">
                                     {isSaving ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>} 
-                                    {isSaving ? 'SINCRONIZANDO...' : 'SINCRONIZAR LOGIN & CADASTRO'}
+                                    SINCRONIZAR LOGIN & CADASTRO
                                 </button>
                             </div>
                         </form>
@@ -269,6 +253,7 @@ export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [], org
                 </div>
             )}
             
+            {/* MODAL: GESTÃO DE ACESSO A PROJETOS */}
             {selectedClientForProjects && (
                  <div className="fixed inset-0 z-[2100] flex items-center justify-center p-4 bg-black/20 backdrop-blur-md animate-in fade-in duration-300">
                     <div className="w-full max-w-2xl bg-white dark:bg-[#0A0A0C] rounded-[3.5rem] shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden animate-ios-pop flex flex-col max-h-[90vh]">
@@ -292,7 +277,11 @@ export const ClientsScreen: React.FC<Props> = ({ userRole, onlineUsers = [], org
                                     return (
                                         <button 
                                             key={project.id}
-                                            onClick={() => toggleProject(project.id)}
+                                            onClick={() => {
+                                                setLocalProjectSelection(prev => 
+                                                    prev.includes(project.id) ? prev.filter(id => id !== project.id) : [...prev, project.id]
+                                                );
+                                            }}
                                             className={`p-6 rounded-[2rem] border text-left transition-all flex items-center justify-between group ${isSelected ? 'bg-amber-500 border-amber-400 text-black shadow-glow-amber scale-[1.02]' : 'bg-white dark:bg-white/5 border-slate-100 dark:border-white/10 text-slate-500 hover:border-amber-500/30'}`}
                                         >
                                             <div className="flex items-center gap-6">

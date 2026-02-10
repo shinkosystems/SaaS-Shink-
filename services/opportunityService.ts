@@ -116,21 +116,44 @@ export const createOpportunity = async (opp: Opportunity): Promise<Opportunity |
 
 export const updateOpportunity = async (opp: Opportunity): Promise<Opportunity | null> => {
     if (!supabase) return null;
+    
+    // Garantimos que o ID seja tratado como número para a coluna bigint
+    const numericId = Number(opp.id);
+    if (isNaN(numericId)) {
+        console.error("Tentativa de atualizar registro sem ID numérico válido:", opp.id);
+        return null;
+    }
+
     try {
         const dbPayload = mapOpportunityToDbProject(opp);
+        // O id não deve ser enviado no corpo do update, apenas na cláusula eq
         const { id, ...updateData } = dbPayload;
         
-        let { data, error } = await supabase.from(TABLE_NAME).update(updateData).eq('id', opp.id).select().single();
+        let { data, error } = await supabase
+            .from(TABLE_NAME)
+            .update(updateData)
+            .eq('id', numericId)
+            .select()
+            .single();
         
-        if (error) throw error;
-
-        if (data.cliente && data.id) {
-            await linkProjectToClient(data.cliente, data.id);
+        if (error) {
+            console.error("Erro no Update Supabase:", error.message, error.details);
+            throw new Error(`Erro ao atualizar banco: ${error.message}`);
         }
 
-        const { data: tasks } = await supabase.from('tasks').select('*').eq('projeto', opp.id);
+        // Atualização de vínculo de cliente não deve bloquear o retorno do sucesso do projeto
+        if (data.cliente && data.id) {
+            linkProjectToClient(data.cliente, data.id).catch(err => 
+                console.warn("Falha silenciosa ao vincular cliente no update:", err)
+            );
+        }
+
+        const { data: tasks } = await supabase.from('tasks').select('*').eq('projeto', numericId);
         return mapDbProjectToOpportunity(data, tasks || []); 
-    } catch (err) { return null; }
+    } catch (err: any) {
+        console.error("Falha crítica no updateOpportunity:", err.message);
+        throw err; // Lançar o erro permite que o UI mostre o alerta adequado
+    }
 };
 
 export const deleteOpportunity = async (id: string | number): Promise<boolean> => {
@@ -180,7 +203,7 @@ const mapDbProjectToOpportunity = (row: DbProject, tasks: DbTask[] = []): Opport
         bpmn: bpmnStructure,
         dbProjectId: row.id,
         docsContext: row.contexto_ia || '',
-        pdfUrl: row.pdf_url || '',
+        pdfUrl: '', // Removido mapping da coluna pdf_url que não existe no schema
         color: row.cor || '#F59E0B',
         mrr: row.mrr || 0,
         meses: row.meses || 12
@@ -206,11 +229,11 @@ const mapOpportunityToDbProject = (opp: Opportunity): any => {
         tadsdorreal: !!opp.tads?.painPoint,
         tadsrecorrencia: !!opp.tads?.recurring,
         tadsvelocidade: !!opp.tads?.mvpSpeed,
-        organizacao: Number(opp.organizationId), 
+        organizacao: Number(opp.organizationId) || 0, // Evita NaN que viola a restrição NOT NULL
         projoport: opp.status !== 'Active',
         bpmn_structure: updatedBpmn,
         contexto_ia: opp.docsContext || '',
-        pdf_url: opp.pdfUrl || null,
+        // pdf_url: opp.pdfUrl || null, // REMOVIDO: Esta coluna não existe no schema físico da tabela 'projetos'
         cor: opp.color || '#F59E0B',
         mrr: Number(opp.mrr) || 0,
         meses: Number(opp.meses) || 12

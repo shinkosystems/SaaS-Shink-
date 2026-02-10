@@ -1,156 +1,60 @@
 
 import React from 'react';
-import { 
-    LayoutDashboard, List, Calendar, User, Settings, 
-    PlusCircle, LogOut, Sun, Moon, Briefcase, 
-    TrendingUp, DollarSign, Users, Shield, Layers, Box, Menu, X, Sparkles, Lightbulb, FileText
-} from 'lucide-react';
+import { LayoutDashboard, List, Settings, PlusCircle, DollarSign, Users, Layers, Menu, X, Lock, Briefcase, Sparkles, BrainCircuit, Plus } from 'lucide-react';
 
 interface Props {
   currentView: string;
   onChangeView: (view: string) => void;
-  onOpenCreate: () => void;
-  onOpenCreateTask: () => void;
-  onToggleTheme: () => void;
   onLogout: () => void;
-  onSearch: (q: string) => void;
-  onOpenFeedback: () => void; 
-  theme: 'dark' | 'light';
-  dbStatus: 'connected' | 'disconnected' | 'error';
+  onOpenCreateTask: () => void;
   isMobileOpen: boolean;
   setIsMobileOpen: (open: boolean) => void;
-  userRole: string;
   userData: { name: string, avatar: string | null, email?: string };
-  currentPlan?: string;
-  customLogoUrl?: string | null;
-  orgName?: string;
-  activeModules?: string[];
 }
 
-const getMenuGroups = (userRole: string, isAdmin: boolean, activeModules: string[] = [], userEmail?: string) => {
-    const isMaster = userEmail === 'peboorba@gmail.com';
-    
-    const groups = [
-        {
-            title: 'Gestão',
-            items: [
-                { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-                { id: 'value-chain', label: 'Cadeia de Valor', icon: Layers }
-            ]
-        },
-        {
-            title: 'Execução',
-            items: [
-                { id: 'list', label: 'Projetos', icon: List },
-                { id: 'kanban', label: 'Tarefas', icon: Briefcase },
-                { id: 'calendar', label: 'Cronograma', icon: Calendar },
-            ]
-        },
-        {
-            title: 'Negócios',
-            items: [
-                { id: 'crm', label: 'CRM / Vendas', icon: TrendingUp },
-                { id: 'financial', label: 'Financeiro', icon: DollarSign },
-                { id: 'clients', label: 'Stakeholders', icon: Users },
-            ]
-        },
-        {
-            title: 'Recursos',
-            items: [
-                { id: 'assets', label: 'Arquivos & Assets', icon: FileText },
-                { id: 'intelligence', label: 'Inteligência', icon: Sparkles },
-            ]
-        }
-    ];
-
-    const systemItems = [
-        { id: 'profile', label: 'Meu Perfil', icon: User },
-        { id: 'settings', label: 'Configurações', icon: Settings }
-    ];
-    
-    if (isMaster) {
-        systemItems.push({ id: 'admin-manager', label: 'Super Admin', icon: Shield });
-    }
-    
-    groups.push({ title: 'Sistema', items: systemItems });
-
-    return groups;
-};
+const MENU_ITEMS = [
+    { id: 'dashboard', label: 'Início', icon: LayoutDashboard, disabled: false },
+    { id: 'list', label: 'Ativos', icon: Briefcase, disabled: false },
+    { id: 'guru', label: 'Guru AI', icon: BrainCircuit, disabled: false },
+    { id: 'kanban', label: 'Trabalho', icon: Layers, disabled: false },
+    { id: 'financial', label: 'Dinheiro', icon: DollarSign, disabled: false },
+    { id: 'clients', label: 'Stakeholders', icon: Users, disabled: false },
+    { id: 'settings', label: 'Ajustes', icon: Settings, disabled: false },
+];
 
 export const Sidebar: React.FC<Props> = (props) => {
-    const menuGroups = getMenuGroups(props.userRole, props.userRole === 'dono', props.activeModules, props.userData.email);
-
     return (
-        <div className="hidden lg:flex flex-col w-64 h-full border-r border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 shrink-0">
-            {/* Header com Logo e Sugestão */}
-            <div className="h-20 flex items-center justify-between px-6 border-b border-slate-200 dark:border-white/5 bg-white/50 dark:bg-transparent backdrop-blur-sm relative z-20">
-                {props.customLogoUrl ? (
-                    <img src={props.customLogoUrl} alt="Logo" className="h-8 object-contain max-w-[140px]" />
-                ) : (
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-amber-500/20">
-                            <Sparkles className="w-4 h-4"/>
-                        </div>
-                        <span className="font-black text-lg tracking-tighter text-slate-900 dark:text-white">Shinkō</span>
-                    </div>
-                )}
-                
-                <button 
-                    onClick={props.onOpenFeedback}
-                    className="p-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black shadow-glow-amber transition-all animate-pulse"
-                    title="Sugerir Melhoria"
-                >
-                    <Lightbulb className="w-4 h-4 stroke-[2.5px]"/>
-                </button>
-            </div>
-            
-            {/* Botões de Ação Rápida */}
-            <div className="p-4 space-y-2 border-b border-slate-100 dark:border-white/5">
-                <button 
-                    onClick={props.onOpenCreate}
-                    className="w-full h-11 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg hover:scale-[1.02] active:scale-98 transition-all"
-                >
-                    <PlusCircle className="w-4 h-4" /> Novo Projeto
-                </button>
-                <button 
-                    onClick={props.onOpenCreateTask}
-                    className="w-full h-10 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/10 rounded-xl font-black text-[9px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all"
-                >
-                    <Briefcase className="w-3.5 h-3.5" /> Tarefa Rápida
-                </button>
+        <div className="hidden lg:flex flex-col w-64 h-screen border-r border-slate-100 dark:border-white/5 bg-white dark:bg-[#020203] shrink-0 p-6">
+            <div className="mb-12 flex items-center gap-3 group cursor-pointer" onClick={() => props.onChangeView('dashboard')}>
+                <div className="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center text-black font-bold">S</div>
+                <span className="font-bold text-lg tracking-tighter dark:text-white uppercase">Shinkō</span>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-8 custom-scrollbar">
-                {menuGroups.map((group, idx) => (
-                    <div key={idx}>
-                        <h3 className="px-4 mb-4 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 opacity-70">{group.title}</h3>
-                        <div className="space-y-1">
-                            {group.items.map(item => (
-                                <button
-                                    key={item.id}
-                                    onClick={() => props.onChangeView(item.id)}
-                                    className={`w-full h-11 flex items-center gap-3 px-4 rounded-xl text-sm font-bold transition-all ${props.currentView === item.id ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-slate-500 hover:bg-white dark:hover:bg-white/5'}`}
-                                >
-                                    <item.icon className="w-4 h-4" />
-                                    <span>{item.label}</span>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
+            <div className="flex-1 space-y-1 overflow-y-auto no-scrollbar">
+                <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-slate-400 ml-4 mb-4 opacity-70">Operação</p>
+                {MENU_ITEMS.map(item => (
+                    <button
+                        key={item.id}
+                        disabled={item.disabled}
+                        onClick={() => !item.disabled && props.onChangeView(item.id)}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${item.disabled ? 'opacity-30 cursor-not-allowed' : props.currentView === item.id ? 'bg-slate-900 dark:bg-white text-white dark:text-black font-bold' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'} ${item.id === 'guru' && props.currentView !== 'guru' ? 'text-purple-500' : ''}`}
+                    >
+                        <item.icon className="w-4 h-4" />
+                        <span className="text-xs font-bold">{item.label}</span>
+                    </button>
                 ))}
             </div>
 
-            <div className="p-4 border-t border-slate-200 dark:border-white/5 bg-white/50 dark:bg-black/20">
-                <div className="flex items-center justify-between mb-4 px-2">
-                    <button onClick={props.onToggleTheme} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500">
-                        {props.theme === 'dark' ? <Sun className="w-4 h-4 text-amber-500"/> : <Moon className="w-4 h-4"/>}
-                    </button>
-                    <span className="text-[9px] font-black px-2 py-1 bg-slate-100 dark:bg-white/10 rounded-full text-slate-400 uppercase tracking-widest">v2.6 OS</span>
+            <div className="mt-auto pt-6 border-t border-slate-100 dark:border-white/5">
+                <div className="flex items-center gap-3 px-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-white/5 p-2 rounded-xl transition-all" onClick={() => props.onChangeView('profile')}>
+                    <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center border border-slate-200 dark:border-white/10 overflow-hidden shadow-sm">
+                        {props.userData.avatar ? <img src={props.userData.avatar} className="w-full h-full object-cover" /> : <span className="font-bold text-[10px] text-slate-400">{props.userData.name.charAt(0)}</span>}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-[11px] font-bold text-slate-900 dark:text-white truncate">{props.userData.name}</p>
+                        <button onClick={(e) => { e.stopPropagation(); props.onLogout(); }} className="text-[9px] font-bold text-red-500 uppercase tracking-widest">Sair</button>
+                    </div>
                 </div>
-                <button onClick={props.onLogout} className="w-full h-11 flex items-center gap-3 px-4 rounded-xl text-sm font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all">
-                    <LogOut className="w-4 h-4" />
-                    <span>Sair</span>
-                </button>
             </div>
         </div>
     );
@@ -158,55 +62,73 @@ export const Sidebar: React.FC<Props> = (props) => {
 
 export const MobileDrawer: React.FC<Props> = (props) => {
     if (!props.isMobileOpen) return (
-        <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white/80 dark:bg-black/80 backdrop-blur-xl border-b border-slate-200 dark:border-white/5 z-40 flex items-center justify-between px-6">
-            <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-amber-500 flex items-center justify-center text-black font-black text-xs">S</div>
-                <span className="font-black text-lg tracking-tighter text-slate-900 dark:text-white">Shinkō OS</span>
-            </div>
-            <button onClick={() => props.setIsMobileOpen(true)} className="p-2 text-slate-500">
-                <Menu className="w-6 h-6" />
+        <div className="lg:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[94%] max-w-md h-16 bg-white/90 dark:bg-[#0a0a0c]/90 backdrop-blur-xl border border-slate-200 dark:border-white/10 z-[1000] flex items-center justify-around px-2 rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.12)]">
+            <button 
+                onClick={() => props.onChangeView('dashboard')} 
+                className={`flex flex-col items-center gap-1 transition-all p-2 rounded-2xl ${props.currentView === 'dashboard' ? 'text-amber-500' : 'text-slate-400'}`}
+            >
+                <LayoutDashboard className="w-5 h-5"/>
+                <span className="text-[8px] font-bold uppercase tracking-tight">Início</span>
+            </button>
+            <button 
+                onClick={() => props.onChangeView('list')} 
+                className={`flex flex-col items-center gap-1 transition-all p-2 rounded-2xl ${props.currentView === 'list' ? 'text-amber-500' : 'text-slate-400'}`}
+            >
+                <Briefcase className="w-5 h-5"/>
+                <span className="text-[8px] font-bold uppercase tracking-tight">Ativos</span>
+            </button>
+            
+            {/* Botão Central de Nova Tarefa */}
+            <button 
+                onClick={props.onOpenCreateTask} 
+                className="flex items-center justify-center w-12 h-12 bg-amber-500 text-black rounded-2xl shadow-lg shadow-amber-500/30 active:scale-90 transition-all -translate-y-4"
+                aria-label="Nova Tarefa"
+            >
+                <Plus className="w-7 h-7 stroke-[3px]"/>
+            </button>
+
+            <button 
+                onClick={() => props.onChangeView('guru')} 
+                className={`flex flex-col items-center gap-1 transition-all p-2 rounded-2xl ${props.currentView === 'guru' ? 'text-purple-500' : 'text-slate-400'}`}
+            >
+                <BrainCircuit className="w-5 h-5"/>
+                <span className="text-[8px] font-bold uppercase tracking-tight">Guru</span>
+            </button>
+            <button 
+                onClick={() => props.setIsMobileOpen(true)} 
+                className="flex flex-col items-center gap-1 text-slate-400 p-2 rounded-2xl"
+            >
+                <Menu className="w-5 h-5"/>
+                <span className="text-[8px] font-bold uppercase tracking-tight">Menu</span>
             </button>
         </div>
     );
 
-    const menuGroups = getMenuGroups(props.userRole, props.userRole === 'dono', props.activeModules, props.userData.email);
-
     return (
-        <div className="lg:hidden fixed inset-0 z-50 bg-white dark:bg-black overflow-y-auto animate-in fade-in slide-in-from-right duration-300">
-            <div className="h-16 flex items-center justify-between px-6 border-b border-slate-200 dark:border-white/5">
-                <span className="font-black text-lg tracking-tighter text-slate-900 dark:text-white">Menu Principal</span>
-                <button onClick={() => props.setIsMobileOpen(false)} className="p-2 text-slate-500">
-                    <X className="w-6 h-6" />
-                </button>
-            </div>
-            
-            <div className="p-6 space-y-10">
-                <div className="grid grid-cols-2 gap-3">
-                     <button onClick={() => {props.onOpenCreate(); props.setIsMobileOpen(false);}} className="p-4 bg-slate-900 text-white rounded-2xl font-black text-[9px] uppercase tracking-widest flex flex-col items-center gap-2 shadow-lg">
-                        <PlusCircle className="w-5 h-5" /> Novo Projeto
-                    </button>
-                    <button onClick={() => {props.onOpenCreateTask(); props.setIsMobileOpen(false);}} className="p-4 bg-amber-500 text-black rounded-2xl font-black text-[9px] uppercase tracking-widest flex flex-col items-center gap-2 shadow-lg">
-                        <Briefcase className="w-5 h-5" /> Tarefa Rápida
+        <div className="lg:hidden fixed inset-0 z-[2000] bg-white/95 dark:bg-[#020203]/95 backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex flex-col h-full p-8">
+                <div className="flex justify-between items-center mb-12">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center text-black font-bold">S</div>
+                        <span className="text-xl font-bold tracking-tighter text-slate-900 dark:text-white uppercase">Menu Shinkō</span>
+                    </div>
+                    <button onClick={() => props.setIsMobileOpen(false)} className="p-3 bg-slate-50 dark:bg-white/5 rounded-full">
+                        <X className="w-6 h-6 text-slate-900 dark:text-white"/>
                     </button>
                 </div>
-
-                {menuGroups.map((group, idx) => (
-                    <div key={idx}>
-                        <h3 className="mb-6 text-[10px] font-black uppercase tracking-widest text-slate-400">{group.title}</h3>
-                        <div className="grid grid-cols-2 gap-4">
-                            {group.items.map(item => (
-                                <button
-                                    key={item.id}
-                                    onClick={() => props.onChangeView(item.id)}
-                                    className={`flex flex-col items-center justify-center p-6 rounded-2xl border transition-all ${props.currentView === item.id ? 'bg-amber-500 border-amber-400 text-black shadow-xl shadow-amber-500/20' : 'bg-slate-50 dark:bg-white/5 border-slate-100 dark:border-white/10 text-slate-500'}`}
-                                >
-                                    <item.icon className="w-6 h-6 mb-3" />
-                                    <span className="text-[10px] font-black uppercase text-center">{item.label}</span>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                ))}
+                <div className="space-y-2 overflow-y-auto no-scrollbar pb-10">
+                    {MENU_ITEMS.map(item => (
+                        <button 
+                            key={item.id} disabled={item.disabled}
+                            onClick={() => { if(!item.disabled) { props.onChangeView(item.id); props.setIsMobileOpen(false); } }}
+                            className={`w-full flex items-center gap-4 p-5 rounded-2xl transition-all ${item.disabled ? 'opacity-20 cursor-not-allowed' : props.currentView === item.id ? 'bg-slate-900 dark:bg-white text-white dark:text-black font-bold' : 'bg-slate-50 dark:bg-white/5 text-slate-500'}`}
+                        >
+                            <item.icon className="w-5 h-5"/>
+                            <span className="text-sm font-bold uppercase tracking-widest">{item.label}</span>
+                        </button>
+                    ))}
+                </div>
+                <button onClick={props.onLogout} className="mt-auto w-full py-5 bg-red-50 dark:bg-red-500/10 text-red-600 font-bold uppercase tracking-widest text-xs rounded-xl shrink-0">Sair da Sessão</button>
             </div>
         </div>
     );

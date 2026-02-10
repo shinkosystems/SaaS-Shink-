@@ -2,17 +2,16 @@
 import React, { useState } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { findOrgIdByOwnerEmail, createOrganization } from '../services/organizationService';
-import { Loader2, X, Sparkles, ArrowRight, Building2, Users, Eye, EyeOff, AlertTriangle } from 'lucide-react';
+import { Loader2, X, ArrowRight, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 
 interface Props {
   onGuestLogin: (persona?: any) => void;
   onClose: () => void;
   customOrgName?: string;
   customLogoUrl?: string | null;
-  customColor?: string;
 }
 
-const LOGO_URL = "https://zjssfnbcboibqeoubeou.supabase.co/storage/v1/object/public/fotoperfil/fotoperfil/1%20(1).png";
+const LOGO_URL = "https://zjssfnbcboibqeoubeou.supabase.co/storage/v1/object/public/fotoperfil/fotoperfil/3.png";
 
 const AuthScreen: React.FC<Props> = ({ onClose, customLogoUrl, customOrgName }) => {
   const [email, setEmail] = useState('');
@@ -22,10 +21,6 @@ const AuthScreen: React.FC<Props> = ({ onClose, customLogoUrl, customOrgName }) 
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  
-  const [orgFlow, setOrgFlow] = useState<'new' | 'join'>('new');
-  const [newOrgName, setNewOrgName] = useState('');
-  const [ownerEmail, setOwnerEmail] = useState('');
 
   const displayLogo = customLogoUrl || LOGO_URL;
   const brandName = customOrgName || "Shinkō OS";
@@ -40,49 +35,12 @@ const AuthScreen: React.FC<Props> = ({ onClose, customLogoUrl, customOrgName }) 
         if (error) throw error;
       } else {
         if (!name.trim()) throw new Error("Informe seu nome.");
-        
-        let targetOrgId: number | null = null;
-
-        if (orgFlow === 'join') {
-          if (!ownerEmail.trim()) throw new Error("Informe o e-mail do dono da organização.");
-          targetOrgId = await findOrgIdByOwnerEmail(ownerEmail);
-          if (!targetOrgId) throw new Error("Não encontramos uma organização para este e-mail de dono.");
-        } else {
-          if (!newOrgName.trim()) throw new Error("Informe o nome da sua nova organização.");
-        }
-
         const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ 
-            email, 
-            password,
-            options: {
-                data: {
-                    full_name: name,
-                    perfil: orgFlow === 'new' ? 'dono' : 'colaborador'
-                }
-            }
+            email, password, options: { data: { full_name: name, perfil: 'dono' } }
         });
-
         if (signUpError) throw signUpError;
-
         if (signUpData.user) {
-            if (orgFlow === 'new') {
-                try {
-                    await createOrganization(signUpData.user.id, newOrgName, 'Tecnologia', '', email, name);
-                } catch (orgErr: any) {
-                    // Se a criação da org falhar, tentamos informar o usuário
-                    throw new Error(`Conta criada, mas houve um erro ao configurar sua empresa: ${orgErr.message}. Tente fazer login.`);
-                }
-            } else {
-                const { error: updateError } = await supabase
-                    .from('users')
-                    .update({ 
-                        organizacao: targetOrgId, 
-                        perfil: 'colaborador',
-                        ativo: true 
-                    })
-                    .eq('id', signUpData.user.id);
-                if (updateError) console.error("Erro ao vincular organização:", updateError);
-            }
+            await createOrganization(signUpData.user.id, "Minha Empresa", 'Tecnologia', '', email, name);
         }
       }
       onClose();
@@ -94,138 +52,65 @@ const AuthScreen: React.FC<Props> = ({ onClose, customLogoUrl, customOrgName }) 
   };
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/95 backdrop-blur-2xl animate-in fade-in">
-      <div className="w-full max-w-md bg-[#0A0A0C] rounded-[3rem] shadow-glass border border-white/10 overflow-hidden relative animate-ios-pop max-h-[90vh] overflow-y-auto custom-scrollbar">
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-white/95 backdrop-blur-sm animate-in fade-in">
+      <div className="w-full max-w-sm bg-white border border-slate-200 overflow-hidden relative rounded-2xl shadow-sm">
         
-        <button onClick={onClose} className="absolute top-8 right-8 text-slate-600 hover:text-white transition-colors z-20">
-            <X className="w-6 h-6"/>
+        <button onClick={onClose} className="absolute top-5 right-5 text-slate-400 hover:text-slate-900 transition-colors z-20">
+            <X className="w-5 h-5"/>
         </button>
 
-        <div className="p-12 pb-8 flex flex-col items-center text-center">
-            <div className="mb-8 relative">
-                <div className="absolute inset-0 bg-amber-500/20 blur-2xl rounded-full scale-150"></div>
-                <img src={displayLogo} alt={brandName} className="h-20 w-auto object-contain relative z-10 animate-in zoom-in duration-700" />
-            </div>
-            <h2 className="text-4xl font-black text-white tracking-tighter leading-none">
-                {mode === 'login' ? 'Bem-vindo ao' : 'Crie sua conta no'} <br/><span className="text-amber-500">{brandName}</span>.
+        <div className="p-8 pt-12 text-center">
+            <img src={displayLogo} alt={brandName} className="h-12 w-auto mx-auto mb-6" />
+            <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+                {mode === 'login' ? 'Entrar no Shinkō' : 'Criar nova conta'}
             </h2>
-            <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px] mt-4">Sistema de Inovação Industrial</p>
+            <p className="text-slate-400 font-bold uppercase tracking-widest text-[9px] mt-2">Gerenciamento Operacional</p>
         </div>
 
         {errorMessage && (
-            <div className="mx-12 mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-start gap-3 animate-in shake duration-500">
-                <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5"/>
-                <p className="text-[11px] text-red-200 font-medium leading-relaxed">{errorMessage}</p>
+            <div className="mx-8 mb-4 p-4 bg-red-50 border border-red-100 rounded-lg flex items-start gap-2 text-[10px] text-red-600 font-bold leading-tight">
+                <AlertTriangle className="w-4 h-4 shrink-0"/> {errorMessage}
             </div>
         )}
 
-        <form onSubmit={handleAuth} className="px-12 pb-12 space-y-5">
+        <form onSubmit={handleAuth} className="px-8 pb-8 space-y-4">
             {mode === 'register' && (
-                <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest ml-1">Seu Nome Completo</label>
-                    <input 
-                        type="text" 
-                        value={name}
-                        onChange={e => setName(e.target.value)}
-                        className="w-full p-4 rounded-2xl bg-white/5 border border-white/10 text-white outline-none focus:border-amber-500/50 transition-all"
-                        required
-                        placeholder="Ex: João Silva"
-                    />
-                </div>
-            )}
-
-            <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest ml-1">E-mail Corporativo</label>
                 <input 
-                    type="email" 
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    className="w-full p-4 rounded-2xl bg-white/5 border border-white/10 text-white outline-none focus:border-amber-500/50 transition-all"
-                    required
-                    placeholder="seu@email.com"
+                    type="text" value={name} onChange={e => setName(e.target.value)} required
+                    className="w-full p-4 rounded-lg bg-slate-50 border border-slate-200 text-sm font-bold outline-none focus:border-amber-500 transition-all"
+                    placeholder="Seu nome"
                 />
-            </div>
-            <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest ml-1">Senha de Acesso</label>
-                <div className="relative group">
-                    <input 
-                        type={showPassword ? 'text' : 'password'} 
-                        value={password}
-                        onChange={e => setPassword(e.target.value)}
-                        className="w-full p-4 pr-12 rounded-2xl bg-white/5 border border-white/10 text-white outline-none focus:border-amber-500/50 transition-all"
-                        required
-                        placeholder="••••••••"
-                    />
-                    <button 
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
-                    >
-                        {showPassword ? <EyeOff className="w-5 h-5"/> : <Eye className="w-5 h-5"/>}
-                    </button>
-                </div>
-            </div>
-
-            {mode === 'register' && (
-                <div className="pt-4 space-y-4">
-                    <div className="flex p-1 bg-white/5 rounded-2xl border border-white/10">
-                        <button 
-                            type="button"
-                            onClick={() => setOrgFlow('new')}
-                            className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${orgFlow === 'new' ? 'bg-amber-500 text-black shadow-lg' : 'text-slate-500'}`}
-                        >
-                            <Building2 className="w-3 h-3"/> Nova Empresa
-                        </button>
-                        <button 
-                            type="button"
-                            onClick={() => setOrgFlow('join')}
-                            className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${orgFlow === 'join' ? 'bg-amber-500 text-black shadow-lg' : 'text-slate-500'}`}
-                        >
-                            <Users className="w-3 h-3"/> Entrar em Time
-                        </button>
-                    </div>
-
-                    {orgFlow === 'new' ? (
-                        <div className="space-y-1 animate-in slide-in-from-top-2">
-                            <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest ml-1">Nome da Organização</label>
-                            <input 
-                                type="text" 
-                                value={newOrgName}
-                                onChange={e => setNewOrgName(e.target.value)}
-                                className="w-full p-4 rounded-2xl bg-white/5 border border-white/10 text-white outline-none focus:border-amber-500/50 transition-all"
-                                placeholder="Ex: Minha Startup Ltda"
-                            />
-                        </div>
-                    ) : (
-                        <div className="space-y-1 animate-in slide-in-from-top-2">
-                            <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest ml-1">E-mail do Proprietário</label>
-                            <input 
-                                type="email" 
-                                value={ownerEmail}
-                                onChange={e => setOwnerEmail(e.target.value)}
-                                className="w-full p-4 rounded-2xl bg-white/5 border border-white/10 text-white outline-none focus:border-amber-500/50 transition-all"
-                                placeholder="E-mail de quem te convidou"
-                            />
-                        </div>
-                    )}
-                </div>
             )}
+            <input 
+                type="email" value={email} onChange={e => setEmail(e.target.value)} required
+                className="w-full p-4 rounded-lg bg-slate-50 border border-slate-200 text-sm font-bold outline-none focus:border-amber-500 transition-all"
+                placeholder="Seu e-mail"
+            />
+            <div className="relative">
+                <input 
+                    type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} required
+                    className="w-full p-4 rounded-lg bg-slate-50 border border-slate-200 text-sm font-bold outline-none focus:border-amber-500 transition-all"
+                    placeholder="Sua senha"
+                />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400">
+                    {showPassword ? <EyeOff className="w-4 h-4"/> : <Eye className="w-4 h-4"/>}
+                </button>
+            </div>
 
             <button 
-                type="submit" 
-                disabled={loading}
-                className="w-full py-5 bg-white text-black rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 mt-4 hover:bg-amber-500 transition-all shadow-xl"
+                type="submit" disabled={loading}
+                className="w-full py-4 bg-slate-900 text-white rounded-lg font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-amber-500 transition-all active:scale-95 disabled:opacity-50"
             >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin"/> : mode === 'login' ? 'Entrar no Sistema' : 'Finalizar Cadastro'}
+                {loading ? <Loader2 className="w-4 h-4 animate-spin"/> : mode === 'login' ? 'Entrar' : 'Registrar'}
                 <ArrowRight className="w-4 h-4"/>
             </button>
 
             <button 
                 type="button"
                 onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
-                className="w-full text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-white transition-colors mt-6"
+                className="w-full text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-900 transition-colors mt-6"
             >
-                {mode === 'login' ? 'Não tem uma conta? Registre-se' : 'Já possui conta? Faça Login'}
+                {mode === 'login' ? 'Não tem conta? Registre-se' : 'Já tem conta? Entre'}
             </button>
         </form>
       </div>
@@ -233,4 +118,5 @@ const AuthScreen: React.FC<Props> = ({ onClose, customLogoUrl, customOrgName }) 
   );
 };
 
+// Added default export to resolve "Module has no default export" error in App.tsx
 export default AuthScreen;

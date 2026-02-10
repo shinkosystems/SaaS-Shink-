@@ -34,7 +34,6 @@ interface Props {
 const getMenuGroups = (userRole: string, isAdmin: boolean, currentPlan: string = 'plan_free', userEmail?: string, activeModules: string[] = []) => {
     const isMaster = userEmail === 'peboorba@gmail.com';
 
-    // Layout Unificado Shinkō: Todos os usuários veem tudo
     const groups = [
         {
             title: 'Gestão',
@@ -46,8 +45,8 @@ const getMenuGroups = (userRole: string, isAdmin: boolean, currentPlan: string =
         {
             title: 'Execução',
             items: [
-                { id: 'list', label: 'Projetos', icon: List },
-                { id: 'kanban', label: 'Tarefas', icon: Briefcase },
+                { id: 'list', label: 'Ativos', icon: Briefcase },
+                { id: 'kanban', label: 'Tarefas', icon: List },
                 { id: 'calendar', label: 'Cronograma', icon: Calendar },
             ]
         },
@@ -110,7 +109,7 @@ export const Sidebar: React.FC<Props> = (props) => {
                 <img src={props.customLogoUrl} alt="Logo" className="h-8 object-contain max-w-[140px]" />
             ) : (
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-shinko-primary to-orange-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-amber-500/20">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#F59E0B] to-orange-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-amber-500/20">
                         {props.orgName ? props.orgName.charAt(0).toUpperCase() : 'S'}
                     </div>
                     <span className="font-bold text-lg tracking-tight text-slate-900 dark:text-white truncate max-w-[100px]">
@@ -131,17 +130,14 @@ export const Sidebar: React.FC<Props> = (props) => {
 
         <div className="p-4 pb-2 space-y-2">
             <button onClick={props.onOpenCreate} className="w-full h-11 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-lg hover:scale-[1.02] active:scale-98 transition-all">
-                <PlusCircle className="w-4 h-4" /> Novo Projeto
-            </button>
-            <button onClick={props.onOpenCreateTask} className="w-full h-10 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/10 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all">
-                <PlusCircle className="w-3 h-3" /> Tarefa Rápida
+                <PlusCircle className="w-4 h-4" /> Novo Ativo
             </button>
         </div>
 
         <div className="px-4 py-2 mb-2">
             <div className="relative group">
-                <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400 group-focus-within:text-shinko-primary transition-colors" />
-                <input type="text" placeholder="Buscar..." onChange={(e) => props.onSearch(e.target.value)} className="w-full h-9 pl-9 pr-4 rounded-xl bg-white dark:bg-white/5 border border-slate-200 dark:border-transparent text-xs font-medium text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-shinko-primary/50 outline-none transition-all shadow-sm"/>
+                <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400 group-focus-within:text-amber-500 transition-colors" />
+                <input type="text" placeholder="Buscar..." onChange={(e) => props.onSearch(e.target.value)} className="w-full h-9 pl-9 pr-4 rounded-xl bg-white dark:bg-white/5 border border-slate-200 dark:border-transparent text-xs font-medium text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-amber-500/50 outline-none transition-all shadow-sm"/>
             </div>
         </div>
 
@@ -154,9 +150,9 @@ export const Sidebar: React.FC<Props> = (props) => {
                             <button
                                 key={item.id}
                                 onClick={() => props.onChangeView(item.id)}
-                                className={`w-full h-10 flex items-center gap-3 px-3 rounded-xl text-sm font-medium transition-all group relative ${props.currentView === item.id ? 'bg-white dark:bg-white/10 text-shinko-primary shadow-sm ring-1 ring-slate-200 dark:ring-white/10 font-bold' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'}`}
+                                className={`w-full h-10 flex items-center gap-3 px-3 rounded-xl text-sm font-medium transition-all group relative ${props.currentView === item.id ? 'bg-white dark:bg-white/10 text-amber-500 shadow-sm ring-1 ring-slate-200 dark:ring-white/10 font-bold' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'}`}
                             >
-                                <item.icon className={`w-4 h-4 transition-colors ${props.currentView === item.id ? 'text-shinko-primary' : 'text-slate-400 group-hover:text-slate-600'}`} />
+                                <item.icon className={`w-4 h-4 transition-colors ${props.currentView === item.id ? 'text-amber-500' : 'text-slate-400 group-hover:text-slate-600'}`} />
                                 <span className="flex-1 text-left">{item.label}</span>
                             </button>
                         ))}
@@ -170,7 +166,7 @@ export const Sidebar: React.FC<Props> = (props) => {
                 <button onClick={props.onToggleTheme} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500">
                     {props.theme === 'dark' ? <Sun className="w-4 h-4"/> : <Moon className="w-4 h-4"/>}
                 </button>
-                <span className="text-[9px] font-bold px-2 py-1 bg-slate-100 dark:bg-white/10 rounded-full text-slate-500 uppercase">v2.5</span>
+                <span className="text-[9px] font-bold px-2 py-1 bg-slate-100 dark:bg-white/10 rounded-full text-slate-500 uppercase">v2.6</span>
             </div>
 
             <div className="flex items-center gap-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-white/5 p-2 rounded-xl group" onClick={() => props.onChangeView('profile')}>
@@ -178,7 +174,7 @@ export const Sidebar: React.FC<Props> = (props) => {
                     {props.userData?.avatar ? <img src={props.userData.avatar} className="w-full h-full object-cover" /> : <span>{props.userData?.name?.charAt(0).toUpperCase()}</span>}
                 </div>
                 <div className="flex flex-col min-w-0 flex-1">
-                    <span className="text-xs font-bold text-slate-900 dark:text-white truncate group-hover:text-shinko-primary">{props.userData?.name || 'Usuário'}</span>
+                    <span className="text-xs font-bold text-slate-900 dark:text-white truncate group-hover:text-amber-500">{props.userData?.name || 'Usuário'}</span>
                 </div>
                 <button onClick={(e) => { e.stopPropagation(); props.onLogout(); }} className="text-slate-400 hover:text-red-500 p-1.5"><LogOut className="w-4 h-4"/></button>
             </div>

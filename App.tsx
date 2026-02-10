@@ -28,6 +28,7 @@ import { EcosystemPage } from './pages/EcosystemPage';
 import { ValueChainDashboard } from './pages/ValueChainDashboard';
 import { AssetsPage } from './pages/AssetsPage';
 import { TicketPortalPage } from './pages/TicketPortalPage';
+import { GuruPage } from './pages/GuruPage';
 
 // Utility Components
 import AuthScreen from './components/AuthScreen';
@@ -35,7 +36,6 @@ import OpportunityWizard from './components/OpportunityWizard';
 import { QuickTaskModal } from './components/QuickTaskModal';
 import { ProjectWorkspace } from './components/ProjectWorkspace';
 import { NpsSurvey } from './components/NpsSurvey';
-import { GuruFab } from './components/GuruFab';
 import { FeedbackModal } from './components/FeedbackModal';
 import { LandingPage } from './components/LandingPage';
 import { InsightCenter } from './components/InsightCenter';
@@ -58,7 +58,8 @@ const ROUTES: Record<string, string> = {
     'assets': '/assets',
     'settings': '/settings',
     'profile': '/profile',
-    'admin-manager': '/admin'
+    'admin-manager': '/admin',
+    'guru': '/guru'
 };
 
 const REVERSE_ROUTES: Record<string, string> = Object.entries(ROUTES).reduce((acc, [key, value]) => {
@@ -263,6 +264,7 @@ const App: React.FC = () => {
       currentView: view, onChangeView: setView,
       onOpenCreate: () => setView('create-project'), 
       onOpenCreateTask: () => setShowCreateTask(true),
+      onOpenGuru: () => setView('guru'),
       onToggleTheme: toggleTheme, onLogout: () => supabase.auth.signOut(),
       onSearch: () => {}, onOpenFeedback: () => setShowFeedback(true),
       theme: theme, dbStatus: 'connected' as const, isMobileOpen, setIsMobileOpen, userRole,
@@ -283,10 +285,9 @@ const App: React.FC = () => {
                         initialData={editingOpportunity} 
                         orgType={orgDetails.name}
                         customLogoUrl={orgDetails.logoUrl}
-                        organizationId={userOrgId || undefined}
                         onSave={async (opp) => {
                             try {
-                                const updated = await updateOpportunity({ ...opp, organizationId: userOrgId || opp.organizationId });
+                                const updated = await updateOpportunity(opp);
                                 if (updated) {
                                     await loadUserData(user.id);
                                     onOpenProject(updated);
@@ -313,24 +314,18 @@ const App: React.FC = () => {
                     <OpportunityWizard 
                         orgType={orgDetails.name}
                         customLogoUrl={orgDetails.logoUrl}
-                        organizationId={userOrgId || undefined}
                         onSave={async (opp) => {
                             try {
-                                const finalOrgId = userOrgId || opp.organizationId;
-                                if (!finalOrgId) throw new Error("ID da organização não identificado.");
-
                                 const newOpp = await createOpportunity({ 
                                     ...opp, 
-                                    organizationId: Number(finalOrgId) 
+                                    organizationId: userOrgId || opp.organizationId 
                                 });
-
                                 if (newOpp) {
                                     await loadUserData(user.id);
                                     onOpenProject(newOpp);
                                 }
                             } catch (err: any) {
-                                console.error("Create Project Error:", err);
-                                alert(`Falha ao salvar: ${err.message || "Erro desconhecido no banco de dados."}`);
+                                alert(`Falha de Sincronização: ${err.message || "O Framework Shinkō exige uma Organização Ativa."}`);
                             }
                         }}
                         onCancel={() => setView('dashboard')}
@@ -340,9 +335,9 @@ const App: React.FC = () => {
                         {view === 'dashboard' && <DashboardPage 
                             opportunities={opportunities} onOpenProject={onOpenProject} 
                             onNavigate={setView} user={user} theme={theme} 
-                            onGuruPrompt={(p) => setGuruInitialPrompt(p)}
-                            organizationId={userOrgId || undefined}
+                            onGuruPrompt={(p) => { setGuruInitialPrompt(p); setView('guru'); }}
                         />}
+                        {view === 'guru' && <GuruPage opportunities={opportunities} user={user} organizationId={userOrgId || undefined} onAction={(aid) => aid === 'create_task' ? setShowCreateTask(true) : setView(aid.replace('nav_', ''))} externalPrompt={guruInitialPrompt} onExternalPromptConsumed={() => setGuruInitialPrompt(null)} />}
                         {view === 'framework-system' && <FrameworkPage orgName={orgDetails.name} onBack={() => setView('dashboard')} onSaveToProject={async (opp) => {
                             try {
                                 const newOpp = await createOpportunity({ ...opp, organizationId: userOrgId || undefined });
@@ -375,7 +370,6 @@ const App: React.FC = () => {
 
         {showCreateTask && <QuickTaskModal opportunities={opportunities} onClose={() => setShowCreateTask(false)} onSave={async (task, pid) => {
             if (!userOrgId || !user) return;
-            
             const dbPayload = {
                 titulo: task.text,
                 descricao: task.description,
@@ -390,20 +384,11 @@ const App: React.FC = () => {
                 datafim: task.dueDate,
                 duracaohoras: task.estimatedHours
             };
-
             await createTask(dbPayload);
             loadUserData(user.id);
             setShowCreateTask(false);
         }} userRole={userRole} />}
         {showFeedback && user && <FeedbackModal userId={user.id} onClose={() => setShowFeedback(false)} />}
-        {user && userRole !== 'cliente' && activeModules.includes('ia') && (
-            <GuruFab 
-                opportunities={opportunities} user={user} organizationId={userOrgId || undefined} 
-                onAction={(aid) => aid === 'create_task' ? setShowCreateTask(true) : setView(aid.replace('nav_', ''))} 
-                externalPrompt={guruInitialPrompt}
-                onExternalPromptConsumed={() => setGuruInitialPrompt(null)}
-            />
-        )}
         <NpsSurvey userId={user?.id} userRole={userRole} />
     </div>
   );

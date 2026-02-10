@@ -1,11 +1,13 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Opportunity, Archetype } from '../types';
+
+import React, { useMemo, useEffect, useState } from 'react';
+import { Opportunity } from '../types';
 import MatrixChart from './MatrixChart';
 import { 
-    Zap, Target, Sparkles, Rocket, Activity, Trophy, DollarSign,
-    AlertTriangle, CheckCircle2, BarChart3, Clock, Info, Layers, ChevronRight
-} from 'lucide-react'; // Fix: Corrected typo in import from lucide-center to lucide-react
-import { SuccessJourney } from './SuccessJourney';
+    Zap, Target, Sparkles, Trophy, DollarSign,
+    Lock, Search, ArrowUpRight, Eye, HelpCircle, UserPlus, 
+    ChevronRight, Briefcase, BarChart3, TrendingUp, AlertCircle,
+    Plus, PlayCircle, Layers, CreditCard, Settings, EyeOff
+} from 'lucide-react';
 import { getOperationalRates } from '../services/financialService';
 
 interface Props {
@@ -14,19 +16,20 @@ interface Props {
   onOpenProject: (opp: Opportunity) => void;
   user: any;
   theme: 'dark' | 'light';
-  userData?: { name: string };
+  userData?: { name: string; avatar?: string | null };
+  organizationId?: number;
   onOpenCreate?: () => void;
-  onGuruPrompt?: (prompt: string) => void; 
+  onGuruPrompt?: (prompt: string) => void;
   billingDate?: string;
   activeModules?: string[];
   userRole?: string;
-  organizationId?: number;
 }
 
 export const Dashboard: React.FC<Props> = ({ 
-    opportunities, onNavigate, onOpenProject, theme, userData, organizationId
+    opportunities, onOpenProject, userData, organizationId, onNavigate, theme, onOpenCreate
 }) => {
     const [rates, setRates] = useState<any>(null);
+    const [showValues, setShowValues] = useState(true);
     const firstName = userData?.name?.split(' ')[0] || 'Inovador';
 
     useEffect(() => {
@@ -35,113 +38,191 @@ export const Dashboard: React.FC<Props> = ({
         }
     }, [organizationId]);
 
-    const milestones = [
-        { id: '1', label: '1º Ativo', description: 'Mapeie sua primeira oportunidade.', completed: opportunities.length > 0, actionId: 'framework-system' },
-        { id: '2', label: 'Priorização', description: 'Gere um Score PRIO-6 válido.', completed: opportunities.some(o => o.prioScore > 0), actionId: 'dashboard' },
-        { id: '3', label: 'Crivo Técnico', description: 'Valide 3 ativos via T.A.D.S.', completed: opportunities.filter(o => o.tadsScore >= 6).length >= 3, actionId: 'list' },
-        { id: '4', label: 'Escala', description: 'Tenha 1 projeto em execução.', completed: opportunities.some(o => o.status === 'Active'), actionId: 'kanban' },
-    ];
-
     const stats = useMemo(() => {
-        const hourlyRate = rates?.totalRate || 85;
         const totalMrr = opportunities.reduce((acc, o) => acc + (Number(o.mrr) || 0), 0);
-        const totalHours = opportunities.reduce((acc, o) => {
-            const nodeHours = o.bpmn?.nodes?.reduce((nAcc, n) => nAcc + (n.checklist?.reduce((cAcc, t) => cAcc + (Number(t.estimatedHours) || 0), 0) || 0), 0) || 0;
-            return acc + nodeHours;
-        }, 0);
-        const activeCost = totalHours * hourlyRate;
-        const margin = totalMrr > 0 ? ((totalMrr - (activeCost/12)) / totalMrr) * 100 : 0;
+        const activeCount = opportunities.filter(o => o.status === 'Active').length;
+        const validationCount = opportunities.filter(o => o.status === 'Future').length;
+        return { totalMrr, activeCount, validationCount };
+    }, [opportunities]);
 
-        return { totalMrr, activeCost, margin, activeCount: opportunities.filter(o => o.status === 'Active').length };
-    }, [opportunities, rates]);
+    const ActionButton = ({ icon: Icon, label, onClick }: any) => (
+        <div className="flex flex-col items-center gap-2 min-w-[80px] group">
+            <button 
+                onClick={onClick}
+                className="w-14 h-14 rounded-full bg-slate-100 dark:bg-white/5 flex items-center justify-center transition-all duration-200 active:scale-90 border border-transparent hover:bg-slate-200 dark:hover:bg-white/10"
+            >
+                <Icon className="w-5 h-5 text-slate-900 dark:text-white" />
+            </button>
+            <span className="text-[10px] font-bold text-slate-700 dark:text-slate-400 text-center tracking-tight">{label}</span>
+        </div>
+    );
+
+    const InsightCard = ({ title, desc, icon: Icon, color }: any) => (
+        <div className="min-w-[260px] bg-slate-100 dark:bg-white/5 p-5 rounded-2xl flex flex-col justify-between h-36 border border-transparent hover:border-slate-200 dark:hover:border-white/10 transition-all cursor-pointer">
+            <div className={`p-2 w-fit rounded-lg ${color} bg-opacity-10 mb-2`}>
+                <Icon className={`w-4 h-4 ${color.replace('bg-', 'text-')}`} />
+            </div>
+            <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                <span className={`font-bold ${color.replace('bg-', 'text-')}`}>{title} </span>
+                {desc}
+            </p>
+        </div>
+    );
+
+    const SectionRow = ({ title, value, subtext, onClick, icon: Icon }: any) => (
+        <button 
+            onClick={onClick}
+            className="w-full flex flex-col p-6 border-b border-slate-100 dark:border-white/5 bg-white dark:bg-transparent text-left hover:bg-slate-50 dark:hover:bg-white/[0.01] transition-all group"
+        >
+            <div className="flex justify-between items-center w-full mb-2">
+                <div className="flex items-center gap-3">
+                    <Icon className="w-4 h-4 text-slate-400 group-hover:text-amber-500 transition-colors" />
+                    <span className="text-xs font-bold tracking-widest text-slate-400 uppercase">{title}</span>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-300 group-hover:translate-x-1 transition-all" />
+            </div>
+            <div className="space-y-0.5">
+                <div className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+                    {showValues ? value : '••••'}
+                </div>
+                {subtext && <div className="text-[10px] font-medium text-slate-400 uppercase tracking-widest">{subtext}</div>}
+            </div>
+        </button>
+    );
 
     return (
-        <div className="max-w-7xl mx-auto pt-10 pb-24 space-y-12 animate-in fade-in duration-1000">
+        <div className="flex flex-col min-h-screen bg-white dark:bg-[#020203] pb-32">
             
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-8 px-4">
-                <div className="space-y-2">
-                    <h2 className="text-2xl font-medium text-slate-400 flex items-center gap-2">
-                        <Sparkles className="w-5 h-5 text-amber-500" />
-                        <span>Bom dia, <span className="text-slate-900 dark:text-white font-black">{firstName}</span></span>
+            {/* Nubank-Style Balanced Header - Full Width Background */}
+            <div className="bg-[#F59E0B] px-6 pt-10 pb-8 md:px-12 md:pt-14 md:pb-12 transition-all">
+                <div className="max-w-7xl mx-auto flex flex-col gap-8">
+                    <div className="flex justify-between items-center">
+                        <div 
+                            className="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center overflow-hidden cursor-pointer hover:bg-white/30 transition-all border border-white/10"
+                            onClick={() => onNavigate('profile')}
+                        >
+                            {userData?.avatar ? (
+                                <img src={userData.avatar} className="w-full h-full object-cover" />
+                            ) : (
+                                <UserPlus className="w-5 h-5 text-white" />
+                            )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <button 
+                                onClick={() => setShowValues(!showValues)}
+                                className="p-3 rounded-full hover:bg-white/10 text-white transition-all"
+                            >
+                                {showValues ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
+                            </button>
+                            <button className="p-3 rounded-full hover:bg-white/10 text-white transition-all">
+                                <HelpCircle className="w-5 h-5" />
+                            </button>
+                            <button 
+                                onClick={() => onNavigate('settings')}
+                                className="p-3 rounded-full hover:bg-white/10 text-white transition-all"
+                            >
+                                <Settings className="w-5 h-5" />
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <h2 className="text-xl md:text-2xl font-bold tracking-tight text-white">
+                        Olá, {firstName}
                     </h2>
-                    <h1 className="text-6xl font-black text-slate-900 dark:text-white tracking-tighter">War Room.</h1>
-                </div>
-
-                <div className="flex gap-4">
-                    <button onClick={() => onNavigate('framework-system')} className="px-8 py-4 bg-amber-500 text-black rounded-[1.5rem] font-black text-xs uppercase tracking-widest flex items-center gap-3 shadow-glow-amber hover:scale-105 transition-all">
-                        <Zap className="w-4 h-4"/> Framework Simulator
-                    </button>
-                    <button onClick={() => onNavigate('create-project')} className="px-8 py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[1.5rem] font-black text-xs uppercase tracking-widest flex items-center gap-3 shadow-xl hover:scale-105 transition-all">
-                        <Rocket className="w-4 h-4"/> Novo Ativo
-                    </button>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 px-4">
-                <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-white/5 flex flex-col justify-between h-44 shadow-soft group">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><DollarSign className="w-3 h-3 text-emerald-500"/> MRR Ativo</span>
-                    <div>
-                        <div className="text-4xl font-black tracking-tighter">R$ {stats.totalMrr.toLocaleString('pt-BR')}</div>
-                        <p className="text-[8px] font-bold text-slate-500 uppercase mt-2">Receita Recorrente Consolidada</p>
+            <div className="max-w-7xl mx-auto w-full">
+                
+                {/* Account Section */}
+                <div className="px-0 md:px-6">
+                    <SectionRow 
+                        title="Portfólio & MRR" 
+                        value={`R$ ${stats.totalMrr.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                        subtext="Faturamento Mensal Recorrente"
+                        icon={DollarSign}
+                        onClick={() => onNavigate('financial')}
+                    />
+                </div>
+
+                {/* Standard Action Carrossel */}
+                <div className="px-6 py-6 overflow-hidden">
+                    <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
+                        <ActionButton icon={Plus} label="Novo Ativo" onClick={onOpenCreate} />
+                        <ActionButton icon={PlayCircle} label="Simular" onClick={() => onNavigate('framework-system')} />
+                        <ActionButton icon={Layers} label="Módulos" onClick={() => onNavigate('ecosystem')} />
+                        <ActionButton icon={CreditCard} label="Fatura" onClick={() => onNavigate('financial')} />
+                        <ActionButton icon={TrendingUp} label="Insights" onClick={() => onNavigate('intelligence')} />
                     </div>
                 </div>
 
-                <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-white/5 flex flex-col justify-between h-44 shadow-soft group">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Zap className="w-3 h-3 text-amber-500"/> WIP Ativo</span>
-                    <div>
-                        <div className="text-4xl font-black tracking-tighter">{stats.activeCount} <span className="text-sm font-bold text-slate-400">Ativos</span></div>
-                        <p className="text-[8px] font-bold text-slate-500 uppercase mt-2">Em Execução na Engenharia</p>
+                {/* My Assets Link */}
+                <div className="px-6 pb-6">
+                    <button 
+                        onClick={() => onNavigate('list')}
+                        className="w-full p-5 bg-slate-100 dark:bg-white/5 rounded-2xl flex items-center gap-4 hover:bg-slate-200 dark:hover:bg-white/10 transition-all text-left"
+                    >
+                        <Briefcase className="w-5 h-5 text-slate-500" />
+                        <span className="text-[11px] font-bold text-slate-800 dark:text-white flex-1 uppercase tracking-widest">Ver Carteira de Ativos</span>
+                        <ChevronRight className="w-4 h-4 text-slate-300" />
+                    </button>
+                </div>
+
+                {/* Insight Carousel */}
+                <div className="px-6 overflow-hidden">
+                    <div className="flex gap-4 overflow-x-auto no-scrollbar pb-8">
+                        <InsightCard 
+                            title="Desempenho:" 
+                            desc={`Crescimento de 12% no trimestre.`} 
+                            icon={TrendingUp} 
+                            color="bg-emerald-500" 
+                        />
+                        <InsightCard 
+                            title="Foco Técnico:" 
+                            desc="Aguardando validação em 3 projetos." 
+                            icon={Target} 
+                            color="bg-amber-500" 
+                        />
+                        <InsightCard 
+                            title="Guru IA:" 
+                            desc="Novo insight sobre ROI disponível." 
+                            icon={Sparkles} 
+                            color="bg-purple-500" 
+                        />
                     </div>
                 </div>
 
-                <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-white/5 flex flex-col justify-between h-44 shadow-soft group">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Target className="w-3 h-3 text-blue-500"/> Margem Global</span>
-                    <div>
-                        <div className="text-4xl font-black tracking-tighter">{stats.margin.toFixed(1)}%</div>
-                        <p className="text-[8px] font-bold text-slate-500 uppercase mt-2">ROI Médio do Portfólio</p>
-                    </div>
-                </div>
-
-                <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-white/5 flex flex-col justify-between h-44 shadow-soft group">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Layers className="w-3 h-3 text-purple-500"/> Eficiência ABC</span>
-                    <div>
-                        <div className="text-4xl font-black tracking-tighter">94%</div>
-                        <p className="text-[8px] font-bold text-slate-500 uppercase mt-2">Aproveitamento de Esforço</p>
-                    </div>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 px-4 pb-20">
-                <div className="lg:col-span-8 space-y-4">
-                    <div className="bg-white dark:bg-slate-900 p-8 rounded-[3rem] border border-slate-100 dark:border-white/5 shadow-2xl h-[600px] relative overflow-hidden">
-                         <div className="absolute top-0 left-0 p-8 z-10">
-                            <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tighter flex items-center gap-3">
-                                <Zap className="w-5 h-5 text-amber-500"/> Matriz RDE Industrial
-                            </h3>
-                         </div>
-                        <MatrixChart data={opportunities} onClick={onOpenProject} theme={theme} />
-                    </div>
-                </div>
-
-                <div className="lg:col-span-4 space-y-8">
-                    <div className="bg-slate-900 p-8 rounded-[2.5rem] border border-white/5 text-white space-y-6 relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 blur-3xl -mr-16 -mt-16"></div>
-                        <div className="relative z-10">
-                            <h3 className="text-lg font-black tracking-tight mb-2">Framework Shinkō</h3>
-                            <p className="text-xs text-slate-400 leading-relaxed font-medium">Siga a jornada de maturidade para extrair o máximo de previsibilidade da sua inovação.</p>
-                        </div>
-                        <SuccessJourney milestones={milestones} onAction={onNavigate} />
-                    </div>
-
-                    <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-white/5 shadow-soft flex items-center justify-between group cursor-pointer" onClick={() => onNavigate('framework-system')}>
-                        <div className="flex items-center gap-4">
-                            <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-500 group-hover:scale-110 transition-transform"><Target className="w-6 h-6"/></div>
-                            <div>
-                                <div className="text-sm font-black tracking-tight">Simular Valor</div>
-                                <p className="text-[10px] text-slate-500 font-bold uppercase">Acesse o Laboratório</p>
+                {/* Content Sections */}
+                <div className="space-y-2">
+                    <div className="bg-white dark:bg-transparent">
+                        <SectionRow 
+                            title="Ativos em Execução" 
+                            value={`${stats.activeCount} Projetos`}
+                            subtext="Operação em Performance"
+                            icon={Briefcase}
+                            onClick={() => onNavigate('list')}
+                        />
+                        
+                        <div className="p-6 md:p-8 space-y-6">
+                            <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-2">
+                                    <BarChart3 className="w-4 h-4 text-slate-400" />
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Matriz de Prioridade</span>
+                                </div>
                             </div>
+                            <div className="aspect-square w-full max-h-[500px] bg-slate-50 dark:bg-white/[0.01] rounded-2xl border border-slate-100 dark:border-white/5 p-4 overflow-hidden shadow-inner">
+                                <MatrixChart data={opportunities} onClick={onOpenProject} theme={theme} />
+                            </div>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em] text-center">Analise o quadrante de valor atualizado</p>
                         </div>
-                        <ChevronRight className="w-5 h-5 text-slate-300 group-hover:translate-x-1 transition-all"/>
+
+                        <SectionRow 
+                            title="Novas Ideias" 
+                            value={`${stats.validationCount} Oportunidades`}
+                            subtext="Aguardando Validação T.A.D.S."
+                            icon={Target}
+                            onClick={() => onNavigate('list')}
+                        />
                     </div>
                 </div>
             </div>

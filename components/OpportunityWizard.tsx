@@ -1,10 +1,9 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Opportunity, Archetype, IntensityLevel, RDEStatus, TadsCriteria, getTerminology, ProjectStatus, DbClient } from '../types';
-import { Check, Loader2, Target, ShieldCheck, Zap, DollarSign, Sparkles, X, ChevronRight, Layers, Gauge, Info, Coins, Calendar, Ban, FileUp, FileText, Wand2, Users, Building2, Plus, Mail, Lock, Save } from 'lucide-react';
+import { Opportunity, Archetype, IntensityLevel, RDEStatus, getTerminology, DbClient } from '../types';
+import { Check, Loader2, Target, Zap, DollarSign, Sparkles, X, ChevronLeft, FileUp, Rocket } from 'lucide-react';
 import { extractProjectDetailsFromPdf } from '../services/geminiService';
-import { supabase } from '../services/supabaseClient';
-import { fetchClients, createClient } from '../services/clientService';
+import { fetchClients } from '../services/clientService';
 
 interface Props {
   initialData?: Partial<Opportunity>;
@@ -15,42 +14,9 @@ interface Props {
   organizationId?: number;
 }
 
-const Logo = ({ customLogoUrl, orgName }: { customLogoUrl?: string | null, orgName?: string }) => (
-    <div className="flex items-center gap-3">
-        {customLogoUrl ? (
-            <img src={customLogoUrl} alt={orgName} className="h-7 w-auto object-contain" />
-        ) : (
-            <>
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-glow-amber">
-                    <Sparkles className="w-4 h-4"/>
-                </div>
-                <div className="flex flex-col">
-                    <span className="font-black text-sm tracking-tighter text-slate-900 dark:text-white leading-none">Shinkō</span>
-                    <span className="text-[6px] font-black uppercase tracking-widest text-amber-500 mt-0.5">OS 26</span>
-                </div>
-            </>
-        )}
-    </div>
-);
-
-const STEPS = [
-    { id: 0, label: 'Estratégia', icon: Target },
-    { id: 1, label: 'DNA', icon: Layers },
-    { id: 2, label: 'Economia', icon: Coins },
-    { id: 3, label: 'Matriz RDE', icon: Zap },
-    { id: 4, label: 'Crivo TADS', icon: ShieldCheck }
-];
-
-const STATUS_OPTIONS: { value: ProjectStatus; label: string }[] = [
-    { value: 'Future', label: 'Backlog / Oportunidade' },
-    { value: 'Negotiation', label: 'Em Negociação' },
-    { value: 'Active', label: 'Ativar na Engenharia' }
-];
-
-export default function OpportunityWizard({ initialData, onSave, onCancel, orgType, customLogoUrl, organizationId }: Props) {
+export default function OpportunityWizard({ initialData, onSave, onCancel, orgType, organizationId }: Props) {
   const [step, setStep] = useState(0);
   const terms = getTerminology(orgType);
-  const isEditing = !!initialData?.id;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState<Partial<Opportunity>>(initialData || {
@@ -71,88 +37,25 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
     clientId: undefined
   });
   
-  const [clients, setClients] = useState<DbClient[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isAnalyzingPdf, setIsAnalyzingPdf] = useState(false);
-  const [analyzedFile, setAnalyzedFile] = useState<string | null>(null);
-
-  // Quick Client Creation State
-  const [showQuickClient, setShowQuickClient] = useState(false);
-  const [isCreatingQuickClient, setIsCreatingQuickClient] = useState(false);
-  const [quickClientForm, setQuickClientForm] = useState({ nome: '', email: '' });
 
   useEffect(() => {
     if (organizationId) {
-        fetchClients(organizationId).then(setClients);
+        fetchClients(organizationId);
     }
   }, [organizationId]);
 
-  const isInternal = formData.archetype === Archetype.INTERNAL_MARKETING;
-
-  const handleQuickClientCreate = async (e: React.FormEvent) => {
-      e.preventDefault();
-      
-      if (isCreatingQuickClient) return;
-      
-      if (!organizationId) {
-          alert("Erro: ID da organização não carregado.");
-          return;
-      }
-
-      if (!quickClientForm.nome || !quickClientForm.email) {
-          alert("Preencha todos os campos do cliente (Nome e Email).");
-          return;
-      }
-
-      setIsCreatingQuickClient(true);
-      try {
-          const newClient = await createClient({
-              nome: quickClientForm.nome,
-              email: quickClientForm.email,
-              organizacao: organizationId,
-              status: 'Ativo',
-              contrato: 'Draft',
-              projetos: []
-          });
-
-          if (newClient) {
-              setClients(prev => [...prev, newClient]);
-              setFormData(prev => ({ ...prev, clientId: newClient.id }));
-              setShowQuickClient(false);
-              setQuickClientForm({ nome: '', email: '' });
-          }
-      } catch (err: any) {
-          console.error("Falha na Sincronização:", err);
-          alert("Erro ao criar stakeholder: " + (err.message || "Falha de comunicação com o banco."));
-      } finally {
-          setIsCreatingQuickClient(false);
-      }
-  };
-
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
-      if (!file || file.type !== 'application/pdf') return alert("Por favor, suba um arquivo PDF.");
+      if (!file || file.type !== 'application/pdf') return;
 
       setIsAnalyzingPdf(true);
-      setAnalyzedFile(file.name);
-
       try {
-          const fileName = `escopos/${Date.now()}-${file.name}`;
-          const { error: uploadError } = await supabase.storage
-              .from('documentos')
-              .upload(fileName, file);
-          
-          if (uploadError) throw uploadError;
-
-          const { data: urlData } = supabase.storage
-              .from('documentos')
-              .getPublicUrl(fileName);
-
           const reader = new FileReader();
           reader.onload = async () => {
               const base64 = (reader.result as string).split(',')[1];
               const result = await extractProjectDetailsFromPdf(base64);
-              
               if (result) {
                   setFormData(prev => ({
                       ...prev,
@@ -161,20 +64,19 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
                       archetype: (result.archetype as Archetype) || prev.archetype,
                       intensity: result.intensity || prev.intensity,
                       docsContext: result.suggestedSummary || '',
-                      pdfUrl: urlData.publicUrl 
                   }));
+                  setStep(1); 
               }
               setIsAnalyzingPdf(false);
           };
           reader.readAsDataURL(file);
-      } catch (err: any) {
-          alert("Erro no processamento do documento: " + err.message);
+      } catch (err) {
           setIsAnalyzingPdf(false);
       }
   };
 
   const handleSave = async () => {
-      if (!formData.title) return alert("Defina um título para o projeto.");
+      if (!formData.title) return;
       setIsSaving(true);
       try {
           const tadsScore = Object.values(formData.tads || {}).filter(Boolean).length * 2;
@@ -183,406 +85,181 @@ export default function OpportunityWizard({ initialData, onSave, onCancel, orgTy
           await onSave({
               ...formData,
               id: initialData?.id || crypto.randomUUID(),
-              mrr: isInternal ? 0 : Number(formData.mrr || 0),
-              meses: Number(formData.meses || 12),
               prioScore: prioScore,
               tadsScore: tadsScore,
               createdAt: initialData?.createdAt || new Date().toISOString(),
-              status: formData.status || 'Future',
-              organizationId: organizationId 
           } as Opportunity);
-      } catch (e: any) {
-          console.error("Wizard Save Error:", e);
-          alert("Erro técnico ao salvar projeto: " + (e.message || "Erro de banco de dados."));
+      } catch (e) {
+          alert("Falha ao salvar projeto.");
       } finally {
           setIsSaving(false);
       }
   };
 
-  const toggleTads = (key: keyof TadsCriteria) => {
-      setFormData({
-          ...formData,
-          tads: {
-              ...formData.tads!,
-              [key]: !formData.tads![key]
-          }
-      });
-  };
+  const next = () => setStep(s => s + 1);
+  const prev = () => setStep(s => s - 1);
 
   return (
-    <div className="fixed inset-0 z-[600] glass-panel bg-[var(--bg-color)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-500">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.08),transparent_50%)] pointer-events-none"></div>
+    <div className="fixed inset-0 z-[1000] bg-[#F8F9FA] flex flex-col font-sans animate-in fade-in duration-300">
+        <div className="h-1.5 w-full bg-slate-100 shrink-0">
+            <div 
+                className="h-full bg-amber-500 transition-all duration-500 ease-out"
+                style={{ width: `${((step + 1) / 6) * 100}%` }}
+            ></div>
+        </div>
 
-        <header className="h-20 lg:h-24 px-6 lg:px-12 flex items-center justify-between shrink-0 relative z-10 border-b border-[var(--border-color)] bg-white/5 backdrop-blur-md">
-            <div className="flex items-center gap-4 lg:gap-10">
-                <div className="hidden lg:block border-r border-white/10 pr-10">
-                    <Logo customLogoUrl={customLogoUrl} orgName={orgType} />
-                </div>
-                <button onClick={onCancel} className="p-2 lg:p-3 hover:bg-black/5 dark:hover:bg-white/5 rounded-2xl text-slate-500 transition-all">
-                    <X className="w-5 h-5 lg:w-6 lg:h-6"/>
-                </button>
-                <div>
-                    <h2 className="text-lg lg:text-2xl font-black text-[var(--text-main)] tracking-tighter leading-none truncate max-w-[150px] lg:max-w-none">{isEditing ? 'Refinar' : 'Mapear'} <span className="text-amber-500">Projeto</span>.</h2>
-                    <p className="text-[8px] lg:text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1 lg:mt-2">FRAMEWORK SHINKŌ</p>
-                </div>
-            </div>
-            
-            <div className="flex items-center gap-4 lg:gap-10">
-                <div className="hidden sm:flex gap-4">
-                    {STEPS.map((s, idx) => (
-                        <div key={s.id} className="flex flex-col items-center gap-2">
-                             <div className={`w-8 lg:w-12 h-1.5 rounded-full transition-all duration-500 ${step === idx ? 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]' : idx < step ? 'bg-amber-500/40' : 'bg-slate-200 dark:bg-white/10'}`}></div>
-                        </div>
-                    ))}
-                </div>
-                {step === STEPS.length - 1 ? (
-                    <button onClick={handleSave} disabled={isSaving} className="px-6 lg:px-12 py-3 lg:py-4 bg-amber-500 text-black rounded-2xl lg:rounded-[1.5rem] font-black text-[10px] lg:text-xs uppercase tracking-widest shadow-glow-amber hover:scale-105 transition-all flex items-center gap-2 disabled:opacity-50">
-                        {isSaving ? <Loader2 className="animate-spin w-5 h-5"/> : 'Finalizar Mapeamento'}
-                    </button>
-                ) : (
-                    <button onClick={() => setStep(s => s + 1)} className="px-6 lg:px-12 py-3 lg:py-4 bg-slate-900 dark:bg-white text-white dark:text-black rounded-2xl lg:rounded-[1.5rem] font-black text-[10px] lg:text-xs uppercase tracking-widest hover:scale-105 transition-all flex items-center gap-2">
-                        Próximo <ChevronRight className="w-4 h-4"/>
-                    </button>
-                )}
+        <header className="px-6 h-16 flex items-center justify-between shrink-0">
+            <button onClick={onCancel} className="p-2 text-slate-400 hover:text-slate-900 transition-colors">
+                <X className="w-6 h-6"/>
+            </button>
+            <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Novo Projeto</span>
+                <span className="text-[10px] font-black text-amber-500">{step + 1}/6</span>
             </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto custom-scrollbar flex flex-col items-center py-8 lg:py-16 px-6 lg:px-8 relative z-10">
-            <div className="max-w-4xl w-full">
+        <main className="flex-1 flex flex-col items-center justify-start md:justify-center px-6 pt-12 md:pt-0">
+            <div className="w-full max-w-lg space-y-8 animate-fade-up">
                 
                 {step === 0 && (
-                    <div className="space-y-8 lg:space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
-                        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-                            <div className="space-y-4">
-                                <h3 className="text-4xl lg:text-6xl font-black text-[var(--text-main)] tracking-tighter leading-[1.1]">Onde está o <br/><span className="text-amber-500">Valor?</span></h3>
-                                <p className="text-slate-500 dark:text-slate-400 text-base lg:text-xl font-medium max-w-lg">Nomeie seu ativo e defina sua governança inicial.</p>
-                            </div>
-                            
-                            <div className="shrink-0">
-                                <input type="file" ref={fileInputRef} className="hidden" accept=".pdf" onChange={handleFileUpload} />
-                                <button 
-                                    onClick={() => fileInputRef.current?.click()}
-                                    disabled={isAnalyzingPdf}
-                                    className={`relative group px-6 py-8 rounded-[2rem] border-2 border-dashed transition-all flex flex-col items-center gap-3 w-full md:w-56 ${isAnalyzingPdf ? 'border-amber-500 bg-amber-500/5' : analyzedFile ? 'border-emerald-500 bg-emerald-500/5' : 'border-slate-200 dark:border-white/10 hover:border-amber-500 hover:bg-amber-500/5'}`}
-                                >
-                                    {isAnalyzingPdf ? (
-                                        <>
-                                            <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
-                                            <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest animate-pulse">Sincronizando Escopo...</span>
-                                        </>
-                                    ) : analyzedFile ? (
-                                        <>
-                                            <Check className="w-8 h-8 text-emerald-500" />
-                                            <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest text-center truncate w-full px-2">{analyzedFile}</span>
-                                            <span className="text-[8px] font-bold text-emerald-600/60 uppercase">PDF SALVO & ANALISADO</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <div className="p-3 bg-slate-100 dark:bg-white/5 rounded-2xl group-hover:bg-amber-500/20 transition-all">
-                                                <FileUp className="w-6 h-6 text-slate-400 group-hover:text-amber-500" />
-                                            </div>
-                                            <div className="text-center">
-                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-amber-500">Subir PDF de Escopo</span>
-                                                <span className="text-[8px] font-bold text-slate-500 block mt-1 uppercase">Salvamento & Análise IA</span>
-                                            </div>
-                                        </>
-                                    )}
-                                </button>
-                            </div>
+                    <div className="space-y-6">
+                        <h1 className="text-3xl md:text-5xl font-black tracking-tighter leading-tight text-slate-900">Qual o <span className="text-amber-500">nome</span> do novo projeto?</h1>
+                        <input 
+                            autoFocus
+                            value={formData.title}
+                            onChange={e => setFormData({...formData, title: e.target.value})}
+                            onKeyDown={e => e.key === 'Enter' && formData.title && next()}
+                            placeholder="Ex: Minha Nova Ideia"
+                            className="w-full bg-transparent border-b-2 border-slate-200 focus:border-amber-500 outline-none py-4 text-2xl md:text-4xl font-bold transition-all placeholder:text-slate-200 text-slate-900"
+                        />
+                        <div className="flex items-center gap-4">
+                            <button onClick={next} disabled={!formData.title} className="flex-1 py-4 bg-slate-900 text-white font-black uppercase tracking-widest text-[10px] rounded-xl shadow-lg hover:bg-amber-500 transition-all disabled:opacity-20 active:scale-95">Próximo</button>
                         </div>
-
-                        <div className="space-y-8 lg:space-y-10">
-                            <div>
-                                <label className="text-[8px] lg:text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-3 block ml-1">Identificação do Ativo</label>
-                                <input 
-                                    autoFocus
-                                    value={formData.title}
-                                    onChange={e => setFormData({...formData, title: e.target.value})}
-                                    placeholder="Ex: Sistema de Gestão de Frotas v2"
-                                    className="w-full bg-[var(--input-bg)] border border-[var(--border-color)] rounded-[1.5rem] lg:rounded-[2rem] p-6 lg:p-8 text-2xl lg:text-4xl font-black text-[var(--text-main)] outline-none focus:border-amber-500/50 transition-all shadow-inner"
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-10">
-                                <div className="space-y-3">
-                                    <div className="flex justify-between items-center mb-3">
-                                        <label className="text-[8px] lg:text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] ml-1">Stakeholder Responsável</label>
-                                        <button 
-                                            onClick={() => setShowQuickClient(true)}
-                                            className="text-[9px] font-black text-amber-500 hover:text-amber-600 uppercase tracking-widest flex items-center gap-1 transition-colors"
-                                        >
-                                            <Plus className="w-3 h-3"/> Novo Stakeholder
-                                        </button>
-                                    </div>
-                                    <div className="relative group">
-                                        <Users className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-amber-500 transition-colors z-10" />
-                                        <select 
-                                            value={formData.clientId || ''}
-                                            onChange={e => setFormData({...formData, clientId: e.target.value || undefined})}
-                                            className="w-full bg-[var(--input-bg)] border border-[var(--border-color)] rounded-[1.5rem] p-5 pl-14 text-sm font-bold text-[var(--text-main)] outline-none focus:border-amber-500/50 transition-all shadow-inner appearance-none cursor-pointer"
-                                        >
-                                            <option value="">Sem Cliente Associado</option>
-                                            {clients.map(c => (
-                                                <option key={c.id} value={c.id}>{c.nome.toUpperCase()}</option>
-                                            ))}
-                                        </select>
-                                        <ChevronRight className="absolute right-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 rotate-90 pointer-events-none" />
-                                    </div>
-                                </div>
-
-                                <div className="space-y-3">
-                                    <label className="text-[8px] lg:text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-3 block ml-1">Governança</label>
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                        {STATUS_OPTIONS.map(opt => (
-                                            <button
-                                                key={opt.value}
-                                                type="button"
-                                                onClick={() => setFormData({...formData, status: opt.value})}
-                                                className={`p-4 rounded-2xl border text-[10px] font-black uppercase tracking-widest transition-all ${formData.status === opt.value ? 'bg-amber-500 border-amber-400 text-black shadow-lg scale-105' : 'bg-white/5 border-white/10 text-slate-500 hover:bg-white/10'}`}
-                                            >
-                                                {opt.label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="text-[8px] lg:text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-3 block ml-1">Contexto Técnico</label>
-                                <textarea 
-                                    value={formData.description}
-                                    onChange={e => setFormData({...formData, description: e.target.value})}
-                                    placeholder="Descreva a dor que este projeto resolve..."
-                                    className="w-full bg-[var(--input-bg)] border border-[var(--border-color)] rounded-[1.5rem] lg:rounded-[2.5rem] p-6 lg:p-10 text-base lg:text-xl text-[var(--text-main)] outline-none focus:border-amber-500/50 transition-all h-48 lg:h-60 resize-none leading-relaxed shadow-inner"
-                                />
-                            </div>
+                        <div className="pt-6">
+                            <input type="file" ref={fileInputRef} className="hidden" accept=".pdf" onChange={handleFileUpload} />
+                            <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 text-slate-400 hover:text-amber-500 transition-all uppercase font-black text-[9px] tracking-widest">
+                                {isAnalyzingPdf ? <Loader2 className="w-3 h-3 animate-spin"/> : <FileUp className="w-3 h-3"/>}
+                                Ou subir descrição em PDF para IA
+                            </button>
                         </div>
                     </div>
                 )}
 
                 {step === 1 && (
-                    <div className="space-y-8 lg:space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
-                        <div className="space-y-4">
-                            <h3 className="text-4xl lg:text-6xl font-black text-[var(--text-main)] tracking-tighter leading-none">DNA do <span className="text-amber-500">Ativo</span>.</h3>
-                            <p className="text-slate-500 dark:text-slate-400 text-base lg:text-xl font-medium">Categorize a natureza e o peso da sua solução.</p>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
-                            <div className="space-y-4">
-                                <label className="text-[8px] lg:text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-2 block ml-1">Arquétipo de Negócio</label>
-                                <div className="grid grid-cols-1 gap-3">
-                                    {Object.values(Archetype).map((arch: string) => (
-                                        <button 
-                                            key={arch}
-                                            onClick={() => setFormData({...formData, archetype: arch as Archetype})}
-                                            className={`p-4 lg:p-6 rounded-[1.5rem] lg:rounded-[2rem] border text-left transition-all group ${formData.archetype === arch ? 'bg-amber-500 border-amber-400 text-black shadow-glow-amber scale-[1.02]' : 'bg-[var(--card-bg)] border-[var(--border-color)] text-slate-500 hover:bg-white/5'}`}
-                                        >
-                                            <div className="flex justify-between items-start mb-1 lg:mb-2">
-                                                <div className="font-black text-xs lg:text-sm uppercase tracking-widest">{terms.archetypes[arch as Archetype].label}</div>
-                                                {formData.archetype === arch && <Check className="w-4 h-4" />}
-                                            </div>
-                                            <p className={`text-[8px] lg:text-[10px] font-bold leading-relaxed ${formData.archetype === arch ? 'text-black/70' : 'text-slate-500 dark:text-slate-400'}`}>
-                                                {terms.archetypes[arch as Archetype].desc}
-                                            </p>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="space-y-6">
-                                <label className="text-[8px] lg:text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-2 block ml-1">Nível de Intensidade</label>
-                                <div className="glass-card p-6 lg:p-10 space-y-6 lg:space-y-10 border-blue-500/20">
-                                    <div className="flex justify-between items-center">
-                                        <div className="p-3 lg:p-4 rounded-xl lg:rounded-2xl bg-blue-500/10 text-blue-500 border border-blue-500/20 shadow-sm">
-                                            <Gauge className="w-6 h-6 lg:w-8 lg:h-8" />
-                                        </div>
-                                        <span className="text-5xl lg:text-7xl font-black text-blue-500 tracking-tighter leading-none">L{formData.intensity}</span>
-                                    </div>
-                                    <input 
-                                        type="range" min="1" max="4" step="1"
-                                        value={formData.intensity}
-                                        onChange={e => setFormData({...formData, intensity: parseInt(e.target.value)})}
-                                        className="w-full h-2 lg:h-3 bg-slate-200 dark:bg-white/10 rounded-full appearance-none cursor-pointer accent-blue-500"
-                                    />
-                                    <div className="flex justify-between text-[8px] lg:text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                                        <span>Baixa</span>
-                                        <span>Crítica</span>
-                                    </div>
-                                    <div className="p-4 lg:p-5 bg-blue-500/5 rounded-xl lg:rounded-2xl border border-blue-500/10 flex gap-3 lg:gap-4 items-start">
-                                        <div className="mt-0.5"><Info className="w-4 h-4 lg:w-5 lg:h-5 text-blue-500 shrink-0" /></div>
-                                        <p className="text-[10px] lg:text-xs text-blue-400 font-bold leading-relaxed">{terms.intensities[formData.intensity || 1]}</p>
-                                    </div>
-                                </div>
-                            </div>
+                    <div className="space-y-6">
+                        <h1 className="text-3xl md:text-5xl font-black tracking-tighter leading-tight text-slate-900">O que vamos <span className="text-amber-500">resolver</span>?</h1>
+                        <textarea 
+                            autoFocus
+                            value={formData.description}
+                            onChange={e => setFormData({...formData, description: e.target.value})}
+                            placeholder="Descreva o problema ou a dor do usuário..."
+                            className="w-full bg-white border border-slate-200 rounded-2xl p-6 text-lg font-medium outline-none focus:border-amber-500 transition-all h-40 resize-none shadow-sm text-slate-700"
+                        />
+                        <div className="flex gap-3">
+                            <button onClick={prev} className="p-4 bg-slate-100 rounded-xl text-slate-500"><ChevronLeft/></button>
+                            <button onClick={next} disabled={!formData.description} className="flex-1 py-4 bg-slate-900 text-white font-black uppercase tracking-widest text-[10px] rounded-xl shadow-lg transition-all disabled:opacity-20">Continuar</button>
                         </div>
                     </div>
                 )}
 
                 {step === 2 && (
-                    <div className="space-y-8 lg:space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
-                        <div className="space-y-4">
-                            <h3 className="text-4xl lg:text-6xl font-black text-[var(--text-main)] tracking-tighter leading-none">Economia do <span className="text-amber-500">Ativo</span>.</h3>
-                            <p className="text-slate-500 dark:text-slate-400 text-base lg:text-xl font-medium">Projete o retorno financeiro deste projeto.</p>
-                        </div>
-                        
-                        {isInternal ? (
-                            <div className="p-12 bg-white/5 border border-dashed border-white/20 rounded-[3rem] text-center space-y-6">
-                                <div className="w-20 h-20 bg-slate-100 dark:bg-white/5 rounded-full flex items-center justify-center mx-auto">
-                                    <Ban className="w-10 h-10 text-slate-400" />
-                                </div>
-                                <div>
-                                    <h4 className="text-2xl font-black text-white">Projeto Interno</h4>
-                                    <p className="text-slate-500 font-medium max-w-md mx-auto mt-2">Ativos deste arquétipo medem valor por redução de custos ou ganho de eficiência técnica.</p>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
-                                <div className="space-y-6 bg-white/5 border border-white/10 p-8 rounded-[2.5rem]">
-                                    <div className="flex items-center gap-4 mb-4">
-                                        <div className="p-3 bg-emerald-500/10 rounded-2xl text-emerald-500 border border-emerald-500/20">
-                                            <Coins className="w-6 h-6"/>
-                                        </div>
-                                        <span className="text-xs font-black uppercase tracking-widest text-slate-400">MRR Alvo</span>
-                                    </div>
-                                    <div className="relative group">
-                                        <span className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl font-black text-slate-500 opacity-50">R$</span>
-                                        <input 
-                                            type="number"
-                                            value={formData.mrr || ''}
-                                            onChange={e => setFormData({...formData, mrr: Number(e.target.value)})}
-                                            placeholder="0,00"
-                                            className="w-full bg-black/20 border border-white/10 rounded-[1.5rem] p-6 pl-16 text-4xl font-black text-white outline-none focus:border-emerald-500/50 transition-all"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="space-y-6 bg-white/5 border border-white/10 p-8 rounded-[2.5rem]">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <div className="flex items-center gap-4">
-                                            <div className="p-3 bg-blue-500/10 rounded-2xl text-blue-500 border border-blue-500/20">
-                                                <Calendar className="w-6 h-6"/>
-                                            </div>
-                                            <span className="text-xs font-black uppercase tracking-widest text-slate-400">Ciclo</span>
-                                        </div>
-                                        <span className="text-3xl font-black text-blue-500">{formData.meses} <span className="text-sm">meses</span></span>
-                                    </div>
-                                    <input 
-                                        type="range" min="1" max="36" step="1"
-                                        value={formData.meses || 12}
-                                        onChange={e => setFormData({...formData, meses: parseInt(e.target.value)})}
-                                        className="w-full h-3 bg-white/10 rounded-full appearance-none cursor-pointer accent-blue-500"
-                                    />
-                                    <div className="pt-4 border-t border-white/5 flex justify-between items-center">
-                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor Projetado:</span>
-                                        <span className="text-lg font-black text-emerald-500">R$ {(Number(formData.mrr || 0) * (formData.meses || 12)).toLocaleString('pt-BR')}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {step === 3 && (
-                    <div className="space-y-8 lg:space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
-                        <div className="space-y-4">
-                            <h3 className="text-4xl lg:text-6xl font-black text-[var(--text-main)] tracking-tighter leading-none">Matriz <span className="text-amber-500">RDE</span>.</h3>
-                            <p className="text-slate-500 dark:text-slate-400 text-base lg:text-xl font-medium">Priorização estratégica baseada em esforço e retorno.</p>
-                        </div>
-                        <div className="grid grid-cols-1 gap-8 lg:gap-10 glass-card p-6 lg:p-12 border-[var(--border-color)]">
-                            {[
-                                { key: 'revenue', label: terms.revenueLabel, icon: DollarSign, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-                                { key: 'viability', label: terms.viabilityLabel, icon: Target, color: 'text-blue-500', bg: 'bg-blue-500/10' },
-                                { key: 'velocity', label: terms.mvpLabel, icon: Zap, color: 'text-amber-500', bg: 'bg-amber-500/10' }
-                            ].map(item => (
-                                <div key={item.key} className="space-y-4 lg:space-y-6">
-                                    <div className="flex justify-between items-start">
-                                        <div className="flex items-center gap-3 lg:gap-4">
-                                            <div className={`p-3 lg:p-4 rounded-xl lg:rounded-2xl ${item.bg} ${item.color} border border-white/5 shadow-sm`}>
-                                                <item.icon className="w-5 h-5 lg:w-6 lg:h-6" />
-                                            </div>
-                                            <span className="text-lg lg:text-2xl font-black text-[var(--text-main)] uppercase tracking-tight block leading-none">{item.label}</span>
-                                        </div>
-                                        <span className={`text-4xl lg:text-6xl font-black ${item.color} tracking-tighter leading-none`}>{formData[item.key as keyof Opportunity] as number}</span>
-                                    </div>
-                                    <input 
-                                        type="range" min="1" max="5" step="1"
-                                        value={formData[item.key as keyof Opportunity] as number}
-                                        onChange={e => setFormData({...formData, [item.key]: parseInt(e.target.value)})}
-                                        className="w-full h-2 lg:h-3 bg-slate-200 dark:bg-white/10 rounded-full appearance-none cursor-pointer accent-amber-500"
-                                    />
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {step === 4 && (
-                    <div className="space-y-8 lg:space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
-                        <div className="space-y-4">
-                            <h3 className="text-4xl lg:text-6xl font-black text-[var(--text-main)] tracking-tighter leading-none">Mapear <span className="text-amber-500">Projeto</span>.</h3>
-                            <p className="text-slate-500 dark:text-slate-400 text-base lg:text-xl font-medium">Validadores fundamentais do Framework Shinkō.</p>
-                        </div>
-                        <div className="grid grid-cols-1 gap-4">
-                            {[
-                                { key: 'scalability', label: terms.scalabilityLabel, desc: `Capacidade de escalar em volume sem aumentar o custo proporcional.` },
-                                { key: 'integration', label: terms.integrationLabel, desc: `Conexão fluida com as outras áreas e ferramentas do ecossistema.` },
-                                { key: 'painPoint', label: terms.painPointLabel, desc: `Evidência factual de necessidade real e imediata do usuário.` },
-                                { key: 'recurring', label: terms.recurringLabel, desc: `Modelo que permite vínculo de longo prazo e faturamento recorrente.` },
-                                { key: 'mvpSpeed', label: terms.mvpLabel, desc: `Entrega funcional rápida para validação de hipótese de mercado.` }
-                            ].map(item => (
+                    <div className="space-y-6">
+                        <h1 className="text-3xl md:text-5xl font-black tracking-tighter leading-tight text-slate-900">Qual o <span className="text-amber-500">tipo</span> de projeto?</h1>
+                        <div className="grid grid-cols-1 gap-3">
+                            {Object.values(Archetype).map(arch => (
                                 <button 
-                                    key={item.key}
-                                    onClick={() => toggleTads(item.key as keyof TadsCriteria)}
-                                    className={`p-6 lg:p-8 rounded-[2rem] border text-left transition-all flex items-center justify-between group ${formData.tads?.[item.key as keyof TadsCriteria] ? 'bg-emerald-600 border-emerald-500 text-white shadow-xl scale-[1.02]' : 'bg-[var(--card-bg)] border-[var(--border-color)] text-slate-500 hover:border-amber-500/30'}`}
+                                    key={arch}
+                                    onClick={() => { setFormData({...formData, archetype: arch as Archetype}); next(); }}
+                                    className={`p-5 rounded-2xl border text-left transition-all ${formData.archetype === arch ? 'bg-amber-500 border-amber-500 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-500 hover:bg-slate-50'}`}
                                 >
-                                    <div className="max-w-[80%] lg:max-w-[85%]">
-                                        <div className={`text-sm lg:text-xl font-black uppercase tracking-tight mb-1 lg:mb-2 ${formData.tads?.[item.key as keyof TadsCriteria] ? 'text-white' : 'text-[var(--text-main)]'}`}>{item.label}</div>
-                                        <div className={`text-[10px] lg:text-sm font-medium leading-relaxed ${formData.tads?.[item.key as keyof TadsCriteria] ? 'text-emerald-100' : 'text-slate-500 dark:text-slate-400'}`}>{item.desc}</div>
-                                    </div>
-                                    <div className={`w-10 h-10 lg:w-14 lg:h-14 rounded-xl lg:rounded-2xl flex items-center justify-center border-2 transition-all ${formData.tads?.[item.key as keyof TadsCriteria] ? 'bg-white text-emerald-600 border-white' : 'border-slate-200 dark:border-white/10 group-hover:border-amber-500/50 shadow-sm'}`}>
-                                        {formData.tads?.[item.key as keyof TadsCriteria] && <Check className="w-5 h-5 lg:w-8 lg:h-8 stroke-[4px]"/>}
-                                    </div>
+                                    <div className="font-bold text-sm uppercase tracking-wider">{terms.archetypes[arch as Archetype].label}</div>
+                                    <p className="text-[10px] opacity-70 mt-1">{terms.archetypes[arch as Archetype].desc}</p>
                                 </button>
                             ))}
                         </div>
                     </div>
                 )}
+
+                {step === 3 && (
+                    <div className="space-y-6">
+                        <h1 className="text-3xl md:text-5xl font-black tracking-tighter leading-tight text-slate-900">Quanto <span className="text-amber-500">vale</span> o projeto?</h1>
+                        <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 block">Ganhos mensais esperados (MRR)</label>
+                            <div className="flex items-center gap-3">
+                                <span className="text-2xl font-black text-slate-300">R$</span>
+                                <input 
+                                    type="number"
+                                    autoFocus
+                                    value={formData.mrr || ''}
+                                    onChange={e => setFormData({...formData, mrr: Number(e.target.value)})}
+                                    className="bg-transparent border-none outline-none text-4xl font-black text-slate-900 w-full"
+                                    placeholder="0"
+                                />
+                            </div>
+                        </div>
+                        <div className="flex gap-3">
+                            <button onClick={prev} className="p-4 bg-slate-100 rounded-xl text-slate-500"><ChevronLeft/></button>
+                            <button onClick={next} className="flex-1 py-4 bg-slate-900 text-white font-black uppercase tracking-widest text-[10px] rounded-xl shadow-lg">Tudo certo</button>
+                        </div>
+                    </div>
+                )}
+
+                {step === 4 && (
+                    <div className="space-y-8">
+                        <h1 className="text-3xl md:text-5xl font-black tracking-tighter leading-tight text-slate-900">Como está o <span className="text-amber-500">ânimo</span>?</h1>
+                        <div className="space-y-8">
+                            {[
+                                { key: 'revenue', label: 'Retorno esperado', icon: DollarSign },
+                                { key: 'viability', label: 'Facilidade técnica', icon: Target },
+                                { key: 'velocity', label: 'Rapidez de entrega', icon: Zap }
+                            ].map(item => (
+                                <div key={item.key} className="space-y-3">
+                                    <div className="flex justify-between items-center">
+                                        <div className="flex items-center gap-2">
+                                            <item.icon className="w-4 h-4 text-amber-500"/>
+                                            <span className="font-bold text-xs uppercase text-slate-600">{item.label}</span>
+                                        </div>
+                                        <span className="text-2xl font-black text-amber-500">{formData[item.key as keyof Opportunity] as number}</span>
+                                    </div>
+                                    <input 
+                                        type="range" min="1" max="5" step="1"
+                                        value={formData[item.key as keyof Opportunity] as number}
+                                        onChange={e => setFormData({...formData, [item.key]: parseInt(e.target.value)})}
+                                        className="w-full accent-amber-500"
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                        <div className="flex gap-3">
+                            <button onClick={prev} className="p-4 bg-slate-100 rounded-xl text-slate-500"><ChevronLeft/></button>
+                            <button onClick={next} className="flex-1 py-4 bg-slate-900 text-white font-black uppercase tracking-widest text-[10px] rounded-xl shadow-lg">Gerar Score</button>
+                        </div>
+                    </div>
+                )}
+
+                {step === 5 && (
+                    <div className="space-y-8 text-center animate-in zoom-in duration-500">
+                        <div className="w-20 h-20 bg-amber-500 rounded-[2rem] flex items-center justify-center mx-auto shadow-lg animate-bounce">
+                            <Rocket className="w-10 h-10 text-white fill-white"/>
+                        </div>
+                        <div className="space-y-2">
+                            <h1 className="text-3xl md:text-5xl font-black tracking-tighter text-slate-900">Tudo <span className="text-amber-500">pronto!</span></h1>
+                            <p className="text-slate-500 font-medium">O projeto foi mapeado com sucesso. Clique abaixo para começar a gestão.</p>
+                        </div>
+                        <div className="pt-4 space-y-4">
+                            <button 
+                                onClick={handleSave}
+                                disabled={isSaving}
+                                className="w-full py-5 bg-slate-900 text-white font-black uppercase tracking-widest text-xs rounded-2xl shadow-xl hover:bg-amber-500 transition-all active:scale-95 flex items-center justify-center gap-3"
+                            >
+                                {isSaving ? <Loader2 className="animate-spin w-5 h-5"/> : <><Check className="w-5 h-5"/> Salvar Projeto</>}
+                            </button>
+                            <button onClick={prev} className="text-[10px] font-black uppercase tracking-widest text-slate-400">Revisar dados</button>
+                        </div>
+                    </div>
+                )}
             </div>
         </main>
-
-        {showQuickClient && (
-            <div className="fixed inset-0 z-[700] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
-                <div className="w-full max-w-md bg-white dark:bg-[#0A0A0C] rounded-[2.5rem] shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden animate-ios-pop flex flex-col">
-                    <header className="p-8 pb-4 flex justify-between items-center bg-slate-50 dark:bg-white/5">
-                        <div>
-                            <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tighter">Novo Stakeholder.</h2>
-                            <p className="text-[8px] text-slate-500 uppercase font-black tracking-widest mt-1">Criação Instantânea de Registro</p>
-                        </div>
-                        <button onClick={() => setShowQuickClient(false)} className="p-2 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-all text-slate-400"><X className="w-5 h-5"/></button>
-                    </header>
-                    <form onSubmit={handleQuickClientCreate} className="p-8 space-y-6">
-                        <div className="space-y-4">
-                            <div className="space-y-1.5">
-                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-2"><Building2 className="w-3 h-3 text-amber-500"/> Nome da Empresa / Pessoa</label>
-                                <input required value={quickClientForm.nome} onChange={e => setQuickClientForm({...quickClientForm, nome: e.target.value})} className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl p-4 text-sm font-bold text-slate-900 dark:text-white outline-none focus:border-amber-500 transition-all shadow-inner" placeholder="Ex: Acme Corp"/>
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-2"><Mail className="w-3 h-3 text-blue-500"/> E-mail Corporativo</label>
-                                <input required type="email" value={quickClientForm.email} onChange={e => setQuickClientForm({...quickClientForm, email: e.target.value})} className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl p-4 text-sm font-bold text-slate-900 dark:text-white outline-none focus:border-amber-500 transition-all shadow-inner" placeholder="contato@empresa.com"/>
-                            </div>
-                        </div>
-                        <button 
-                            type="submit" 
-                            disabled={isCreatingQuickClient}
-                            className="w-full py-5 bg-slate-900 dark:bg-white text-white dark:text-black rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-30"
-                        >
-                            {isCreatingQuickClient ? <Loader2 className="animate-spin w-5 h-5"/> : <Save className="w-5 h-5"/>}
-                            Sincronizar Novo Stakeholder
-                        </button>
-                    </form>
-                </div>
-            </div>
-        )}
     </div>
   );
 }

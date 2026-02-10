@@ -1,12 +1,14 @@
 
-import React, { useState } from 'react';
-import { Opportunity, Archetype } from '../types';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { Opportunity } from '../types';
 import { 
-    Search, Filter, LayoutGrid, Zap, Target, ArrowRight, 
-    Briefcase, GanttChartSquare, Plus, Trash2, List, 
-    DollarSign, ChevronRight, Info, AlertCircle, Ban 
+    Search, Target, ArrowRight, 
+    Briefcase, DollarSign, ChevronRight,
+    Wallet, X, Activity, ShieldCheck, TrendingUp,
+    Plus, CreditCard, Ticket, Sparkles, Filter, 
+    Cpu, Info, Settings, Layout, ChevronDown,
+    SortAsc, SortDesc, ArrowUpDown, Check
 } from 'lucide-react';
-import { deleteOpportunity } from '../services/opportunityService';
 
 interface Props {
   opportunities: Opportunity[];
@@ -15,234 +17,414 @@ interface Props {
   organizationId?: number;
   onOpenCreate?: () => void;
   initialFilterStatus?: string;
-  activeModules?: string[];
   onRefresh?: () => void;
 }
 
-export const ProjectList: React.FC<Props> = ({ opportunities, onOpenProject, userRole, onOpenCreate, initialFilterStatus, activeModules, onRefresh }) => {
+type SortMode = 'prio' | 'mrr-desc' | 'mrr-asc' | 'alpha-asc' | 'alpha-desc';
+
+export const ProjectList: React.FC<Props> = ({ opportunities = [], onOpenProject, userRole, onOpenCreate, initialFilterStatus }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>(initialFilterStatus || 'All');
-  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+  const [sortMode, setSortMode] = useState<SortMode>('prio');
+  const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
+  const [flippedCardId, setFlippedCardId] = useState<string | null>(null);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  
+  const menuRef = useRef<HTMLDivElement>(null);
 
-  const filteredOpps = opportunities.filter(opp => {
-      const matchesSearch = opp.title.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus = filterStatus === 'All' || opp.status === filterStatus;
-      return matchesSearch && matchesStatus;
-  });
+  // Close menu on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+    if (isMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isMenuOpen]);
 
-  const handleDelete = async (e: React.MouseEvent, id: string) => {
-      e.preventDefault();
-      e.stopPropagation();
+  const filteredOpps = useMemo(() => {
+      if (!Array.isArray(opportunities)) return [];
       
-      if (confirm("Deseja realmente excluir este projeto? Esta ação é irreversível.")) {
-          try {
-              const success = await deleteOpportunity(id);
-              if (success) {
-                  if (onRefresh) onRefresh();
-              } else {
-                  alert("Erro ao excluir projeto.");
-              }
-          } catch (err) {
-              alert("Falha na comunicação com o banco.");
+      let result = opportunities.filter(opp => {
+          if (!opp) return false;
+          const title = (opp.title || '').toLowerCase();
+          const id = String(opp.id || '').toLowerCase();
+          const search = searchTerm.toLowerCase();
+          
+          const matchesSearch = title.includes(search) || id.includes(search);
+          const matchesStatus = filterStatus === 'All' || opp.status === filterStatus;
+          return matchesSearch && matchesStatus;
+      });
+
+      result.sort((a, b) => {
+          switch (sortMode) {
+              case 'mrr-desc':
+                  return (Number(b.mrr) || 0) - (Number(a.mrr) || 0);
+              case 'mrr-asc':
+                  return (Number(a.mrr) || 0) - (Number(b.mrr) || 0);
+              case 'alpha-asc':
+                  return (a.title || '').localeCompare(b.title || '');
+              case 'alpha-desc':
+                  return (b.title || '').localeCompare(a.title || '');
+              default:
+                  // Prioridade: Ativos primeiro, depois Score
+                  if (a.status === 'Active' && b.status !== 'Active') return -1;
+                  if (a.status !== 'Active' && b.status === 'Active') return 1;
+                  return (b.prioScore || 0) - (a.prioScore || 0);
           }
+      });
+
+      return result;
+  }, [opportunities, searchTerm, filterStatus, sortMode]);
+
+  const getAssetStyle = (opp: Opportunity) => {
+      if (opp.status === 'Active') {
+          return {
+              type: 'card',
+              bg: opp.color || '#F59E0B',
+              text: 'text-white',
+              sub: 'text-white/70'
+          };
       }
+      return {
+          type: 'ticket',
+          bg: 'bg-white dark:bg-[#1a1a1e]',
+          text: 'text-slate-900 dark:text-white',
+          sub: 'text-slate-500 dark:text-slate-400'
+      };
   };
 
-  const getStatusColor = (status: string) => {
-      switch(status) {
-          case 'Active': return 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20';
-          case 'Negotiation': return 'text-blue-500 bg-blue-500/10 border-blue-500/20';
-          case 'Future': return 'text-amber-500 bg-amber-500/10 border-amber-500/20';
-          default: return 'text-slate-500 bg-slate-100 border-slate-200';
-      }
+  const handleBackgroundClick = () => {
+      setExpandedCardId(null);
+      setFlippedCardId(null);
+      setIsMenuOpen(false);
   };
 
-  const renderValue = (opp: Opportunity) => {
-      if (opp.archetype === Archetype.INTERNAL_MARKETING) {
-          return (
-              <div className="flex flex-col items-end">
-                <span className="font-black text-slate-400 flex items-center gap-1.5">
-                    <Ban className="w-3 h-3"/> INTERNO
-                </span>
-                <span className="text-[7px] font-bold text-slate-400 uppercase tracking-tighter">Centro de Custo</span>
-              </div>
-          );
-      }
+  const CARD_HEADER_OFFSET = 85;
+  const EXPANDED_HEIGHT = 460;
 
-      // Fixed: Using correct mrr property from Opportunity interface
-      const realMrr = Number(opp.mrr || 0);
-      if (realMrr > 0) {
-          return (
-              <div className="flex flex-col items-end">
-                <span className="font-black text-emerald-500">
-                    R$ {realMrr.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
-                </span>
-                <span className="text-[7px] font-bold text-slate-400 uppercase tracking-tighter">Recorrência Mensal</span>
-              </div>
-          );
-      }
-      // Projeção baseada no Score RDE (Revenue 1-5) -> 1 ponto = R$ 2k MRR
-      const projectedMrr = (Number(opp.revenue || 1) * 2000);
-      return (
-          <div className="flex flex-col items-end">
-              <span className="font-black text-amber-500/60 text-xs">
-                  ~ R$ {projectedMrr.toLocaleString('pt-BR')}
-              </span>
-              <span className="text-[7px] font-bold text-slate-400 uppercase tracking-tighter">Projeção via Score</span>
-          </div>
-      );
-  };
+  const containerHeight = useMemo(() => {
+      if (filteredOpps.length === 0) return 400;
+      const baseStackHeight = (filteredOpps.length - 1) * CARD_HEADER_OFFSET + 280;
+      return expandedCardId ? baseStackHeight + (EXPANDED_HEIGHT - 120) : baseStackHeight;
+  }, [filteredOpps.length, expandedCardId]);
+
+  const sortOptions = [
+    { id: 'prio', label: 'Prioridade (Padrão)' },
+    { id: 'mrr-desc', label: 'Ticket (Maior p/ Menor)' },
+    { id: 'mrr-asc', label: 'Ticket (Menor p/ Maior)' },
+    { id: 'alpha-asc', label: 'Ordem Alfabética (A-Z)' },
+    { id: 'alpha-desc', label: 'Ordem Alfabética (Z-A)' },
+  ];
+
+  const statusFilters = [
+    { id: 'All', label: 'Todos os Status' },
+    { id: 'Active', label: 'Ativos (Performance)' },
+    { id: 'Future', label: 'Backlog (Valoração)' },
+  ];
 
   return (
-    <div className="max-w-7xl mx-auto space-y-10 animate-in fade-in duration-700 pb-32">
-        {/* Header Estratégico */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-            <div>
-                <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">
-                    Portfólio de <span className="text-amber-500">Ativos</span>.
-                </h1>
-                <p className="text-slate-500 dark:text-[#A1A1AA] font-bold uppercase tracking-widest text-[10px] mt-4 flex items-center gap-2">
-                    <Zap className="w-3 h-3 text-amber-500"/> Pipeline de Engenharia e Valor Recorrente
-                </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
-                <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-xl border border-slate-200 dark:border-white/10 shadow-inner">
-                    <button onClick={() => setViewMode('grid')} className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-white/10 shadow-sm text-amber-500' : 'text-slate-400'}`}><LayoutGrid className="w-4 h-4"/></button>
-                    <button onClick={() => setViewMode('table')} className={`p-2 rounded-lg transition-all ${viewMode === 'table' ? 'bg-white dark:bg-white/10 shadow-sm text-amber-500' : 'text-slate-400'}`}><List className="w-4 h-4"/></button>
+    <div 
+        className="w-full min-h-screen animate-in fade-in duration-700 pb-40 select-none"
+        onClick={handleBackgroundClick}
+    >
+        <div className="max-w-4xl mx-auto px-4 md:px-0">
+            {/* Header Local da Carteira */}
+            <header className="flex justify-between items-end mb-10 pt-6" onClick={e => e.stopPropagation()}>
+                <div>
+                    <h1 className="text-4xl font-black tracking-tighter text-slate-900 dark:text-white">Carteira.</h1>
+                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mt-2">Patrimônio de Ativos Shinkō</p>
                 </div>
+                <div className="flex gap-2 relative">
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); onOpenCreate?.(); }}
+                        className="w-11 h-11 rounded-2xl bg-slate-100 dark:bg-white/5 flex items-center justify-center text-slate-900 dark:text-white hover:bg-amber-500 hover:text-black transition-all shadow-sm active:scale-90"
+                    >
+                        <Plus className="w-5 h-5"/>
+                    </button>
+                    
+                    <div ref={menuRef} className="relative">
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); setIsMenuOpen(!isMenuOpen); }}
+                            className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all shadow-sm active:scale-90 ${isMenuOpen ? 'bg-slate-900 text-white dark:bg-white dark:text-black' : 'bg-slate-100 dark:bg-white/5 text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}
+                        >
+                            <Filter className="w-5 h-5"/>
+                        </button>
 
-                <div className="relative flex-1 md:w-64">
-                    <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"/>
+                        {/* MENU FLUTUANTE (POPOVER) */}
+                        {isMenuOpen && (
+                            <div className="absolute right-0 mt-3 w-72 glass-panel bg-white/90 dark:bg-[#0a0a0c]/95 border border-slate-200 dark:border-white/10 rounded-[2rem] shadow-2xl z-[500] p-6 animate-in zoom-in-95 duration-200 origin-top-right">
+                                <div className="space-y-6">
+                                    {/* Ordenação */}
+                                    <div className="space-y-3">
+                                        <div className="flex items-center gap-2 text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">
+                                            <ArrowUpDown className="w-3 h-3"/> Ordenar Por
+                                        </div>
+                                        <div className="space-y-1">
+                                            {sortOptions.map(opt => (
+                                                <button 
+                                                    key={opt.id}
+                                                    onClick={() => { setSortMode(opt.id as SortMode); setIsMenuOpen(false); }}
+                                                    className={`w-full text-left px-4 py-3 rounded-xl text-xs transition-all flex items-center justify-between group ${sortMode === opt.id ? 'bg-amber-500 text-black font-black' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 font-bold'}`}
+                                                >
+                                                    {opt.label}
+                                                    {sortMode === opt.id && <Check className="w-4 h-4"/>}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="h-px bg-slate-100 dark:bg-white/5"></div>
+
+                                    {/* Filtragem de Status */}
+                                    <div className="space-y-3">
+                                        <div className="flex items-center gap-2 text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">
+                                            <Activity className="w-3 h-3"/> Filtrar Status
+                                        </div>
+                                        <div className="space-y-1">
+                                            {statusFilters.map(opt => (
+                                                <button 
+                                                    key={opt.id}
+                                                    onClick={() => { setFilterStatus(opt.id); setIsMenuOpen(false); }}
+                                                    className={`w-full text-left px-4 py-3 rounded-xl text-xs transition-all flex items-center justify-between group ${filterStatus === opt.id ? 'bg-slate-900 text-white dark:bg-white dark:text-black font-black' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 font-bold'}`}
+                                                >
+                                                    {opt.label}
+                                                    {filterStatus === opt.id && <Check className="w-4 h-4"/>}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </header>
+
+            {/* Busca Local */}
+            <div className="mb-12" onClick={e => e.stopPropagation()}>
+                <div className="relative group">
+                    <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400 group-focus-within:text-amber-500 transition-colors"/>
                     <input 
-                        type="text" 
-                        placeholder="Buscar por ID ou Nome..." 
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
-                        className="w-full pl-11 pr-4 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-[#333] rounded-2xl text-sm font-bold outline-none focus:border-amber-500 transition-all shadow-sm"
+                        placeholder="Buscar em seus ativos..."
+                        className="w-full bg-slate-100 dark:bg-white/[0.04] border border-transparent dark:border-white/5 rounded-[1.8rem] py-5 pl-14 pr-6 text-base font-bold outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500/20 transition-all text-slate-900 dark:text-white shadow-inner"
                     />
                 </div>
+            </div>
 
-                {onOpenCreate && (
-                    <button onClick={onOpenCreate} className="px-8 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-105 transition-all shadow-xl active:scale-95 flex items-center gap-2">
-                        <Plus className="w-4 h-4"/> Novo Ativo
-                    </button>
+            {/* Container da Pilha com Perspectiva 3D */}
+            <div 
+                className="relative transition-all duration-700 ease-in-out" 
+                style={{ minHeight: `${containerHeight}px`, perspective: '2000px' }}
+            >
+                {filteredOpps.map((opp, idx) => {
+                    const isExpanded = expandedCardId === opp.id;
+                    const isFlipped = flippedCardId === opp.id;
+                    const style = getAssetStyle(opp);
+                    const isTicket = style.type === 'ticket';
+                    const expandedIdx = filteredOpps.findIndex(o => o.id === expandedCardId);
+                    
+                    let translateY = idx * CARD_HEADER_OFFSET;
+                    if (expandedCardId && idx > expandedIdx) {
+                        translateY += (EXPANDED_HEIGHT - CARD_HEADER_OFFSET - 40);
+                    }
+
+                    return (
+                        <div 
+                            key={opp.id}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (isExpanded) {
+                                    setFlippedCardId(isFlipped ? null : opp.id);
+                                } else {
+                                    setExpandedCardId(opp.id);
+                                    setFlippedCardId(null);
+                                }
+                            }}
+                            className={`
+                                w-full transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] cursor-pointer absolute top-0 left-0
+                                ${isExpanded ? 'scale-[1.02]' : 'hover:-translate-y-2'}
+                            `}
+                            style={{
+                                transform: `translateY(${translateY}px)`,
+                                zIndex: isExpanded ? 100 : idx + 10,
+                                transformStyle: 'preserve-3d'
+                            }}
+                        >
+                            {/* O "CONTAINER" DO CARTÃO QUE GIRA */}
+                            <div 
+                                className={`
+                                    relative w-full transition-transform duration-[800ms] ease-[cubic-bezier(0.34,1.56,0.64,1)]
+                                    ${isFlipped ? 'rotate-y-180' : ''}
+                                `}
+                                style={{ 
+                                    transformStyle: 'preserve-3d',
+                                    height: isExpanded ? `${EXPANDED_HEIGHT}px` : '180px'
+                                }}
+                            >
+                                
+                                {/* LADO A: FRENTE DO CARTÃO */}
+                                <div 
+                                    className={`
+                                        absolute inset-0 w-full rounded-[2.5rem] shadow-2xl overflow-hidden p-8 md:p-10 flex flex-col border border-white/10 transition-all duration-500 backface-hidden
+                                        ${isTicket ? 'bg-white dark:bg-[#1a1a1e] border-slate-200 dark:border-white/5' : ''}
+                                    `}
+                                    style={{ 
+                                        backgroundColor: !isTicket ? (opp.color || '#F59E0B') : undefined,
+                                        backfaceVisibility: 'hidden',
+                                        WebkitBackfaceVisibility: 'hidden',
+                                        transform: 'translateZ(1px)',
+                                        opacity: 1
+                                    }}
+                                >
+                                    {!isTicket && (
+                                        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/20 to-transparent opacity-40 pointer-events-none"></div>
+                                    )}
+
+                                    <div className="flex justify-between items-start relative z-10 mb-6 gap-4">
+                                        <div className="space-y-1 min-w-0 flex-1">
+                                            <div className={`flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.2em] ${style.sub}`}>
+                                                {isTicket ? <Ticket className="w-3 h-3"/> : <CreditCard className="w-3 h-3"/>}
+                                                {opp.archetype}
+                                            </div>
+                                            <h3 className={`text-xl md:text-2xl font-black tracking-tighter ${style.text} truncate`}>{opp.title}</h3>
+                                        </div>
+                                        <div className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border shrink-0 ${isTicket ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' : 'bg-white/10 text-white border-white/20'}`}>
+                                            {isTicket ? 'Backlog' : 'Performance'}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex-1 flex flex-col justify-end">
+                                        <div className="flex justify-between items-end relative z-10">
+                                            <div>
+                                                <div className={`text-[9px] font-black uppercase tracking-[0.2em] mb-1 ${style.sub}`}>Yield Mensal</div>
+                                                <div className={`text-2xl md:text-3xl font-black ${style.text}`}>
+                                                    <span className="text-sm font-bold mr-1 opacity-50">R$</span>
+                                                    {(Number(opp.mrr) || 0).toLocaleString('pt-BR')}
+                                                </div>
+                                            </div>
+                                            <div className="text-right shrink-0">
+                                                <div className={`text-[9px] font-black uppercase tracking-[0.2em] mb-1 ${style.sub}`}>PRIO-6 SCORE</div>
+                                                <div className={`text-2xl font-black ${isTicket ? 'text-amber-500' : 'text-white'}`}>{(opp.prioScore || 0).toFixed(1)}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    {isExpanded && !isFlipped && (
+                                        <div className="mt-8 pt-4 border-t border-white/10 flex justify-center items-center animate-pulse shrink-0">
+                                            <span className={`text-[8px] font-black uppercase tracking-[0.4em] ${style.sub}`}>Clique para ver o verso</span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* LADO B: VERSO DO CARTÃO */}
+                                <div 
+                                    className={`
+                                        absolute inset-0 w-full rounded-[2.5rem] shadow-2xl p-10 flex flex-col rotate-y-180 backface-hidden border border-white/20 bg-[#0a0a0b]
+                                    `}
+                                    style={{ 
+                                        transform: 'rotateY(180deg) translateZ(1px)',
+                                        backfaceVisibility: 'hidden',
+                                        WebkitBackfaceVisibility: 'hidden',
+                                        opacity: 1
+                                    }}
+                                >
+                                    <div className="flex justify-between items-center mb-8 relative z-20">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-amber-500/10 rounded-lg">
+                                                <Cpu className="w-5 h-5 text-amber-500"/>
+                                            </div>
+                                            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Dados de Engenharia</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-8 h-5 bg-white/5 rounded flex items-center justify-center border border-white/10">
+                                                <div className="w-4 h-2.5 bg-amber-500/40 rounded-sm"></div>
+                                            </div>
+                                            <span className="text-[8px] font-bold text-slate-600 uppercase">v2.6</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="mb-8 relative z-20">
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); onOpenProject(opp); }}
+                                            className="w-full py-5 rounded-[1.8rem] bg-white text-black font-black text-[11px] uppercase tracking-[0.3em] transition-all flex items-center justify-center gap-3 hover:bg-amber-500 shadow-glow-white active:scale-95 group"
+                                        >
+                                            Abrir Ativo <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1"/>
+                                        </button>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-10 mb-8 relative z-20 flex-1">
+                                        <div className="space-y-4">
+                                            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Indicadores Shinkō</h4>
+                                            <div className="space-y-3">
+                                                {[
+                                                    { label: 'Velocidade', val: opp.velocity },
+                                                    { label: 'Viabilidade', val: opp.viability },
+                                                    { label: 'Retorno', val: opp.revenue }
+                                                ].map(item => (
+                                                    <div key={item.label} className="flex flex-col gap-1.5">
+                                                        <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                                            <span>{item.label}</span>
+                                                            <span className="text-amber-500">{item.val || 1}/5</span>
+                                                        </div>
+                                                        <div className="flex gap-1">
+                                                            {[1,2,3,4,5].map(v => (
+                                                                <div key={v} className={`h-1 flex-1 rounded-full transition-all duration-500 ${v <= (item.val || 1) ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.3)]' : 'bg-white/5'}`}></div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="space-y-6">
+                                            <div className="space-y-3">
+                                                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Saúde Técnica</h4>
+                                                <div className="p-4 bg-emerald-500/5 rounded-2xl border border-emerald-500/10 flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <Activity className="w-3.5 h-3.5 text-emerald-500"/>
+                                                        <span className="text-[9px] font-black uppercase text-slate-400">Status</span>
+                                                    </div>
+                                                    <span className="text-xs font-black text-emerald-500">92%</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="p-4 bg-white/5 rounded-2xl border border-white/5 text-[9px] text-slate-500 leading-relaxed font-medium italic text-center">
+                                                Ativo otimizado para {(opp.prioScore || 0) > 40 ? 'Alta Performance' : 'Estabilidade'}.
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="mt-auto text-center relative z-20 opacity-40">
+                                        <span className="text-[8px] font-black uppercase tracking-[0.5em] text-slate-600">Shinkō Systems Global</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
+
+                {filteredOpps.length === 0 && (
+                    <div className="py-40 text-center border-2 border-dashed border-slate-200 dark:border-white/5 rounded-[3rem] opacity-30 w-full">
+                        <Wallet className="w-16 h-16 mx-auto mb-4 text-slate-300"/>
+                        <p className="text-xs font-black uppercase tracking-[0.4em]">Carteira de ativos vazia</p>
+                    </div>
                 )}
             </div>
         </div>
 
-        {/* Listagem em GRID */}
-        {viewMode === 'grid' ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {filteredOpps.map(opp => (
-                    <div 
-                        key={opp.id}
-                        onClick={() => onOpenProject(opp)}
-                        className="bg-white dark:bg-slate-900 p-8 flex flex-col justify-between min-h-[300px] cursor-pointer group relative rounded-[2.5rem] border border-slate-100 dark:border-white/5 hover:border-amber-500/30 transition-all hover:shadow-2xl hover:-translate-y-1"
-                    >
-                        {userRole !== 'cliente' && (
-                            <button 
-                                type="button"
-                                onClick={(e) => handleDelete(e, opp.id)}
-                                className="absolute top-6 right-6 p-2 text-slate-300 hover:text-red-500 transition-all z-10 opacity-0 group-hover:opacity-100"
-                            >
-                                <Trash2 className="w-4 h-4"/>
-                            </button>
-                        )}
-
-                        <div>
-                            <div className="flex justify-between items-start mb-8">
-                                <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border ${getStatusColor(opp.status)}`}>
-                                    {opp.status}
-                                </span>
-                                <div className="text-[10px] font-black text-amber-500 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
-                                    {opp.prioScore.toFixed(1)}
-                                </div>
-                            </div>
-
-                            <h3 className="text-xl font-black text-slate-900 dark:text-white group-hover:text-amber-500 transition-colors leading-tight mb-3 tracking-tighter">
-                                {opp.title}
-                            </h3>
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-3 font-medium leading-relaxed">
-                                {opp.description || "Iniciativa sem contexto estratégico definido."}
-                            </p>
-                        </div>
-
-                        <div className="pt-6 mt-8 border-t border-slate-50 dark:border-white/5 flex items-end justify-between">
-                            <div className="space-y-1">
-                                <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                                    <DollarSign className="w-2.5 h-2.5"/> MRR Alvo
-                                </div>
-                                <div className="text-sm font-black text-slate-900 dark:text-white">
-                                    {renderValue(opp)}
-                                </div>
-                            </div>
-                            <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 flex items-center justify-center group-hover:bg-amber-500 group-hover:text-black transition-all">
-                                <ArrowRight className="w-4 h-4"/>
-                            </div>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        ) : (
-            /* Listagem em TABELA (Classic Spreadsheet View) */
-            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-white/5 overflow-hidden shadow-soft overflow-x-auto custom-scrollbar">
-                <table className="w-full text-left table-auto">
-                    <thead className="bg-slate-50 dark:bg-white/[0.02] border-b border-slate-100 dark:border-white/10">
-                        <tr>
-                            <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Ativo / Projeto</th>
-                            <th className="px-4 py-5 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Status</th>
-                            <th className="px-4 py-5 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">RDE PRIO</th>
-                            <th className="px-4 py-5 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">T.A.D.S</th>
-                            <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">MRR (Mensal)</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50 dark:divide-white/5">
-                        {filteredOpps.map(opp => (
-                            <tr key={opp.id} onClick={() => onOpenProject(opp)} className="group hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-all cursor-pointer">
-                                <td className="px-8 py-5">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-1.5 h-6 bg-amber-500/20 rounded-full group-hover:bg-amber-500 transition-all"></div>
-                                        <div className="flex flex-col">
-                                            <span className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-tight group-hover:text-amber-500">{opp.title}</span>
-                                            <span className="text-[9px] font-bold text-slate-400 uppercase mt-0.5">{opp.archetype}</span>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td className="px-4 py-5 text-center">
-                                    <span className={`px-2.5 py-1 rounded-[6px] text-[8px] font-black uppercase tracking-tighter border inline-block ${getStatusColor(opp.status)}`}>
-                                        {opp.status}
-                                    </span>
-                                </td>
-                                <td className="px-4 py-5 text-center">
-                                    <span className="text-[10px] font-black text-slate-700 dark:text-slate-300 font-mono">{opp.prioScore.toFixed(1)}</span>
-                                </td>
-                                <td className="px-4 py-5 text-center">
-                                    <div className="flex justify-center gap-1">
-                                        {Object.values(opp.tads).map((val, i) => (
-                                            <div key={i} className={`w-1.5 h-1.5 rounded-full ${val ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-white/10'}`}></div>
-                                        ))}
-                                    </div>
-                                </td>
-                                <td className="px-8 py-5 text-right">
-                                    {renderValue(opp)}
-                                </td>
-                            </tr>
-                        ))}
-                        {filteredOpps.length === 0 && (
-                            <tr>
-                                <td colSpan={5} className="py-20 text-center opacity-30">
-                                    <div className="flex flex-col items-center gap-4">
-                                        <AlertCircle className="w-12 h-12"/>
-                                        <span className="text-xs font-black uppercase tracking-widest">Nenhum ativo mapeado</span>
-                                    </div>
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
-        )}
+        {/* Global CSS Inject for the Flip effect */}
+        <style>{`
+            .rotate-y-180 { transform: rotateY(180deg); }
+            .backface-hidden { backface-visibility: hidden !important; -webkit-backface-visibility: hidden !important; }
+            .shadow-glow-amber { box-shadow: 0 0 10px rgba(245, 158, 11, 0.4); }
+            .shadow-glow-white { box-shadow: 0 0 20px rgba(255, 255, 255, 0.2); }
+        `}</style>
     </div>
   );
 };

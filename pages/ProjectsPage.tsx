@@ -12,12 +12,17 @@ interface Props {
 
 export const ProjectsPage: React.FC<Props> = ({ opportunities, onOpenProject, userRole, onRefresh }) => {
     return (
-        <div className="h-full p-4 md:p-8 overflow-y-auto custom-scrollbar">
+        <div className="h-full p-6 md:p-12 overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-transparent">
             <ProjectList 
                 opportunities={opportunities} 
                 onOpenProject={onOpenProject} 
                 userRole={userRole} 
-                onRefresh={onRefresh} 
+                onRefresh={onRefresh}
+                onOpenCreate={() => {
+                    // Redireciona para o Wizard de criação através do histórico de navegação
+                    window.history.pushState({}, '', '/project/new');
+                    window.dispatchEvent(new PopStateEvent('popstate'));
+                }}
             />
         </div>
     );

@@ -39,7 +39,7 @@ export const DashboardPage: React.FC<Props> = ({ opportunities, onOpenProject, o
     }, [user]);
 
     return (
-        <div className="h-full overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-transparent px-4 md:px-8 lg:px-12">
+        <div className="h-full overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-transparent animate-page-enter">
             <Dashboard 
                 opportunities={opportunities} 
                 onNavigate={onNavigate} 
