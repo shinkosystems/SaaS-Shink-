@@ -130,7 +130,8 @@ export const CalendarView: React.FC<Props> = ({
                         completed: editingTaskCtx.task.status === 'done',
                         assigneeId: editingTaskCtx.task.responsavel,
                         dueDate: editingTaskCtx.task.datafim,
-                        category: editingTaskCtx.task.category
+                        category: editingTaskCtx.task.category,
+                        gut: { g: editingTaskCtx.task.gravidade || 3, u: editingTaskCtx.task.urgencia || 3, t: editingTaskCtx.task.tendencia || 3 }
                     }}
                     opportunityTitle={editingTaskCtx.projetoData?.nome || 'PROJETO ATIVO'}
                     nodeTitle={editingTaskCtx.task.category || 'Tarefa'} organizationId={organizationId} onClose={() => setEditingTaskCtx(null)}
@@ -141,7 +142,10 @@ export const CalendarView: React.FC<Props> = ({
                             datafim: updated.dueDate,
                             titulo: updated.text,
                             descricao: updated.description,
-                            category: updated.category
+                            category: updated.category,
+                            gravidade: updated.gut?.g,
+                            urgencia: updated.gut?.u,
+                            tendencia: updated.gut?.t
                         }); 
                         onTaskUpdate(); 
                         setEditingTaskCtx(null); 

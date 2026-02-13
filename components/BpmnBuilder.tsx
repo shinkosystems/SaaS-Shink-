@@ -53,7 +53,8 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
             category: 'Gestão',
             status: 'todo',
             completed: false,
-            estimatedHours: 2
+            estimatedHours: 2,
+            gut: { g: 3, u: 3, t: 3 }
         };
 
         const newNodes = nodes.map(n => {
@@ -120,7 +121,8 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
                         category: n.label,
                         status: 'todo',
                         completed: false,
-                        estimatedHours: Number(t.estimatedHours) || 4
+                        estimatedHours: Number(t.estimatedHours) || 4,
+                        gut: { g: 3, u: 3, t: 3 }
                     }))
                 }));
                 
@@ -174,7 +176,10 @@ const BpmnBuilder: React.FC<Props> = ({ opportunity, onUpdate, readOnly }) => {
                 status: updatedTask.status,
                 responsavel: updatedTask.assigneeId,
                 duracaohoras: updatedTask.estimatedHours,
-                datafim: updatedTask.dueDate
+                datafim: updatedTask.dueDate,
+                gravidade: updatedTask.gut?.g,
+                urgencia: updatedTask.gut?.u,
+                tendencia: updatedTask.gut?.t
             });
         }
     };

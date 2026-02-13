@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Opportunity, DbTask } from '../types';
-import { updateTask } from '../services/projectService';
+import { updateTask, deleteTask } from '../services/projectService';
 import { TaskDetailModal } from './TaskDetailModal';
 import { 
     ChevronLeft, ChevronRight, Zap, Loader2, 
@@ -102,7 +102,7 @@ export const GanttView: React.FC<Props> = ({
                                             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
                                                 {task.category || 'Ativo'}
                                             </span>
-                                            <div className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest ${task.status === 'done' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>
+                                            <div className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest ${task.status === 'done' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-amber-500/10 text-amber-500'}`}>
                                                 {task.status}
                                             </div>
                                         </div>
@@ -136,6 +136,11 @@ export const GanttView: React.FC<Props> = ({
                         onSave={async (updated) => {
                             await updateTask(Number(updated.id), { titulo: updated.text, status: updated.status, responsavel: updated.assigneeId, duracaohoras: updated.estimatedHours, datafim: updated.dueDate, datainicio: updated.startDate, category: updated.category });
                             onTaskUpdate(); setEditingTaskCtx(null);
+                        }}
+                        onDelete={async (id) => {
+                            await deleteTask(Number(id));
+                            onTaskUpdate();
+                            setEditingTaskCtx(null);
                         }}
                     />
                 )}
@@ -240,10 +245,16 @@ export const GanttView: React.FC<Props> = ({
                     task={editingTaskCtx.task} 
                     nodeTitle={editingTaskCtx.task.category || 'Tarefa'} 
                     opportunityTitle={editingTaskCtx.projetoData?.nome}
-                    organizationId={organizationId} onClose={() => setEditingTaskCtx(null)}
+                    organizationId={organizationId} 
+                    onClose={() => setEditingTaskCtx(null)}
                     onSave={async (updated) => {
                         await updateTask(Number(updated.id), { titulo: updated.text, status: updated.status, responsavel: updated.assigneeId, duracaohoras: updated.estimatedHours, datafim: updated.dueDate, datainicio: updated.startDate, category: updated.category });
                         onTaskUpdate(); setEditingTaskCtx(null);
+                    }}
+                    onDelete={async (id) => {
+                        await deleteTask(Number(id));
+                        onTaskUpdate();
+                        setEditingTaskCtx(null);
                     }}
                 />
             )}
