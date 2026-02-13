@@ -165,6 +165,7 @@ export const ProjectWorkspace: React.FC<Props> = ({
                         onSelectOpportunity={() => {}} 
                         userRole={userRole}
                         organizationId={opportunity.organizationId} 
+                        projectId={opportunity.id}
                         readOnly={readOnly}
                         onRefresh={loadProjectTasks}
                     />

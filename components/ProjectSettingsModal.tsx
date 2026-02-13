@@ -11,6 +11,7 @@ import {
     Activity
 } from 'lucide-react';
 import { fetchClientById, updateClient } from '../services/clientService';
+import { supabase } from '../services/supabaseClient';
 
 interface Props {
     opportunity: Opportunity;
@@ -24,8 +25,6 @@ export const ProjectSettingsModal: React.FC<Props> = ({ opportunity, onClose, on
     const [isSaving, setIsSaving] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [loadingClient, setLoadingClient] = useState(false);
-    const [deleteProgress, setDeleteProgress] = useState(0);
-    const deleteTimerRef = useRef<any | null>(null);
 
     // Esconder navegação global ao abrir
     useEffect(() => {
@@ -90,40 +89,37 @@ export const ProjectSettingsModal: React.FC<Props> = ({ opportunity, onClose, on
         }
     };
 
-    const startDeleting = (e: React.MouseEvent | React.TouchEvent) => {
+    const handleRemoveAsset = async () => {
         if (isDeleting) return;
-        setDeleteProgress(0);
-        const startTime = Date.now();
-        const duration = 1500;
 
-        deleteTimerRef.current = setInterval(() => {
-            const elapsed = Date.now() - startTime;
-            const progress = Math.min(100, (elapsed / duration) * 100);
-            setDeleteProgress(progress);
-
-            if (progress >= 100) {
-                stopDeleting();
-                confirmDelete();
-            }
-        }, 30);
-    };
-
-    const stopDeleting = () => {
-        if (deleteTimerRef.current) {
-            clearInterval(deleteTimerRef.current);
-            deleteTimerRef.current = null;
-        }
-        if (deleteProgress < 100) setDeleteProgress(0);
-    };
-
-    const confirmDelete = async () => {
         setIsDeleting(true);
         try {
-            await onDeleteProject(opportunity.id);
-        } catch (e) {
-            alert("Falha crítica na exclusão.");
+            // 1. Verificar se existem tarefas vinculadas
+            const { count, error } = await supabase
+                .from('tasks')
+                .select('*', { count: 'exact', head: true })
+                .eq('projeto', opportunity.id);
+
+            if (error) throw new Error("Falha ao validar integridade do ativo.");
+
+            if (count && count > 0) {
+                alert(`Ação Interrompida: Este ativo possui ${count} tarefas vinculadas. Para deletar o projeto, você deve primeiro remover todas as tarefas associadas a ele.`);
+                setIsDeleting(false);
+                return;
+            }
+
+            // 2. Pedir confirmação final
+            const confirmed = window.confirm(`Deseja destruir permanentemente o ativo "${opportunity.title}"? Esta operação é irreversível.`);
+            
+            if (confirmed) {
+                await onDeleteProject(opportunity.id);
+            } else {
+                setIsDeleting(false);
+            }
+
+        } catch (e: any) {
+            alert("Erro operacional: " + e.message);
             setIsDeleting(false);
-            setDeleteProgress(0);
         }
     };
 
@@ -280,25 +276,17 @@ export const ProjectSettingsModal: React.FC<Props> = ({ opportunity, onClose, on
                                             <h5 className="text-[10px] font-black text-red-500 uppercase tracking-widest flex items-center gap-2">
                                                 <AlertTriangle className="w-4 h-4"/> Zona de Exclusão
                                             </h5>
-                                            <p className="text-[10px] text-slate-500 font-bold uppercase mt-2">Segure por 1.5s para destruir permanentemente</p>
+                                            <p className="text-[10px] text-slate-500 font-bold uppercase mt-2">Clique para remover permanentemente</p>
                                         </div>
                                         <button 
-                                            onMouseDown={startDeleting}
-                                            onMouseUp={stopDeleting}
-                                            onMouseLeave={stopDeleting}
-                                            onTouchStart={startDeleting}
-                                            onTouchEnd={stopDeleting}
+                                            onClick={handleRemoveAsset}
                                             disabled={isDeleting}
-                                            className="relative overflow-hidden w-full md:w-auto px-10 py-4 bg-red-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 group disabled:opacity-50"
+                                            className="relative overflow-hidden w-full md:w-auto px-10 py-4 bg-red-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 group disabled:opacity-50 shadow-lg hover:bg-red-600"
                                         >
                                             <span className="relative z-10 flex items-center justify-center gap-2">
                                                 {isDeleting ? <Loader2 className="w-4 h-4 animate-spin"/> : <Trash2 className="w-4 h-4"/>}
-                                                {isDeleting ? 'Removendo...' : 'Remover Ativo'}
+                                                {isDeleting ? 'Processando...' : 'Remover Ativo'}
                                             </span>
-                                            <div 
-                                                className="absolute inset-0 bg-red-700 transition-all duration-75"
-                                                style={{ width: `${deleteProgress}%` }}
-                                            />
                                         </button>
                                     </div>
                                 </div>
