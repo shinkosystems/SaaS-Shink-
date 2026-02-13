@@ -44,7 +44,6 @@ export const KanbanBoard: React.FC<Props> = ({ tasks, organizationId, projectId,
         setDraggedTaskId(taskId);
         e.dataTransfer.setData('taskId', taskId.toString());
         e.dataTransfer.effectAllowed = 'move';
-        // Pequeno delay para a imagem fantasma do drag não sumir imediatamente
         setTimeout(() => {
             const target = e.target as HTMLElement;
             target.style.opacity = '0.4';
@@ -72,7 +71,6 @@ export const KanbanBoard: React.FC<Props> = ({ tasks, organizationId, projectId,
         const taskId = parseInt(e.dataTransfer.getData('taskId'));
         if (isNaN(taskId)) return;
 
-        // Otimismo na UI: remove o card da coluna antiga e coloca na nova antes de salvar
         const taskToUpdate = tasks.find(t => t.id === taskId);
         if (taskToUpdate && taskToUpdate.status !== columnId) {
             try {
@@ -80,7 +78,7 @@ export const KanbanBoard: React.FC<Props> = ({ tasks, organizationId, projectId,
                 onRefresh?.();
             } catch (err) {
                 alert("Erro ao sincronizar estágio.");
-                onRefresh?.(); // Reverte para o estado original
+                onRefresh?.(); 
             }
         }
     };
@@ -90,7 +88,7 @@ export const KanbanBoard: React.FC<Props> = ({ tasks, organizationId, projectId,
             const XLSX = await import('https://esm.sh/xlsx@0.18.5');
             const data = [
                 ["Titulo", "Descricao", "Categoria", "Horas Estimadas", "Prazo (AAAA-MM-DD)", "Gravidade (1-5)", "Urgencia (1-5)", "Tendencia (1-5)"],
-                ["Exemplo de Tarefa", "Descrição detalhada aqui", "Lógica", 4, "2025-12-31", 3, 3, 3]
+                ["Exemplo de Ativo", "Desenvolver lógica de precificação", "Lógica", 4, "2025-12-31", 3, 3, 3]
             ];
             const ws = XLSX.utils.aoa_to_sheet(data);
             const wb = XLSX.utils.book_new();
@@ -112,39 +110,67 @@ export const KanbanBoard: React.FC<Props> = ({ tasks, organizationId, projectId,
             
             reader.onload = async (event) => {
                 const bstr = event.target?.result;
-                const wb = XLSX.read(bstr, { type: 'binary' });
+                const wb = XLSX.read(bstr, { type: 'binary', cellDates: true });
                 const wsname = wb.SheetNames[0];
                 const ws = wb.Sheets[wsname];
                 const data = XLSX.utils.sheet_to_json(ws) as any[];
 
                 let successCount = 0;
+                let errorCount = 0;
+
                 for (const row of data) {
+                    // Mapeamento flexível de colunas (com e sem acento)
+                    const title = row.Titulo || row.titulo || row.Título || row.título || 'Ativo Importado';
+                    const description = row.Descricao || row.descricao || row.Descrição || row.descrição || '';
+                    const category = row.Categoria || row.categoria || 'Gestão';
+                    const hours = Number(row["Horas Estimadas"] || row["Horas"] || row.horas || 2);
+                    
+                    // Tratamento de data (pode vir como objeto Date do XLSX ou string)
+                    let dueDate = row["Prazo (AAAA-MM-DD)"] || row.Prazo || row.prazo || row.Deadline || new Date().toISOString();
+                    if (dueDate instanceof Date) dueDate = dueDate.toISOString();
+
+                    const g = Number(row["Gravidade (1-5)"] || row.Gravidade || row.g || 3);
+                    const u = Number(row["Urgencia (1-5)"] || row.Urgencia || row["Urgência"] || row.u || 3);
+                    const t = Number(row["Tendencia (1-5)"] || row.Tendencia || row["Tendência"] || row.t || 3);
+
                     const taskPayload = {
-                        titulo: row.Titulo || row.titulo || 'Tarefa Importada',
-                        descricao: row.Descricao || row.descricao || '',
-                        category: row.Categoria || row.categoria || 'Gestão',
-                        duracaohoras: Number(row["Horas Estimadas"] || row.horas || 2),
-                        datafim: row["Prazo (AAAA-MM-DD)"] || row.prazo || new Date().toISOString(),
-                        gravidade: Number(row["Gravidade (1-5)"] || row.g || 1),
-                        urgencia: Number(row["Urgencia (1-5)"] || row.u || 1),
-                        tendencia: Number(row["Tendencia (1-5)"] || row.t || 1),
+                        titulo: title,
+                        descricao: description,
+                        category: category,
+                        duracaohoras: isNaN(hours) ? 2 : hours,
+                        datafim: dueDate,
+                        gravidade: isNaN(g) ? 3 : g,
+                        urgencia: isNaN(u) ? 3 : u,
+                        tendencia: isNaN(t) ? 3 : t,
                         projeto: projectId ? Number(projectId) : null,
-                        organizacao: organizationId,
+                        organizacao: Number(organizationId),
                         status: 'todo'
                     };
                     
-                    const res = await createTask(taskPayload);
-                    if (res) successCount++;
+                    try {
+                        const res = await createTask(taskPayload);
+                        if (res) successCount++;
+                        else errorCount++;
+                    } catch (err) {
+                        console.error("Falha ao importar linha:", row, err);
+                        errorCount++;
+                    }
                 }
 
-                alert(`${successCount} tarefas sincronizadas com o projeto!`);
+                if (errorCount > 0) {
+                    alert(`Importação concluída: ${successCount} sucessos, ${errorCount} falhas. Verifique o console para detalhes.`);
+                } else {
+                    alert(`${successCount} tarefas sincronizadas com sucesso!`);
+                }
+                
                 onRefresh?.();
                 setIsImporting(false);
                 if (fileInputRef.current) fileInputRef.current.value = '';
             };
             reader.readAsBinaryString(file);
         } catch (err) {
-            alert("Erro ao processar planilha.");
+            console.error("Erro fatal na importação Excel:", err);
+            alert("Erro crítico ao processar planilha.");
             setIsImporting(false);
         }
     };
