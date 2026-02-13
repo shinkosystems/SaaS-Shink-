@@ -1,6 +1,7 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { FinancialTransaction } from '../types';
-import { Plus, Trash2, ChevronLeft, ChevronRight, Search, RefreshCw, Edit, FileText, Save, ArrowUpRight, ArrowDownRight, X, DollarSign, Calendar, Tag, Repeat, Filter, CreditCard, Cpu, ArrowRight } from 'lucide-react';
+import { Plus, Trash2, ChevronLeft, ChevronRight, Search, RefreshCw, Edit, FileText, Save, ArrowUpRight, ArrowDownRight, X, DollarSign, Calendar, Tag, Repeat, Filter, CreditCard, Cpu, ArrowRight, Hash } from 'lucide-react';
 import { ElasticSwitch } from './ElasticSwitch';
 
 interface Props {
@@ -29,7 +30,18 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
     const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
     const [flippedCardId, setFlippedCardId] = useState<string | null>(null);
 
-    // RESET CRÍTICO: Limpa estados de expansão ao navegar para evitar o "vácuo" (cards órfãos)
+    const [newTrans, setNewTrans] = useState<Partial<FinancialTransaction>>({
+        type: 'outflow',
+        date: new Date().toISOString().split('T')[0],
+        amount: 0,
+        description: '',
+        category: 'Financeiro',
+        isRecurring: false,
+        periodicity: 'monthly',
+        installments: 12,
+        metadata: {}
+    });
+
     useEffect(() => {
         setExpandedCardId(null);
         setFlippedCardId(null);
@@ -49,24 +61,12 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
             category: 'Financeiro',
             isRecurring: false,
             periodicity: 'monthly',
-            installments: 1,
+            installments: 12,
             id: undefined,
             metadata: {}
         });
         setShowModal(true);
     };
-
-    const [newTrans, setNewTrans] = useState<Partial<FinancialTransaction>>({
-        type: 'outflow',
-        date: new Date().toISOString().split('T')[0],
-        amount: 0,
-        description: '',
-        category: 'Financeiro',
-        isRecurring: false,
-        periodicity: 'monthly',
-        installments: 1,
-        metadata: {}
-    });
 
     const handleSave = () => {
         if (!newTrans.description || !newTrans.amount) {
@@ -86,7 +86,7 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
                 organizationId: newTrans.organizationId || 0,
                 isRecurring: newTrans.isRecurring,
                 periodicity: newTrans.periodicity,
-                installments: newTrans.installments,
+                installments: newTrans.isRecurring ? Number(newTrans.installments) : 1,
                 metadata: newTrans.metadata || {}
             });
         }
@@ -138,7 +138,6 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
         setViewDate(newDate);
     };
 
-    // Dimensões Shinkō Standard
     const CARD_HEADER_OFFSET = 85;
     const EXPANDED_HEIGHT = 460;
     const BASE_HEIGHT = 180;
@@ -153,7 +152,6 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
     return (
         <div className="w-full flex flex-col animate-in fade-in duration-500 pb-40" onClick={() => { setExpandedCardId(null); setFlippedCardId(null); }}>
             
-            {/* TOOLBAR INDUSTRIAL */}
             <div className="flex flex-col lg:flex-row gap-6 justify-between items-center mb-12" onClick={e => e.stopPropagation()}>
                 <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
                     <div className="relative flex-1 md:min-w-[320px]">
@@ -188,7 +186,6 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
                 </div>
             </div>
 
-            {/* CARD STACK VIEW - KEY DINÂMICO PARA FORÇAR REDESENHO LIMPO NA TROCA DE MÊS */}
             <div 
                 key={`${viewDate.toISOString()}-${filtered.length}`}
                 className="relative transition-all duration-700 ease-in-out" 
@@ -231,12 +228,10 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
                                 className={`relative w-full transition-transform duration-[800ms] ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isFlipped ? 'rotate-y-180' : ''}`}
                                 style={{ transformStyle: 'preserve-3d', height: isExpanded ? `${EXPANDED_HEIGHT}px` : `${BASE_HEIGHT}px` }}
                             >
-                                {/* LADO A: FRENTE DO LANÇAMENTO */}
                                 <div 
                                     className={`absolute inset-0 w-full rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col border border-white/10 transition-all duration-500 backface-hidden bg-white dark:bg-[#1a1a1e]`}
                                     style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'translateZ(1px)' }}
                                 >
-                                    {/* CABEÇALHO COLORIDO DINÂMICO */}
                                     <div className={`p-8 pb-7 flex justify-between items-start transition-colors duration-500 rounded-t-[2.5rem] ${isOutflow ? 'bg-rose-50/70 dark:bg-rose-500/10' : 'bg-emerald-50/70 dark:bg-emerald-500/10'} border-b border-slate-100 dark:border-white/5`}>
                                         <div className="space-y-1.5 min-w-0 flex-1">
                                             <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
@@ -249,7 +244,6 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
                                         </div>
                                     </div>
 
-                                    {/* CORPO DO CARD - VOLUMES */}
                                     <div className="p-8 pt-7 flex-1 flex flex-col justify-end">
                                         <div className="flex justify-between items-end relative">
                                             <div>
@@ -276,7 +270,6 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
                                     </div>
                                 </div>
 
-                                {/* LADO B: VERSO DO LANÇAMENTO */}
                                 <div 
                                     className={`absolute inset-0 w-full rounded-[2.5rem] shadow-2xl p-10 flex flex-col rotate-y-180 backface-hidden border border-white/20 bg-[#0a0a0b]`}
                                     style={{ transform: 'rotateY(180deg) translateZ(1px)', backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
@@ -340,7 +333,6 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
                 )}
             </div>
 
-            {/* MODAL DE EDIÇÃO/CRIAÇÃO */}
             {showModal && (
                 <div className="fixed inset-0 z-[3000] flex items-center justify-center p-6 md:p-16 bg-black/90 backdrop-blur-xl animate-in fade-in duration-300" onClick={e => e.stopPropagation()}>
                     <div className="w-full max-w-lg rounded-[3rem] shadow-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-[#0A0A0C] overflow-hidden animate-ios-pop flex flex-col max-h-[95vh]" onClick={e => e.stopPropagation()}>
@@ -367,23 +359,23 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
 
                             <div className="space-y-6">
                                 <div>
-                                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Descrição</label>
+                                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Descrição do Ativo</label>
                                     <input value={newTrans.description} onChange={e => setNewTrans({...newTrans, description: e.target.value})} placeholder="Ex: Pagamento Consultoria..." className="w-full px-6 py-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm font-bold outline-none focus:border-amber-500 transition-all shadow-inner dark:text-white"/>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Valor (R$)</label>
+                                        <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Valor Unitário (R$)</label>
                                         <input type="number" value={newTrans.amount} onChange={e => setNewTrans({...newTrans, amount: Number(e.target.value)})} className="w-full px-6 py-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-lg font-black outline-none focus:border-amber-500 transition-all shadow-inner dark:text-white"/>
                                     </div>
                                     <div>
-                                        <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Data</label>
+                                        <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Data Inicial</label>
                                         <input type="date" value={newTrans.date} onChange={e => setNewTrans({...newTrans, date: e.target.value})} className="w-full px-6 py-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xs font-bold outline-none focus:border-amber-500 transition-all uppercase shadow-inner dark:text-white"/>
                                     </div>
                                 </div>
 
                                 <div>
-                                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Categoria</label>
+                                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Categoria Estratégica</label>
                                     <select value={newTrans.category} onChange={e => setNewTrans({...newTrans, category: e.target.value})} className="w-full p-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xs font-bold outline-none focus:border-amber-500 dark:text-white">
                                         {SHINKO_CATEGORIES.map(cat => (
                                             <option key={cat} value={cat}>{cat}</option>
@@ -391,24 +383,58 @@ export const FinancialLedger: React.FC<Props> = ({ transactions, onAddTransactio
                                     </select>
                                 </div>
 
-                                <div className="p-6 bg-slate-50 dark:bg-white/[0.03] rounded-[2rem] border border-slate-100 dark:border-white/5 space-y-6">
+                                <div className="p-8 bg-slate-50 dark:bg-white/[0.03] rounded-[2.5rem] border border-slate-100 dark:border-white/5 space-y-8 shadow-inner">
                                     <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2.5 bg-amber-500/10 text-amber-500 rounded-xl"><Repeat className="w-4 h-4"/></div>
+                                        <div className="flex items-center gap-4">
+                                            <div className="p-3 bg-amber-500/10 text-amber-500 rounded-xl"><Repeat className="w-5 h-5"/></div>
                                             <div>
-                                                <span className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-widest block">Recorrência</span>
-                                                <span className="text-[9px] text-slate-500 uppercase font-bold">Automático</span>
+                                                <span className="text-[12px] font-black text-slate-900 dark:text-white uppercase tracking-widest block">Recorrência Industrial</span>
+                                                <span className="text-[9px] text-slate-500 uppercase font-bold tracking-widest">Habilitar Fluxo Sequencial</span>
                                             </div>
                                         </div>
                                         <ElasticSwitch checked={newTrans.isRecurring || false} onChange={() => setNewTrans({...newTrans, isRecurring: !newTrans.isRecurring})} />
                                     </div>
+
+                                    {newTrans.isRecurring && (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in slide-in-from-top-4 duration-500">
+                                            <div className="space-y-2">
+                                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                                    <Hash className="w-3 h-3"/> Quantidade de Parcelas
+                                                </label>
+                                                <input 
+                                                    type="number" 
+                                                    min="2" max="120"
+                                                    value={newTrans.installments} 
+                                                    onChange={e => setNewTrans({...newTrans, installments: parseInt(e.target.value)})}
+                                                    className="w-full p-4 rounded-xl bg-white dark:bg-black/40 border border-slate-200 dark:border-white/10 outline-none font-black text-slate-900 dark:text-white"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                                    <Calendar className="w-3 h-3"/> Periodicidade
+                                                </label>
+                                                <select 
+                                                    value={newTrans.periodicity} 
+                                                    onChange={e => setNewTrans({...newTrans, periodicity: e.target.value as any})}
+                                                    className="w-full p-4 rounded-xl bg-white dark:bg-black/40 border border-slate-200 dark:border-white/10 outline-none font-bold text-xs uppercase dark:text-white cursor-pointer"
+                                                >
+                                                    <option value="monthly">Mensal</option>
+                                                    <option value="quarterly">Trimestral</option>
+                                                    <option value="semiannual">Semestral</option>
+                                                    <option value="yearly">Anual</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
 
-                        <div className="p-8 border-t border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-white/5 flex gap-4 shrink-0">
+                        <div className="p-8 border-t border-slate-100 dark:border-white/5 bg-white dark:bg-white/5 flex gap-4 shrink-0">
                             <button onClick={() => setShowModal(false)} className="flex-1 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">Descartar</button>
-                            <button onClick={handleSave} className="flex-[1.5] py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-2xl flex items-center justify-center gap-2 hover:scale-[1.02] transition-all"><Save className="w-4 h-4"/> Sincronizar Registro</button>
+                            <button onClick={handleSave} className="flex-[1.5] py-5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[1.8rem] font-black text-[10px] uppercase tracking-[0.2em] shadow-2xl flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-95 transition-all">
+                                <Save className="w-4 h-4"/> Sincronizar {newTrans.isRecurring ? 'Lote de Lançamentos' : 'Registro'}
+                            </button>
                         </div>
                     </div>
                 </div>

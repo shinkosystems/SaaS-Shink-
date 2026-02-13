@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Opportunity, DbTask, BpmnTask } from '../types';
-import { RefreshCw, Clock, Lock, Trash2, Edit, DollarSign, BarChart3, AlignLeft, User, ChevronDown, Layers, FileText, Cpu, ArrowRight, X, LayoutGrid, FileSpreadsheet, Download, Plus, UploadCloud, Loader2, CheckCircle2 } from 'lucide-react';
+import { RefreshCw, Clock, Lock, Trash2, Edit, DollarSign, BarChart3, AlignLeft, User, ChevronDown, Layers, FileText, Cpu, ArrowRight, X, LayoutGrid, FileSpreadsheet, Download, Plus, UploadCloud, Loader2, CheckCircle2, MoreHorizontal } from 'lucide-react';
 import { TaskDetailModal } from './TaskDetailModal';
 import { createTask, updateTask, deleteTask } from '../services/projectService';
 
@@ -16,7 +16,7 @@ interface Props {
 }
 
 const COLUMNS = [
-    { id: 'todo', label: 'Backlog', color: 'bg-slate-400', accent: 'border-slate-400/20 bg-slate-400/5' },
+    { id: 'todo', label: 'Backlog', color: 'bg-slate-300', accent: 'border-slate-400/20 bg-slate-400/5' },
     { id: 'doing', label: 'Execução', color: 'bg-blue-500', accent: 'border-blue-500/20 bg-blue-500/5' },
     { id: 'review', label: 'Revisão', color: 'bg-purple-500', accent: 'border-purple-500/20 bg-purple-500/5' },
     { id: 'approval', label: 'Aprovação', color: 'bg-orange-500', accent: 'border-orange-500/20 bg-orange-500/5' },
@@ -44,15 +44,23 @@ export const KanbanBoard: React.FC<Props> = ({ tasks, organizationId, projectId,
         setDraggedTaskId(taskId);
         e.dataTransfer.setData('taskId', taskId.toString());
         e.dataTransfer.effectAllowed = 'move';
+        
+        // Efeito visual de "levantar" o card
+        const target = e.currentTarget as HTMLElement;
+        target.classList.add('grabbing-card');
+        
+        // Timeout para a imagem fantasma não herdar a opacidade zero
         setTimeout(() => {
-            const target = e.target as HTMLElement;
             target.style.opacity = '0.4';
+            target.style.transform = 'scale(1.05) rotate(2deg)';
         }, 0);
     };
 
     const handleDragEnd = (e: React.DragEvent) => {
-        const target = e.target as HTMLElement;
+        const target = e.currentTarget as HTMLElement;
+        target.classList.remove('grabbing-card');
         target.style.opacity = '1';
+        target.style.transform = 'scale(1) rotate(0deg)';
         setDraggedTaskId(null);
         setDropTargetColumn(null);
     };
@@ -60,7 +68,7 @@ export const KanbanBoard: React.FC<Props> = ({ tasks, organizationId, projectId,
     const handleDragOver = (e: React.DragEvent, columnId: string) => {
         if (readOnly) return;
         e.preventDefault();
-        setDropTargetColumn(columnId);
+        if (dropTargetColumn !== columnId) setDropTargetColumn(columnId);
     };
 
     const handleDrop = async (e: React.DragEvent, columnId: string) => {
@@ -68,16 +76,18 @@ export const KanbanBoard: React.FC<Props> = ({ tasks, organizationId, projectId,
         e.preventDefault();
         setDropTargetColumn(null);
         
-        const taskId = parseInt(e.dataTransfer.getData('taskId'));
+        const taskIdStr = e.dataTransfer.getData('taskId');
+        const taskId = parseInt(taskIdStr);
         if (isNaN(taskId)) return;
 
         const taskToUpdate = tasks.find(t => t.id === taskId);
         if (taskToUpdate && taskToUpdate.status !== columnId) {
             try {
+                // Atualização otimista na UI (opcional se onRefresh for rápido)
                 await updateTask(taskId, { status: columnId });
                 onRefresh?.();
             } catch (err) {
-                alert("Erro ao sincronizar estágio.");
+                alert("Falha ao sincronizar estágio.");
                 onRefresh?.(); 
             }
         }
@@ -116,22 +126,13 @@ export const KanbanBoard: React.FC<Props> = ({ tasks, organizationId, projectId,
                 const data = XLSX.utils.sheet_to_json(ws) as any[];
 
                 let successCount = 0;
-                let errorCount = 0;
-
                 for (const row of data) {
-                    // Mapeamento flexível de colunas (com e sem acento)
                     const title = row.Titulo || row.titulo || row.Título || row.título || 'Ativo Importado';
                     const description = row.Descricao || row.descricao || row.Descrição || row.descrição || '';
                     const category = row.Categoria || row.categoria || 'Gestão';
                     const hours = Number(row["Horas Estimadas"] || row["Horas"] || row.horas || 2);
-                    
-                    // Tratamento de data (pode vir como objeto Date do XLSX ou string)
-                    let dueDate = row["Prazo (AAAA-MM-DD)"] || row.Prazo || row.prazo || row.Deadline || new Date().toISOString();
+                    let dueDate = row["Prazo (AAAA-MM-DD)"] || row.Prazo || row.prazo || new Date().toISOString();
                     if (dueDate instanceof Date) dueDate = dueDate.toISOString();
-
-                    const g = Number(row["Gravidade (1-5)"] || row.Gravidade || row.g || 3);
-                    const u = Number(row["Urgencia (1-5)"] || row.Urgencia || row["Urgência"] || row.u || 3);
-                    const t = Number(row["Tendencia (1-5)"] || row.Tendencia || row["Tendência"] || row.t || 3);
 
                     const taskPayload = {
                         titulo: title,
@@ -139,113 +140,110 @@ export const KanbanBoard: React.FC<Props> = ({ tasks, organizationId, projectId,
                         category: category,
                         duracaohoras: isNaN(hours) ? 2 : hours,
                         datafim: dueDate,
-                        gravidade: isNaN(g) ? 3 : g,
-                        urgencia: isNaN(u) ? 3 : u,
-                        tendencia: isNaN(t) ? 3 : t,
                         projeto: projectId ? Number(projectId) : null,
                         organizacao: Number(organizationId),
                         status: 'todo'
                     };
                     
-                    try {
-                        const res = await createTask(taskPayload);
-                        if (res) successCount++;
-                        else errorCount++;
-                    } catch (err) {
-                        console.error("Falha ao importar linha:", row, err);
-                        errorCount++;
-                    }
+                    const res = await createTask(taskPayload);
+                    if (res) successCount++;
                 }
 
-                if (errorCount > 0) {
-                    alert(`Importação concluída: ${successCount} sucessos, ${errorCount} falhas. Verifique o console para detalhes.`);
-                } else {
-                    alert(`${successCount} tarefas sincronizadas com sucesso!`);
-                }
-                
+                alert(`${successCount} ativos sincronizados!`);
                 onRefresh?.();
                 setIsImporting(false);
                 if (fileInputRef.current) fileInputRef.current.value = '';
             };
             reader.readAsBinaryString(file);
         } catch (err) {
-            console.error("Erro fatal na importação Excel:", err);
-            alert("Erro crítico ao processar planilha.");
             setIsImporting(false);
         }
     };
 
+    // Estilo Nubank: A interface de fundo encolhe quando o modal abre
+    const isModalOpen = !!editingTaskCtx || showBatchInsertModal;
+
     return (
-        <div className="flex flex-col h-full overflow-hidden">
+        <div className="flex flex-col h-full overflow-hidden bg-slate-50/50 dark:bg-[#020203]">
             
-            {/* TOOLBAR OPERACIONAL DE BATELADA */}
-            {!readOnly && (
-                <div className="px-8 md:px-12 py-4 flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.01]">
-                    <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-600">
-                            <Layers className="w-5 h-5"/>
-                        </div>
-                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Operação em Lote</span>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-3">
-                        <button 
-                            onClick={() => setShowBatchInsertModal(true)}
-                            className="px-6 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg hover:scale-105 transition-all flex items-center gap-2"
-                        >
-                            <Plus className="w-3.5 h-3.5"/> Nova Task
-                        </button>
-
-                        <div className="h-4 w-px bg-slate-200 dark:bg-white/10 hidden sm:block"></div>
-
-                        <button 
-                            onClick={handleDownloadTemplate}
-                            className="px-6 py-2.5 bg-white dark:bg-white/5 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2"
-                        >
-                            <Download className="w-3.5 h-3.5"/> Modelo .xlsx
-                        </button>
-
-                        <label className="cursor-pointer">
-                            <div className="px-6 py-2.5 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg hover:scale-105 transition-all flex items-center gap-2">
-                                {isImporting ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <UploadCloud className="w-3.5 h-3.5"/>}
-                                {isImporting ? 'Importando...' : 'Subir Planilha'}
+            {/* CONTAINER COM EFEITO DE ESCALA (CONTEXTUAL SHEET) */}
+            <div className={`flex flex-col h-full transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${isModalOpen ? 'scale-[0.96] rounded-[3rem] opacity-50 blur-[2px] pointer-events-none' : 'scale-100'}`}>
+                
+                {/* TOOLBAR OPERACIONAL - REESTILIZADA NUBANK */}
+                {!readOnly && (
+                    <div className="px-8 md:px-12 py-6 flex flex-col sm:flex-row items-center justify-between gap-6 border-b border-slate-100 dark:border-white/5 bg-white/60 dark:bg-black/40 backdrop-blur-md">
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-2xl bg-amber-500 flex items-center justify-center text-black shadow-lg shadow-amber-500/20">
+                                <Layers className="w-5 h-5"/>
                             </div>
-                            <input 
-                                type="file" 
-                                ref={fileInputRef}
-                                className="hidden" 
-                                accept=".xlsx, .xls" 
-                                onChange={handleExcelUpload}
-                                disabled={isImporting}
-                            />
-                        </label>
-                    </div>
-                </div>
-            )}
+                            <div>
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 block">Workflow Master</span>
+                                <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">Operação Industrial</h3>
+                            </div>
+                        </div>
 
-            <div className="flex overflow-x-auto custom-scrollbar bg-transparent p-8 md:p-12">
-                <div className="flex gap-8 min-w-max">
+                        <div className="flex flex-wrap items-center gap-3">
+                            <button 
+                                onClick={() => setShowBatchInsertModal(true)}
+                                className="px-8 py-3.5 bg-slate-900 dark:bg-white text-white dark:text-black rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
+                            >
+                                <Plus className="w-4 h-4 stroke-[3px]"/> Nova Task
+                            </button>
+
+                            <div className="h-6 w-px bg-slate-200 dark:bg-white/10 hidden sm:block"></div>
+
+                            <button 
+                                onClick={handleDownloadTemplate}
+                                className="p-3.5 bg-white dark:bg-white/5 text-slate-400 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-white/10 rounded-2xl transition-all"
+                                title="Baixar Modelo XLSX"
+                            >
+                                <FileSpreadsheet className="w-5 h-5"/>
+                            </button>
+
+                            <label className="cursor-pointer group">
+                                <div className="px-6 py-3.5 bg-white dark:bg-white/5 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:border-amber-500/50 transition-all flex items-center gap-2">
+                                    {isImporting ? <Loader2 className="w-4 h-4 animate-spin"/> : <UploadCloud className="w-4 h-4 text-amber-500"/>}
+                                    {isImporting ? 'Importando...' : 'Subir Planilha'}
+                                </div>
+                                <input 
+                                    type="file" 
+                                    ref={fileInputRef}
+                                    className="hidden" 
+                                    accept=".xlsx, .xls" 
+                                    onChange={handleExcelUpload}
+                                    disabled={isImporting}
+                                />
+                            </label>
+                        </div>
+                    </div>
+                )}
+
+                {/* BOARD AREA */}
+                <div className="flex overflow-x-auto custom-scrollbar p-8 md:p-12 gap-8">
                     {COLUMNS.map(col => (
                         <div 
                             key={col.id} 
                             onDragOver={(e) => handleDragOver(e, col.id)}
                             onDrop={(e) => handleDrop(e, col.id)}
                             onDragLeave={() => setDropTargetColumn(null)}
-                            className={`w-[320px] flex flex-col space-y-6 rounded-[2.5rem] transition-all duration-300 border-2 border-transparent ${dropTargetColumn === col.id ? 'border-amber-500 bg-amber-500/5 scale-[1.02] shadow-2xl' : ''}`}
+                            className={`
+                                w-[320px] shrink-0 flex flex-col rounded-[2.5rem] transition-all duration-500 relative
+                                ${dropTargetColumn === col.id ? 'bg-amber-500/5 ring-2 ring-amber-500/40 scale-[1.02] shadow-2xl' : 'bg-white/40 dark:bg-white/[0.01]'}
+                            `}
                         >
-                            {/* HEADER DA COLUNA */}
-                            <div className="flex items-center justify-between px-4 shrink-0">
+                            {/* HEADER COLUNA */}
+                            <div className="p-6 flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <div className={`w-1.5 h-5 rounded-full ${col.color}`}></div>
+                                    <div className={`w-1.5 h-4 rounded-full ${col.color}`}></div>
                                     <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">{col.label}</h3>
                                 </div>
-                                <div className="text-[10px] font-black px-2 py-0.5 rounded-md bg-slate-100 dark:bg-white/5 text-slate-400">
+                                <span className="text-[10px] font-black px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-white/5 text-slate-400">
                                     {columnsData[col.id]?.length || 0}
-                                </div>
+                                </span>
                             </div>
 
-                            {/* ÁREA DE CARDS */}
-                            <div className="flex-1 space-y-5 px-3 pb-10 min-h-[400px]">
+                            {/* ÁREA DE CARDS - GLASS EFFECT */}
+                            <div className="flex-1 px-4 pb-12 space-y-4 min-h-[400px]">
                                 {columnsData[col.id]?.map(task => (
                                     <div 
                                         key={task.id}
@@ -253,16 +251,18 @@ export const KanbanBoard: React.FC<Props> = ({ tasks, organizationId, projectId,
                                         onDragStart={(e) => handleDragStart(e, task.id)}
                                         onDragEnd={handleDragEnd}
                                         onClick={() => setEditingTaskCtx(task)}
-                                        className="group relative bg-white dark:bg-[#0c0c0e] p-6 rounded-[2rem] border border-slate-200 dark:border-white/5 shadow-soft transition-all duration-300 cursor-pointer hover:shadow-2xl hover:border-amber-500/30 hover:-translate-y-1 active:scale-[0.98] active:cursor-grabbing"
+                                        className="
+                                            group relative bg-white dark:bg-[#111113] p-6 rounded-[2rem] border border-slate-100 dark:border-white/5 
+                                            shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] transition-all duration-500 cursor-pointer
+                                            hover:shadow-[0_20px_40px_-12px_rgba(0,0,0,0.1)] hover:scale-[1.03] hover:border-amber-500/20 active:scale-95
+                                        "
                                     >
-                                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-12 rounded-r-full bg-slate-100 dark:bg-white/5 transition-colors group-hover:bg-amber-500"></div>
-
                                         <div className="flex justify-between items-start mb-4">
-                                            <div className="flex flex-col">
-                                                <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest truncate max-w-[150px]">{task.projetoData?.nome || 'Avulso'}</span>
-                                                <span className="text-[8px] font-bold text-slate-300 dark:text-slate-600 uppercase mt-0.5">#{task.id}</span>
+                                            <div className="space-y-0.5 min-w-0 flex-1">
+                                                <div className="text-[9px] font-black text-amber-500 uppercase tracking-widest truncate">{task.projetoData?.nome || 'Avulso'}</div>
+                                                <div className="text-[8px] font-bold text-slate-300 dark:text-slate-600 uppercase">#{task.id}</div>
                                             </div>
-                                            <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-white/5 border border-slate-200/50 flex items-center justify-center overflow-hidden">
+                                            <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 overflow-hidden flex items-center justify-center shrink-0">
                                                 {task.responsavelData?.avatar_url ? (
                                                     <img src={task.responsavelData.avatar_url} className="w-full h-full object-cover" />
                                                 ) : (
@@ -271,25 +271,29 @@ export const KanbanBoard: React.FC<Props> = ({ tasks, organizationId, projectId,
                                             </div>
                                         </div>
 
-                                        <h4 className="text-sm font-black tracking-tight text-slate-800 dark:text-slate-200 leading-snug line-clamp-3 mb-6">
+                                        <h4 className="text-sm font-black tracking-tight text-slate-800 dark:text-slate-100 leading-snug line-clamp-3 mb-6 group-hover:text-amber-500 transition-colors">
                                             {task.titulo}
                                         </h4>
 
-                                        <div className="flex items-center justify-between pt-5 border-t border-slate-50 dark:border-white/5">
-                                            <div className="flex items-center gap-3 text-slate-400">
-                                                <div className="flex items-center gap-1">
+                                        <div className="flex items-center justify-between pt-4 border-t border-slate-50 dark:border-white/5">
+                                            <div className="flex items-center gap-4 text-slate-400">
+                                                <div className="flex items-center gap-1.5">
                                                     <Clock className="w-3 h-3"/>
                                                     <span className="text-[9px] font-black">{task.duracaohoras || 2}h</span>
                                                 </div>
+                                                {task.category && (
+                                                    <span className="text-[8px] font-black uppercase tracking-widest opacity-40">{task.category}</span>
+                                                )}
                                             </div>
-                                            <ArrowRight className="w-4 h-4 text-slate-200 group-hover:text-amber-500 transition-colors"/>
+                                            <ArrowRight className="w-4 h-4 text-slate-200 group-hover:text-amber-500 transition-all group-hover:translate-x-1"/>
                                         </div>
                                     </div>
                                 ))}
+
                                 {columnsData[col.id]?.length === 0 && (
-                                    <div className="py-16 flex flex-col items-center justify-center text-center opacity-10 border-2 border-dashed border-slate-300 dark:border-white/5 rounded-[2.5rem]">
-                                        <LayoutGrid className="w-10 h-10 mb-2"/>
-                                        <p className="text-[9px] font-black uppercase">Vazio</p>
+                                    <div className="py-20 flex flex-col items-center justify-center text-center opacity-10 border-2 border-dashed border-slate-300 dark:border-white/10 rounded-[2.5rem]">
+                                        <LayoutGrid className="w-8 h-8 mb-2"/>
+                                        <p className="text-[9px] font-black uppercase tracking-widest">Livre</p>
                                     </div>
                                 )}
                             </div>
@@ -340,7 +344,7 @@ export const KanbanBoard: React.FC<Props> = ({ tasks, organizationId, projectId,
                         dueDate: new Date().toISOString().split('T')[0]
                     }}
                     nodeTitle="Nova Tarefa Operacional"
-                    opportunityTitle="Criação Direta no Ativo"
+                    opportunityTitle="Injeção de Ativo"
                     organizationId={organizationId}
                     onClose={() => setShowBatchInsertModal(false)}
                     onSave={async (task) => {
@@ -363,6 +367,17 @@ export const KanbanBoard: React.FC<Props> = ({ tasks, organizationId, projectId,
                     }}
                 />
             )}
+
+            <style>{`
+                .grabbing-card {
+                    cursor: grabbing !important;
+                    z-index: 1000 !important;
+                    box-shadow: 0 40px 80px -20px rgba(0,0,0,0.2) !important;
+                }
+                .grabbing-card * {
+                    pointer-events: none !important;
+                }
+            `}</style>
         </div>
     );
 };

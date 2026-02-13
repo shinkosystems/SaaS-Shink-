@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, Suspense, useMemo } from 'react';
 import { supabase } from './services/supabaseClient';
-import { Opportunity, BpmnTask } from './types';
+import { Opportunity, BpmnTask, DbTask } from './types';
 import { fetchOpportunities, createOpportunity, updateOpportunity, deleteOpportunity, fetchOpportunityById } from './services/opportunityService';
-import { createTask } from './services/projectService';
+import { createTask, fetchAllTasks } from './services/projectService';
 import { updateOrgDetails, fetchActiveOrgModules, getPlanDefaultModules } from './services/organizationService';
 import { subscribeToPresence } from './services/presenceService';
 import { trackUserAccess } from './services/analyticsService';
@@ -28,7 +28,7 @@ import { EcosystemPage } from './pages/EcosystemPage';
 import { ValueChainDashboard } from './pages/ValueChainDashboard';
 import { AssetsPage } from './pages/AssetsPage';
 import { TicketPortalPage } from './pages/TicketPortalPage';
-import { GuruPage } from './pages/GuruPage';
+import { AgendaTimeline } from './components/AgendaTimeline';
 
 // Utility Components
 import AuthScreen from './components/AuthScreen';
@@ -43,6 +43,7 @@ import { Loader2, AlertCircle } from 'lucide-react';
 
 const ROUTES: Record<string, string> = {
     'dashboard': '/',
+    'agenda': '/agenda',
     'value-chain': '/value-chain',
     'ecosystem': '/ecosystem',
     'framework-system': '/framework',
@@ -58,8 +59,7 @@ const ROUTES: Record<string, string> = {
     'assets': '/assets',
     'settings': '/settings',
     'profile': '/profile',
-    'admin-manager': '/admin',
-    'guru': '/guru'
+    'admin-manager': '/admin'
 };
 
 const REVERSE_ROUTES: Record<string, string> = Object.entries(ROUTES).reduce((acc, [key, value]) => {
@@ -75,6 +75,7 @@ const App: React.FC = () => {
   const [currentPlan, setCurrentPlan] = useState<string>('plan_free');
   const [view, setViewState] = useState<string>('dashboard');
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [allTasks, setAllTasksState] = useState<DbTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeModules, setActiveModules] = useState<string[]>(['ia', 'projects', 'kanban']); 
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -83,7 +84,6 @@ const App: React.FC = () => {
   const [showFeedback, setShowFeedback] = useState(false);
   const [selectedProject, setSelectedProjectState] = useState<Opportunity | null>(null);
   const [editingOpportunity, setEditingOpportunity] = useState<Opportunity | null>(null);
-  const [guruInitialPrompt, setGuruInitialPrompt] = useState<string | null>(null);
   
   const [theme, setTheme] = useState<'light'|'dark'>(() => {
     const saved = localStorage.getItem('shinko_theme');
@@ -96,8 +96,16 @@ const App: React.FC = () => {
       name: '', limit: 1, logoUrl: null, primaryColor: '#F59E0B', aiSector: '', aiTone: '', aiContext: '' 
   });
 
+  const syncUrl = (path: string) => {
+      try { 
+        if (window.location.protocol.startsWith('http')) {
+            window.history.pushState({}, '', path); 
+        }
+      } catch (e) {}
+  };
+
   const handleRouting = async () => {
-      let path = window.location.pathname;
+      const path = window.location.pathname;
 
       if (path.startsWith('/ticket/')) {
           setViewState('ticket-portal');
@@ -138,14 +146,6 @@ const App: React.FC = () => {
       if (mappedView) setViewState(mappedView);
   };
 
-  const syncUrl = (path: string) => {
-      try { 
-        window.history.pushState({}, '', path); 
-      } catch (e) { 
-        console.warn("URL sync blocked by environment:", e); 
-      }
-  };
-
   const setView = (newView: string) => {
       setViewState(newView);
       setSelectedProjectState(null); 
@@ -161,6 +161,7 @@ const App: React.FC = () => {
       syncUrl(`/project/${opp.id}`);
   };
 
+  // Fix: Added missing onEditProject function to resolve "Cannot find name 'onEditProject'" error.
   const onEditProject = (opp: Opportunity) => {
       setEditingOpportunity(opp);
       setSelectedProjectState(null);
@@ -195,7 +196,12 @@ const App: React.FC = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       if (session?.user) loadUserData(session.user.id);
-      else { setUserData(null); setOpportunities([]); setLoading(false); }
+      else { 
+          setUserData(null); 
+          setOpportunities([]); 
+          setLoading(false);
+          setViewState('dashboard');
+      }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -217,7 +223,7 @@ const App: React.FC = () => {
                     setCurrentPlan(mapDbPlanIdToString(orgData.plano || 4));
                     setOrgDetails({
                         name: orgData.nome, limit: orgData.colaboradores, logoUrl: orgData.logo, primaryColor: orgData.cor || '#F59E0B',
-                        aiSector: orgData.setor || '', aiTone: orgData.tomdevoz || '', aiContext: orgDetails.aiContext
+                        aiSector: orgData.setor || '', aiTone: orgData.tomdevoz || '', aiContext: orgData.dna || ''
                     });
 
                     const modules = await fetchActiveOrgModules(data.organizacao);
@@ -225,8 +231,12 @@ const App: React.FC = () => {
                   }
                   
                   const clientId = currentRole === 'cliente' ? data.id : undefined;
-                  const opps = await fetchOpportunities(data.organizacao, clientId);
+                  const [opps, tasks] = await Promise.all([
+                      fetchOpportunities(data.organizacao, clientId),
+                      fetchAllTasks(data.organizacao)
+                  ]);
                   if (opps) setOpportunities(opps);
+                  if (tasks) setAllTasksState(tasks);
               }
               trackUserAccess(userId);
               subscribeToPresence(userId, setOnlineUsers);
@@ -256,14 +266,21 @@ const App: React.FC = () => {
       );
   }
 
+  if (loading) {
+      return (
+          <div className="flex h-screen w-full items-center justify-center bg-white dark:bg-[#020203]">
+              <div className="flex flex-col items-center gap-4">
+                  <Loader2 className="animate-spin text-amber-500 w-10 h-10"/>
+                  <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Sincronizando Workspace...</span>
+              </div>
+          </div>
+      );
+  }
+
   const commonProps = {
       currentView: view, onChangeView: setView,
-      onOpenCreate: () => {
-          setViewState('create-project');
-          syncUrl('/project/new');
-      }, 
+      onOpenCreate: () => setView('create-project'), 
       onOpenCreateTask: () => setShowCreateTask(true),
-      onOpenGuru: () => setView('guru'),
       onToggleTheme: toggleTheme, onLogout: () => supabase.auth.signOut(),
       onSearch: () => {}, onOpenFeedback: () => setShowFeedback(true),
       theme: theme, dbStatus: 'connected' as const, isMobileOpen, setIsMobileOpen, userRole,
@@ -273,18 +290,17 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen w-full bg-[var(--bg-color)] text-slate-900 transition-colors duration-300">
+    <div className="flex h-screen w-full bg-[var(--bg-color)] text-slate-900 transition-colors duration-300 overflow-hidden">
         {view !== 'create-project' && !editingOpportunity && <Sidebar {...commonProps} />}
         {view !== 'create-project' && !editingOpportunity && <MobileDrawer {...commonProps} />}
         
-        <main className={`flex-1 overflow-y-auto overflow-x-hidden relative pt-16 lg:pt-0 custom-scrollbar`}>
+        <main className={`flex-1 overflow-hidden relative pt-16 lg:pt-0`}>
             <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-amber-500 w-8 h-8"/></div>}>
                 {editingOpportunity ? (
                     <OpportunityWizard 
                         initialData={editingOpportunity} 
                         orgType={orgDetails.name}
                         customLogoUrl={orgDetails.logoUrl}
-                        organizationId={userOrgId || undefined}
                         onSave={async (opp) => {
                             try {
                                 const updated = await updateOpportunity(opp);
@@ -317,7 +333,6 @@ const App: React.FC = () => {
                     <OpportunityWizard 
                         orgType={orgDetails.name}
                         customLogoUrl={orgDetails.logoUrl}
-                        organizationId={userOrgId || undefined}
                         onSave={async (opp) => {
                             try {
                                 const newOpp = await createOpportunity({ 
@@ -335,13 +350,12 @@ const App: React.FC = () => {
                         onCancel={() => setView('dashboard')}
                     />
                 ) : (
-                    <>
+                    <div className="h-full overflow-y-auto custom-scrollbar">
                         {view === 'dashboard' && <DashboardPage 
                             opportunities={opportunities} onOpenProject={onOpenProject} 
                             onNavigate={setView} user={user} theme={theme} 
-                            onGuruPrompt={(p) => { setGuruInitialPrompt(p); setView('guru'); }}
                         />}
-                        {view === 'guru' && <GuruPage opportunities={opportunities} user={user} organizationId={userOrgId || undefined} onAction={(aid) => aid === 'create_task' ? setShowCreateTask(true) : setView(aid.replace('nav_', ''))} externalPrompt={guruInitialPrompt} onExternalPromptConsumed={() => setGuruInitialPrompt(null)} />}
+                        {view === 'agenda' && <div className="p-4 md:p-12"><AgendaTimeline tasks={allTasks} organizationId={userOrgId || undefined} onRefresh={() => loadUserData(user.id)} currentUserId={user?.id} /></div>}
                         {view === 'framework-system' && <FrameworkPage orgName={orgDetails.name} onBack={() => setView('dashboard')} onSaveToProject={async (opp) => {
                             try {
                                 const newOpp = await createOpportunity({ ...opp, organizationId: userOrgId || undefined });
@@ -351,7 +365,7 @@ const App: React.FC = () => {
                                 }
                             } catch (e: any) { alert(e.message); }
                         }} />}
-                        {view === 'list' && <ProjectsPage opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} onRefresh={() => loadUserData(user.id)} onOpenCreate={() => { setViewState('create-project'); syncUrl('/project/new'); }} />}
+                        {view === 'list' && <ProjectsPage opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} onRefresh={() => loadUserData(user.id)} onOpenCreate={() => setView('create-project')} />}
                         
                         {view === 'kanban' && <TasksPage initialSubView="kanban" opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} />}
                         {view === 'calendar' && <TasksPage initialSubView="calendar" opportunities={opportunities} onOpenProject={onOpenProject} userRole={userRole} organizationId={userOrgId || undefined} />}
@@ -367,7 +381,7 @@ const App: React.FC = () => {
                         {view === 'settings' && <SettingsPage theme={theme} onToggleTheme={toggleTheme} onlineUsers={onlineUsers} userOrgId={userOrgId} orgDetails={orgDetails} onUpdateOrgDetails={() => {}} setView={setView} userRole={userRole} userData={userData} activeModules={activeModules} onRefreshModules={() => loadUserData(user.id)} />}
                         {view === 'profile' && <ProfilePage currentPlan={currentPlan} onRefresh={() => loadUserData(user.id)} />}
                         {view === 'admin-manager' && (userData?.email === 'peboorba@gmail.com') && <AdminPage onlineUsers={onlineUsers} />}
-                    </>
+                    </div>
                 )}
             </Suspense>
         </main>

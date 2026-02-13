@@ -102,115 +102,71 @@ export const TasksPage: React.FC<Props> = ({ opportunities, onOpenProject, userR
     ];
 
     return (
-        <div className="flex flex-col bg-[#F9FAFB] dark:bg-[#020203] pb-32">
-            {/* HEADER RELATIVO - ELE SOBE COM O SCROLL DA PÁGINA */}
-            <header className="relative p-8 md:px-12 bg-white dark:bg-[#0A0A0C] border-b border-slate-200 dark:border-white/5 space-y-8 shrink-0 z-30 shadow-sm">
-                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-8">
-                    <div className="space-y-2">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full">
-                            <Activity className="w-3 h-3 text-amber-600"/>
-                            <span className="text-[9px] font-black text-amber-600 uppercase tracking-widest">Pipeline Engine v2.6</span>
+        <div className="flex flex-col bg-white dark:bg-[#020203] min-h-screen">
+            {/* Nubank-Style Header */}
+            <header className="bg-[#F59E0B] -mx-4 md:-mx-12 px-8 pt-10 pb-8 md:px-12 md:pt-14 md:pb-12 mb-8 rounded-b-[3.5rem] shadow-xl relative z-50">
+                <div className="max-w-7xl mx-auto flex flex-col gap-8">
+                    <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center border border-white/10">
+                                <Activity className="w-5 h-5 text-white" />
+                            </div>
+                            <h2 className="text-xl font-black text-white uppercase tracking-tight">Operações.</h2>
                         </div>
-                        <h1 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">
-                            Central de <span className="text-amber-500">Operações</span>.
-                        </h1>
-                    </div>
-
-                    {/* SEGMENTED CONTROL NATIVO */}
-                    <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-2xl shadow-inner border border-slate-200/50 dark:border-white/10 relative w-full lg:w-auto">
-                        <div 
-                            className="absolute top-1 bottom-1 bg-white dark:bg-white/10 rounded-xl shadow-lg transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]"
-                            style={{ 
-                                left: `${(VIEWS.findIndex(v => v.id === subView) * (100 / VIEWS.length))}%`,
-                                marginLeft: '4px',
-                                width: `calc(${100 / VIEWS.length}% - 8px)`
-                            }}
-                        />
-                        {VIEWS.map(tab => (
-                            <button 
-                                key={tab.id}
-                                onClick={() => setSubView(tab.id as any)}
-                                className={`relative z-10 flex-1 lg:flex-none flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${subView === tab.id ? 'text-amber-500' : 'text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}
-                            >
-                                <tab.icon className="w-3.5 h-3.5"/> <span className="hidden sm:inline">{tab.label}</span>
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                {/* FILTROS INTEGRADOS */}
-                <div className="flex flex-col md:flex-row items-center gap-4">
-                    <div className="relative flex-1 w-full">
-                        <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-300 dark:text-slate-600"/>
-                        <input 
-                            value={searchTerm} 
-                            onChange={e => setSearchTerm(e.target.value)}
-                            placeholder="Buscar ativo por ID ou título..."
-                            className="w-full bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/5 rounded-2xl py-4 pl-14 pr-6 text-sm font-bold outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500/30 transition-all text-slate-900 dark:text-white shadow-inner"
-                        />
-                    </div>
-
-                    <div className="flex items-center gap-3 w-full md:w-auto">
-                        <button 
-                            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                            className={`p-4 rounded-2xl border transition-all flex items-center justify-center gap-2 ${showAdvancedFilters ? 'bg-slate-900 text-white border-slate-900' : 'bg-white dark:bg-white/5 text-slate-500 border-slate-200 dark:border-white/10'}`}
-                        >
-                            <SlidersHorizontal className="w-4 h-4"/>
-                        </button>
-
                         <button 
                             onClick={handleGlobalOptimize}
                             disabled={isOptimizing}
-                            className="flex-1 md:flex-none px-8 py-4 bg-[#0a0a0c] dark:bg-white text-white dark:text-black rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-xl active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50"
+                            className="px-6 py-3 bg-white text-black rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-xl active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50"
                         >
                             {isOptimizing ? <Loader2 className="w-4 h-4 animate-spin"/> : <Sparkles className="w-4 h-4 text-amber-500"/>}
                             <span>IA Smart Engine</span>
                         </button>
                     </div>
-                </div>
+                    
+                    <div className="space-y-1">
+                        <h2 className="text-2xl md:text-3xl font-black tracking-tighter text-white">
+                            Central de Execução Industrial
+                        </h2>
+                        <p className="text-[10px] font-black text-white/60 uppercase tracking-[0.3em]">Gestão de Pipeline e Alocação</p>
+                    </div>
 
-                {showAdvancedFilters && (
-                    <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-4 animate-in slide-in-from-top-4 duration-300">
-                        <div className="space-y-2">
-                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Projeto Alvo</label>
-                            <select 
-                                value={filterProject} 
-                                onChange={e => setFilterProject(e.target.value)}
-                                className="w-full p-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none dark:text-white"
-                            >
-                                <option value="">Todos os Projetos</option>
-                                {projects.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
-                            </select>
+                    {/* Integrated Search and View Switcher Area */}
+                    <div className="flex flex-col md:flex-row items-center gap-4">
+                        <div className="relative flex-1 w-full">
+                            <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
+                            <input 
+                                value={searchTerm}
+                                onChange={e => setSearchTerm(e.target.value)}
+                                placeholder="Buscar ativos ou IDs..."
+                                className="w-full bg-white/10 border border-white/10 rounded-[1.5rem] p-4 pl-14 text-white placeholder:text-white/40 outline-none focus:bg-white/20 transition-all"
+                            />
                         </div>
-                        <div className="space-y-2">
-                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Estágio de Fluxo</label>
-                            <select 
-                                value={filterStatus} 
-                                onChange={e => setFilterStatus(e.target.value)}
-                                className="w-full p-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none dark:text-white"
-                            >
-                                <option value="">Todos os Estágios</option>
-                                {STATUS_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                            </select>
+                        <div className="flex bg-white/10 p-1 rounded-2xl border border-white/10 w-full md:w-auto">
+                            {VIEWS.map(tab => (
+                                <button 
+                                    key={tab.id}
+                                    onClick={() => setSubView(tab.id as any)}
+                                    className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${subView === tab.id ? 'bg-white text-amber-500 shadow-lg' : 'text-white/60 hover:text-white'}`}
+                                >
+                                    <tab.icon className="w-3.5 h-3.5"/> <span className="hidden sm:inline">{tab.label}</span>
+                                </button>
+                            ))}
                         </div>
                     </div>
-                )}
+                </div>
             </header>
 
-            <div className="flex-1">
+            <div className="flex-1 max-w-7xl mx-auto w-full px-4 md:px-0">
                 {loading ? (
                     <div className="py-40 flex flex-col items-center justify-center gap-6 text-slate-300">
-                        <div className="w-12 h-12 relative">
-                            <div className="absolute inset-0 border-4 border-amber-500/10 rounded-full"></div>
-                            <div className="absolute inset-0 border-4 border-t-amber-500 rounded-full animate-spin"></div>
-                        </div>
+                        <Loader2 className="w-12 h-12 animate-spin text-amber-500"/>
                         <span className="text-[10px] font-black uppercase tracking-[0.4em] animate-pulse">Sincronizando Pipeline</span>
                     </div>
                 ) : (
-                    <div className="w-full">
+                    <div className="w-full pb-40">
                         {subView === 'kanban' && <KanbanBoard tasks={filteredTasks} onSelectOpportunity={onOpenProject} userRole={userRole} organizationId={organizationId} onRefresh={loadData} />}
-                        {subView === 'gantt' && <div className="h-auto min-h-[600px]"><GanttView tasks={filteredTasks} opportunities={opportunities} onSelectOpportunity={onOpenProject} onTaskUpdate={loadData} organizationId={organizationId} /></div>}
-                        {subView === 'calendar' && <div className="h-auto min-h-[600px]"><CalendarView tasks={filteredTasks} opportunities={opportunities} onSelectOpportunity={onOpenProject} onTaskUpdate={loadData} organizationId={organizationId} /></div>}
+                        {subView === 'gantt' && <GanttView tasks={filteredTasks} opportunities={opportunities} onSelectOpportunity={onOpenProject} onTaskUpdate={loadData} organizationId={organizationId} />}
+                        {subView === 'calendar' && <CalendarView tasks={filteredTasks} opportunities={opportunities} onSelectOpportunity={onOpenProject} onTaskUpdate={loadData} organizationId={organizationId} />}
                         {subView === 'workload' && <WorkloadView tasks={filteredTasks} members={members} organizationId={organizationId} />}
                     </div>
                 )}

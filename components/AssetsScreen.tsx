@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
     Activity, Zap, ShieldCheck, AlertTriangle, 
-    Globe, Cpu, Gauge, RefreshCw, Loader2
+    Globe, Cpu, Gauge, RefreshCw, Loader2, HardDrive
 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 
@@ -25,152 +25,83 @@ export const AssetsScreen: React.FC<Props> = ({ organizationId }) => {
 
     const loadData = async () => {
         setLoading(true);
-        // Simulação de carregamento de métricas APM
         await new Promise(resolve => setTimeout(resolve, 800));
         setLoading(false);
     };
 
     useEffect(() => { loadData(); }, [organizationId]);
 
-    const MonitoringDashboard = () => (
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            {/* Real-time Health Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="glass-panel p-8 rounded-[2rem] border-emerald-500/20 bg-emerald-500/5 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-4 opacity-20"><Globe className="w-12 h-12 text-emerald-500"/></div>
-                    <div className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-4">Disponibilidade</div>
-                    <div className="text-4xl font-black text-white leading-none">99.98%</div>
-                    <div className="text-[9px] font-bold text-slate-500 uppercase mt-2">Uptime (SLA Mensal)</div>
-                </div>
-
-                <div className="glass-panel p-8 rounded-[2rem] border-amber-500/20 bg-amber-500/5 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-4 opacity-20"><Zap className="w-12 h-12 text-amber-500"/></div>
-                    <div className="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-4">Latência Média</div>
-                    <div className="text-4xl font-black text-white leading-none">164ms</div>
-                    <div className="text-[9px] font-bold text-slate-500 uppercase mt-2">Global Response Time</div>
-                </div>
-
-                <div className="glass-panel p-8 rounded-[2rem] border-blue-500/20 bg-blue-500/5 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-4 opacity-20"><Cpu className="w-12 h-12 text-blue-500"/></div>
-                    <div className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-4">Utilização CPU</div>
-                    <div className="text-4xl font-black text-white leading-none">42.5%</div>
-                    <div className="text-[9px] font-bold text-slate-500 uppercase mt-2">Cluster Infra Autoscale</div>
-                </div>
-
-                <div className="glass-panel p-8 rounded-[2rem] border-red-500/20 bg-red-500/5 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-4 opacity-20"><AlertTriangle className="w-12 h-12 text-red-500"/></div>
-                    <div className="text-[10px] font-black text-red-500 uppercase tracking-widest mb-4">Taxa de Erro</div>
-                    <div className="text-4xl font-black text-white leading-none">0.02%</div>
-                    <div className="text-[9px] font-bold text-slate-500 uppercase mt-2">Exceções Críticas</div>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* APM Performance Chart */}
-                <div className="lg:col-span-2 glass-panel p-10 rounded-[3rem] border-white/5 bg-black/20 min-h-[450px] flex flex-col">
-                    <div className="flex justify-between items-center mb-10">
-                        <div>
-                            <h3 className="text-2xl font-black text-white tracking-tighter">Performance de Resposta (APM)</h3>
-                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Análise granulada por endpoint</p>
-                        </div>
-                        <div className="px-4 py-2 bg-white/5 rounded-xl border border-white/5 text-[9px] font-black uppercase text-amber-500">Live Stream</div>
-                    </div>
-                    <div className="flex-1 min-h-[300px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={APM_MOCK_DATA}>
-                                <defs>
-                                    <linearGradient id="latencyGrad" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.3}/>
-                                        <stop offset="95%" stopColor="#F59E0B" stopOpacity={0}/>
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ffffff05" />
-                                <XAxis dataKey="time" tick={{fontSize: 10, fill: '#64748b'}} axisLine={false} tickLine={false} />
-                                <YAxis tick={{fontSize: 10, fill: '#64748b'}} axisLine={false} tickLine={false} />
-                                <Tooltip contentStyle={{backgroundColor: '#0A0A0C', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px'}} />
-                                <Area type="monotone" dataKey="latency" name="Latência (ms)" stroke="#F59E0B" strokeWidth={3} fill="url(#latencyGrad)" />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-
-                {/* SaaS Metrics Side */}
-                <div className="space-y-6">
-                    <div className="glass-panel p-8 rounded-[2.5rem] bg-gradient-to-br from-white/[0.03] to-transparent border-white/5">
-                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
-                             <ShieldCheck className="w-4 h-4 text-amber-500"/> Segurança & Compliance
-                        </h4>
-                        <div className="space-y-4">
-                            <div className="flex justify-between items-center p-4 bg-black/40 rounded-2xl border border-white/5">
-                                <span className="text-xs font-bold text-slate-300">ISO 27001 Status</span>
-                                <span className="text-[9px] font-black text-emerald-500 uppercase">Compliant</span>
-                            </div>
-                            <div className="flex justify-between items-center p-4 bg-black/40 rounded-2xl border border-white/5">
-                                <span className="text-xs font-bold text-slate-300">WAF Alertas (24h)</span>
-                                <span className="text-[9px] font-black text-white uppercase">0 Detectados</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="glass-panel p-8 rounded-[2.5rem] bg-white/[0.02] border-white/5">
-                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
-                             <Gauge className="w-4 h-4 text-blue-500"/> Business KPIs (SaaS)
-                        </h4>
-                        <div className="space-y-6">
-                            <div>
-                                <div className="flex justify-between text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-widest">
-                                    <span>Quota de API Mensal</span>
-                                    <span className="text-white">82%</span>
-                                </div>
-                                <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-                                    <div className="h-full bg-blue-500 shadow-glow-blue" style={{width: '82%'}}></div>
-                                </div>
-                            </div>
-                            <div>
-                                <div className="flex justify-between text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-widest">
-                                    <span>Health Score Global</span>
-                                    <span className="text-emerald-500">EXCELENTE</span>
-                                </div>
-                                <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-                                    <div className="h-full bg-emerald-500 shadow-glow-emerald" style={{width: '95%'}}></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-
     return (
-        <div className="min-h-full flex flex-col p-8 md:p-12 space-y-12 animate-in fade-in duration-700">
-            {/* Header Performance */}
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-8">
-                <div>
-                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full text-[9px] font-black text-amber-600 dark:text-amber-500 uppercase tracking-widest mb-4">
-                        <Activity className="w-3 h-3"/> Central de Monitoramento
+        <div className="h-full flex flex-col bg-white dark:bg-[#020203] overflow-y-auto custom-scrollbar">
+            {/* Nubank-Style Header */}
+            <header className="bg-[#F59E0B] -mx-4 md:-mx-12 px-8 pt-10 pb-8 md:px-12 md:pt-14 md:pb-12 mb-8 rounded-b-[3.5rem] shadow-xl relative z-50">
+                <div className="max-w-7xl mx-auto flex flex-col gap-8">
+                    <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center border border-white/10">
+                                <HardDrive className="w-5 h-5 text-white" />
+                            </div>
+                            <h2 className="text-xl font-black text-white uppercase tracking-tight">Ativos.</h2>
+                        </div>
+                        <button onClick={loadData} className="p-3 bg-white/20 rounded-2xl hover:bg-white/30 text-white transition-all border border-white/10 group">
+                            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+                        </button>
                     </div>
-                    <h1 className="text-5xl md:text-6xl font-black text-slate-900 dark:text-white leading-none tracking-tighter">
-                        Dashboard de <span className="text-amber-500">Performance</span>.
-                    </h1>
-                    <p className="text-slate-500 font-bold uppercase tracking-[0.2em] text-[10px] mt-4">Monitoramento APM e Métricas de Negócio em Tempo Real</p>
+                    
+                    <div className="space-y-1">
+                        <h2 className="text-2xl md:text-3xl font-black tracking-tighter text-white">
+                            Monitoramento de Performance
+                        </h2>
+                        <p className="text-[10px] font-black text-white/60 uppercase tracking-[0.3em]">Cofre de Assets e Saúde Cloud</p>
+                    </div>
                 </div>
-                
-                <div className="flex gap-4 w-full lg:w-auto">
-                    <button onClick={loadData} className="p-4 bg-white dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm hover:border-amber-500/30 transition-all group">
-                        <RefreshCw className={`w-5 h-5 text-slate-400 group-hover:text-amber-500 ${loading ? 'animate-spin' : ''}`}/>
-                    </button>
-                </div>
-            </div>
+            </header>
 
-            {loading ? (
-                <div className="flex-1 flex flex-col items-center justify-center py-20 gap-4 text-slate-400">
-                    <Loader2 className="w-12 h-12 animate-spin text-amber-500"/>
-                    <span className="text-[10px] font-black uppercase tracking-[0.3em]">Coletando Métricas de Infraestrutura...</span>
-                </div>
-            ) : (
-                <MonitoringDashboard />
-            )}
+            <div className="flex-1 max-w-7xl mx-auto w-full px-4 md:px-0 space-y-12 pb-40">
+                {loading ? (
+                    <div className="py-40 flex flex-col items-center justify-center gap-4 text-slate-400">
+                        <Loader2 className="w-12 h-12 animate-spin text-amber-500"/>
+                        <span className="text-[10px] font-black uppercase tracking-[0.3em]">Coletando Métricas de Infraestrutura...</span>
+                    </div>
+                ) : (
+                    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                        {/* Health Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            <div className="bg-emerald-50 dark:bg-emerald-500/5 p-8 rounded-[2rem] border border-emerald-100 dark:border-emerald-500/20 relative overflow-hidden group">
+                                <div className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-4">Uptime</div>
+                                <div className="text-4xl font-black text-emerald-700 dark:text-white leading-none">99.9%</div>
+                            </div>
+                            <div className="bg-amber-50 dark:bg-amber-500/5 p-8 rounded-[2rem] border border-amber-100 dark:border-amber-500/20 relative overflow-hidden group">
+                                <div className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-4">Latência</div>
+                                <div className="text-4xl font-black text-amber-700 dark:text-white leading-none">164ms</div>
+                            </div>
+                            <div className="bg-blue-50 dark:bg-blue-500/5 p-8 rounded-[2rem] border border-blue-100 dark:border-blue-500/20 relative overflow-hidden group">
+                                <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-4">Cloud CPU</div>
+                                <div className="text-4xl font-black text-blue-700 dark:text-white leading-none">42%</div>
+                            </div>
+                            <div className="bg-slate-50 dark:bg-white/5 p-8 rounded-[2rem] border border-slate-200 dark:border-white/10 relative overflow-hidden group">
+                                <div className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-4">SLA</div>
+                                <div className="text-4xl font-black text-slate-700 dark:text-white leading-none">Elite</div>
+                            </div>
+                        </div>
+
+                        {/* Chart Area */}
+                        <div className="bg-white dark:bg-white/[0.02] border border-slate-100 dark:border-white/5 p-8 md:p-10 rounded-[3rem] shadow-soft">
+                             <div className="h-80 w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={APM_MOCK_DATA}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ffffff05" />
+                                        <XAxis dataKey="time" tick={{fontSize: 10, fill: '#94a3b8'}} axisLine={false} tickLine={false} />
+                                        <YAxis tick={{fontSize: 10, fill: '#94a3b8'}} axisLine={false} tickLine={false} />
+                                        <Tooltip />
+                                        <Area type="monotone" dataKey="latency" stroke="#F59E0B" fill="#F59E0B" fillOpacity={0.1} strokeWidth={3} />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                             </div>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

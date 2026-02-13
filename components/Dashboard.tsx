@@ -6,7 +6,8 @@ import {
     Zap, Target, Sparkles, Trophy, DollarSign,
     Lock, Search, ArrowUpRight, Eye, HelpCircle, UserPlus, 
     ChevronRight, Briefcase, BarChart3, TrendingUp, AlertCircle,
-    Plus, PlayCircle, Layers, CreditCard, Settings, EyeOff
+    Plus, PlayCircle, Layers, CreditCard, Settings, EyeOff,
+    CalendarDays, User
 } from 'lucide-react';
 import { getOperationalRates } from '../services/financialService';
 
@@ -45,13 +46,13 @@ export const Dashboard: React.FC<Props> = ({
         return { totalMrr, activeCount, validationCount };
     }, [opportunities]);
 
-    const ActionButton = ({ icon: Icon, label, onClick }: any) => (
+    const ActionButton = ({ icon: Icon, label, onClick, color = "text-slate-900 dark:text-white" }: any) => (
         <div className="flex flex-col items-center gap-2 min-w-[80px] group">
             <button 
                 onClick={onClick}
                 className="w-14 h-14 rounded-full bg-slate-100 dark:bg-white/5 flex items-center justify-center transition-all duration-200 active:scale-90 border border-transparent hover:bg-slate-200 dark:hover:bg-white/10"
             >
-                <Icon className="w-5 h-5 text-slate-900 dark:text-white" />
+                <Icon className={`w-5 h-5 ${color}`} />
             </button>
             <span className="text-[10px] font-bold text-slate-700 dark:text-slate-400 text-center tracking-tight">{label}</span>
         </div>
@@ -101,9 +102,9 @@ export const Dashboard: React.FC<Props> = ({
     return (
         <div className="flex flex-col min-h-screen bg-white dark:bg-[#020203] pb-32">
             
-            {/* Nubank-Style Balanced Header - Full Width Background */}
-            <div className="bg-[#F59E0B] px-6 pt-10 pb-8 md:px-12 md:pt-14 md:pb-12 transition-all">
-                <div className="max-w-7xl mx-auto flex flex-col gap-8">
+            {/* Unidade Nubank-Style Header */}
+            <div className="bg-[#F59E0B] -mx-4 md:-mx-12 px-8 pt-10 pb-8 md:px-12 md:pt-14 md:pb-12 mb-8 rounded-b-[3.5rem] shadow-xl relative z-50">
+                <div className="max-w-7xl mx-auto flex flex-col gap-10">
                     <div className="flex justify-between items-center">
                         <div 
                             className="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center overflow-hidden cursor-pointer hover:bg-white/30 transition-all border border-white/10"
@@ -112,29 +113,29 @@ export const Dashboard: React.FC<Props> = ({
                             {userData?.avatar ? (
                                 <img src={userData.avatar} className="w-full h-full object-cover" />
                             ) : (
-                                <UserPlus className="w-5 h-5 text-white" />
+                                <User className="w-5 h-5 text-white" />
                             )}
                         </div>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-2">
                             <button 
                                 onClick={() => setShowValues(!showValues)}
-                                className="p-3 rounded-full hover:bg-white/10 text-white transition-all"
+                                className="p-3 bg-white/10 rounded-full hover:bg-white/20 text-white transition-all border border-white/10"
                             >
                                 {showValues ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
                             </button>
-                            <button className="p-3 rounded-full hover:bg-white/10 text-white transition-all">
+                            <button className="p-3 bg-white/10 rounded-full hover:bg-white/20 text-white transition-all border border-white/10">
                                 <HelpCircle className="w-5 h-5" />
                             </button>
                             <button 
                                 onClick={() => onNavigate('settings')}
-                                className="p-3 rounded-full hover:bg-white/10 text-white transition-all"
+                                className="p-3 bg-white/10 rounded-full hover:bg-white/20 text-white transition-all border border-white/10"
                             >
-                                <Settings className="w-4 h-4" />
+                                <Settings className="w-5 h-5" />
                             </button>
                         </div>
                     </div>
                     
-                    <h2 className="text-xl md:text-2xl font-bold tracking-tight text-white">
+                    <h2 className="text-2xl md:text-3xl font-black tracking-tighter text-white">
                         Olá, {firstName}
                     </h2>
                 </div>
@@ -157,6 +158,7 @@ export const Dashboard: React.FC<Props> = ({
                 <div className="px-6 py-6 overflow-hidden">
                     <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
                         <ActionButton icon={Plus} label="Novo Ativo" onClick={onOpenCreate} />
+                        <ActionButton icon={CalendarDays} label="Agenda" onClick={() => onNavigate('agenda')} color="text-amber-500" />
                         <ActionButton icon={CreditCard} label="Financeiro" onClick={() => onNavigate('financial')} />
                         <ActionButton icon={TrendingUp} label="Insights" onClick={() => onNavigate('intelligence')} />
                     </div>
@@ -174,7 +176,7 @@ export const Dashboard: React.FC<Props> = ({
                     </button>
                 </div>
 
-                {/* Insight Carousel - Interactive Implementation with Deeper Shadows */}
+                {/* Insight Carousel */}
                 <div className="px-6 overflow-hidden">
                     <div className="flex gap-6 overflow-x-auto no-scrollbar pb-10 pt-2 -mx-2 px-2">
                         <InsightCard 
